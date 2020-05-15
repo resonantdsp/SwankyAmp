@@ -1,0 +1,47 @@
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2019
+
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ResonantAmp - Standalone Plugin", "ResonantAmp_StandalonePlugin.vcxproj", "{09E9C180-CFB5-85DF-3F44-A08333E2B2A9}"
+	ProjectSection(ProjectDependencies) = postProject
+		{1FBB46B9-AB44-EC18-B8BD-F3AA524DD27C} = {1FBB46B9-AB44-EC18-B8BD-F3AA524DD27C}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ResonantAmp - VST3", "ResonantAmp_VST3.vcxproj", "{88210271-55F7-985E-C559-6002F5942DF2}"
+	ProjectSection(ProjectDependencies) = postProject
+		{1FBB46B9-AB44-EC18-B8BD-F3AA524DD27C} = {1FBB46B9-AB44-EC18-B8BD-F3AA524DD27C}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ResonantAmp - AAX", "ResonantAmp_AAX.vcxproj", "{F03727D4-6AC3-3AFB-03A4-6AE5A9731393}"
+	ProjectSection(ProjectDependencies) = postProject
+		{1FBB46B9-AB44-EC18-B8BD-F3AA524DD27C} = {1FBB46B9-AB44-EC18-B8BD-F3AA524DD27C}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ResonantAmp - Shared Code", "ResonantAmp_SharedCode.vcxproj", "{1FBB46B9-AB44-EC18-B8BD-F3AA524DD27C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{88210271-55F7-985E-C559-6002F5942DF2}.Debug|x64.ActiveCfg = Debug|x64
+		{88210271-55F7-985E-C559-6002F5942DF2}.Debug|x64.Build.0 = Debug|x64
+		{88210271-55F7-985E-C559-6002F5942DF2}.Release|x64.ActiveCfg = Release|x64
+		{88210271-55F7-985E-C559-6002F5942DF2}.Release|x64.Build.0 = Release|x64
+		{F03727D4-6AC3-3AFB-03A4-6AE5A9731393}.Debug|x64.ActiveCfg = Debug|x64
+		{F03727D4-6AC3-3AFB-03A4-6AE5A9731393}.Debug|x64.Build.0 = Debug|x64
+		{F03727D4-6AC3-3AFB-03A4-6AE5A9731393}.Release|x64.ActiveCfg = Release|x64
+		{F03727D4-6AC3-3AFB-03A4-6AE5A9731393}.Release|x64.Build.0 = Release|x64
+		{09E9C180-CFB5-85DF-3F44-A08333E2B2A9}.Debug|x64.ActiveCfg = Debug|x64
+		{09E9C180-CFB5-85DF-3F44-A08333E2B2A9}.Debug|x64.Build.0 = Debug|x64
+		{09E9C180-CFB5-85DF-3F44-A08333E2B2A9}.Release|x64.ActiveCfg = Release|x64
+		{09E9C180-CFB5-85DF-3F44-A08333E2B2A9}.Release|x64.Build.0 = Release|x64
+		{1FBB46B9-AB44-EC18-B8BD-F3AA524DD27C}.Debug|x64.ActiveCfg = Debug|x64
+		{1FBB46B9-AB44-EC18-B8BD-F3AA524DD27C}.Debug|x64.Build.0 = Debug|x64
+		{1FBB46B9-AB44-EC18-B8BD-F3AA524DD27C}.Release|x64.ActiveCfg = Release|x64
+		{1FBB46B9-AB44-EC18-B8BD-F3AA524DD27C}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
