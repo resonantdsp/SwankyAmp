@@ -4514,10 +4514,10 @@
     <ClInclude Include="..\..\JuceLibraryCode\JuceHeader.h">
       <Filter>JUCE Library Code</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\LevelMeter.h">
+    <ClInclude Include="..\..\Source\AmpMono.h">
       <Filter>ResonantAmp\Source</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\AmpMono.h">
+    <ClInclude Include="..\..\Source\LevelMeter.h">
       <Filter>ResonantAmp\Source</Filter>
     </ClInclude>
   </ItemGroup>
