@@ -16,15 +16,6 @@
 
 import("stdfaust.lib");
 
-// API conventions:
-//
-// The `nentry` function is used by faust to construct a UI. But in this case 
-// it is used to track which parameters should be exposed to the plugin.
-// Variables aassigned from `nentry` get setters in the standalone header file.
-//
-// Assume the parameters will be given in the range (-1, +1), and scale them
-// here to the appropriate value.
-
 tone_stack = tone_stack
 with {
     // User inputs, note that these are "controls" which have different impacts

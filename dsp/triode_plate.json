@@ -1,0 +1,15 @@
+{
+	"triode_plate_power": 0.0,
+	"triode_plate_bias": -0.11201978417212398,
+	"triode_plate_scale": -0.5523370312163359,
+	"triode_plate_corner": -0.3222958265203334,
+	"triode_plate_clip": 0.7278736254309612,
+	"triode_plate_level": 65.67378688463752,
+	"triode_plate_tau": 65.79678688463753,
+	"triode_plate_ratio": 61.17378688463752,
+	"triode_plate_level_b": -0.09430009502745527,
+	"triode_plate_tau_b": -0.43115487808510305,
+	"triode_plate_ratio_b": 0.8422808068383776,
+	"triode_plate_scale_b": -0.33189846151826113,
+	"triode_plate_smooth_b": -3.580169756304611
+}

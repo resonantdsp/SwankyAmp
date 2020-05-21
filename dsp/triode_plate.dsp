@@ -26,52 +26,13 @@ import("common.dsp");
 // Assume the parameters will be given in the range (-1, +1), and scale them
 // here to the appropriate value.
 
-triode_grid = triode_grid
-with {
-    // High pass frequency for the signal coming into the tridoe, this is the 
-    // result of the capacitor after the input signal and also means we don't
-    // have to worry about signal biases. This has an audible impact on the
-    // signal and can be used to shape it into the desired tone.
-    hp_freq = nentry("triode_hp_freq", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+2)) : exp;
-    
-    // Observed a soft compression on the upper portion of the signal before 
-    // grid conduction regime. This is well modelled by `cap_comp`. Suspect
-    // this is the result of some capacitance between grid and plate?
-    grid_tau = nentry("triode_grid_tau", 0, -1, +1, .1) : uscale(log(1e-6), log(1e-3)) : exp;
-    grid_ratio = nentry("triode_grid_ratio", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+4)) : exp;
-    grid_smooth = nentry("triode_grid_smooth", 0, -1, +1, .1) : uscale(log(1e-5), log(1e+1)) : exp;
-    grid_level = nentry("triode_grid_level", 0, -1, +1, .1) : uscale(-5, +5);
-    
-    // This is mean to emulate grid conduction regime. The level is higher 
-    // than the previous compression and the time scale is shorter, this is a
-    // more pronounced effect. It is well modelled by `cap_comp` though its
-    // not obvious to me why that should be.
-    clip_tau = nentry("triode_clip_tau", 0, -1, +1, .1) : uscale(log(1e-8), log(1e-4)) : exp;
-    clip_ratio = nentry("triode_clip_ratio", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+4)) : exp;
-    clip_smooth = nentry("triode_clip_smooth", 0, -1, +1, .1) : uscale(log(1e-5), log(1e+1)) : exp;
-    clip_level = nentry("triode_clip_level", 0, -1, +1, .1) : uscale(1, 3);
-    
-    // Convert to `cap_comp` parameters
-    grid_tau1 = grid_tau : 1.0 / (ba.sec2samp(_) + 1);
-    grid_tau2 = grid_tau * grid_ratio : 1.0 / (ba.sec2samp(_) + 1);
-    grid_tau3 = grid_tau * grid_smooth : 1.0 / (ba.sec2samp(_) + 1);
-    
-    clip_tau1 = clip_tau : 1.0 / (ba.sec2samp(_) + 1);
-    clip_tau2 = clip_tau * clip_ratio : 1.0 / (ba.sec2samp(_) + 1);
-    clip_tau3 = clip_tau * clip_smooth : 1.0 / (ba.sec2samp(_) + 1);
-
-    triode_grid = _ 
-        : fi.highpass(1, hp_freq) 
-        : cap_comp(grid_level, grid_tau1, grid_tau2, grid_tau3)
-        : cap_comp(clip_level, clip_tau1, clip_tau2, clip_tau3)
-        : _;
-};
-
 triode_plate = environment {
     // Plate bias
     bias = nentry("triode_plate_bias", 0, -1, +1, .1) : uscale(0, +20);
     // Plate power (typically 1.5)
-    power = nentry("triode_plate_power", 0, -1, +1, .1) : uscale(0.5, 2.5);
+    power = nentry("triode_plate_power", 0, -1, +1, .1) : uscale(1.0, 2.0);
+
+    scale = nentry("triode_plate_scale", 0, -1, +1, .1) : uscale(0, 100);
 
     // the level where to start compressing the signal leading to the lower clip
     corner = nentry("triode_plate_corner", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+3)) : exp;
@@ -97,17 +58,20 @@ triode_plate = environment {
     tau1_b = tau_b : 1.0 / (ba.sec2samp(_) + 1);
     tau2_b = tau_b * ratio_b : 1.0 / (ba.sec2samp(_) + 1);
 
-    mixab(m, a, b) = m * a + (1 - m) * b;
+    // NOTE: the parameter values were estimated using a signal that has the
+    // bias, but here the bias is removed after the power clip. So need to
+    // remove it also from the parameters, accouting for phase inversion also
+    clip_unscaled = clip + bias^power;
+    level_unscaled = level + bias^power;
+    level_b_unscaled = level_b + bias^power;
 
-    // NOTE: the parameters are fit w.r.t. to the bias value, but it is
-    // subtracted in the signal, the +bias^power is added to remove it from
-    // the parameters
+    mix_wet_dry(m, a, b) = m * a + (1 - m) * b;
 
     full = _ 
         // Loss of float precision happens for small signal when subtracting
         // bias, so instead for small signal use a taylor series approximation
         // of the power clip which doesn't require the offset.
-        <: mixab(
+        <: mix_wet_dry(
             // When the signal is less than 5% of bias, use approximation, and
             // between 5 and 15% interpolate to full power clip
             max(0, min(1, abs(_) / (bias * 0.1) - 0.05 )),
@@ -118,39 +82,30 @@ triode_plate = environment {
             // Taylor series of the power clip with bias already removed
             bias^(power - 1) * power * _ 
         )
-        : *(-1)
-
-        // The power clipping is not continuous, smoothen it
-        : soft_clip_down(corner, (clip + bias^power))
 
         // Compress the signal above level, not sure if this is a tube effect
         // or maybe related to voltage changes on the plate.
-        <: _, max(0, _ - (level + bias^power))
+        <: _, max(0, _ - level_unscaled)
         : _, calc_charge(tau1, tau2)
         : -
 
+        : *(-1)
+
+        // There is some additional clipping at the bottom of the the waveform
+        : soft_clip_down(corner, clip_unscaled)
+
         // Noticed a clip level that drifts and found the drift can be modelled
-        // by the same sort of capacitive compression mechanism.
-        <: max(0, _ - (level_b + bias^power)), _
-        : calc_charge(tau1_b, tau2_b) * scale_b + (level_b + bias^power), _
+        // by calculating a capacitive-like charging and discharging.
+        <: max(0, _ - level_b_unscaled), _
+        : calc_charge(tau1_b, tau2_b) * scale_b + (level_b_unscaled), _
         : soft_clip_up(smooth_b)
 
         // Remove scaling imparted by power law so that the output is just the
         // distortion on the signal, no additional scaling
         : /( bias^(power-1) ) 
 
-        : _;
+        // Apply the scale observed in the circuit
+        : *(scale)
 
-    // Simplified version just runs the signal throughh the power law, and
-    // softens the clipping happening at zero.
-    simplified = _ 
-        <: mixab(
-            max(0, min(1, abs(_) / (bias * 0.1) - 0.05 )),
-            _ : power_clip(power, bias) : -(bias^power), 
-            bias^(power - 1) * power * _ 
-        )
-        : *(-1)
-        : soft_clip_down(corner, (clip + bias^power))
-        : /( bias^(power-1) ) 
         : _;
 };

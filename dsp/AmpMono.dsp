@@ -15,7 +15,7 @@
 //  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import("stdfaust.lib");
-import("pushpull.dsp");
+import("push_pull.dsp");
 
 // API conventions:
 //
@@ -40,6 +40,8 @@ output_level = nentry("output_level", 0, -1, +1, .1) : uscale(-35, +35) : ba.db2
 
 process = _
     : *(input_level)
-    : pushpull
+    : push_pull
     : *(output_level)
+    // Drive correction increases the volume, correct for that
+    : *(ba.db2linear(-12.0))
     : _;

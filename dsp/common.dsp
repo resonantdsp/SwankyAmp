@@ -16,9 +16,6 @@
 
 import("stdfaust.lib");
 
-// Transform a value in the range (-inf, +inf) to (-1, +1)
-nscale(vmin, vmax) = ma.tanh : +(1) : /(2) : *(vmax - vmin) : +(vmin);
-
 // Linear transformation of a value such that its range [-1, +1] maps to the
 // range [vmin, vmax]
 uscale(vmin, vmax) = +(1) : /(2) : *(vmax - vmin) : +(vmin);
@@ -26,7 +23,7 @@ uscale(vmin, vmax) = +(1) : /(2) : *(vmax - vmin) : +(vmin);
 // Build up a charge when a signal is greater than the current charge, and
 // decay that charge otherwise. Versatile for modelling effects wherein some
 // bias is drifting, as this is often related to some effective capcitance
-// somewhere charging and discharging.
+// charging and discharging.
 calc_charge(tau1, tau2, s) = c
 letrec {
     'c = c + tau1 * max(0, s - c) -tau2 * c;
@@ -40,9 +37,8 @@ cap_comp(level, tau1, tau2, tau3) = _
     : -
     : _;
 
-// Apply soft clipping (tanh) to the portion of a signal above `level`. The
-// `scale` determines over what range the signal is being compressed as it
-// reaches `level`. The output signal will not exceed `level`.
+// Apply soft clipping (tanh) to the portion of a signal between `scale` and
+// `level`. The signal won't exceed `level`.
 soft_clip_up(scale, level) = _ 
     : -(level - scale)
     <: min(0), max(0)
@@ -51,7 +47,7 @@ soft_clip_up(scale, level) = _
     : +(level - scale)
     : _;
 
-// Like `soft_clip_up` but applies to the portion of a signal below `level`.
+// Like `soft_clip_up` but applies to the portion of a signal below `scale`.
 // It is possible to acheive the same effect by reversing the polarity of a
 // signal and using `soft_clip_up` but this is provided as a convenience.
 soft_clip_down(scale, level) = _ 

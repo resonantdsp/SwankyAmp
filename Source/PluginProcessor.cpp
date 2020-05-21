@@ -53,7 +53,7 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 			MAKE_PARAMETER_UNIT(TsMid),
 			MAKE_PARAMETER_UNIT(TsHigh),
 
-			MAKE_PARAMETER(GainStages, 1.0f, 4.0f, 2.0f),
+			MAKE_PARAMETER(GainStages, 1.0f, 4.0f, 1.0f),
 			MAKE_PARAMETER_UNIT(GainSlope),
 
 			MAKE_PARAMETER_UNIT(LowCut),
@@ -107,8 +107,13 @@ void ResonantAmpAudioProcessor::removeMeterListener(LevelMeter::Listener& listen
 	meterListeners.remove(&listener);
 }
 
-float remap_unit(float unit, float lower, float upper) {
-	return (unit + 1.0f) / 2.0f * (upper - lower) + lower;
+float remap_unit(float unit, float to_low, float to_high) {
+	if (unit >= 0) {
+		return unit * to_high;
+	}
+	else {
+		return -unit * to_low;
+	}
 }
 
 // set the amp object user parameters from the VTS values
@@ -127,20 +132,23 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 		amp_channel[i].set_gain_slope(*parGainSlope);
 		amp_channel[i].set_cab_mix(*parCabMix);
 
-		amp_channel[i].set_triode_hp_freq(remap_unit(*parLowCut, -1, 0.75)); 
-		amp_channel[i].set_tetrode_hp_freq(remap_unit(*parLowCut, -1, 0.75)); 
+		amp_channel[i].set_triode_hp_freq(remap_unit(*parLowCut, -1.0f, +0.75f)); 
+		amp_channel[i].set_tetrode_hp_freq(remap_unit(*parLowCut, -1.0f, +0.75f)); 
 
-		amp_channel[i].set_triode_grid_tau(remap_unit(*parTriodeDistort * -1, -1.0, 0));
-		amp_channel[i].set_triode_grid_ratio(remap_unit(*parTriodeDynamic, -2, 0));
+		amp_channel[i].set_triode_grid_tau(remap_unit(*parTriodeDynamic, -0.5f, +0.25f));
+		amp_channel[i].set_triode_grid_ratio(remap_unit(*parTriodeDynamic, -1.0f, +0.15f));
+		amp_channel[i].set_triode_plate_bias(remap_unit(*parTriodeDynamic, -0.1f, +0.1f));
+		amp_channel[i].set_triode_plate_ratio_b(remap_unit(*parTriodeDynamic, -1.0f, +1.0f));
 
-		amp_channel[i].set_triode_plate_power(remap_unit(*parTriodeDistort * -1, 0, 0.5));
-		amp_channel[i].set_triode_plate_corner(remap_unit(*parTriodeDynamic, 0, 0.1));
+		amp_channel[i].set_triode_plate_power(remap_unit(*parTriodeDistort, -0.5f, +0.25f));
+		amp_channel[i].set_triode_plate_level_b(remap_unit(*parTriodeDistort * -1.0f, -1.0f, +0.0f));
+		amp_channel[i].set_triode_plate_tau_b(remap_unit(*parTriodeDistort, -0.5f, +0.5f));
 
-		amp_channel[i].set_tetrode_grid_tau(remap_unit(*parTetrodeDistort, -2, 0));
-		amp_channel[i].set_tetrode_grid_ratio(remap_unit(*parTetrodeDistort, -2, 0));
+		amp_channel[i].set_tetrode_grid_taus(remap_unit(*parTetrodeDynamic, -0.7f, +1.0f));
+		amp_channel[i].set_tetrode_grid_ratio(remap_unit(*parTetrodeDynamic, -1.0f, +1.0f));
 
-		amp_channel[i].set_tetrode_plate_ratio(remap_unit(*parTetrodeDynamic, 0, 0.5));
-		amp_channel[i].set_tetrode_plate_smooth(remap_unit(*parTetrodeDistort * -1, 0, 2));
+		amp_channel[i].set_tetrode_plate_clip(remap_unit(*parTetrodeDistort * -1.0f, -0.1f, +1.0f));
+		amp_channel[i].set_tetrode_plate_ratio(remap_unit(*parTetrodeDistort, 0.0f, +0.15f));
 	}
 }
 
