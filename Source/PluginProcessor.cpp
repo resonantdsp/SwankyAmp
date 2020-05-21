@@ -124,9 +124,9 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 		amp_channel[i].set_pre_drive(*parPreDrive);
 		amp_channel[i].set_power_drive(*parPowerDrive);
 
-		amp_channel[i].set_ts_low(*parTsLow);
-		amp_channel[i].set_ts_mid(*parTsMid);
-		amp_channel[i].set_ts_high(*parTsHigh);
+		amp_channel[i].set_ts_low(*parTsLow * 1.5);
+		amp_channel[i].set_ts_mid(*parTsMid * 1.5);
+		amp_channel[i].set_ts_high(*parTsHigh * 1.5);
 
 		amp_channel[i].set_gain_stages(*parGainStages);
 		amp_channel[i].set_gain_slope(*parGainSlope);
@@ -148,7 +148,7 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 		amp_channel[i].set_tetrode_grid_ratio(remap_unit(*parTetrodeDynamic, -1.0f, +1.0f));
 
 		amp_channel[i].set_tetrode_plate_clip(remap_unit(*parTetrodeDistort * -1.0f, -0.1f, +1.0f));
-		amp_channel[i].set_tetrode_plate_ratio(remap_unit(*parTetrodeDistort, 0.0f, +0.15f));
+		amp_channel[i].set_tetrode_plate_ratio(remap_unit(*parTetrodeDistort, 0.0f, +0.2f));
 	}
 }
 
