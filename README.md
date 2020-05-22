@@ -6,6 +6,26 @@ The software is currently in alpha and is distributed only as a VST3 for 64-bit 
 
 <https://drive.google.com/open?id=1aOKUJyCAkUSvM0FRaJP6nhsQv2_noSLS>
 
+If you prefer to download the VST3 file directly and move it into the appropriate folder (typically `C:\Program Files\Common Files\VST3`), you can get it here:
+
+<https://drive.google.com/open?id=1BrrAsjQ0f8kNIKv2-GHh7Hjl1CVIRMka>
+
+## Change log
+
+Version 0.0.2:
+
+* The power amplifier model is re-written and is a better representation of the simulation.
+* The perceived volume of the plugin is more invariant to changes in the drive parameters.
+* All model fits have been improved, default parameters should better ressemble the simulated circuits.
+* Parameter ranges have been refined to give better control over the distortion sound.
+* The cabinet mix has been made into a toggle for clarity.
+
+## Road map
+
+* Re-work the tone stack to give greater range
+* Add the ability to save presets
+* Overhaul the UI
+
 ## Usage
 
 Load the plugin into your favorite VST host or DAW (into a mono or stereo track), and have fun!
@@ -28,7 +48,7 @@ The UI is a hot mess at the moment, but here's a rough overview of the functiona
 
 * The `Contour` control adjusts a high pass which removes low end in the pre-amp stage. Increase it for a tighter sound, but too much and you'll notice you're losing lows. Decrease it for a dirty distortion sound as the low end builds up in the pre-amp section and constantly biases the signal into a distorted region.
 
-* The `Cab Mix` control adjusts how much of the signal goes through the cabinet model. This plugin currently uses a fairly simple 4x12 cabinet model. If you prefer to use your own IR cabinet modeller (recommended), then turn this all the way to the left. Anything in between makes for an experimental sound.
+* When the `Cabinet` parameter is active, the amplifier output is fed into a cabinet model. The model emulates a generic 4x12 cabinet with a condesner microphone. If you have a cabinet emulation plugin, it might be best to disable this parameter and feed the output of Resonant Amp into your cabinet emulator.
 
 * The `Pre. ...` controls adjust parameters relating to the pre-amp distortion, while the `Power ...` controls adjust the same parameters but for the power amp.
 
@@ -40,7 +60,7 @@ The UI is a hot mess at the moment, but here's a rough overview of the functiona
 
 ## The model
 
-The model was developed by running finite element method simulations (spice), storing the outputs, developing empirical models using a mix of python and C++, and then fitting the simulation results to those models. That code is very experimental and outside the scope of this repository.
+The model was developed by running finit-difference simulation methods (spice), storing the outputs, developing empirical models using a mix of python and C++, and then fitting the model paramters to the simulation results. That code is very experimental and outside the scope of this repository.
 
 ## Building
 
@@ -55,9 +75,15 @@ This repository includes code to:
 
 ### For Windows
 
-The project is configured assuming the VST3 SDK is found at: `C:\SDKs\VST_SDK\VST3_SDK\`. This can be changed in the VS solution files.
+You will need the following softare to compile the plugin for windows:
 
-* Open the VS solution file at: `Builds/VisualStudio2019/ResonantAmp.sln`
+* Visual Studio 2019
+* The VST3 SDK
+* The JUCE SDK
+
+The project is configured assuming the VST3 SDK is found at: `C:\SDKs\VST_SDK\VST3_SDK\`, and that the JUCE SDK is found at `C:\JUCE\modules`. This can be changed in the VS solution files.
+
+* Open the VS solution file at: `Builds\VisualStudio2019\ResonantAmp.sln`
 * Change the target in VS to the x64 Release.
 * Build the VST3 target.
 * Move the VST3 to your VST3 system directory (usually `C:\Program Files\Common Files\VST3`)
@@ -70,7 +96,7 @@ This hasn't yet been attempted, but in theory it is possible.
 
 * Move into the `package` directory
 * Open the Inno Setup script `setup.iss`
-* Compile the installer, it should be created at `package/ResonantAmp-win64.exe`
+* Compile the installer, it should be created at `package\ResonantAmp-win64.exe`
 
 ### FAUST code
 
