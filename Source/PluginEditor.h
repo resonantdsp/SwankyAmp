@@ -23,6 +23,7 @@
 #include "LevelMeter.h"
 
 typedef AudioProcessorValueTreeState::SliderAttachment SliderAttachment;
+typedef AudioProcessorValueTreeState::ButtonAttachment ButtonAttachment;
 
 // add a slider and label member for a VTS parameter
 #define INSERT_PARAMETER(name) \
@@ -65,7 +66,9 @@ private:
 	INSERT_PARAMETER(GainSlope)
 
 	INSERT_PARAMETER(LowCut)
-	INSERT_PARAMETER(CabMix)
+
+	ToggleButton buttonCabinet;
+	std::unique_ptr<ButtonAttachment> attCabinet;
 
 	INSERT_PARAMETER(TriodeDynamic)
 	INSERT_PARAMETER(TriodeDistort)

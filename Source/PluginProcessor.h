@@ -53,7 +53,7 @@ public:
 	std::atomic<float>* parGainSlope = nullptr;
 
 	std::atomic<float>* parLowCut = nullptr;
-	std::atomic<float>* parCabMix = nullptr;
+	std::atomic<float>* parCabinet = nullptr;
 
 	std::atomic<float>* parTriodeDynamic = nullptr;
 	std::atomic<float>* parTriodeDistort = nullptr;

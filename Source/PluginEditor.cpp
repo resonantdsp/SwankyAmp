@@ -56,7 +56,10 @@ ResonantAmpAudioProcessorEditor::ResonantAmpAudioProcessorEditor(
 	INIT_PARAMETER(GainSlope, "Gain Slope")
 
 	INIT_PARAMETER(LowCut, "Contour")
-	INIT_PARAMETER(CabMix, "Cab Mix")
+
+	buttonCabinet.setButtonText("Cabinet");
+	addAndMakeVisible(buttonCabinet);
+	attCabinet.reset(new ButtonAttachment(valueTreeState, "idCabinet", buttonCabinet));
 
 	INIT_PARAMETER(TriodeDynamic, "Pre Dyn.")
 	INIT_PARAMETER(TriodeDistort, "Pre Dist.")
@@ -120,7 +123,7 @@ void ResonantAmpAudioProcessorEditor::resized()
 	LAYOUT_GRID(GainSlope, 1, 2)
 
 	LAYOUT_GRID(LowCut, 2, 2)
-	LAYOUT_GRID(CabMix, 3, 2)
+	buttonCabinet.setBounds(inset + 3 * (knobSize + knobPad), inset + 2 * (knobSize + labelSize + knobPad), knobSize, knobSize);
 
 	LAYOUT_GRID(TriodeDynamic, 0, 3)
 	LAYOUT_GRID(TriodeDistort, 1, 3)

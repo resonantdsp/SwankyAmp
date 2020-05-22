@@ -57,7 +57,7 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 			MAKE_PARAMETER_UNIT(GainSlope),
 
 			MAKE_PARAMETER_UNIT(LowCut),
-			MAKE_PARAMETER(CabMix, 0.0f, 1.0f, 1.0f),
+			std::make_unique<AudioParameterBool>("idCabinet", "Cabinet", true),
 
 			MAKE_PARAMETER_UNIT(TriodeDynamic),
 			MAKE_PARAMETER_UNIT(TriodeDistort),
@@ -80,7 +80,7 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 	ASSIGN_PARAMETER(GainSlope)
 
 	ASSIGN_PARAMETER(LowCut)
-	ASSIGN_PARAMETER(CabMix)
+	ASSIGN_PARAMETER(Cabinet)
 
 	ASSIGN_PARAMETER(TriodeDynamic)
 	ASSIGN_PARAMETER(TriodeDistort)
@@ -130,7 +130,7 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 
 		amp_channel[i].set_gain_stages(*parGainStages);
 		amp_channel[i].set_gain_slope(*parGainSlope);
-		amp_channel[i].set_cab_mix(*parCabMix);
+		amp_channel[i].set_cab_on_off((*parCabinet > 0.5) ? +1.0f : -1.0f);
 
 		amp_channel[i].set_triode_hp_freq(remap_unit(*parLowCut, -1.0f, +0.75f)); 
 		amp_channel[i].set_tetrode_hp_freq(remap_unit(*parLowCut, -1.0f, +0.75f)); 

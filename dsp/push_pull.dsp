@@ -29,7 +29,7 @@ with {
     pre_drive = pre_drive_unit : uscale(log(5e-1), log(5e2)) : exp;
     // Measured the loudness change as a function of the pre drive, this looks
     // up the correction for any drive
-    unscale_pre = ba.listInterp((+4.85e+00,-1.17e+00,-7.12e+00,-1.27e+01,-1.75e+01,-2.02e+01,-2.15e+01,-2.21e+01,-2.26e+01,-2.29e+01,-2.31e+01), (pre_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
+    unscale_pre = ba.listInterp((+4.85e+00,-1.17e+00,-7.12e+00,-1.27e+01,-1.75e+01,-2.02e+01,-2.15e+01,-2.21e+01,-2.26e+01,-2.29e+01,-2.31e+01), (pre_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear; 
 
     power_drive_unit = nentry("power_drive", 0, -1, +1, .1);
     power_drive = power_drive_unit : uscale(log(1e-1), log(2e2)) : exp;
@@ -37,7 +37,7 @@ with {
 
     gain_stages = nentry("gain_stages", 0, -1, +1, .1);
     gain_slope = nentry("gain_slope", 0, -1, +1, .1) : uscale(0.5, 1.5);
-    cab_mix = nentry("cab_mix", 0, -1, +1, .1);
+    cab_on_off = nentry("cab_on_off", 0, -1, +1, .1);
 
     // How much of stages 2/3 to include in the mix
     stage_2_mix = max(0, min(2, gain_stages) - 1);
@@ -89,7 +89,7 @@ with {
         : power_stage
         : *(unscale_power)
 
-        <: cab_mix, cab, _ : mix_wet_dry
+        <: ba.if(cab_on_off > 0, cab, _)
 
         : _;
 };
