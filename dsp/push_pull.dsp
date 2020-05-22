@@ -26,23 +26,23 @@ import("cabinet.dsp");
 push_pull = push_pull
 with {
     pre_drive_unit = nentry("pre_drive", 0, -1, +1, .1);
-    pre_drive = pre_drive_unit : uscale(log(5e-1), log(5e2)) : exp;
+    pre_drive = pre_drive_unit : uscale(log(5e-1), log(2e2)) : exp;
     // Measured the loudness change as a function of the pre drive, this looks
     // up the correction for any drive
-    unscale_pre = ba.listInterp((+4.85e+00,-1.17e+00,-7.12e+00,-1.27e+01,-1.75e+01,-2.02e+01,-2.15e+01,-2.21e+01,-2.26e+01,-2.29e+01,-2.31e+01), (pre_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear; 
+    unscale_pre = ba.listInterp((+1.05e+00,-4.17e+00,-9.37e+00,-1.43e+01,-1.88e+01,-2.23e+01,-2.39e+01,-2.41e+01,-2.38e+01,-2.34e+01,-2.32e+01), (pre_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
 
     power_drive_unit = nentry("power_drive", 0, -1, +1, .1);
-    power_drive = power_drive_unit : uscale(log(1e-1), log(2e2)) : exp;
-    unscale_power = ba.listInterp((+1.90e+01,+1.24e+01,+5.85e+00,-1.58e-01,-5.41e+00,-8.99e+00,-1.04e+01,-1.06e+01,-1.06e+01,-1.05e+01,-1.04e+01), (power_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
+    power_drive = power_drive_unit : uscale(log(1e-1), log(1e2)) : exp;
+    unscale_power = ba.listInterp((+2.28e+01,+1.68e+01,+1.09e+01,+5.09e+00,-3.51e-01,-5.31e+00,-8.76e+00,-1.03e+01,-1.08e+01,-1.08e+01,-1.07e+01), (power_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
 
     gain_stages = nentry("gain_stages", 0, -1, +1, .1);
     gain_slope = nentry("gain_slope", 0, -1, +1, .1) : uscale(0.5, 1.5);
     cab_on_off = nentry("cab_on_off", 0, -1, +1, .1);
 
-    // How much of stages 2/3 to include in the mix
-    stage_2_mix = max(0, min(2, gain_stages) - 1);
-    // How much of stages 4/5 to include in the mix
-    stage_3_mix = max(0, min(3, gain_stages) - 2);
+    // when stages is between 1 and 3, turn that into a mix from 0 to 1
+    stage_2_mix = max(0, min(3, gain_stages) - 1) / 2.0;
+    // likewise for the range 3 to 5
+    stage_3_mix = max(0, min(5, gain_stages) - 3) / 2.0;
 
     gain_stage = _
         : triode_grid 

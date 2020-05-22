@@ -1,14 +1,13 @@
 {
 	"tetrode_plate_power": 0.0,
-	"tetrode_plate_bias": -1.57509508072527,
-	"tetrode_plate_scale": -0.5594135509025624,
-	"tetrode_plate_point": -12.613975133517902,
-	"tetrode_plate_level": -0.5551660331979449,
-	"tetrode_plate_tau": 0.018478604079054654,
-	"tetrode_plate_ratio": 0.3132526979606767,
-	"tetrode_plate_corner": -0.20684712806160116,
-	"tetrode_plate_clip": 0.005307900046903605,
-	"tetrode_plate_level_b": -12.152000613282361,
-	"tetrode_plate_tau_b": 0.4243600180493667,
-	"tetrode_plate_ratio_b": 1903.1637868846378
+	"tetrode_plate_bias": -1.5231230615921252,
+	"tetrode_plate_scale": -0.5469312361627922,
+	"tetrode_plate_point": 0.5188754800000265,
+	"tetrode_plate_level": -0.5337839978011261,
+	"tetrode_plate_tau": 0.018050512893268277,
+	"tetrode_plate_ratio": 0.29309714276314836,
+	"tetrode_plate_corner": 0.026991447958634642,
+	"tetrode_plate_clip": 0.09287699066981095,
+	"tetrode_plate_corner_b": 0.38927493858141066,
+	"tetrode_plate_hp": -0.09838880452865748
 }

@@ -12,6 +12,12 @@ If you prefer to download the VST3 file directly and move it into the appropriat
 
 ## Change log
 
+Version 0.0.3:
+
+* Added a parameter smooth cross over distortion
+* Adjusted drive range for less spinal tap level 11
+* Fixed issue with gain stage parameter not working as intended
+
 Version 0.0.2:
 
 * The power amplifier model is re-written and is a better representation of the simulation.
@@ -23,8 +29,8 @@ Version 0.0.2:
 ## Road map
 
 * Re-work the tone stack to give greater range
-* Add the ability to save presets
 * Overhaul the UI
+* Add the ability to save presets
 
 ## Usage
 

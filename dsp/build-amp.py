@@ -33,9 +33,9 @@ def main():
         # psuh pull amp
         "pre_drive": 0,
         "power_drive": 0,
-        "gain_stages": 1,
+        "gain_stages": 0,
         "gain_slope": 0,
-        "cab_on_off": 1,
+        "cab_on_off": 0,
         # amp
         "input_level": 0,
         "output_level": 0,

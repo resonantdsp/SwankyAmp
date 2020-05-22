@@ -53,7 +53,7 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 			MAKE_PARAMETER_UNIT(TsMid),
 			MAKE_PARAMETER_UNIT(TsHigh),
 
-			MAKE_PARAMETER(GainStages, 1.0f, 4.0f, 1.0f),
+			MAKE_PARAMETER(GainStages, 1.0f, 5.0f, 2.0f),
 			MAKE_PARAMETER_UNIT(GainSlope),
 
 			MAKE_PARAMETER_UNIT(LowCut),
@@ -144,9 +144,10 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 		amp_channel[i].set_triode_plate_level_b(remap_unit(*parTriodeDistort * -1.0f, -1.0f, +0.0f));
 		amp_channel[i].set_triode_plate_tau_b(remap_unit(*parTriodeDistort, -0.5f, +0.5f));
 
-		amp_channel[i].set_tetrode_grid_taus(remap_unit(*parTetrodeDynamic, -0.7f, +1.0f));
+		amp_channel[i].set_tetrode_grid_taus(remap_unit(*parTetrodeDynamic, -0.5f, +1.0f));
 		amp_channel[i].set_tetrode_grid_ratio(remap_unit(*parTetrodeDynamic, -1.0f, +1.0f));
 
+		amp_channel[i].set_tetrode_plate_corner_b(remap_unit(*parTetrodeDistort * -1, -2.0f, +2.0f));
 		amp_channel[i].set_tetrode_plate_clip(remap_unit(*parTetrodeDistort * -1.0f, -0.1f, +1.0f));
 		amp_channel[i].set_tetrode_plate_ratio(remap_unit(*parTetrodeDistort, 0.0f, +0.2f));
 	}

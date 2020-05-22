@@ -25,7 +25,7 @@ tetrode_plate = environment {
 
     scale = nentry("tetrode_plate_scale", 0, -1, +1, 1) : uscale(log(1e-2), log(1e2)) : exp;
     // The working point
-    point = nentry("tetrode_plate_point", 0, -1, +1, 1) : uscale(40, 44);
+    point = nentry("tetrode_plate_point", 0, -1, +1, 1) : uscale(0, 20);
 
     level = nentry("tetrode_plate_level", 0, -1, +1, .1) : uscale(0, 100);
     tau = nentry("tetrode_plate_tau", 0, -1, +1, .1) : uscale(log(1e-4), log(1e+0)) : exp;
@@ -37,12 +37,8 @@ tetrode_plate = environment {
     corner = nentry("tetrode_plate_corner", 0, -1, +1, 1) : uscale(0, 20);
     clip = nentry("tetrode_plate_clip", 0, -1, +1, 1) : uscale(10, 50);
 
-    level_b = nentry("tetrode_plate_level_b", 0, -1, +1, .1) : uscale(-100, 100);
-    tau_b = nentry("tetrode_plate_tau_b", 0, -1, +1, .1) : uscale(log(1e-4), log(1e+0)) : exp;
-    ratio_b = nentry("tetrode_plate_ratio_b", 0, -1, +1, .1) : uscale(log(1e-2), log(1e+2)) : exp;
-
-    tau1_b = tau_b : 1.0 / (ba.sec2samp(_) + 1);
-    tau2_b = tau_b * ratio_b : 1.0 / (ba.sec2samp(_) + 1);
+    corner_b = nentry("tetrode_plate_corner_b", 0, -1, +1, 1) : uscale(0, 10);
+    hp_freq = nentry("tetrode_plate_hp", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+2)) : exp;
 
     // This is the common process for both sides of the signal
     side = _ 
@@ -78,12 +74,12 @@ tetrode_plate = environment {
 
         // Keep just one side of the signal (push-pull)
         : max(0)
+        // Soften the cross over distortion edge
+        : soft_clip_down(corner_b, 0)
 
-        // Observed the cross-over point drifts, this means there is some 
-        // post-max drift, and found it can be modelled with compression
-        : cap_comp(level_b, tau1_b, tau2_b, 1.0)
+        // Noticed lack of low featurse (no flat edges)
+        : fi.highpass(1, hp_freq) 
 
-        // Scaling due to transformers to get from plate to load
         : *(-1)
 
         : _;
