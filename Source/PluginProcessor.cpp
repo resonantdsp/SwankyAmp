@@ -143,12 +143,12 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 		amp_channel[i].set_triode_grid_clip(remap_unit(*parTriodeDistort * -1, -0.75f, +0.0f));
 		amp_channel[i].set_triode_plate_tau_b(remap_unit(*parTriodeDistort, -0.1f, +0.1f));
 
-		amp_channel[i].set_tetrode_grid_taus(remap_unit(*parTetrodeDynamic, -0.5f, +1.0f));
+		amp_channel[i].set_tetrode_grid_taus(remap_unit(*parTetrodeDynamic, -0.5f, +0.5f));
 		amp_channel[i].set_tetrode_grid_ratio(remap_unit(*parTetrodeDynamic, -1.0f, +1.0f));
 
-		amp_channel[i].set_tetrode_plate_corner_b(remap_unit(*parTetrodeDistort * -1, -2.0f, +2.0f));
+		amp_channel[i].set_tetrode_plate_corner_b(remap_unit(*parTetrodeDistort, -0.5f, +1.0f));
 		amp_channel[i].set_tetrode_plate_clip(remap_unit(*parTetrodeDistort * -1.0f, -0.1f, +1.0f));
-		amp_channel[i].set_tetrode_plate_ratio(remap_unit(*parTetrodeDistort, 0.0f, +0.2f));
+		amp_channel[i].set_tetrode_plate_taus(remap_unit(*parTetrodeDistort, -0.5f, +0.5f));
 	}
 }
 

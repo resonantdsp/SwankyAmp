@@ -27,13 +27,7 @@ tetrode_plate = environment {
     // The working point
     point = nentry("tetrode_plate_point", 0, -1, +1, 1) : uscale(0, 20);
 
-    level = nentry("tetrode_plate_level", 0, -1, +1, .1) : uscale(0, 100);
-    tau = nentry("tetrode_plate_tau", 0, -1, +1, .1) : uscale(log(1e-4), log(1e+0)) : exp;
-    ratio = nentry("tetrode_plate_ratio", 0, -1, +1, .1) : uscale(log(1e-2), log(1e+2)) : exp;
-    cap = nentry("tetrode_plate_cap", 0, -1, +1, .1) : uscale(0, 100);
-
-    tau1 = tau : 1.0 / (ba.sec2samp(_) + 1);
-    tau2 = tau * ratio : 1.0 / (ba.sec2samp(_) + 1);
+    taus = nentry("tetrode_plate_taus", 0, -1, +1, .1) : uscale(log(1e-4), log(1e+0)) : exp;
 
     corner = nentry("tetrode_plate_corner", 0, -1, +1, 1) : uscale(0, 20);
     clip = nentry("tetrode_plate_clip", 0, -1, +1, 1) : uscale(10, 50);
@@ -65,16 +59,13 @@ tetrode_plate = environment {
         // were first estimated by measuring the plate signal)
         : *(scale)
 
-        // Some compression can be observed, this is also what will cause the
-        // cross over distortion
-        : cap_comp(level, cap, tau1, tau2, 1.0)
+        // Bias drifting causing cross over distortion
+        <: _, si.smooth(ba.tau2pole(taus)) : -
 
         // There appears to be a ceiling to the signal, so apply clipping. The
         // difference in signal scales very non-linearly.
         : soft_clip_up(corner, clip)
 
-        // Keep just one side of the signal (push-pull)
-        : max(0)
         // Soften the cross over distortion edge
         : soft_clip_down(corner_b, 0)
 
