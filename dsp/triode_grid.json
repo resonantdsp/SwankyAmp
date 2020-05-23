@@ -1,11 +1,10 @@
 {
-	"triode_hp_freq": 0.45222489145687994,
-	"triode_clip_tau": -1.3017848165415316,
-	"triode_clip_ratio": 1.1477039814261736,
-	"triode_clip_smooth": -3.100321981895387,
-	"triode_clip_level": 0.9067675918581548,
-	"triode_grid_tau": -1.1211884186931567,
-	"triode_grid_ratio": 1.0665308160493476,
-	"triode_grid_smooth": 1.399599853143473,
-	"triode_grid_level": 0.33806303106851404
+	"triode_hp_freq": 0.45218728121160007,
+	"triode_grid_tau": -1.4120773519222358,
+	"triode_grid_ratio": 1.2417459742014247,
+	"triode_grid_smooth": 1.5693466325675385,
+	"triode_grid_level": 0.33821556268455644,
+	"triode_grid_cap": 9.879311322468926,
+	"triode_grid_clip": 0.1826775513339053,
+	"triode_grid_corner": -0.4062808994466517
 }

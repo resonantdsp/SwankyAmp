@@ -30,6 +30,7 @@ tetrode_plate = environment {
     level = nentry("tetrode_plate_level", 0, -1, +1, .1) : uscale(0, 100);
     tau = nentry("tetrode_plate_tau", 0, -1, +1, .1) : uscale(log(1e-4), log(1e+0)) : exp;
     ratio = nentry("tetrode_plate_ratio", 0, -1, +1, .1) : uscale(log(1e-2), log(1e+2)) : exp;
+    cap = nentry("tetrode_plate_cap", 0, -1, +1, .1) : uscale(0, 100);
 
     tau1 = tau : 1.0 / (ba.sec2samp(_) + 1);
     tau2 = tau * ratio : 1.0 / (ba.sec2samp(_) + 1);
@@ -66,7 +67,7 @@ tetrode_plate = environment {
 
         // Some compression can be observed, this is also what will cause the
         // cross over distortion
-        : cap_comp(level, tau1, tau2, 1.0)
+        : cap_comp(level, cap, tau1, tau2, 1.0)
 
         // There appears to be a ceiling to the signal, so apply clipping. The
         // difference in signal scales very non-linearly.

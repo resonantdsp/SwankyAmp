@@ -41,27 +41,19 @@ with {
     grid_ratio = nentry("triode_grid_ratio", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+4)) : exp;
     grid_smooth = nentry("triode_grid_smooth", 0, -1, +1, .1) : uscale(log(1e-5), log(1e+1)) : exp;
     grid_level = nentry("triode_grid_level", 0, -1, +1, .1) : uscale(-5, +5);
-    
-    // This is mean to emulate grid conduction regime. The level is higher 
-    // than the previous compression and the time scale is shorter, this is a
-    // more pronounced effect.
-    clip_tau = nentry("triode_clip_tau", 0, -1, +1, .1) : uscale(log(1e-8), log(1e-4)) : exp;
-    clip_ratio = nentry("triode_clip_ratio", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+4)) : exp;
-    clip_smooth = nentry("triode_clip_smooth", 0, -1, +1, .1) : uscale(log(1e-5), log(1e+1)) : exp;
-    clip_level = nentry("triode_clip_level", 0, -1, +1, .1) : uscale(1, 3);
+    grid_cap = nentry("triode_grid_cap", 0, -1, +1, .1) : uscale(0, +10);
+
+    grid_clip = nentry("triode_grid_clip", 0, -1, +1, .1) : uscale(0, +5);
+    grid_corner = nentry("triode_grid_corner", 0, -1, +1, .1) : uscale(0, +5);
     
     // Convert to `cap_comp` parameters
     grid_tau1 = grid_tau : 1.0 / (ba.sec2samp(_) + 1);
     grid_tau2 = grid_tau * grid_ratio : 1.0 / (ba.sec2samp(_) + 1);
     grid_tau3 = grid_tau * grid_smooth : 1.0 / (ba.sec2samp(_) + 1);
-    
-    clip_tau1 = clip_tau : 1.0 / (ba.sec2samp(_) + 1);
-    clip_tau2 = clip_tau * clip_ratio : 1.0 / (ba.sec2samp(_) + 1);
-    clip_tau3 = clip_tau * clip_smooth : 1.0 / (ba.sec2samp(_) + 1);
 
     triode_grid = _ 
         : fi.highpass(1, hp_freq) 
-        : cap_comp(grid_level, grid_tau1, grid_tau2, grid_tau3)
-        : cap_comp(clip_level, clip_tau1, clip_tau2, clip_tau3)
+        : cap_comp(grid_level, grid_cap, grid_tau1, grid_tau2, grid_tau3)
+        : soft_clip_up(grid_corner, grid_clip)
         : _;
 };

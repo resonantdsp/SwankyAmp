@@ -24,15 +24,15 @@ uscale(vmin, vmax) = +(1) : /(2) : *(vmax - vmin) : +(vmin);
 // decay that charge otherwise. Versatile for modelling effects wherein some
 // bias is drifting, as this is often related to some effective capcitance
 // charging and discharging.
-calc_charge(tau1, tau2, s) = c
+calc_charge(cap, tau1, tau2, s) = c
 letrec {
-    'c = c + tau1 * max(0, s - c) -tau2 * c;
+    'c = c + tau1 * max(0, s - c) * max(0, cap - c) / cap -tau2 * c;
 };
 
 // Compression of signal due to charge buildup that biases the signal.
-cap_comp(level, tau1, tau2, tau3) = _ 
+cap_comp(level, cap, tau1, tau2, tau3) = _ 
     <: _, max(0, _ - level)
-    : _, calc_charge(tau1, tau2)
+    : _, calc_charge(cap, tau1, tau2)
     : _, si.smooth(1 - tau3)
     : -
     : _;
