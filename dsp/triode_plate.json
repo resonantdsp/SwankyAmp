@@ -1,13 +1,13 @@
 {
 	"triode_plate_power": 0.0,
-	"triode_plate_bias": -0.06884415354381974,
-	"triode_plate_scale": -0.5534144836216482,
-	"triode_plate_corner": -0.3080320734508546,
-	"triode_plate_clip": 0.712101814449466,
-	"triode_plate_level_b": -0.1911161147081152,
-	"triode_plate_tau_b": -0.4565295923757817,
-	"triode_plate_ratio_b": 0.6690959602566606,
-	"triode_plate_cap_b": -0.7078196517677837,
-	"triode_plate_scale_b": -0.2505888122467578,
-	"triode_plate_smooth_b": -0.10983853177505387
+	"triode_plate_bias": -0.06074699412867796,
+	"triode_plate_scale": -0.5537254215782115,
+	"triode_plate_corner": -0.2074367998443136,
+	"triode_plate_clip": 0.7069491639644974,
+	"triode_plate_level_b": -0.20011753703815907,
+	"triode_plate_tau_b": -0.43539725903606785,
+	"triode_plate_ratio_b": 0.5666554660042091,
+	"triode_plate_cap_b": -0.7208258652368806,
+	"triode_plate_scale_b": -0.23436047946335556,
+	"triode_plate_smooth_b": -0.12747353608865364
 }
