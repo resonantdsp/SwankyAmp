@@ -39,15 +39,11 @@ triode_plate = environment {
     // the clip level at the bottom of the signal
     clip = nentry("triode_plate_clip", 0, -1, +1, .1) : uscale(-300, 0);
 
-    // compression of the signal above level
-    level = nentry("triode_plate_level", 0, -1, +1, .1) : uscale(-100, 50);
-    tau = nentry("triode_plate_tau", 0, -1, +1, .1) : uscale(log(1e-4), log(1e+0)) : exp;
-    ratio = nentry("triode_plate_ratio", 0, -1, +1, .1) : uscale(log(1e-2), log(1e+2)) : exp;
-
     // compression of the signal w.r.t to a variable level
     level_b = nentry("triode_plate_level_b", 0, -1, +1, .1) : uscale(-50, 25);
     tau_b = nentry("triode_plate_tau_b", 0, -1, +1, .1) : uscale(log(1e-4), log(1e+0)) : exp;
     ratio_b = nentry("triode_plate_ratio_b", 0, -1, +1, .1) : uscale(log(5e-2), log(5e+2)) : exp;
+    cap_b = nentry("triode_plate_cap_b", 0, -1, +1, .1) : uscale(0, 100);
     // for computing the variable level
     scale_b = nentry("triode_plate_scale_b", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+2)) : exp;
     smooth_b = nentry("triode_plate_smooth_b", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+2)) : exp;
@@ -65,8 +61,6 @@ triode_plate = environment {
     level_unscaled = level + bias^power;
     level_b_unscaled = level_b + bias^power;
 
-    mix_wet_dry(m, a, b) = m * a + (1 - m) * b;
-
     full = _ 
         // Loss of float precision happens for small signal when subtracting
         // bias, so instead for small signal use a taylor series approximation
@@ -83,12 +77,6 @@ triode_plate = environment {
             bias^(power - 1) * power * _ 
         )
 
-        // Compress the signal above level, not sure if this is a tube effect
-        // or maybe related to voltage changes on the plate.
-        <: _, max(0, _ - level_unscaled)
-        : _, calc_charge(tau1, tau2)
-        : -
-
         : *(-1)
 
         // There is some additional clipping at the bottom of the the waveform
@@ -97,7 +85,7 @@ triode_plate = environment {
         // Noticed a clip level that drifts and found the drift can be modelled
         // by calculating a capacitive-like charging and discharging.
         <: max(0, _ - level_b_unscaled), _
-        : calc_charge(tau1_b, tau2_b) * scale_b + (level_b_unscaled), _
+        : calc_charge(cap_b, tau1_b, tau2_b) * scale_b + (level_b_unscaled), _
         : soft_clip_up(smooth_b)
 
         // Remove scaling imparted by power law so that the output is just the

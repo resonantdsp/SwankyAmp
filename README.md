@@ -12,6 +12,12 @@ If you prefer to download the VST3 file directly and move it into the appropriat
 
 ## Change log
 
+Version 0.0.4:
+
+* Stability fixes
+* Minor tweaks to power amp model
+* Improvement to the pre amp model
+
 Version 0.0.3:
 
 * Added a parameter smooth cross over distortion

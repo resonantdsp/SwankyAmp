@@ -16,6 +16,14 @@
 
 import("stdfaust.lib");
 
+ftanh = ftanh
+with {
+    ftanh1 = max(-1, min(+1, _ / 3.4));
+    ftanh2 = _ <: (abs(ftanh1) - 2), ftanh1 : * ;
+    ftanh = _ <: (abs(ftanh2) - 2), ftanh2 : * ;
+    
+};
+
 // Linear transformation of a value such that its range [-1, +1] maps to the
 // range [vmin, vmax]
 uscale(vmin, vmax) = +(1) : /(2) : *(vmax - vmin) : +(vmin);
@@ -24,15 +32,15 @@ uscale(vmin, vmax) = +(1) : /(2) : *(vmax - vmin) : +(vmin);
 // decay that charge otherwise. Versatile for modelling effects wherein some
 // bias is drifting, as this is often related to some effective capcitance
 // charging and discharging.
-calc_charge(tau1, tau2, s) = c
+calc_charge(cap, tau1, tau2, s) = c
 letrec {
-    'c = c + tau1 * max(0, s - c) -tau2 * c;
+    'c = c + tau1 * max(0, s - c) * max(0, cap - c) / cap -tau2 * c;
 };
 
 // Compression of signal due to charge buildup that biases the signal.
-cap_comp(level, tau1, tau2, tau3) = _ 
+cap_comp(level, cap, tau1, tau2, tau3) = _ 
     <: _, max(0, _ - level)
-    : _, calc_charge(tau1, tau2)
+    : _, calc_charge(cap, tau1, tau2)
     : _, si.smooth(1 - tau3)
     : -
     : _;
@@ -42,7 +50,7 @@ cap_comp(level, tau1, tau2, tau3) = _
 soft_clip_up(scale, level) = _ 
     : -(level - scale)
     <: min(0), max(0)
-    : _, ma.tanh(_ / scale) * scale
+    : _, ftanh(_ / scale) * scale
     : +
     : +(level - scale)
     : _;
@@ -53,7 +61,7 @@ soft_clip_up(scale, level) = _
 soft_clip_down(scale, level) = _ 
     : -(level + scale)
     <: min(0), max(0)
-    : ma.tanh(_ / scale) * scale, _
+    : ftanh(_ / scale) * scale, _
     : +
     : +(level + scale)
     : _;
