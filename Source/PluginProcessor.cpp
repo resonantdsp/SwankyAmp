@@ -227,6 +227,7 @@ void ResonantAmpAudioProcessor::releaseResources()
 {
 	// When playback stops, you can use this as an opportunity to free up any
 	// spare memory, etc.
+	for (int i = 0; i < 2; i++) amp_channel[i].instanceClear();
 }
 
 #ifndef JucePlugin_PreferredChannelConfigurations
