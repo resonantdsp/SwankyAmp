@@ -12,6 +12,11 @@ If you prefer to download the VST3 file directly and move it into the appropriat
 
 ## Change log
 
+Version 0.0.5:
+
+* Reworked tone stack to behave more like a normal amp
+* Don't normalize tone stack levels (pushing up levels will increase distortion)
+
 Version 0.0.4:
 
 * Stability fixes

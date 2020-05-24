@@ -20,7 +20,7 @@ import("triode_grid.dsp");
 import("triode_plate.dsp");
 import("tetrode_grid.dsp");
 import("tetrode_plate.dsp");
-import("tonestack.dsp");
+import("tone_stack.dsp");
 import("cabinet.dsp");
 
 push_pull = push_pull
@@ -29,11 +29,11 @@ with {
     pre_drive = pre_drive_unit : uscale(log(5e-1), log(2e2)) : exp;
     // Measured the loudness change as a function of the pre drive, this looks
     // up the correction for any drive
-    unscale_pre = ba.listInterp((-3.15e+00,-8.33e+00,-1.32e+01,-1.75e+01,-2.10e+01,-2.34e+01,-2.44e+01,-2.44e+01,-2.40e+01,-2.46e+01,-2.63e+01), (pre_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
+    unscale_pre = ba.listInterp((-1.70e+00,-6.89e+00,-1.18e+01,-1.62e+01,-1.96e+01,-2.21e+01,-2.34e+01,-2.36e+01,-2.35e+01,-2.42e+01,-2.58e+01), (pre_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
 
     power_drive_unit = nentry("power_drive", 0, -1, +1, .1);
     power_drive = power_drive_unit : uscale(log(1e-1), log(1e2)) : exp;
-    unscale_power = ba.listInterp((+2.26e+01,+1.66e+01,+1.07e+01,+4.69e+00,-9.01e-01,-5.59e+00,-9.34e+00,-1.14e+01,-1.19e+01,-1.21e+01,-1.22e+01), (power_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
+    unscale_power = ba.listInterp((+2.79e+01,+2.19e+01,+1.59e+01,+9.95e+00,+3.98e+00,-1.56e+00,-6.23e+00,-9.84e+00,-1.17e+01,-1.21e+01,-1.23e+01), (power_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
 
     gain_stages = nentry("gain_stages", 0, -1, +1, .1);
     gain_slope = nentry("gain_slope", 0, -1, +1, .1) : uscale(0.5, 1.5);

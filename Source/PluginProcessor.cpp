@@ -124,9 +124,9 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 		amp_channel[i].set_pre_drive(*parPreDrive);
 		amp_channel[i].set_power_drive(*parPowerDrive);
 
-		amp_channel[i].set_ts_low(*parTsLow * 1.5);
-		amp_channel[i].set_ts_mid(*parTsMid * 1.5);
-		amp_channel[i].set_ts_high(*parTsHigh * 1.5);
+		amp_channel[i].set_ts_low(*parTsLow);
+		amp_channel[i].set_ts_mid(*parTsMid);
+		amp_channel[i].set_ts_high(*parTsHigh);
 
 		amp_channel[i].set_gain_stages(*parGainStages);
 		amp_channel[i].set_gain_slope(*parGainSlope);
