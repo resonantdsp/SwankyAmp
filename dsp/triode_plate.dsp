@@ -27,73 +27,48 @@ import("common.dsp");
 // here to the appropriate value.
 
 triode_plate = environment {
-    // Plate bias
-    bias = nentry("triode_plate_bias", 0, -1, +1, .1) : uscale(0, +20);
-    // Plate power (typically 1.5)
-    power = nentry("triode_plate_power", 0, -1, +1, .1) : uscale(1.0, 2.0);
+    bias = nentry("triode_plate_bias", 0, -1, +1, .1) : uscale(-100, +100);
+    bias_corner = nentry("triode_plate_bias_corner", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+3)) : exp;
 
-    scale = nentry("triode_plate_scale", 0, -1, +1, .1) : uscale(0, 100);
+    scale = nentry("triode_plate_scale", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+1)) : exp;
 
-    // the level where to start compressing the signal leading to the lower clip
-    corner = nentry("triode_plate_corner", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+3)) : exp;
-    // the clip level at the bottom of the signal
-    clip = nentry("triode_plate_clip", 0, -1, +1, .1) : uscale(-300, 0);
+    clip = nentry("triode_plate_clip", 0, -1, +1, .1) : uscale(-100, +100);
+    corner = nentry("triode_plate_corner", 0, -1, +1, .1) : uscale(log(1e-2), log(1e+2)) : exp;
 
-    // compression of the signal w.r.t to a variable level
-    level_b = nentry("triode_plate_level_b", 0, -1, +1, .1) : uscale(-50, 25);
-    tau_b = nentry("triode_plate_tau_b", 0, -1, +1, .1) : uscale(log(1e-4), log(1e+0)) : exp;
-    ratio_b = nentry("triode_plate_ratio_b", 0, -1, +1, .1) : uscale(log(5e-2), log(5e+2)) : exp;
-    cap_b = nentry("triode_plate_cap_b", 0, -1, +1, .1) : uscale(0, 100);
-    // for computing the variable level
-    scale_b = nentry("triode_plate_scale_b", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+2)) : exp;
-    smooth_b = nentry("triode_plate_smooth_b", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+2)) : exp;
+    drift_level = nentry("triode_plate_drift_level", 0, -1, +1, .1) : uscale(-100, +100);
+    drift_tau = nentry("triode_plate_drift_tau", 0, -1, +1, .1) : uscale(log(1e-3), log(1e+0)) : exp;
+    drift_depth = nentry("triode_plate_drift_depth", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+1)) : exp;
 
-    tau1 = tau : 1.0 / (ba.sec2samp(_) + 1);
-    tau2 = tau * ratio : 1.0 / (ba.sec2samp(_) + 1);
+    comp_level = nentry("triode_plate_comp_level", 0, -1, +1, .1) : uscale(-100, +100);
+    comp_tau = nentry("triode_plate_comp_tau", 0, -1, +1, .1) : uscale(log(1e-3), log(1e+0)) : exp;
+    comp_ratio = nentry("triode_plate_comp_ratio", 0, -1, +1, .1) : uscale(log(1e0), log(1e+1)) : exp;
+    comp_depth = nentry("triode_plate_comp_depth", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+1)) : exp;
+    
+    comp_tau1 = comp_tau : 1.0 / (ba.sec2samp(_) + 1);
+    comp_tau2 = comp_tau * comp_ratio : 1.0 / (ba.sec2samp(_) + 1);
 
-    tau1_b = tau_b : 1.0 / (ba.sec2samp(_) + 1);
-    tau2_b = tau_b * ratio_b : 1.0 / (ba.sec2samp(_) + 1);
+    comp_corner = nentry("triode_plate_comp_corner", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+2)) : exp;
 
-    // NOTE: the parameter values were estimated using a signal that has the
-    // bias, but here the bias is removed after the power clip. So need to
-    // remove it also from the parameters, accouting for phase inversion also
-    clip_unscaled = clip + bias^power;
-    level_unscaled = level + bias^power;
-    level_b_unscaled = level_b + bias^power;
 
     full = _ 
-        // Loss of float precision happens for small signal when subtracting
-        // bias, so instead for small signal use a taylor series approximation
-        // of the power clip which doesn't require the offset.
-        <: mix_wet_dry(
-            // When the signal is less than 5% of bias, use approximation, and
-            // between 5 and 15% interpolate to full power clip
-            max(0, min(1, abs(_) / (bias * 0.1) - 0.05 )),
+        // found the fit works better with just a scale and a clip instead of
+        // the full 1.5 power law treatement
+        : *(scale)
+        : soft_clip_down(bias_corner, -bias)
 
-            // Full power clip, not that we are removing the bias afterwards
-            _ : power_clip(power, bias) : -(bias^power), 
-            
-            // Taylor series of the power clip with bias already removed
-            bias^(power - 1) * power * _ 
-        )
-
+        // wave form is inverted on plate, easier to set defaults this way
         : *(-1)
 
-        // There is some additional clipping at the bottom of the the waveform
-        : soft_clip_down(corner, clip_unscaled)
+        : soft_clip_down(corner, clip)
 
-        // Noticed a clip level that drifts and found the drift can be modelled
-        // by calculating a capacitive-like charging and discharging.
-        <: max(0, _ - level_b_unscaled), _
-        : calc_charge(cap_b, tau1_b, tau2_b) * scale_b + (level_b_unscaled), _
-        : soft_clip_up(smooth_b)
+        <: _, max(drift_level) - drift_level
+        : _, si.smooth(ba.tau2pole(drift_tau)) * drift_depth
+        : -
 
-        // Remove scaling imparted by power law so that the output is just the
-        // distortion on the signal, no additional scaling
-        : /( bias^(power-1) ) 
-
-        // Apply the scale observed in the circuit
-        : *(scale)
+        <: max(comp_level) - comp_level, _
+        : calc_charge(comp_tau1, comp_tau2) * comp_depth, _
+        // NOTE: the clip level is relative to zero
+        : soft_clip_up(comp_corner)
 
         : _;
 };

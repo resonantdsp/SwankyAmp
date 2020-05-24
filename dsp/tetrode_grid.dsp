@@ -37,7 +37,6 @@ tetrode_grid = environment {
     level = nentry("tetrode_grid_level", 0, -1, +1, .1) : uscale(-100, +100);
     tau = nentry("tetrode_grid_tau", 0, -1, +1, .1) : uscale(log(1e-4), log(1e+0)) : exp;
     ratio = nentry("tetrode_grid_ratio", 0, -1, +1, .1) : uscale(log(1e-2), log(1e+2)) : exp;
-    cap = nentry("tetrode_grid_cap", 0, -1, +1, .1) : uscale(0, 100);
 
     tau1 = tau : 1.0 / (ba.sec2samp(_) + 1);
     tau2 = tau * ratio : 1.0 / (ba.sec2samp(_) + 1);
@@ -54,7 +53,9 @@ tetrode_grid = environment {
         <: _, si.smooth(ba.tau2pole(taus)) : -
 
         // Same effect observed with the triode grid signal
-        : cap_comp(level, cap, tau1, tau2, 1.0)
+        <: _, max(0, _ - level)
+        : _, calc_charge(tau1, tau2)
+        : -
 
         : _;
 };

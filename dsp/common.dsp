@@ -32,18 +32,10 @@ uscale(vmin, vmax) = +(1) : /(2) : *(vmax - vmin) : +(vmin);
 // decay that charge otherwise. Versatile for modelling effects wherein some
 // bias is drifting, as this is often related to some effective capcitance
 // charging and discharging.
-calc_charge(cap, tau1, tau2, s) = c
+calc_charge(tau1, tau2, s) = c
 letrec {
-    'c = c + tau1 * max(0, s - c) * max(0, cap - c) / cap -tau2 * c;
+    'c = c + tau1 * max(0, s - c) - tau2 * c;
 };
-
-// Compression of signal due to charge buildup that biases the signal.
-cap_comp(level, cap, tau1, tau2, tau3) = _ 
-    <: _, max(0, _ - level)
-    : _, calc_charge(cap, tau1, tau2)
-    : _, si.smooth(1 - tau3)
-    : -
-    : _;
 
 // Apply soft clipping (tanh) to the portion of a signal between `scale` and
 // `level`. The signal won't exceed `level`.
@@ -66,14 +58,32 @@ soft_clip_down(scale, level) = _
     : +(level + scale)
     : _;
 
-// Applies power scaling to a signal, and clips the signal below 0.
-power_clip(power, level) = _
-    : +(level)
-    : max(0)
-    : ^(power)
-    : _;
-
 // Given 3 channels, mixes the 2nd channel with weight given in the first
 // channel, and mixes the 3rd channel with remaining weight. Note that the
 // mix value should be in the range (0, 1).
 mix_wet_dry(mix, wet, dry) = mix * wet + (1 - mix) * dry;
+
+power_clip = power_clip
+with {
+    power_clip_full(power, bias) = _
+        : +(bias)
+        : max(0)
+        : ^(power)
+        : -(bias^power)
+        : _;
+
+    power_clip_approx(power, bias) = _
+        : bias^(power - 1) * power * _ 
+        : _;
+
+    // when signal is large w.r.t. bias, this goes to 1
+    factor(bias, s) = max(0, min(1, ( abs(s) / max(abs(s), abs(bias)) - 0.05 ) / (0.1 - 0.05) ));
+
+    power_clip(power, bias) = _ 
+        <: mix_wet_dry(
+            factor(bias),
+            power_clip_full(power, bias),
+            power_clip_approx(power, bias)
+        )
+        : _;
+};

@@ -1,10 +1,9 @@
 {
-	"tetrode_hp_freq": -8.210805366411334,
-	"tetrode_grid_offset1": 0.047726570965422564,
-	"tetrode_grid_offset2": -2.047728645298814,
-	"tetrode_grid_taus": -1.5246180743612742e-05,
-	"tetrode_grid_level": 0.42481866157062936,
-	"tetrode_grid_tau": -0.6194207595381156,
-	"tetrode_grid_ratio": 0.6319992316229885,
-	"tetrode_grid_cap": 4.705513112607268
+	"tetrode_hp_freq": -8.160827792484875,
+	"tetrode_grid_offset1": 0.04772623944882953,
+	"tetrode_grid_offset2": -2.047725694825766,
+	"tetrode_grid_taus": 0.00017558406352694096,
+	"tetrode_grid_level": 0.42440634382505704,
+	"tetrode_grid_tau": -0.6103268428149087,
+	"tetrode_grid_ratio": 0.6149204457354528
 }

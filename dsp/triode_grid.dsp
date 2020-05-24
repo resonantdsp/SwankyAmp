@@ -41,7 +41,6 @@ with {
     grid_ratio = nentry("triode_grid_ratio", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+4)) : exp;
     grid_smooth = nentry("triode_grid_smooth", 0, -1, +1, .1) : uscale(log(1e-5), log(1e+1)) : exp;
     grid_level = nentry("triode_grid_level", 0, -1, +1, .1) : uscale(-5, +5);
-    grid_cap = nentry("triode_grid_cap", 0, -1, +1, .1) : uscale(0, +10);
 
     grid_clip = nentry("triode_grid_clip", 0, -1, +1, .1) : uscale(0, +5);
     grid_corner = nentry("triode_grid_corner", 0, -1, +1, .1) : uscale(0, +5);
@@ -53,7 +52,12 @@ with {
 
     triode_grid = _ 
         : fi.highpass(1, hp_freq) 
-        : cap_comp(grid_level, grid_cap, grid_tau1, grid_tau2, grid_tau3)
+
+        <: _, max(0, _ - grid_level)
+        : _, calc_charge(grid_tau1, grid_tau2)
+        : _, si.smooth(1 - grid_tau3)
+        : -
+        
         : soft_clip_up(grid_corner, grid_clip)
         : _;
 };

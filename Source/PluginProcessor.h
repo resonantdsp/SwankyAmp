@@ -55,11 +55,9 @@ public:
 	std::atomic<float>* parLowCut = nullptr;
 	std::atomic<float>* parCabinet = nullptr;
 
-	std::atomic<float>* parTriodeDynamic = nullptr;
-	std::atomic<float>* parTriodeDistort = nullptr;
+	std::atomic<float>* parTriodeTouch = nullptr;
 
-	std::atomic<float>* parTetrodeDynamic = nullptr;
-	std::atomic<float>* parTetrodeDistort = nullptr;
+	std::atomic<float>* parTetrodeTouch = nullptr;
 
 	void setAmpParameters();
 

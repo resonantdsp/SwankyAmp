@@ -59,11 +59,9 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 			MAKE_PARAMETER_UNIT(LowCut),
 			std::make_unique<AudioParameterBool>("idCabinet", "Cabinet", true),
 
-			MAKE_PARAMETER_UNIT(TriodeDynamic),
-			MAKE_PARAMETER_UNIT(TriodeDistort),
+			MAKE_PARAMETER_UNIT(TriodeTouch),
 
-			MAKE_PARAMETER_UNIT(TetrodeDynamic),
-			MAKE_PARAMETER_UNIT(TetrodeDistort),
+			MAKE_PARAMETER_UNIT(TetrodeTouch),
 		}
 	)
 {
@@ -82,11 +80,9 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 	ASSIGN_PARAMETER(LowCut)
 	ASSIGN_PARAMETER(Cabinet)
 
-	ASSIGN_PARAMETER(TriodeDynamic)
-	ASSIGN_PARAMETER(TriodeDistort)
+	ASSIGN_PARAMETER(TriodeTouch)
 
-	ASSIGN_PARAMETER(TetrodeDynamic)
-	ASSIGN_PARAMETER(TetrodeDistort)
+	ASSIGN_PARAMETER(TetrodeTouch)
 }
 
 #undef MAKE_PARAMETER_UNIT
@@ -135,20 +131,16 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 		amp_channel[i].set_triode_hp_freq(remap_unit(*parLowCut, -1.0f, +0.75f)); 
 		amp_channel[i].set_tetrode_hp_freq(remap_unit(*parLowCut, -1.0f, +0.75f)); 
 
-		amp_channel[i].set_triode_grid_tau(remap_unit(*parTriodeDynamic, -0.5f, +0.25f));
-		amp_channel[i].set_triode_grid_ratio(remap_unit(*parTriodeDynamic, -1.0f, +0.15f));
-		amp_channel[i].set_triode_plate_bias(remap_unit(*parTriodeDynamic, -0.1f, +0.1f));
-		amp_channel[i].set_triode_plate_ratio_b(remap_unit(*parTriodeDynamic, -1.0f, +1.0f));
+		amp_channel[i].set_triode_grid_tau(remap_unit(*parTriodeTouch, -0.5f, +0.1f)); 
+		amp_channel[i].set_triode_grid_ratio(remap_unit(*parTriodeTouch, -1.0f, +0.1f)); 
+		amp_channel[i].set_triode_plate_bias(remap_unit(*parTriodeTouch * -1.0f, -1.0f, +0.5f)); 
+		amp_channel[i].set_triode_plate_comp_ratio(remap_unit(*parTriodeTouch * -1.0f, -1.0f, +0.0f)); 
 
-		amp_channel[i].set_triode_grid_clip(remap_unit(*parTriodeDistort * -1, -0.75f, +0.0f));
-		amp_channel[i].set_triode_plate_tau_b(remap_unit(*parTriodeDistort, -0.1f, +0.1f));
-
-		amp_channel[i].set_tetrode_grid_taus(remap_unit(*parTetrodeDynamic, -0.5f, +0.5f));
-		amp_channel[i].set_tetrode_grid_ratio(remap_unit(*parTetrodeDynamic, -1.0f, +1.0f));
-
-		amp_channel[i].set_tetrode_plate_corner_b(remap_unit(*parTetrodeDistort, -0.5f, +1.0f));
-		amp_channel[i].set_tetrode_plate_clip(remap_unit(*parTetrodeDistort * -1.0f, -0.1f, +1.0f));
-		amp_channel[i].set_tetrode_plate_taus(remap_unit(*parTetrodeDistort, -0.5f, +0.5f));
+		amp_channel[i].set_tetrode_grid_tau(remap_unit(*parTetrodeTouch, -1.0f, +1.0f)); 
+		amp_channel[i].set_tetrode_grid_ratio(remap_unit(*parTetrodeTouch, -1.0f, +0.1f)); 
+		amp_channel[i].set_tetrode_plate_comp_tau(remap_unit(*parTetrodeTouch * -1.0f, -0.5f, +0.0f)); 
+		amp_channel[i].set_tetrode_plate_comp_ratio(remap_unit(*parTetrodeTouch * -1.0f, -0.5f, +0.0f)); 
+		amp_channel[i].set_tetrode_plate_comp_depth(remap_unit(*parTetrodeTouch, -1.0f, +0.5f)); 
 	}
 }
 
