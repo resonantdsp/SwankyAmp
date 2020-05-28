@@ -70,11 +70,9 @@ private:
 	ToggleButton buttonCabinet;
 	std::unique_ptr<ButtonAttachment> attCabinet;
 
-	INSERT_PARAMETER(TriodeDynamic)
-	INSERT_PARAMETER(TriodeDistort)
+	INSERT_PARAMETER(TriodeTouch)
 
-	INSERT_PARAMETER(TetrodeDynamic)
-	INSERT_PARAMETER(TetrodeDistort)
+	INSERT_PARAMETER(TetrodeTouch)
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ResonantAmpAudioProcessorEditor)
 };

@@ -21,63 +21,51 @@ tetrode_plate = environment {
     // See `triode_plate.dsp` for more info on common functionality
 
     power = nentry("tetrode_plate_power", 0, -1, +1, 1) : uscale(1.0, 2.0);
-    bias = nentry("tetrode_plate_bias", 0, -1, +1, 1) : uscale(30, 50);
+    bias = nentry("tetrode_plate_bias", 0, -1, +1, 1) : uscale(-10, +10);
 
     scale = nentry("tetrode_plate_scale", 0, -1, +1, 1) : uscale(log(1e-2), log(1e2)) : exp;
     // The working point
     point = nentry("tetrode_plate_point", 0, -1, +1, 1) : uscale(0, 20);
 
-    taus = nentry("tetrode_plate_taus", 0, -1, +1, .1) : uscale(log(1e-4), log(1e+0)) : exp;
+    drift_level = nentry("tetrode_plate_drift_level", 0, -1, +1, .1) : uscale(-10, 10) : exp;
+    drift_tau = nentry("tetrode_plate_drift_tau", 0, -1, +1, .1) : uscale(log(1e-3), log(1e+0)) : exp;
+    drift_depth = nentry("tetrode_plate_drift_depth", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+1)) : exp;
 
-    corner = nentry("tetrode_plate_corner", 0, -1, +1, 1) : uscale(0, 20);
     clip = nentry("tetrode_plate_clip", 0, -1, +1, 1) : uscale(10, 50);
+    clip_corner = nentry("tetrode_plate_clip_corner", 0, -1, +1, 1) : uscale(log(1e-1), log(1e2)) : exp;
+    
+    comp_level = nentry("tetrode_plate_comp_level", 0, -1, +1, .1) : uscale(-100, +100);
+    comp_tau = nentry("tetrode_plate_comp_tau", 0, -1, +1, .1) : uscale(log(1e-3), log(1e+0)) : exp;
+    comp_ratio = nentry("tetrode_plate_comp_ratio", 0, -1, +1, .1) : uscale(log(1e0), log(1e+1)) : exp;
+    comp_depth = nentry("tetrode_plate_comp_depth", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+1)) : exp;
+    comp_tau1 = comp_tau : 1.0 / (ba.sec2samp(_) + 1);
+    comp_tau2 = comp_tau * comp_ratio : 1.0 / (ba.sec2samp(_) + 1);
 
-    corner_b = nentry("tetrode_plate_corner_b", 0, -1, +1, 1) : uscale(0, 10);
-    hp_freq = nentry("tetrode_plate_hp", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+2)) : exp;
+    cross_corner = nentry("tetrode_plate_cross_corner", 0, -1, +1, 1) : uscale(log(1e-1), log(1e+2)) : exp;
 
     // This is the common process for both sides of the signal
     side = _ 
-        : *(-1)
-
-        // See triode code for notes on this
-        <: mix_wet_dry(
-            // When the signal is less than 5% of bias, use approximation, and
-            // between 5 and 15% interpolate to full power clip
-            max(0, min(1, abs(_) / (bias * 0.1) - 0.05 )),
-
-            // Full power clip, not that we are removing the bias afterwards
-            _ : power_clip(power, bias) : -(bias^power), 
-            
-            // Taylor series of the power clip with bias already removed
-            bias^(power - 1) * power * _ 
-        )
-        // current centered about bias, but want to be centered about working 
-        // point
-        : -(point^power - bias^power)
-
-        // Scaling to get something like the plate signal (the parameters
-        // were first estimated by measuring the plate signal)
-        : *(scale)
+        // NOTE: power clip is correct here, but the results aren't impacted 
+        // strongly but it, so omitted for simplicity
 
         // Bias drifting causing cross over distortion
-        <: _, si.smooth(ba.tau2pole(taus)) : -
+        <: _, max(drift_level) - drift_level
+        : _, si.smooth(ba.tau2pole(drift_tau)) * drift_depth
+        : -
 
-        // There appears to be a ceiling to the signal, so apply clipping. The
-        // difference in signal scales very non-linearly.
-        : soft_clip_up(corner, clip)
+        // Clipping at the top of the waveform with a variable level
+        <: max(comp_level) - comp_level, _
+        : calc_charge(comp_tau1, comp_tau2) * -1 * comp_depth + clip, _
+        : soft_clip_up(clip_corner)
 
         // Soften the cross over distortion edge
-        : soft_clip_down(corner_b, 0)
-
-        // Noticed lack of low featurse (no flat edges)
-        : fi.highpass(1, hp_freq) 
-
-        : *(-1)
+        : soft_clip_down(cross_corner, 0)
 
         : _;
     
     // Combine both sides in push-pull fashion
     full = _
+        : *(scale)
         <: *(-1), _
         : side, side
         : *(-1), _

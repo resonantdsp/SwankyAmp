@@ -61,11 +61,8 @@ ResonantAmpAudioProcessorEditor::ResonantAmpAudioProcessorEditor(
 	addAndMakeVisible(buttonCabinet);
 	attCabinet.reset(new ButtonAttachment(valueTreeState, "idCabinet", buttonCabinet));
 
-	INIT_PARAMETER(TriodeDynamic, "Pre Dyn.")
-	INIT_PARAMETER(TriodeDistort, "Pre Dist.")
-
-	INIT_PARAMETER(TetrodeDynamic, "Power Dyn.")
-	INIT_PARAMETER(TetrodeDistort, "Power Dist.")
+	INIT_PARAMETER(TriodeTouch, "Pre Touch")
+	INIT_PARAMETER(TetrodeTouch, "Power Touch")
 
 	processor.addMeterListener(*this);
 
@@ -125,11 +122,8 @@ void ResonantAmpAudioProcessorEditor::resized()
 	LAYOUT_GRID(LowCut, 2, 2)
 	buttonCabinet.setBounds(inset + 3 * (knobSize + knobPad), inset + 2 * (knobSize + labelSize + knobPad), knobSize, knobSize);
 
-	LAYOUT_GRID(TriodeDynamic, 0, 3)
-	LAYOUT_GRID(TriodeDistort, 1, 3)
-
-	LAYOUT_GRID(TetrodeDynamic, 2, 3)
-	LAYOUT_GRID(TetrodeDistort, 3, 3)
+	LAYOUT_GRID(TriodeTouch, 0, 3)
+	LAYOUT_GRID(TetrodeTouch, 1, 3)
 }
 
 #undef LAYOUT_GRID

@@ -1,6 +1,6 @@
 [Setup]
 AppName=ResonantAmp
-AppVersion=0.0.5
+AppVersion=0.0.6
 DefaultDirName={commoncf64}\VST3
 DirExistsWarning=no
 DisableDirPage=no
