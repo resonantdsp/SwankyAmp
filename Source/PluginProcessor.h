@@ -20,7 +20,7 @@
 
 #include <JuceHeader.h>
 #include "AmpMono.h"
-#include "LevelMeter.h"
+#include "Components/LevelMeter.h"
 
 //==============================================================================
 /**
@@ -32,33 +32,37 @@ public:
 	ResonantAmpAudioProcessor();
 	~ResonantAmpAudioProcessor();
 
-	AmpMono amp_channel[2]; // one amp for each channel
+	// The amplifier DSP objects (contains DSP state and the process function)
+	// one for each possible channel (even if unused)
+	AmpMono amp_channel[2];
 
-	ListenerList<LevelMeter::Listener> meterListeners;
-
-	void addMeterListener(LevelMeter::Listener&);
-	void removeMeterListener(LevelMeter::Listener&);
+	// Objects with an `update` method for updating the value of input meters.
+	LevelMeterListener* meterListenersIn[2];
+	LevelMeterListener* meterListenersOut[2];
 
 	AudioProcessorValueTreeState parameters;
 
 	std::atomic<float>* parInputLevel = nullptr;
 	std::atomic<float>* parOutputLevel = nullptr;
-	std::atomic<float>* parPreDrive = nullptr;
-	std::atomic<float>* parPowerDrive = nullptr;
+
 	std::atomic<float>* parTsLow = nullptr;
 	std::atomic<float>* parTsMid = nullptr;
 	std::atomic<float>* parTsHigh = nullptr;
 
 	std::atomic<float>* parGainStages = nullptr;
 	std::atomic<float>* parGainSlope = nullptr;
-
 	std::atomic<float>* parLowCut = nullptr;
-	std::atomic<float>* parCabinet = nullptr;
 
-	std::atomic<float>* parTriodeTouch = nullptr;
+	std::atomic<float>* parCabOnOff = nullptr;
 
-	std::atomic<float>* parTetrodeTouch = nullptr;
+	std::atomic<float>* parPreAmpDrive = nullptr;
+	std::atomic<float>* parPreAmpTouch = nullptr;
 
+	std::atomic<float>* parPowerAmpDrive = nullptr;
+	std::atomic<float>* parPowerAmpTouch = nullptr;
+
+	void setMeterListenerIn(LevelMeterListener* /*meter*/, int /*channel*/);
+	void setMeterListenerOut(LevelMeterListener* /*meter*/, int /*channel*/);
 	void setAmpParameters();
 
 	//==============================================================================

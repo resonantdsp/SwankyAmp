@@ -1,13 +1,57 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT id="sJgmJL" name="ResonantAmp" projectType="audioplug" jucerVersion="5.4.7"
-              version="0.0.6" projectLineFeed="&#10;" companyName="Resonant DSP"
+              version="0.1.0" projectLineFeed="&#10;" companyName="Resonant DSP"
               companyWebsite="https://www.resonantdsp.com/" companyEmail="info@resonantdsp.com"
               pluginFormats="buildAAX,buildAU,buildStandalone,buildVST3" pluginName="Resonant Amp"
               pluginDesc="Tube amplifiers simulation" pluginManufacturer="Resonant DSP"
-              pluginAAXCategory="8192" pluginRTASCategory="8192">
+              pluginAAXCategory="8192" pluginRTASCategory="8192" splashScreenColour="Light">
   <MAINGROUP id="qolZJU" name="ResonantAmp">
+    <GROUP id="{DE71F08C-9BB3-E05B-B09D-49D3564FD2D1}" name="Resources">
+      <FILE id="A3p67q" name="logo.svg" compile="0" resource="1" file="Resources/logo.svg"/>
+      <FILE id="Cro6kc" name="PTSans-Bold.ttf" compile="0" resource="1" file="Resources/PTSans/PTSans-Bold.ttf"/>
+      <FILE id="hIVvsZ" name="PTSans-Regular.ttf" compile="0" resource="1"
+            file="Resources/PTSans/PTSans-Regular.ttf"/>
+      <FILE id="MoC8Of" name="PTSansNarrow-Regular.ttf" compile="0" resource="1"
+            file="Resources/PTSansNarrow/PTSansNarrow-Regular.ttf"/>
+    </GROUP>
     <GROUP id="{1D5987B1-0BA7-E171-9516-427783CB7E4A}" name="Source">
+      <GROUP id="{2BC335E6-8421-3F7B-5FF8-345C44B52666}" name="Components">
+        <FILE id="H8ysIN" name="CabGroup.cpp" compile="1" resource="0" file="Source/Components/CabGroup.cpp"/>
+        <FILE id="BP3mX8" name="CabGroup.h" compile="0" resource="0" file="Source/Components/CabGroup.h"/>
+        <FILE id="aR1yqN" name="LevelMeter.cpp" compile="1" resource="0" file="Source/Components/LevelMeter.cpp"/>
+        <FILE id="utuzB3" name="LevelMeter.h" compile="0" resource="0" file="Source/Components/LevelMeter.h"/>
+        <FILE id="W8y0o3" name="LevelsGroup.cpp" compile="1" resource="0" file="Source/Components/LevelsGroup.cpp"/>
+        <FILE id="avdarJ" name="LevelsGroup.h" compile="0" resource="0" file="Source/Components/LevelsGroup.h"/>
+        <FILE id="MAu800" name="ParameterGroup.cpp" compile="1" resource="0"
+              file="Source/Components/ParameterGroup.cpp"/>
+        <FILE id="Yu11te" name="ParameterGroup.h" compile="0" resource="0"
+              file="Source/Components/ParameterGroup.h"/>
+        <FILE id="SfPVcF" name="PowerAmpGroup.cpp" compile="1" resource="0"
+              file="Source/Components/PowerAmpGroup.cpp"/>
+        <FILE id="cKYP56" name="PowerAmpGroup.h" compile="0" resource="0" file="Source/Components/PowerAmpGroup.h"/>
+        <FILE id="lYZZuU" name="PreAmpGroup.cpp" compile="1" resource="0" file="Source/Components/PreAmpGroup.cpp"/>
+        <FILE id="InSxOR" name="PreAmpGroup.h" compile="0" resource="0" file="Source/Components/PreAmpGroup.h"/>
+        <FILE id="EU8W53" name="RSlider.cpp" compile="1" resource="0" file="Source/Components/RSlider.cpp"/>
+        <FILE id="uaxdQh" name="RSlider.h" compile="0" resource="0" file="Source/Components/RSlider.h"/>
+        <FILE id="GwS8Zn" name="RSliderLabel.cpp" compile="1" resource="0"
+              file="Source/Components/RSliderLabel.cpp"/>
+        <FILE id="x1TY7J" name="RSliderLabel.h" compile="0" resource="0" file="Source/Components/RSliderLabel.h"/>
+        <FILE id="eVdell" name="StagingGroup.cpp" compile="1" resource="0"
+              file="Source/Components/StagingGroup.cpp"/>
+        <FILE id="e1Aa8D" name="StagingGroup.h" compile="0" resource="0" file="Source/Components/StagingGroup.h"/>
+        <FILE id="ifLlpO" name="ToneStackGroup.cpp" compile="1" resource="0"
+              file="Source/Components/ToneStackGroup.cpp"/>
+        <FILE id="VD9aTv" name="ToneStackGroup.h" compile="0" resource="0"
+              file="Source/Components/ToneStackGroup.h"/>
+      </GROUP>
+      <FILE id="cyaozc" name="Utils.cpp" compile="1" resource="0" file="Source/Utils.cpp"/>
+      <FILE id="BkB5cF" name="Utils.h" compile="0" resource="0" file="Source/Utils.h"/>
+      <FILE id="BF767l" name="ResonantAmpLAF.cpp" compile="1" resource="0"
+            file="Source/ResonantAmpLAF.cpp"/>
+      <FILE id="TBMLgx" name="ResonantAmpLAF.h" compile="0" resource="0"
+            file="Source/ResonantAmpLAF.h"/>
+      <FILE id="CNVd3V" name="AmpMono.h" compile="0" resource="0" file="Source/AmpMono.h"/>
       <FILE id="m1Xtuh" name="PluginProcessor.cpp" compile="1" resource="0"
             file="Source/PluginProcessor.cpp"/>
       <FILE id="gzx8za" name="PluginProcessor.h" compile="0" resource="0"
@@ -83,5 +127,6 @@
   <LIVE_SETTINGS>
     <WINDOWS/>
   </LIVE_SETTINGS>
-  <JUCEOPTIONS JUCE_VST3_CAN_REPLACE_VST2="0" JUCE_STRICT_REFCOUNTEDPOINTER="1"/>
+  <JUCEOPTIONS JUCE_VST3_CAN_REPLACE_VST2="0" JUCE_STRICT_REFCOUNTEDPOINTER="1"
+               JUCE_DISABLE_COREGRAPHICS_FONT_SMOOTHING="1"/>
 </JUCERPROJECT>

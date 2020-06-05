@@ -20,59 +20,64 @@
 
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
-#include "LevelMeter.h"
+#include "ResonantAmpLAF.h"
+#include "Components/ParameterGroup.h"
+#include "Components/LevelsGroup.h"
+#include "Components/PreAmpGroup.h"
+#include "Components/PowerAmpGroup.h"
+#include "Components/StagingGroup.h"
+#include "Components/ToneStackGroup.h"
+#include "Components/CabGroup.h"
 
 typedef AudioProcessorValueTreeState::SliderAttachment SliderAttachment;
 typedef AudioProcessorValueTreeState::ButtonAttachment ButtonAttachment;
 
-// add a slider and label member for a VTS parameter
-#define INSERT_PARAMETER(name) \
-Slider slide##name; \
-Label label##name; \
-std::unique_ptr<SliderAttachment> att##name;
-
-//==============================================================================
-/**
-*/
-class ResonantAmpAudioProcessorEditor : public AudioProcessorEditor, private LevelMeter::Listener
+class ResonantAmpAudioProcessorEditor : public AudioProcessorEditor
 {
 public:
 	ResonantAmpAudioProcessorEditor(ResonantAmpAudioProcessor&, AudioProcessorValueTreeState&);
 	~ResonantAmpAudioProcessorEditor();
 
-	//==============================================================================
 	void paint (Graphics&) override;
 	void resized() override;
 
 private:
+	ResonantAmpLAF resonantAmpLAF;
 	// This reference is provided as a quick way for your editor to
 	// access the processor object that created it.
 	ResonantAmpAudioProcessor& processor;
 	AudioProcessorValueTreeState& valueTreeState;
 
-	void handleNewValue(int, float) override;
-	LevelMeter meter;
+	std::unique_ptr<Drawable> logoSvg;
 
-	INSERT_PARAMETER(InputLevel)
-	INSERT_PARAMETER(OutputLevel)
-	INSERT_PARAMETER(PreDrive)
-	INSERT_PARAMETER(PowerDrive);
+	LevelsGroup levelsGroup;
+	std::unique_ptr<SliderAttachment> attInputLevel;
+	std::unique_ptr<SliderAttachment> attOutputLevel;
 
-	INSERT_PARAMETER(TsLow)
-	INSERT_PARAMETER(TsMid)
-	INSERT_PARAMETER(TsHigh)
+	PreAmpGroup preAmpGroup;
+	std::unique_ptr<SliderAttachment> attPreAmpDrive;
+	std::unique_ptr<SliderAttachment> attPreAmpTouch;
 
-	INSERT_PARAMETER(GainStages)
-	INSERT_PARAMETER(GainSlope)
+	PowerAmpGroup powerAmpGroup;
+	std::unique_ptr<SliderAttachment> attPowerAmpDrive;
+	std::unique_ptr<SliderAttachment> attPowerAmpTouch;
 
-	INSERT_PARAMETER(LowCut)
+	StagingGroup stagingGroup;
+	std::unique_ptr<SliderAttachment> attGainStages;
+	std::unique_ptr<SliderAttachment> attGainSlope;
+	std::unique_ptr<SliderAttachment> attLowCut;
 
-	ToggleButton buttonCabinet;
-	std::unique_ptr<ButtonAttachment> attCabinet;
+	ToneStackGroup toneStackGroup;
+	std::unique_ptr<SliderAttachment> attTsLow;
+	std::unique_ptr<SliderAttachment> attTsMid;
+	std::unique_ptr<SliderAttachment> attTsHigh;
 
-	INSERT_PARAMETER(TriodeTouch)
+	CabGroup cabGroup;
+	std::unique_ptr<ButtonAttachment> attCabOnOff;
 
-	INSERT_PARAMETER(TetrodeTouch)
+	Image bgNoise;
+	Path bgPattern;
+	Random rng;
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ResonantAmpAudioProcessorEditor)
 };

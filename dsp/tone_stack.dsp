@@ -31,7 +31,7 @@ with {
 
     low_proc = fi.lowshelf(1, low_db, low_freq) : fi.highpass(1, 10.0);
 
-    mid_db = -14.0 + ba.if(mid_ctrl < 0, 9.0, 14.0) * mid_ctrl;
+    mid_db = -14.0 + 10.0 * mid_ctrl;
     mid_freq = 500.0;
     mid_band = 1.2e3 + ba.if(low_ctrl < 0, 800.0, 0.0) * mid_ctrl;
 
