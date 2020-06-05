@@ -46,8 +46,6 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 		Identifier("APVTSResonantAmp"), {
 			MAKE_PARAMETER_UNIT(InputLevel),
 			MAKE_PARAMETER_UNIT(OutputLevel),
-			MAKE_PARAMETER_UNIT(PreDrive),
-			MAKE_PARAMETER_UNIT(PowerDrive),
 
 			MAKE_PARAMETER_UNIT(TsLow),
 			MAKE_PARAMETER_UNIT(TsMid),
@@ -55,20 +53,22 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 
 			MAKE_PARAMETER(GainStages, 1.0f, 5.0f, 2.0f),
 			MAKE_PARAMETER_UNIT(GainSlope),
-
 			MAKE_PARAMETER_UNIT(LowCut),
-			std::make_unique<AudioParameterBool>("idCabinet", "Cabinet", true),
 
-			MAKE_PARAMETER_UNIT(TriodeTouch),
+			std::make_unique<AudioParameterBool>("idCabOnOff", "CabOnOff", true),
 
-			MAKE_PARAMETER_UNIT(TetrodeTouch),
+			MAKE_PARAMETER(PreAmpDrive, -1.0f, 1.0f, -0.5f),
+			MAKE_PARAMETER_UNIT(PreAmpTouch),
+
+			MAKE_PARAMETER_UNIT(PowerAmpDrive),
+			MAKE_PARAMETER_UNIT(PowerAmpTouch),
 		}
-	)
+	),
+	meterListenersIn(),
+	meterListenersOut()
 {
 	ASSIGN_PARAMETER(InputLevel)
 	ASSIGN_PARAMETER(OutputLevel)
-	ASSIGN_PARAMETER(PreDrive)
-	ASSIGN_PARAMETER(PowerDrive)
 
 	ASSIGN_PARAMETER(TsLow)
 	ASSIGN_PARAMETER(TsMid)
@@ -76,13 +76,15 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 
 	ASSIGN_PARAMETER(GainStages)
 	ASSIGN_PARAMETER(GainSlope)
-
 	ASSIGN_PARAMETER(LowCut)
-	ASSIGN_PARAMETER(Cabinet)
 
-	ASSIGN_PARAMETER(TriodeTouch)
+	ASSIGN_PARAMETER(CabOnOff)
 
-	ASSIGN_PARAMETER(TetrodeTouch)
+	ASSIGN_PARAMETER(PreAmpDrive)
+	ASSIGN_PARAMETER(PreAmpTouch)
+
+	ASSIGN_PARAMETER(PowerAmpDrive)
+	ASSIGN_PARAMETER(PowerAmpTouch)
 }
 
 #undef MAKE_PARAMETER_UNIT
@@ -91,16 +93,6 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 
 ResonantAmpAudioProcessor::~ResonantAmpAudioProcessor()
 {
-}
-
-void ResonantAmpAudioProcessor::addMeterListener(LevelMeter::Listener& listener)
-{
-	meterListeners.add(&listener);
-}
-
-void ResonantAmpAudioProcessor::removeMeterListener(LevelMeter::Listener& listener)
-{
-	meterListeners.remove(&listener);
 }
 
 float remap_unit(float unit, float to_low, float to_high) {
@@ -117,8 +109,8 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 	for (int i = 0; i < 2; i++) {
 		amp_channel[i].set_input_level(*parInputLevel);
 		amp_channel[i].set_output_level(*parOutputLevel);
-		amp_channel[i].set_pre_drive(*parPreDrive);
-		amp_channel[i].set_power_drive(*parPowerDrive);
+		amp_channel[i].set_pre_drive(*parPreAmpDrive);
+		amp_channel[i].set_power_drive(*parPowerAmpDrive);
 
 		amp_channel[i].set_ts_low(*parTsLow);
 		amp_channel[i].set_ts_mid(*parTsMid);
@@ -126,25 +118,32 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 
 		amp_channel[i].set_gain_stages(*parGainStages);
 		amp_channel[i].set_gain_slope(*parGainSlope);
-		amp_channel[i].set_cab_on_off((*parCabinet > 0.5) ? +1.0f : -1.0f);
+		amp_channel[i].set_cab_on_off((*parCabOnOff > 0.5) ? +1.0f : -1.0f);
 
 		amp_channel[i].set_triode_hp_freq(remap_unit(*parLowCut, -1.0f, +0.75f)); 
 		amp_channel[i].set_tetrode_hp_freq(remap_unit(*parLowCut, -1.0f, +0.75f)); 
 
-		amp_channel[i].set_triode_grid_tau(remap_unit(*parTriodeTouch, -0.5f, +0.1f)); 
-		amp_channel[i].set_triode_grid_ratio(remap_unit(*parTriodeTouch, -1.0f, +0.1f)); 
-		amp_channel[i].set_triode_plate_bias(remap_unit(*parTriodeTouch * -1.0f, -1.0f, +0.5f)); 
-		amp_channel[i].set_triode_plate_comp_ratio(remap_unit(*parTriodeTouch * -1.0f, -1.0f, +0.0f)); 
+		amp_channel[i].set_triode_grid_tau(remap_unit(*parPreAmpTouch, -0.5f, +0.1f)); 
+		amp_channel[i].set_triode_grid_ratio(remap_unit(*parPreAmpTouch, -1.0f, +0.1f)); 
+		amp_channel[i].set_triode_plate_bias(remap_unit(*parPreAmpTouch * -1.0f, -1.0f, +0.5f)); 
+		amp_channel[i].set_triode_plate_comp_ratio(remap_unit(*parPreAmpTouch * -1.0f, -1.0f, +0.0f)); 
 
-		amp_channel[i].set_tetrode_grid_tau(remap_unit(*parTetrodeTouch, -1.0f, +1.0f)); 
-		amp_channel[i].set_tetrode_grid_ratio(remap_unit(*parTetrodeTouch, -1.0f, +0.1f)); 
-		amp_channel[i].set_tetrode_plate_comp_tau(remap_unit(*parTetrodeTouch * -1.0f, -0.5f, +0.0f)); 
-		amp_channel[i].set_tetrode_plate_comp_ratio(remap_unit(*parTetrodeTouch * -1.0f, -0.5f, +0.0f)); 
-		amp_channel[i].set_tetrode_plate_comp_depth(remap_unit(*parTetrodeTouch, -1.0f, +0.5f)); 
+		amp_channel[i].set_tetrode_grid_tau(remap_unit(*parPowerAmpTouch, -1.0f, +1.0f)); 
+		amp_channel[i].set_tetrode_grid_ratio(remap_unit(*parPowerAmpTouch, -1.0f, +0.1f)); 
+		amp_channel[i].set_tetrode_plate_comp_tau(remap_unit(*parPowerAmpTouch * -1.0f, -0.5f, +0.0f)); 
+		amp_channel[i].set_tetrode_plate_comp_ratio(remap_unit(*parPowerAmpTouch * -1.0f, -0.5f, +0.0f)); 
+		amp_channel[i].set_tetrode_plate_comp_depth(remap_unit(*parPowerAmpTouch, -1.0f, +0.5f)); 
 	}
 }
 
-//==============================================================================
+void ResonantAmpAudioProcessor::setMeterListenerIn(LevelMeterListener* meter, int channel) {
+	meterListenersIn[channel] = meter;
+}
+
+void ResonantAmpAudioProcessor::setMeterListenerOut(LevelMeterListener* meter, int channel) {
+	meterListenersOut[channel] = meter;
+}
+
 const String ResonantAmpAudioProcessor::getName() const
 {
 	return JucePlugin_Name;
@@ -206,7 +205,6 @@ void ResonantAmpAudioProcessor::changeProgramName(int index, const String& newNa
 {
 }
 
-//==============================================================================
 void ResonantAmpAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
 	// Use this method as the place to do any pre-playback
@@ -274,11 +272,12 @@ void ResonantAmpAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
 
 	const auto numSamples = buffer.getNumSamples();
 
-	// TODO: stereo meter if input is stereo
-	auto newLevel = buffer.getMagnitude(0, 0, numSamples);
-	// convert to decibels and add the input level which ranges from -35 to +35
-	newLevel = 20 * log10f(newLevel) + (*parInputLevel * 35);
-	meterListeners.call ([=] (LevelMeter::Listener& l) { l.handleNewValue(0, newLevel); });
+	for (int ichannel = 0; ichannel < jmin(totalNumInputChannels, 2); ichannel++) {
+		auto inLevel = buffer.getMagnitude(ichannel, 0, numSamples);
+		// convert to decibels and add the input level which ranges from -35 to +35
+		inLevel = 20 * log10f(inLevel) + (*parInputLevel * 35);
+		if (meterListenersIn[ichannel] != nullptr) meterListenersIn[ichannel]->update(inLevel);
+	}
 
 	// mono to mono: run the amp once
 	if (totalNumInputChannels == 1 && totalNumOutputChannels == 1) {
@@ -299,9 +298,15 @@ void ResonantAmpAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
 			amp_channel[i].compute(buffer.getNumSamples(), &amp_buffer, &amp_buffer);
 		}
 	}
+
+	for (int ichannel = 0; ichannel < jmin(totalNumOutputChannels, 2); ichannel++) {
+		auto outLevel = buffer.getMagnitude(ichannel, 0, numSamples);
+		// note: the output level parameter is already factored into the buffer
+		outLevel = 20 * log10f(outLevel);
+		if (meterListenersOut[ichannel] != nullptr) meterListenersOut[ichannel]->update(outLevel);
+	}
 }
 
-//==============================================================================
 bool ResonantAmpAudioProcessor::hasEditor() const
 {
 	return true; // (change this to false if you choose to not supply an editor)
@@ -312,7 +317,6 @@ AudioProcessorEditor* ResonantAmpAudioProcessor::createEditor()
 	return new ResonantAmpAudioProcessorEditor(*this, parameters);
 }
 
-//==============================================================================
 void ResonantAmpAudioProcessor::getStateInformation(MemoryBlock& destData)
 {
 	auto state = parameters.copyState();
@@ -328,8 +332,6 @@ void ResonantAmpAudioProcessor::setStateInformation(const void* data, int sizeIn
 			parameters.replaceState(ValueTree::fromXml(*xmlState));
 }
 
-//==============================================================================
-// This creates new instances of the plugin..
 AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
 	return new ResonantAmpAudioProcessor();

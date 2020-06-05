@@ -16,114 +16,225 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
-// initialize the editor members related to a VTS parameter and connect them
-#define INIT_PARAMETER(n, l) \
-slide##n.setSliderStyle(Slider::RotaryHorizontalVerticalDrag); \
-slide##n.setTextBoxStyle(Slider::NoTextBox, true, 0, 0); \
-addAndMakeVisible(slide##n); \
-label##n.setText(l, dontSendNotification); \
-label##n.setJustificationType(Justification::centred); \
-addAndMakeVisible(label##n); \
-att##n.reset(new SliderAttachment(valueTreeState, "id"#n, slide##n));
-
-//==============================================================================
 ResonantAmpAudioProcessorEditor::ResonantAmpAudioProcessorEditor(
 	ResonantAmpAudioProcessor& p,
 	AudioProcessorValueTreeState& vts) :
 	AudioProcessorEditor(&p),
 	processor(p),
-	valueTreeState(vts),
-	meter(30, 0.5f, -26.0f, +8.0f)
+	valueTreeState(vts)
 {
-	// Make sure that before the constructor has finished, you've set the
-	// editor's size to whatever you need it to be.
-	setSize (600, 500);
+	setLookAndFeel(&resonantAmpLAF);
+	LookAndFeel::getDefaultLookAndFeel().setDefaultSansSerifTypeface(
+		resonantAmpLAF.getDefaultFont().getTypeface()
+	);
 
-	INIT_PARAMETER(InputLevel, "Input Level")
-	INIT_PARAMETER(OutputLevel, "Output Level")
-	INIT_PARAMETER(PreDrive, "Pre Drive")
-	INIT_PARAMETER(PowerDrive, "Power Drive")
+	addAndMakeVisible(levelsGroup);
+	processor.setMeterListenerIn(levelsGroup.getLevelMeterListenerIn(0), 0);
+	processor.setMeterListenerIn(levelsGroup.getLevelMeterListenerIn(1), 1);
+	processor.setMeterListenerOut(levelsGroup.getLevelMeterListenerOut(0), 0);
+	processor.setMeterListenerOut(levelsGroup.getLevelMeterListenerOut(1), 1);
+	attInputLevel.reset(new SliderAttachment(
+		valueTreeState,
+		"idInputLevel",
+		levelsGroup.sliderInputLevel.slider)
+	);
+	attOutputLevel.reset(new SliderAttachment(
+		valueTreeState,
+		"idOutputLevel",
+		levelsGroup.sliderOutputLevel.slider)
+	);
 
-	INIT_PARAMETER(TsLow, "Low")
-	INIT_PARAMETER(TsMid, "Mid")
-	INIT_PARAMETER(TsHigh, "High")
+	addAndMakeVisible(preAmpGroup);
+	attPreAmpDrive.reset(new SliderAttachment(
+		valueTreeState,
+		"idPreAmpDrive",
+		preAmpGroup.sliderDrive.slider)
+	);
+	attPreAmpTouch.reset(new SliderAttachment(
+		valueTreeState,
+		"idPreAmpTouch",
+		preAmpGroup.sliderTouch.slider)
+	);
 
-	INIT_PARAMETER(GainStages, "Gain Stages")
-	INIT_PARAMETER(GainSlope, "Gain Slope")
+	addAndMakeVisible(powerAmpGroup);
+	attPowerAmpDrive.reset(new SliderAttachment(
+		valueTreeState,
+		"idPowerAmpDrive",
+		powerAmpGroup.sliderDrive.slider)
+	);
+	attPowerAmpTouch.reset(new SliderAttachment(
+		valueTreeState,
+		"idPowerAmpTouch",
+		powerAmpGroup.sliderTouch.slider)
+	);
 
-	INIT_PARAMETER(LowCut, "Contour")
+	addAndMakeVisible(stagingGroup);
+	attGainStages.reset(new SliderAttachment(
+		valueTreeState,
+		"idGainStages",
+		stagingGroup.sliderStages.slider)
+	);
+	attGainSlope.reset(new SliderAttachment(
+		valueTreeState,
+		"idGainSlope",
+		stagingGroup.sliderSlope.slider)
+	);
+	attLowCut.reset(new SliderAttachment(
+		valueTreeState,
+		"idLowCut",
+		stagingGroup.sliderFilter.slider)
+	);
 
-	buttonCabinet.setButtonText("Cabinet");
-	addAndMakeVisible(buttonCabinet);
-	attCabinet.reset(new ButtonAttachment(valueTreeState, "idCabinet", buttonCabinet));
+	addAndMakeVisible(toneStackGroup);
+	attTsLow.reset(new SliderAttachment(
+		valueTreeState,
+		"idTsLow",
+		toneStackGroup.sliderLow.slider)
+	);
+	attTsMid.reset(new SliderAttachment(
+		valueTreeState,
+		"idTsMid",
+		toneStackGroup.sliderMid.slider)
+	);
+	attTsHigh.reset(new SliderAttachment(
+		valueTreeState,
+		"idTsHigh",
+		toneStackGroup.sliderHigh.slider)
+	);
 
-	INIT_PARAMETER(TriodeTouch, "Pre Touch")
-	INIT_PARAMETER(TetrodeTouch, "Power Touch")
+	addAndMakeVisible(cabGroup);
+	attCabOnOff.reset(new ButtonAttachment(
+		valueTreeState,
+		"idCabOnOff",
+		cabGroup.buttonCabOnOff)
+	);
 
-	processor.addMeterListener(*this);
+	logoSvg = Drawable::createFromSVG(*XmlDocument::parse(BinaryData::logo_svg));
 
-	resized();
+
+	const int padding = 64;
+	const int spacing = 32;
+	setSize(5 * 93 + 7 * 8 + spacing + 2 * padding, 3 * 128 + 2 * spacing + 2 * padding);
 }
-
-#undef INIT_PARAMETER
 
 ResonantAmpAudioProcessorEditor::~ResonantAmpAudioProcessorEditor()
 {
-	processor.removeMeterListener(*this);
+	setLookAndFeel(nullptr);
+	processor.setMeterListenerIn(nullptr, 0);
+	processor.setMeterListenerIn(nullptr, 1);
+	processor.setMeterListenerOut(nullptr, 0);
+	processor.setMeterListenerOut(nullptr, 1);
 }
 
-//==============================================================================
+#define GROUP_DROP_SHADOW(n) \
+auto n##ShadowPath = Path(); \
+n##ShadowPath.addRoundedRectangle(n##Group.getBorderBounds(), 4.0f); \
+n##ShadowPath.applyTransform(AffineTransform::translation( \
+	(float)n##Group.getBounds().getTopLeft().getX(), \
+	(float)n##Group.getBounds().getTopLeft().getY() \
+)); \
+auto n##Shadow = DropShadow(Colour::fromHSV(0.0f, 0.0f, 0.0f, 0.333f), 6, Point<int>(1, 1)); \
+n##Shadow.drawForPath(g, n##ShadowPath); 
+
 void ResonantAmpAudioProcessorEditor::paint(Graphics& g)
 {
 	g.fillAll(getLookAndFeel().findColour(ResizableWindow::backgroundColourId));
-	g.setColour(Colours::white);
-	g.setFont(15.0f);
-}
 
-void ResonantAmpAudioProcessorEditor::handleNewValue(int channel, float value)
-{
-	if (channel == 0) meter.update(value);
-}
+	g.drawImage(bgNoise, getLocalBounds().toFloat());
 
-#define LAYOUT_GRID(n, c, r) \
-slide##n.setBounds(inset + c * (knobSize + knobPad), inset + r * (knobSize + labelSize + knobPad), knobSize, knobSize); \
-label##n.setBounds(inset + c * (knobSize + knobPad), inset + r * (knobSize + labelSize + knobPad) + knobSize, knobSize, labelSize);
+	const float height = 24.0f;
+	const float padding = 16.0f;
+
+	const float logoRatio = (float)logoSvg->getWidth() / (float)logoSvg->getHeight();
+	const float logoWidth = logoRatio * height;
+	const float logoX = getBounds().getRight() - padding - logoWidth;
+	const float logoY = getBounds().getY() + padding;
+	logoSvg->setTransformToFit(Rectangle<float>(logoX, logoY, logoWidth, height), RectanglePlacement::centred);
+	logoSvg->draw(g, 1.0f);
+
+	g.setColour(Colour::fromHSV(0.0f, 0.0f, 0.0f, 0.05f));
+	g.fillPath(bgPattern);
+	g.setColour(Colour::fromHSV(0.0f, 0.0f, 0.0f, 0.1f));
+	g.strokePath(bgPattern, PathStrokeType(1.0f));
+
+	GROUP_DROP_SHADOW(levels)
+	GROUP_DROP_SHADOW(preAmp)
+	GROUP_DROP_SHADOW(powerAmp)
+	GROUP_DROP_SHADOW(staging)
+	GROUP_DROP_SHADOW(toneStack)
+}
 
 void ResonantAmpAudioProcessorEditor::resized()
 {
-	// This is generally where you'll want to lay out the positions of any
-	// subcomponents in your editor..
-	const float inset = 20;
-	const float spacing = 20;
-	const float knobSize = 80;
-	const float textHeight = 15;
-	const float knobPad = 10;
-	const float labelSize = labelInputLevel.getFont().getHeight();
+	const float lineThickness = 2.0f;
 
-	meter.setBounds(inset + knobSize + knobPad - 20, inset + knobPad, 20, knobSize - 2 * knobPad);
-	addAndMakeVisible(meter);
+	int padding = 64;
+	int spacing = 32;
 
-	LAYOUT_GRID(InputLevel, 1, 0)
-	LAYOUT_GRID(OutputLevel, 2, 0)
-	LAYOUT_GRID(PreDrive, 3, 0)
-	LAYOUT_GRID(PowerDrive, 4, 0)
+	levelsGroup.setLineThickness(lineThickness);
+	levelsGroup.setHeight(128);
+	levelsGroup.setTopLeftPosition(padding, padding);
 
-	LAYOUT_GRID(TsLow, 0, 1)
-	LAYOUT_GRID(TsMid, 1, 1)
-	LAYOUT_GRID(TsHigh, 2, 1)
+	cabGroup.setLineThickness(lineThickness);
+	cabGroup.setHeight(128);
+	cabGroup.setTopLeftPosition(spacing + levelsGroup.getRight(), padding);
 
-	LAYOUT_GRID(GainStages, 0, 2)
-	LAYOUT_GRID(GainSlope, 1, 2)
+	preAmpGroup.setLineThickness(lineThickness);
+	preAmpGroup.setHeight(128);
+	preAmpGroup.setTopLeftPosition(padding, spacing + levelsGroup.getBottom());
 
-	LAYOUT_GRID(LowCut, 2, 2)
-	buttonCabinet.setBounds(inset + 3 * (knobSize + knobPad), inset + 2 * (knobSize + labelSize + knobPad), knobSize, knobSize);
+	powerAmpGroup.setLineThickness(lineThickness);
+	powerAmpGroup.setHeight(128);
+	powerAmpGroup.setTopLeftPosition(padding, spacing + preAmpGroup.getBottom());
 
-	LAYOUT_GRID(TriodeTouch, 0, 3)
-	LAYOUT_GRID(TetrodeTouch, 1, 3)
+	stagingGroup.setLineThickness(lineThickness);
+	stagingGroup.setHeight(128);
+	stagingGroup.setTopLeftPosition(preAmpGroup.getBounds().getTopRight() + Point<int>(spacing, 0));
+
+	toneStackGroup.setLineThickness(lineThickness);
+	toneStackGroup.setHeight(128);
+	toneStackGroup.setTopLeftPosition(powerAmpGroup.getBounds().getTopRight() + Point<int>(spacing, 0));
+
+
+	rng.setSeed(1234);
+
+	auto noise = Image(
+		Image::PixelFormat::ARGB,
+		getWidth(),
+		getHeight(),
+		false
+	);
+	for (int i = 0; i < noise.getWidth(); i++)
+		for (int j = 0; j < noise.getHeight(); j++)
+			noise.setPixelAt(
+				i, j,
+				Colour::fromHSV(0.0f, 0.0f, 0.0f, rng.nextFloat() * 0.03f)
+			);
+	bgNoise = noise;
+
+	rng.setSeed(3);
+
+	const float patternScale = 24.0f;
+	bgPattern.clear();
+	Rectangle<float> element;
+	element.setSize(patternScale * 0.8f, patternScale * 0.8f);
+	for (int i = 0; i < 15; i++) {
+		for (int j = 0; j < 10; j++) {
+			const float distance = 
+				powf(((float)(i * i) + (float)(j * j)), 0.5f) 
+				/ powf((float)(14*14 + 9*9), 0.5f);
+			if (rng.nextFloat() < 0.3 + 0.7 * distance) continue;
+
+			Point<float> corner(getLocalBounds().getBottomRight().toFloat());
+			corner += Point<float>(-patternScale * (i + 0.5f), -patternScale * (j + 0.5f));
+			corner += Point<float>(-patternScale / 2.0f, -patternScale / 2.0f);
+			element.setPosition(corner);
+			bgPattern.addRoundedRectangle(element, 2.0f);
+		}
+	}
 }
 
 #undef LAYOUT_GRID

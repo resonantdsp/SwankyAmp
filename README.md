@@ -10,70 +10,40 @@ If you prefer to download the VST3 file directly and move it into the appropriat
 
 <https://drive.google.com/open?id=1BrrAsjQ0f8kNIKv2-GHh7Hjl1CVIRMka>
 
-## Change log
-
-Version 0.0.5:
-
-* Reworked tone stack to behave more like a normal amp
-* Don't normalize tone stack levels (pushing up levels will increase distortion)
-
-Version 0.0.4:
-
-* Stability fixes
-* Minor tweaks to power amp model
-* Improvement to the pre amp model
-
-Version 0.0.3:
-
-* Added a parameter smooth cross over distortion
-* Adjusted drive range for less spinal tap level 11
-* Fixed issue with gain stage parameter not working as intended
-
-Version 0.0.2:
-
-* The power amplifier model is re-written and is a better representation of the simulation.
-* The perceived volume of the plugin is more invariant to changes in the drive parameters.
-* All model fits have been improved, default parameters should better ressemble the simulated circuits.
-* Parameter ranges have been refined to give better control over the distortion sound.
-* The cabinet mix has been made into a toggle for clarity.
-
 ## Road map
 
-* Re-work the tone stack to give greater range
-* Overhaul the UI
-* Add the ability to save presets
+* Preset management
+* Cabinet improvements and customization
+* More modern high gain mode
+* Investigate rectifier sag
 
 ## Usage
 
 Load the plugin into your favorite VST host or DAW (into a mono or stereo track), and have fun!
 
-The UI is a hot mess at the moment, but here's a rough overview of the functionality:
+* Set the levels (gain staging):
+    * Set the `input` control such that a strummed open chord just reaches the `S` tick mark for a single coil pickeup, or `H` for a hummbucker.
+    * Set the `output` control to get the desired volume. Generally the -15 dB range is typical.
+    * Note: these are suggested values. You can safely increase the input level to mimick the use of a clean boost pedal, or if you know your pickups are hotter than typical.
 
-* Use the input level to gain stage appropriately. The level meter has a marking `S` indicating roughly where you want to gain stage a single coil pickup, and `H` for a humbucker pickup. Strum a chord and adjust the input level until the meter peaks at the appropriate level. This is just a guideline. If you play hard, through an overdrive, or just want a different sound, then you can safely ignore that guideline.
+* Generally speaking, you'll want to leave the `cabinet` control to `on`, unless you'd rather use your own cabinet plugin downstream of the amp.
 
-* The `Pre Drive` control allows you to adjust the amount of distortion arising from the pre-amp stage. This is also often called the "Gain".
+* Set the pre amp section
+  * Set the `drive` control (a.k.a. gain) to get the desired pre amp distortion.
+  * Tune the `touch` control to get the desired touch sensitivity. Larger values are less stable but exhibit more vintage tube behaviour. Smaller values lead to more modern sounding distortion.
+  * Note: the plugin will attempt to maintain an even perceived loudness when modyfing the drive. This way you can use the drive to set the desired distortion, and then use the output level to adjust... well the output level.
 
-* The `Power Drive` control allows you to adjust the amount of distortion arising from the power amp stage. This is often also called the "Volume".
+* Set the staging:
+  * Set the `stages` control to determine the number of pre amp tubes the signal is routed to. Increase this for a more even high gain distortion.
+  * Tune the `slope` control to determine how much harder each successive tube is pushed (smaller values can help even out the distortion).
+  * Increase `filter` control to remove low end build up in the pre-amp stage. A lower value can lead to a fuller sound, but it can be less stable.
 
-* The plugin roughly compensates for the additional volume arising from increasing the drive. However, when you get to very high levels you will notice the volume increasing, and might have to adjust your output level accordingly.
+* Set the `low`, `mid`, `high` controls as you normally would.
 
-* The `Low`, `Mid` and `High` controls adjust the tone stack as you might expect from a typical guitar amp.
-
-* The `Gain Stages` control adjusts the number of pre-amp stages the signal goes through. Increase this for a more modern distorted sound. All the way to the left the signal goes through only one gain stage which is an unusual situation and can give rise to some interesting tones.
-
-* The `Gain Slope` control adjusts how much harder each consecutive gain stage is working than the last. Increase this for an edgier distortion. The effect is most pronounced at higher gain stages.
-
-* The `Contour` control adjusts a high pass which removes low end in the pre-amp stage. Increase it for a tighter sound, but too much and you'll notice you're losing lows. Decrease it for a dirty distortion sound as the low end builds up in the pre-amp section and constantly biases the signal into a distorted region.
-
-* When the `Cabinet` parameter is active, the amplifier output is fed into a cabinet model. The model emulates a generic 4x12 cabinet with a condesner microphone. If you have a cabinet emulation plugin, it might be best to disable this parameter and feed the output of Resonant Amp into your cabinet emulator.
-
-* The `Pre. ...` controls adjust parameters relating to the pre-amp distortion, while the `Power ...` controls adjust the same parameters but for the power amp.
-
-* The `... Dyn.` controls adjust parameters that affect how dynamically the distortion responds to your playing. Reduce the controls for a more consistent distortion, increase them to get more slow moving bias shifts.
-
-* The `... Dist.` controls adjust parameters that affect the sound or tone of the distortion.
-
-* These parameters are changing this relating to the circuitry around the tube and even the tube geometry itself (e.g. think plate voltage, resistors, but also the power of the tube, its internal capacitance etc.). These controls allow you to tune into a particular distortion sound not related to any one particular amplifier model. Think of it as building your own amp.
+* Set the power amp section:
+  * See the notes on the pre amp section
+  * The `drive` control here has the same effect on distortion as the volume knob of an amp, but the plugin maintains an even loudness.
+  * Note that the power amp can act as a compressor: try setting the drive to the point where softly picked notes don't distort, but heavily picked ones do. You should notice the notes souding a bit fuller as the transiet hits the distortion ceiling, and then the note rings through as the bias point shifts.
 
 ## The model
 
@@ -125,3 +95,44 @@ This process generates `Source/AmpMono.h` artifact. However this file is tracked
 * Run `python buildamp.py`
 
 However this might not work for versions of FAUST other than `2.14.4` in which case you will need to dig around `dsp/builddsp.py` and fix any issues arising from that script.
+
+## Change log
+
+Version 0.1.0:
+
+* Built a proper UI
+* Improved the parameter ranges, especially the drive
+* Simplified the drive tone control
+* Reduced the mids control slightly
+
+Version 0.0.6:
+
+* Rework the power amp again, capture slow dynamics
+* In particular capturing bias drift contributing to distorted compression
+* Improvements transfered over also to the pre amp section
+* Some of the dsp code was streamlined to be more efficient
+
+Version 0.0.5:
+
+* Reworked tone stack to behave more like a normal amp
+* Don't normalize tone stack levels (pushing up levels will increase distortion)
+
+Version 0.0.4:
+
+* Stability fixes
+* Minor tweaks to power amp model
+* Improvement to the pre amp model
+
+Version 0.0.3:
+
+* Added a parameter smooth cross over distortion
+* Adjusted drive range for less spinal tap level 11
+* Fixed issue with gain stage parameter not working as intended
+
+Version 0.0.2:
+
+* The power amplifier model is re-written and is a better representation of the simulation.
+* The perceived volume of the plugin is more invariant to changes in the drive parameters.
+* All model fits have been improved, default parameters should better ressemble the simulated circuits.
+* Parameter ranges have been refined to give better control over the distortion sound.
+* The cabinet mix has been made into a toggle for clarity.

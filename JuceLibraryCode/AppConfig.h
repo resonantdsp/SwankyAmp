@@ -45,7 +45,7 @@
 
 // END SECTION A
 
-#define JUCE_USE_DARK_SPLASH_SCREEN 1
+#define JUCE_USE_DARK_SPLASH_SCREEN 0
 
 #define JUCE_PROJUCER_VERSION 0x50407
 
@@ -256,7 +256,7 @@
 #endif
 
 #ifndef    JUCE_DISABLE_COREGRAPHICS_FONT_SMOOTHING
- //#define JUCE_DISABLE_COREGRAPHICS_FONT_SMOOTHING 0
+ #define   JUCE_DISABLE_COREGRAPHICS_FONT_SMOOTHING 1
 #endif
 
 //==============================================================================
@@ -368,13 +368,13 @@
  #define JucePlugin_EditorRequiresKeyboardFocus  0
 #endif
 #ifndef  JucePlugin_Version
- #define JucePlugin_Version                0.0.6
+ #define JucePlugin_Version                0.1.0
 #endif
 #ifndef  JucePlugin_VersionCode
- #define JucePlugin_VersionCode            0x6
+ #define JucePlugin_VersionCode            0x100
 #endif
 #ifndef  JucePlugin_VersionString
- #define JucePlugin_VersionString          "0.0.6"
+ #define JucePlugin_VersionString          "0.1.0"
 #endif
 #ifndef  JucePlugin_VSTUniqueID
  #define JucePlugin_VSTUniqueID            JucePlugin_PluginCode
