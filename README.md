@@ -31,6 +31,7 @@ Load the plugin into your favorite VST host or DAW (into a mono or stereo track)
 * Set the pre amp section
   * Set the `drive` control (a.k.a. gain) to get the desired pre amp distortion.
   * Tune the `touch` control to get the desired touch sensitivity. Larger values are less stable but exhibit more vintage tube behaviour. Smaller values lead to more modern sounding distortion.
+  * Tune the `grit` control to get different distortion tones. This effectively changes the overhead available in the pre amp tubes.
   * Note: the plugin will attempt to maintain an even perceived loudness when modyfing the drive. This way you can use the drive to set the desired distortion, and then use the output level to adjust... well the output level.
 
 * Set the staging:
@@ -97,6 +98,10 @@ This process generates `Source/AmpMono.h` artifact. However this file is tracked
 However this might not work for versions of FAUST other than `2.14.4` in which case you will need to dig around `dsp/builddsp.py` and fix any issues arising from that script.
 
 ## Change log
+
+Version 0.2.0:
+
+* Add grit control to pre amp
 
 Version 0.1.0:
 

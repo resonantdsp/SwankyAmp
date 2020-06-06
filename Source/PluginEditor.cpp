@@ -58,6 +58,11 @@ ResonantAmpAudioProcessorEditor::ResonantAmpAudioProcessorEditor(
 		"idPreAmpTouch",
 		preAmpGroup.sliderTouch.slider)
 	);
+	attPreAmpGrit.reset(new SliderAttachment(
+		valueTreeState,
+		"idPreAmpGrit",
+		preAmpGroup.sliderGrit.slider)
+	);
 
 	addAndMakeVisible(powerAmpGroup);
 	attPowerAmpDrive.reset(new SliderAttachment(
@@ -117,7 +122,7 @@ ResonantAmpAudioProcessorEditor::ResonantAmpAudioProcessorEditor(
 
 	const int padding = 64;
 	const int spacing = 32;
-	setSize(5 * 93 + 7 * 8 + spacing + 2 * padding, 3 * 128 + 2 * spacing + 2 * padding);
+	setSize(6 * 93 + 7 * 8 + spacing + 2 * padding, 3 * 128 + 2 * spacing + 2 * padding);
 }
 
 ResonantAmpAudioProcessorEditor::~ResonantAmpAudioProcessorEditor()

@@ -35,6 +35,7 @@ public:
 	// note: need to expose so that it can get a parameter attachment
 	RSliderLabel sliderDrive;
 	RSliderLabel sliderTouch;
+	RSliderLabel sliderGrit;
 
 private:
 	int height = 0;
