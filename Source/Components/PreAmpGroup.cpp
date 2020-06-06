@@ -37,6 +37,12 @@ PreAmpGroup::PreAmpGroup() :
 	sliderTouch.slider.setPosMapLow(0.0f);
 	sliderTouch.slider.setPosMapHigh(10.0f);
 	sliderTouch.slider.setPosMapFmt("%02.0f");
+
+	addAndMakeVisible(sliderGrit);
+	sliderGrit.setLabel("GRIT");
+	sliderGrit.slider.setPosMapLow(0.0f);
+	sliderGrit.slider.setPosMapHigh(10.0f);
+	sliderGrit.slider.setPosMapFmt("%02.0f");
 }
 
 void PreAmpGroup::setHeight(int height) {
@@ -67,6 +73,16 @@ void PreAmpGroup::setHeight(int height) {
 	sliderTouch.setHeight(innerHeight);
 
 	corner = sliderTouch.getBounds().getTopRight() + Point<int>(spacing, 0);
+
+	sliderGrit.setTopLeftPosition(corner);
+	sliderGrit.setLabelHeight(labelSize);
+	sliderGrit.slider.setGap(2.0f);
+	sliderGrit.slider.setMargin(0.15 * innerHeight);
+	sliderGrit.setLabelHeight(16.0f);
+	sliderGrit.setFont(16.0f);
+	sliderGrit.setHeight(innerHeight);
+
+	corner = sliderGrit.getBounds().getTopRight() + Point<int>(spacing, 0);
 
 	setSize(corner.getX() - getBounds().getX() + spacing, height);
 }

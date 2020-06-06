@@ -57,6 +57,7 @@ private:
 	PreAmpGroup preAmpGroup;
 	std::unique_ptr<SliderAttachment> attPreAmpDrive;
 	std::unique_ptr<SliderAttachment> attPreAmpTouch;
+	std::unique_ptr<SliderAttachment> attPreAmpGrit;
 
 	PowerAmpGroup powerAmpGroup;
 	std::unique_ptr<SliderAttachment> attPowerAmpDrive;

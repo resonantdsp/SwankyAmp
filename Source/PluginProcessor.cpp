@@ -57,8 +57,9 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 
 			std::make_unique<AudioParameterBool>("idCabOnOff", "CabOnOff", true),
 
-			MAKE_PARAMETER(PreAmpDrive, -1.0f, 1.0f, -0.5f),
+			MAKE_PARAMETER_UNIT(PreAmpDrive),
 			MAKE_PARAMETER_UNIT(PreAmpTouch),
+			MAKE_PARAMETER(PreAmpGrit, -1.0f, 1.0f, -0.5f),
 
 			MAKE_PARAMETER_UNIT(PowerAmpDrive),
 			MAKE_PARAMETER_UNIT(PowerAmpTouch),
@@ -82,6 +83,7 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 
 	ASSIGN_PARAMETER(PreAmpDrive)
 	ASSIGN_PARAMETER(PreAmpTouch)
+	ASSIGN_PARAMETER(PreAmpGrit)
 
 	ASSIGN_PARAMETER(PowerAmpDrive)
 	ASSIGN_PARAMETER(PowerAmpTouch)
@@ -127,6 +129,11 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 		amp_channel[i].set_triode_grid_ratio(remap_unit(*parPreAmpTouch, -1.0f, +0.1f)); 
 		amp_channel[i].set_triode_plate_bias(remap_unit(*parPreAmpTouch * -1.0f, -1.0f, +0.5f)); 
 		amp_channel[i].set_triode_plate_comp_ratio(remap_unit(*parPreAmpTouch * -1.0f, -1.0f, +0.0f)); 
+
+		amp_channel[i].set_triode_grid_level(remap_unit(*parPreAmpGrit * -1.0f, -0.25f, +3.0f)); 
+		amp_channel[i].set_triode_grid_clip(remap_unit(*parPreAmpGrit * -1.0f, -1.0f, +4.0f)); 
+		amp_channel[i].set_triode_plate_comp_level(remap_unit(*parPreAmpGrit * +1.0f, -0.0f, +1.0f)); 
+		amp_channel[i].set_triode_plate_comp_offset(remap_unit(*parPreAmpGrit * -1.0f, -0.0f, +5.0f)); 
 
 		amp_channel[i].set_tetrode_grid_tau(remap_unit(*parPowerAmpTouch, -1.0f, +1.0f)); 
 		amp_channel[i].set_tetrode_grid_ratio(remap_unit(*parPowerAmpTouch, -1.0f, +0.1f)); 

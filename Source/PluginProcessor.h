@@ -57,6 +57,7 @@ public:
 
 	std::atomic<float>* parPreAmpDrive = nullptr;
 	std::atomic<float>* parPreAmpTouch = nullptr;
+	std::atomic<float>* parPreAmpGrit = nullptr;
 
 	std::atomic<float>* parPowerAmpDrive = nullptr;
 	std::atomic<float>* parPowerAmpTouch = nullptr;

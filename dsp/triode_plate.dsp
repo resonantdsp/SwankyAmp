@@ -48,6 +48,7 @@ triode_plate = environment {
     comp_tau2 = comp_tau * comp_ratio : 1.0 / (ba.sec2samp(_) + 1);
 
     comp_corner = nentry("triode_plate_comp_corner", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+2)) : exp;
+    comp_offset = nentry("triode_plate_comp_offset", 0, -1, +1, .1) : uscale(-100, +100);
 
 
     full = _ 
@@ -66,7 +67,7 @@ triode_plate = environment {
         : -
 
         <: max(comp_level) - comp_level, _
-        : calc_charge(comp_tau1, comp_tau2) * comp_depth, _
+        : calc_charge(comp_tau1, comp_tau2) * comp_depth + comp_offset, _
         // NOTE: the clip level is relative to zero
         : soft_clip_up(comp_corner)
 
