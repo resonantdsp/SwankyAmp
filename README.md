@@ -99,6 +99,11 @@ However this might not work for versions of FAUST other than `2.14.4` in which c
 
 ## Change log
 
+Version 0.2.1:
+
+* Added some texturing to the dials and buttons
+* Technical changes to support further UI developement
+
 Version 0.2.0:
 
 * Add grit control to pre amp
