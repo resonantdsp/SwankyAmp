@@ -34,6 +34,7 @@
         <FILE id="cKYP56" name="PowerAmpGroup.h" compile="0" resource="0" file="Source/Components/PowerAmpGroup.h"/>
         <FILE id="lYZZuU" name="PreAmpGroup.cpp" compile="1" resource="0" file="Source/Components/PreAmpGroup.cpp"/>
         <FILE id="InSxOR" name="PreAmpGroup.h" compile="0" resource="0" file="Source/Components/PreAmpGroup.h"/>
+        <FILE id="JZcEVK" name="RButton.cpp" compile="1" resource="0" file="Source/Components/RButton.cpp"/>
         <FILE id="RPoaOX" name="RButton.h" compile="0" resource="0" file="Source/Components/RButton.h"/>
         <FILE id="EU8W53" name="RSlider.cpp" compile="1" resource="0" file="Source/Components/RSlider.cpp"/>
         <FILE id="uaxdQh" name="RSlider.h" compile="0" resource="0" file="Source/Components/RSlider.h"/>

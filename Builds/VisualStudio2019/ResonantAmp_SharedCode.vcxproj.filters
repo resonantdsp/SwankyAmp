@@ -460,6 +460,9 @@
     <ClCompile Include="..\..\Source\Components\PreAmpGroup.cpp">
       <Filter>ResonantAmp\Source\Components</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Source\Components\RButton.cpp">
+      <Filter>ResonantAmp\Source\Components</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Source\Components\RSlider.cpp">
       <Filter>ResonantAmp\Source\Components</Filter>
     </ClCompile>

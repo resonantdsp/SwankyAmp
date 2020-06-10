@@ -143,6 +143,7 @@
     <ClCompile Include="..\..\Source\Components\ParameterGroup.cpp"/>
     <ClCompile Include="..\..\Source\Components\PowerAmpGroup.cpp"/>
     <ClCompile Include="..\..\Source\Components\PreAmpGroup.cpp"/>
+    <ClCompile Include="..\..\Source\Components\RButton.cpp"/>
     <ClCompile Include="..\..\Source\Components\RSlider.cpp"/>
     <ClCompile Include="..\..\Source\Components\RSliderLabel.cpp"/>
     <ClCompile Include="..\..\Source\Components\StagingGroup.cpp"/>

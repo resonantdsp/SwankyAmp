@@ -22,7 +22,6 @@
 
 float angleModulo(float angle);
 
-void fillImageNoise(Image& image, Random& rng, float alpha);
 Image buildImageNoise(int width, int height, Random& rng, float alpha);
 
 // commonly used in parameter groups that need to handle the size (e.g. to

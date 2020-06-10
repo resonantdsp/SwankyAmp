@@ -43,6 +43,8 @@ public:
 	// an `RSlider` of type `Slider*` when deleting.
 	~RSlider() {}
 
+	void resized() override;
+
 	String fmtSliderPos(float sliderPos) const;
 
 	// NOTE: this could be called on `resized` and cached, but it also depends on
@@ -56,6 +58,8 @@ public:
 	void setPosMapLow(float value) { posMapLow = value; }
 	void setPosMapHigh(float value) { posMapHigh = value; }
 	void setPosMapFmt(const String& fmt) { posMapFmt = fmt; }
+
+	const Image& getBgNoise() const { return bgNoise; }
 
 	enum ColourIds
 	{
@@ -75,6 +79,9 @@ private:
 
 	float gap = 2.0f;
 	float margin = 0.0f;
+
+	Random rng;
+	Image bgNoise;
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (RSlider)
 };

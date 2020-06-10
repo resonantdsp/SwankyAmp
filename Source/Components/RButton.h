@@ -26,6 +26,10 @@ public:
 	RButton() {}
 	~RButton() {}
 
+	void resized() override;
+
+	const Image& getBgNoise() const { return bgNoise; }
+
 	enum ColourIds
 	{
 		buttonColourId = 0x2000401,
@@ -33,5 +37,8 @@ public:
 	};
 
 private:
+	Random rng;
+	Image bgNoise;
+	
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (RButton)
 };

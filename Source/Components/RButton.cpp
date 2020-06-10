@@ -18,32 +18,12 @@
 
 #include <JuceHeader.h>
 
-#include "Utils.h"
+#include "../Utils.h"
 
-float angleModulo(float angle)
-{
-	const float modulo = fmodf(angle, MathConstants<float>::twoPi);
-	if (modulo > MathConstants<float>::pi)
-		return modulo - MathConstants<float>::twoPi;
-	else
-		return modulo;
-}
+#include "RButton.h"
 
-void fillImageNoise(Image& image, Random& rng, float alpha)
+void RButton::resized()
 {
-	if (image.getFormat() != Image::PixelFormat::ARGB)
-		image.convertedToFormat(Image::PixelFormat::ARGB);
-	for (int i = 0; i < image.getWidth(); i++)
-		for (int j = 0; j < image.getHeight(); j++)
-			image.setPixelAt(
-				i, j,
-				Colour::fromHSV(0.0f, 0.0f, 0.0f, rng.nextFloat() * alpha)
-			);
-}
-
-Image buildImageNoise(int width, int height, Random& rng, float alpha)
-{
-	Image noise(Image::PixelFormat::ARGB, width, height, false);
-	fillImageNoise(noise, rng, alpha);
-	return noise;
+	ToggleButton::resized();
+	bgNoise = buildImageNoise(getWidth(), getHeight(), rng, 0.1f);
 }

@@ -119,3 +119,9 @@ float RSlider::calcHeightForWidth(float width) const
 
 	return (radiusForWidth + margin) * 2.0f;
 }
+
+void RSlider::resized()
+{
+	Slider::resized();
+	bgNoise = buildImageNoise(getWidth(), getHeight(), rng, 0.1f);
+}

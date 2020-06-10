@@ -150,6 +150,11 @@ void ResonantAmpLAF::drawRotarySlider(
 	
 	// dial
 
+	auto dialBounds = Rectangle<float>();
+	dialBounds.setSize(dims.radius * 2.0f, dims.radius * 2.0f);
+	dialBounds.setX(dims.centre.getX() - dims.radius);
+	dialBounds.setY(dims.centre.getY() - dims.radius);
+
 	Path dialPath;
 	dialPath.addCentredArc(
 		dims.centre.getX(),
@@ -167,6 +172,21 @@ void ResonantAmpLAF::drawRotarySlider(
 
 	g.setColour(findColour(RSlider::dialColourId));
 	g.fillPath(dialPath);
+
+	// texture the dial
+
+	ColourGradient gradient;
+	gradient.addColour(0.0f, Colour::fromHSV(0.0f, 0.0f, 1.0f, 0.1f));
+	gradient.addColour(0.75f, Colour::fromHSV(0.0f, 0.0f, 1.0f, 0.0f));
+	gradient.point1 = dialBounds.getTopLeft();
+	gradient.point2 = dialBounds.getBottomLeft();
+	g.setGradientFill(gradient);
+	g.fillPath(dialPath);
+
+	g.saveState();
+	g.reduceClipRegion(dialPath);
+	g.drawImage(rslider->getBgNoise(), slider.getLocalBounds().toFloat());
+	g.restoreState();
 
 	// dial outline
 
@@ -186,11 +206,6 @@ void ResonantAmpLAF::drawRotarySlider(
 	);
 	dialOutlinePath.closeSubPath();
 	g.strokePath(dialOutlinePath, PathStrokeType(1.0f));
-
-	auto dialBounds = Rectangle<float>();
-	dialBounds.setSize(dims.radius * 2.0f, dims.radius * 2.0f);
-	dialBounds.setX(dims.centre.getX() - dims.radius);
-	dialBounds.setY(dims.centre.getY() - dims.radius);
 
 	// label text
 
@@ -299,21 +314,43 @@ void ResonantAmpLAF::drawToggleButton(
 		g.getClipBounds().getCentreY() - 2.0f * radius
 	);
 
-	Rectangle<float> circle;
-	circle.setSize(2.0f * radius, 2.0f * radius);
+	// draw the circle
+
+	Rectangle<float> circleBounds;
+	circleBounds.setSize(2.0f * radius, 2.0f * radius);
 	if (button.getToggleState())
-		circle.setPosition(outer.getTopLeft());
+		circleBounds.setPosition(outer.getTopLeft());
 	else
-		circle.setPosition(outer.getTopLeft().translated(0.0f, 2.0f * radius));
+		circleBounds.setPosition(outer.getTopLeft().translated(0.0f, 2.0f * radius));
+
+	Path circlePath;
+	circlePath.addEllipse(circleBounds);
 
 	g.setColour(findColour(RButton::buttonColourId));
-	g.fillEllipse(circle);
+	g.fillPath(circlePath);
+
+	// texture the circle
+
+	ColourGradient gradient;
+	gradient.addColour(0.0f, Colour::fromHSV(0.0f, 0.0f, 1.0f, 0.1f));
+	gradient.addColour(0.75f, Colour::fromHSV(0.0f, 0.0f, 1.0f, 0.0f));
+	gradient.point1 = circleBounds.getTopLeft();
+	gradient.point2 = circleBounds.getBottomLeft();
+	g.setGradientFill(gradient);
+	g.fillPath(circlePath);
+
+	g.saveState();
+	g.reduceClipRegion(circlePath);
+	g.drawImage(rbutton->getBgNoise(), button.getLocalBounds().toFloat());
+	g.restoreState();
+
+	// draw the text
 
 	g.setColour(findColour(RButton::textColourId));
 	g.setFont(ResonantAmpLAF::getDefaultFontNarrow().withHeight(radius));
 	g.drawText(
 		button.getToggleState() ? "ON" : "OFF",
-		circle,
+		circleBounds,
 		Justification::centred,
 		true
 	);
