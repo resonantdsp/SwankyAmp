@@ -19,35 +19,39 @@
 #pragma once
 
 #include <JuceHeader.h>
+
+#include "../Utils.h"
 #include "RSlider.h"
 
 class RSliderLabel : public Component
 {
 public:
 	RSliderLabel();
-	~RSliderLabel();
+	~RSliderLabel() {}
 
 	void resized() override;
 
-	void setLabel(const String& /*text*/);
+	void setLabel(const String& text) { label.setText(text, NotificationType::dontSendNotification); }
 
-	void setFont(float /*fontSize*/);
-	void setFont(const Font& /*font*/);
-	void setLabelHeight(int /*height*/);
-	void setHeight(int /*size*/);
-	void setWidth(int /*size*/);
+	void setHeight(int size);
+	void setWidth(int size);
+	void setSliderMargin(float size);
 
+	// TODO: publich for parameter attachment, but maybe RSliderLabel should
+	// just inherent from RSlider and not compose the elements?
 	RSlider slider;
-	Label label;
 
 private:
-	// disable setting the size directly
-	using Component::setSize;
-	using Component::setBounds;
-	using Component::setBoundsRelative;
-	using Component::setBoundsInset;
-	using Component::setBoundsToFit;
-	using Component::centreWithSize;
+	Label label;
 
+	enum class SetDimension
+	{
+		SetFromHeight,
+		SetFromWidth,
+		NoDimension
+	};
+	SetDimension setDimension = SetDimension::NoDimension;
+
+	DISABLE_COMPONENT_RESIZE()
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (RSliderLabel)
 };

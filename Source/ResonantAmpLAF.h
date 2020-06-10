@@ -37,29 +37,32 @@ public:
 	static const Font& getDefaultFontNarrow();
 	static const Font& getDefaultFontBold();
 
-	static const Colour& getColourDark();
-	static const Colour& getColourGrey();
-	static const Colour& getColourBackground();
-	static const Colour& getColourHighlight();
+	static const Colour colourDark;
+	static const Colour colourGrey;
+	static const Colour colourBackground;
+	static const Colour colourHighlight;
+	static const Colour colourSteel;
+
+	static const DropShadow& getDropShadow();
 
 	Slider::SliderLayout getSliderLayout(Slider& slider) override;
 
 	void drawRotarySlider(
-		Graphics& /*g*/,
-		int /*x*/,
-		int /*y*/,
-		int /*width*/,
-		int /*height*/,
-		float /*sliderPos*/,
-        const float /*rotaryStartAngle*/,
-		const float /*rotaryEndAngle*/,
-		Slider& /*slider*/
+		Graphics& g,
+		int x,
+		int y,
+		int width,
+		int height,
+		float sliderPos,
+		const float rotaryStartAngle,
+		const float rotaryEndAngle,
+		Slider& slider
 	) override;
 
 	void drawToggleButton(
 		Graphics& g,
 		ToggleButton& button,
-        bool shouldDrawButtonAsHighlighted,
+		bool shouldDrawButtonAsHighlighted,
 		bool shouldDrawButtonAsDown
 	) override;
 };

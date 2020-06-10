@@ -20,28 +20,51 @@
 
 #include <JuceHeader.h>
 
+#include "../Utils.h"
+
+typedef AudioProcessorValueTreeState::SliderAttachment SliderAttachment;
+typedef AudioProcessorValueTreeState::ButtonAttachment ButtonAttachment;
+
 /*
- * Common functionality for a group of parameters: label, border and padding.
+ * A group of parameters drawn in a box, with a label sitting atop the box.
  */
 class ParameterGroup : public Component
 {
 public:
-	ParameterGroup();
 	ParameterGroup(const String& label);
+	ParameterGroup() : ParameterGroup("") {}
 	virtual ~ParameterGroup() {}
 
-	void paint(Graphics&) override;
-	void resized() override;
+	virtual void paint(Graphics&) override;
+	virtual void resized() override;
 
-	Rectangle<int> getBorderBounds() const;
+	virtual void attachVTS(AudioProcessorValueTreeState& vts) = 0;
 
-	void setLabel(const String& /*label*/);
-	void setLineThickness(float /*thickness*/);
+	const Rectangle<int>& getBorderBounds() const { return borderBounds; }
+
+	void setLabel(const String& pLabel) { label.setText(pLabel, dontSendNotification); }
+	void setFont(const Font& font);
+	void setFont(float height);
+	void setLineThickness(float thickness);
+	void setSpacing(int spacing);
+	void setBgNoiseAlpha(float alpha) { bgNoiseAlpha = alpha; }
+
+	float getLineThickness() const { return lineThickness; }
+
+	enum ColourIds
+	{
+		borderColourId = 0x2000101, // the colour of the border
+		steelColourId = 0x2000102,  // the component background brushed steel colour
+	};
 
 protected:
 	Label label;
-	float lineThickness;
+	float lineThickness = 2.0f;
+	int spacing = 12;
+	Rectangle<int> borderBounds;
+	float bgNoiseAlpha =  0.03f;
 
+	ColourGradient gradient;
 	Image bgNoise;
 	Random rng;
 

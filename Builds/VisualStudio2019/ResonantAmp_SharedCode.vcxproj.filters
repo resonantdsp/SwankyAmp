@@ -439,6 +439,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\Source\Components\AmpGroup.cpp">
+      <Filter>ResonantAmp\Source\Components</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Source\Components\CabGroup.cpp">
       <Filter>ResonantAmp\Source\Components</Filter>
     </ClCompile>
@@ -455,6 +458,9 @@
       <Filter>ResonantAmp\Source\Components</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Components\PreAmpGroup.cpp">
+      <Filter>ResonantAmp\Source\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\Components\RButton.cpp">
       <Filter>ResonantAmp\Source\Components</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\Components\RSlider.cpp">
@@ -2475,6 +2481,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Source\Components\AmpGroup.h">
+      <Filter>ResonantAmp\Source\Components</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\Components\CabGroup.h">
       <Filter>ResonantAmp\Source\Components</Filter>
     </ClInclude>
@@ -2491,6 +2500,9 @@
       <Filter>ResonantAmp\Source\Components</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Components\PreAmpGroup.h">
+      <Filter>ResonantAmp\Source\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\Components\RButton.h">
       <Filter>ResonantAmp\Source\Components</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\Components\RSlider.h">

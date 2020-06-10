@@ -19,10 +19,10 @@
 #pragma once
 
 #include <JuceHeader.h>
+
+#include "../Utils.h"
 #include "ParameterGroup.h"
 #include "RSliderLabel.h"
-
-#include "LevelMeter.h"
 
 class ToneStackGroup : public ParameterGroup
 {
@@ -30,22 +30,20 @@ public:
 	ToneStackGroup();
 	~ToneStackGroup() {}
 
-	void setHeight(int height);
+	void attachVTS(AudioProcessorValueTreeState& vts);
 
+	void setHeight(int height) { setSize(0, height); }
+	void resized() override;
+
+private:
 	RSliderLabel sliderLow;
 	RSliderLabel sliderMid;
 	RSliderLabel sliderHigh;
 
-private:
-	int height = 0;
+	std::unique_ptr<SliderAttachment> attLow;
+	std::unique_ptr<SliderAttachment> attMid;
+	std::unique_ptr<SliderAttachment> attHigh;
 
-	// disable setting the width
-	using Component::setSize;
-	using Component::setBounds;
-	using Component::setBoundsRelative;
-	using Component::setBoundsInset;
-	using Component::setBoundsToFit;
-	using Component::centreWithSize;
-
+	DISABLE_COMPONENT_RESIZE()
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ToneStackGroup)
 };

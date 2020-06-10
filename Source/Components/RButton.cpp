@@ -16,35 +16,14 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#pragma once
-
 #include <JuceHeader.h>
 
 #include "../Utils.h"
-#include "ParameterGroup.h"
-#include "RSliderLabel.h"
 
-class StagingGroup : public ParameterGroup
+#include "RButton.h"
+
+void RButton::resized()
 {
-public:
-	StagingGroup();
-	~StagingGroup() {}
-
-	void setHeight(int height) { setSize(0, height); }
-	void resized() override;
-
-	void attachVTS(AudioProcessorValueTreeState& vts);
-
-private:
-	RSliderLabel sliderStages;
-	RSliderLabel sliderSlope;
-	RSliderLabel sliderFilter;
-
-	std::unique_ptr<SliderAttachment> attStages;
-	std::unique_ptr<SliderAttachment> attSlope;
-	std::unique_ptr<SliderAttachment> attFilter;
-
-	DISABLE_COMPONENT_RESIZE()
-	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (StagingGroup)
-};
-
+	ToggleButton::resized();
+	bgNoise = buildImageNoise(getWidth(), getHeight(), rng, 0.1f);
+}

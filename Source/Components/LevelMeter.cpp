@@ -19,46 +19,10 @@
 #pragma once
 
 #include <JuceHeader.h>
+
 #include "../ResonantAmpLAF.h"
+
 #include "LevelMeter.h"
-
-
-LevelMeter::LevelMeter() :
-	maxLevel{ 0.0f },
-	level(0.0f),
-	dbLow(-30.0f),
-	dbHigh(0.0f),
-	decayTau(0.5f),
-	ticks{},
-	barWidth(0),
-	labelWidth(0),
-	labelHeight(16.0f),
-	labelGap(0),
-	labelsOnRight(false)
-{
-	setRefreshRate(30);
-}
-
-void LevelMeter::setRefreshRate(int refreshRateHz) {
-	startTimer(refreshRateHz);
-}
-
-void LevelMeter::setDbLow(float db) {
-	dbLow = db;
-}
-
-void LevelMeter::setDbHigh(float db) {
-	dbHigh = db;
-}
-
-void LevelMeter::setDecayTau(float tau) {
-	decayTau = tau;
-}
-
-void LevelMeter::setTicks(const MeterTicks& pTicks) {
-	// should do a deep copy
-	ticks = pTicks;
-}
 
 void LevelMeter::setBarWidth(int width) {
 	barWidth = width;
@@ -66,7 +30,7 @@ void LevelMeter::setBarWidth(int width) {
 }
 
 void LevelMeter::setBarHeight(int height) {
-	setSize(getWidth(), height);
+	setSize(labelWidth + labelGap + barWidth, height);
 }
 
 void LevelMeter::setLabelWidth(int width) {
@@ -77,22 +41,6 @@ void LevelMeter::setLabelWidth(int width) {
 void LevelMeter::setLabelGap(int width) {
 	labelGap = width;
 	setSize(labelWidth + labelGap + barWidth, getHeight());
-}
-
-void LevelMeter::setLabelHeight(float height) {
-	labelHeight = height;
-}
-
-void LevelMeter::setLabelsOnRight(bool choice) {
-	labelsOnRight = choice;
-}
-
-float LevelMeter::getLabelHeight() const {
-	return labelHeight;
-}
-
-int LevelMeter::getLabelWidth() const {
-	return labelWidth;
 }
 
 float LevelMeter::dbToLevel(float db) const
@@ -132,10 +80,10 @@ void LevelMeter::paint(Graphics& g)
 		true
 	);
 
-	g.setColour(ResonantAmpLAF::getColourBackground());
+	g.setColour(findColour(backgroundColourId));
 	g.fillRoundedRectangle(fullBar, corner);
 
-	g.setColour(ResonantAmpLAF::getColourGrey());
+	g.setColour(findColour(meterColourId));
 	g.fillPath(filledBarPath);
 
 	g.setFont(font);
@@ -151,7 +99,7 @@ void LevelMeter::paint(Graphics& g)
 			labelBox.setY(y - labelHeight / 2.0f);
 			labelBox.setSize((float)labelWidth, labelHeight);
 
-			g.setColour(ResonantAmpLAF::getColourDark());
+			g.setColour(findColour(textColourId));
 			g.drawText(tick.second, labelBox, Justification::centredRight, false);
 		}
 
@@ -159,11 +107,11 @@ void LevelMeter::paint(Graphics& g)
 		tickLineBox.setY(y);
 		tickLineBox.setHeight(lw);
 
-		g.setColour(ResonantAmpLAF::getColourBackground());
+		g.setColour(findColour(backgroundColourId));
 		g.fillRect(tickLineBox);
 	}
 
-	g.setColour(ResonantAmpLAF::getColourDark());
+	g.setColour(findColour(outlineColourId));
 	g.drawRoundedRectangle(BorderSize<float>(lw / 2.0f).subtractedFrom(fullBar), corner, lw);
 }
 

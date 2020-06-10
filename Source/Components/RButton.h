@@ -20,31 +20,25 @@
 
 #include <JuceHeader.h>
 
-#include "../Utils.h"
-#include "ParameterGroup.h"
-#include "RSliderLabel.h"
-
-class StagingGroup : public ParameterGroup
+class RButton : public ToggleButton
 {
 public:
-	StagingGroup();
-	~StagingGroup() {}
+	RButton() {}
+	~RButton() {}
 
-	void setHeight(int height) { setSize(0, height); }
 	void resized() override;
 
-	void attachVTS(AudioProcessorValueTreeState& vts);
+	const Image& getBgNoise() const { return bgNoise; }
+
+	enum ColourIds
+	{
+		buttonColourId = 0x2000401,
+		textColourId = 0x2000402,
+	};
 
 private:
-	RSliderLabel sliderStages;
-	RSliderLabel sliderSlope;
-	RSliderLabel sliderFilter;
-
-	std::unique_ptr<SliderAttachment> attStages;
-	std::unique_ptr<SliderAttachment> attSlope;
-	std::unique_ptr<SliderAttachment> attFilter;
-
-	DISABLE_COMPONENT_RESIZE()
-	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (StagingGroup)
+	Random rng;
+	Image bgNoise;
+	
+	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (RButton)
 };
-

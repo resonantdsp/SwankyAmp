@@ -22,29 +22,36 @@
 
 #include "../Utils.h"
 #include "ParameterGroup.h"
-#include "RSliderLabel.h"
+#include "LevelsGroup.h"
+#include "PreAmpGroup.h"
+#include "PowerAmpGroup.h"
+#include "StagingGroup.h"
+#include "ToneStackGroup.h"
+#include "CabGroup.h"
 
-class StagingGroup : public ParameterGroup
+class AmpGroup : public ParameterGroup
 {
 public:
-	StagingGroup();
-	~StagingGroup() {}
+	AmpGroup();
+	~AmpGroup() {}
 
-	void setHeight(int height) { setSize(0, height); }
 	void resized() override;
+	void paint(Graphics& g) override;
 
 	void attachVTS(AudioProcessorValueTreeState& vts);
 
+	void setGroupsHeight(int height);
+
+	// TODO: for the time being keep public as need to access members, but this
+	// should be cleaned up at some point
+	LevelsGroup levelsGroup;
+	PreAmpGroup preAmpGroup;
+	PowerAmpGroup powerAmpGroup;
+	StagingGroup stagingGroup;
+	ToneStackGroup toneStackGroup;
+	CabGroup cabGroup;
+
 private:
-	RSliderLabel sliderStages;
-	RSliderLabel sliderSlope;
-	RSliderLabel sliderFilter;
-
-	std::unique_ptr<SliderAttachment> attStages;
-	std::unique_ptr<SliderAttachment> attSlope;
-	std::unique_ptr<SliderAttachment> attFilter;
-
 	DISABLE_COMPONENT_RESIZE()
-	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (StagingGroup)
+	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AmpGroup)
 };
-

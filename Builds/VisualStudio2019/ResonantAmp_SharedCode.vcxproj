@@ -64,7 +64,7 @@
       <Optimization>Disabled</Optimization>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <AdditionalIncludeDirectories>C:\SDKs\VST_SDK\VST3_SDK;..\..\JuceLibraryCode;C:\SDKs\AAX;C:\SDKs\AAX\Interfaces;C:\SDKs\AAX\Interfaces\ACF;C:\JUCE\modules;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;_WINDOWS;DEBUG;_DEBUG;JUCER_VS2019_78A5026=1;JUCE_APP_VERSION=0.2.0;JUCE_APP_VERSION_HEX=0x200;JucePlugin_Build_VST=0;JucePlugin_Build_VST3=1;JucePlugin_Build_AU=0;JucePlugin_Build_AUv3=0;JucePlugin_Build_RTAS=0;JucePlugin_Build_AAX=1;JucePlugin_Build_Standalone=1;JucePlugin_Build_Unity=0;JUCE_SHARED_CODE=1;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;_WINDOWS;DEBUG;_DEBUG;JUCER_VS2019_78A5026=1;JUCE_APP_VERSION=0.2.1;JUCE_APP_VERSION_HEX=0x201;JucePlugin_Build_VST=0;JucePlugin_Build_VST3=1;JucePlugin_Build_AU=0;JucePlugin_Build_AUv3=0;JucePlugin_Build_RTAS=0;JucePlugin_Build_AAX=1;JucePlugin_Build_Standalone=1;JucePlugin_Build_Unity=0;JUCE_SHARED_CODE=1;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
       <PrecompiledHeader/>
@@ -104,7 +104,7 @@
     <ClCompile>
       <Optimization>Full</Optimization>
       <AdditionalIncludeDirectories>C:\SDKs\VST_SDK\VST3_SDK;..\..\JuceLibraryCode;C:\SDKs\AAX;C:\SDKs\AAX\Interfaces;C:\SDKs\AAX\Interfaces\ACF;C:\JUCE\modules;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;_WINDOWS;NDEBUG;JUCER_VS2019_78A5026=1;JUCE_APP_VERSION=0.2.0;JUCE_APP_VERSION_HEX=0x200;JucePlugin_Build_VST=0;JucePlugin_Build_VST3=1;JucePlugin_Build_AU=0;JucePlugin_Build_AUv3=0;JucePlugin_Build_RTAS=0;JucePlugin_Build_AAX=1;JucePlugin_Build_Standalone=1;JucePlugin_Build_Unity=0;JUCE_SHARED_CODE=1;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;_WINDOWS;NDEBUG;JUCER_VS2019_78A5026=1;JUCE_APP_VERSION=0.2.1;JUCE_APP_VERSION_HEX=0x201;JucePlugin_Build_VST=0;JucePlugin_Build_VST3=1;JucePlugin_Build_AU=0;JucePlugin_Build_AUv3=0;JucePlugin_Build_RTAS=0;JucePlugin_Build_AAX=1;JucePlugin_Build_Standalone=1;JucePlugin_Build_Unity=0;JUCE_SHARED_CODE=1;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
       <PrecompiledHeader/>
@@ -136,12 +136,14 @@
     </Bscmake>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\Source\Components\AmpGroup.cpp"/>
     <ClCompile Include="..\..\Source\Components\CabGroup.cpp"/>
     <ClCompile Include="..\..\Source\Components\LevelMeter.cpp"/>
     <ClCompile Include="..\..\Source\Components\LevelsGroup.cpp"/>
     <ClCompile Include="..\..\Source\Components\ParameterGroup.cpp"/>
     <ClCompile Include="..\..\Source\Components\PowerAmpGroup.cpp"/>
     <ClCompile Include="..\..\Source\Components\PreAmpGroup.cpp"/>
+    <ClCompile Include="..\..\Source\Components\RButton.cpp"/>
     <ClCompile Include="..\..\Source\Components\RSlider.cpp"/>
     <ClCompile Include="..\..\Source\Components\RSliderLabel.cpp"/>
     <ClCompile Include="..\..\Source\Components\StagingGroup.cpp"/>
@@ -1991,12 +1993,14 @@
     <ClCompile Include="..\..\JuceLibraryCode\include_juce_opengl.cpp"/>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Source\Components\AmpGroup.h"/>
     <ClInclude Include="..\..\Source\Components\CabGroup.h"/>
     <ClInclude Include="..\..\Source\Components\LevelMeter.h"/>
     <ClInclude Include="..\..\Source\Components\LevelsGroup.h"/>
     <ClInclude Include="..\..\Source\Components\ParameterGroup.h"/>
     <ClInclude Include="..\..\Source\Components\PowerAmpGroup.h"/>
     <ClInclude Include="..\..\Source\Components\PreAmpGroup.h"/>
+    <ClInclude Include="..\..\Source\Components\RButton.h"/>
     <ClInclude Include="..\..\Source\Components\RSlider.h"/>
     <ClInclude Include="..\..\Source\Components\RSliderLabel.h"/>
     <ClInclude Include="..\..\Source\Components\StagingGroup.h"/>

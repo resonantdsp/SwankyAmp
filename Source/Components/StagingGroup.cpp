@@ -18,8 +18,6 @@
 
 #include <JuceHeader.h>
 
-#include "LevelMeter.h"
-#include "ParameterGroup.h"
 #include "StagingGroup.h"
 
 StagingGroup::StagingGroup() :
@@ -30,60 +28,55 @@ StagingGroup::StagingGroup() :
 	sliderStages.setLabel("STAGES");
 	sliderStages.slider.setPosMapLow(1.0f);
 	sliderStages.slider.setPosMapHigh(5.0f);
-	sliderStages.slider.setPosMapFmt("%02.0f");
 
 	addAndMakeVisible(sliderSlope);
 	sliderSlope.setLabel("SLOPE");
-	sliderSlope.slider.setPosMapLow(0.0f);
-	sliderSlope.slider.setPosMapHigh(10.0f);
-	sliderSlope.slider.setPosMapFmt("%02.0f");
 
 	addAndMakeVisible(sliderFilter);
 	sliderFilter.setLabel("FILTER");
-	sliderFilter.slider.setPosMapLow(0.0f);
-	sliderFilter.slider.setPosMapHigh(10.0f);
-	sliderFilter.slider.setPosMapFmt("%02.0f");
 }
 
-void StagingGroup::setHeight(int height) {
-	setSize(0, height);
 
-	const int labelSize = 16;
-	const int spacing = 12;
+void StagingGroup::attachVTS(AudioProcessorValueTreeState& vts)
+{
+	attStages.reset(new SliderAttachment(vts, "idGainStages", sliderStages.slider));
+	attSlope.reset(new SliderAttachment(vts, "idGainSlope", sliderSlope.slider));
+	attFilter.reset(new SliderAttachment(vts, "idLowCut", sliderFilter.slider));
+}
+
+void StagingGroup::resized()
+{
+	const int prevInnerHeight = getBorderBounds().getHeight() - 2 * spacing;
+	const Point<int> prevCorner = getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
+
+	ParameterGroup::resized();
+
 	const int innerHeight = getBorderBounds().getHeight() - 2 * spacing;
-
 	Point<int> corner = getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
 
+	// only re-set the positions when the height or position changes
+	if (prevInnerHeight == innerHeight && prevCorner == corner) return;
+
 	sliderStages.setTopLeftPosition(corner);
-	sliderStages.setLabelHeight(labelSize);
-	sliderStages.slider.setGap(2.0f);
-	sliderStages.slider.setMargin(0.15 * innerHeight);
-	sliderStages.setLabelHeight(16.0f);
-	sliderStages.setFont(16.0f);
+	sliderStages.slider.setMargin(0.15f * (float)innerHeight);
 	sliderStages.setHeight(innerHeight);
 
 	corner = sliderStages.getBounds().getTopRight() + Point<int>(spacing, 0);
 
 	sliderSlope.setTopLeftPosition(corner);
-	sliderSlope.setLabelHeight(labelSize);
-	sliderSlope.slider.setGap(2.0f);
-	sliderSlope.slider.setMargin(0.15 * innerHeight);
-	sliderSlope.setLabelHeight(16.0f);
-	sliderSlope.setFont(16.0f);
+	sliderSlope.slider.setMargin(0.15f * (float)innerHeight);
 	sliderSlope.setHeight(innerHeight);
 
 	corner = sliderSlope.getBounds().getTopRight() + Point<int>(spacing, 0);
 
 	sliderFilter.setTopLeftPosition(corner);
-	sliderFilter.setLabelHeight(labelSize);
-	sliderFilter.slider.setGap(2.0f);
-	sliderFilter.slider.setMargin(0.15 * innerHeight);
-	sliderFilter.setLabelHeight(16.0f);
-	sliderFilter.setFont(16.0f);
+	sliderFilter.slider.setMargin(0.15f * (float)innerHeight);
 	sliderFilter.setHeight(innerHeight);
 
 	corner = sliderFilter.getBounds().getTopRight() + Point<int>(spacing, 0);
 
-	setSize(corner.getX() - getBounds().getX() + spacing, height);
+	// can now determine the width and set it, this will re-call `resized` but
+	// since the height is the same it won't re-do the calculation
+	setSize(corner.getX() - getBounds().getX(), getHeight());
 }
 

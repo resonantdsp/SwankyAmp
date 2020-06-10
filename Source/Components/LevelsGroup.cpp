@@ -19,26 +19,19 @@
 #include <JuceHeader.h>
 
 #include "LevelsGroup.h"
-#include "ParameterGroup.h"
-#include "LevelMeter.h"
 
 LevelsGroup::LevelsGroup() :
-	ParameterGroup("LEVELS"),
-	meterInL(),
-	meterInR(),
-	meterOutL(),
-	meterOutR()
+	ParameterGroup("LEVELS")
 {
-	const auto inputTicks = MeterTicks{ {-16.5f, "S"}, {-2.5f, "H"} };
+	const auto inputTicks = MeterTicks{
+		{-16.5f, "S"},
+		{-2.5f, "H"}
+	};
 
-	meterInL.setRefreshRate(30);
-	meterInL.setDecayTau(0.5f);
 	meterInL.setDbLow(-26.0f);
 	meterInL.setDbHigh(+8.0f);
 	meterInL.setTicks(inputTicks);
 
-	meterInR.setRefreshRate(30);
-	meterInR.setDecayTau(0.5f);
 	meterInR.setDbLow(-26.0f);
 	meterInR.setDbHigh(+8.0f);
 	meterInR.setTicks(inputTicks);
@@ -52,15 +45,11 @@ LevelsGroup::LevelsGroup() :
 		{-25.0f, "-25"},
 	};
 
-	meterOutL.setRefreshRate(30);
-	meterOutL.setDecayTau(0.5f);
 	meterOutL.setDbLow(-30.0f);
 	meterOutL.setDbHigh(0.0f);
 	meterOutL.setTicks(outputTicks);
 	meterOutL.setLabelWidth(0);
 
-	meterOutR.setRefreshRate(30);
-	meterOutR.setDecayTau(0.5f);
 	meterOutR.setDbLow(-30.0f);
 	meterOutR.setDbHigh(0.0f);
 	meterOutR.setTicks(outputTicks);
@@ -85,103 +74,58 @@ LevelsGroup::LevelsGroup() :
 	sliderOutputLevel.slider.setPosMapFmt("%+.0f dB");
 }
 
-LevelMeterListener* LevelsGroup::getLevelMeterListenerIn(int channel) {
-	if (channel == 0) {
-		return &meterInL;
-	}
-	else if (channel == 1) {
-		return &meterInR;
-	}
-	else {
-		return nullptr;
-	}
+void LevelsGroup::attachVTS(AudioProcessorValueTreeState& vts)
+{
+	attInputLevel.reset(new SliderAttachment(vts, "idInputLevel", sliderInputLevel.slider));
+	attOutputLevel.reset(new SliderAttachment(vts, "idOutputLevel", sliderOutputLevel.slider));
 }
 
-LevelMeterListener* LevelsGroup::getLevelMeterListenerOut(int channel) {
-	if (channel == 0) {
-		return &meterOutL;
-	}
-	else if (channel == 1) {
-		return &meterOutR;
-	}
-	else {
-		return nullptr;
-	}
-}
+void LevelsGroup::resized()
+{
+	const int prevInnerHeight = getBorderBounds().getHeight() - 2 * spacing;
+	const Point<int> prevCorner = getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
 
-void LevelsGroup::setHeight(int height) {
-	setSize(0, height);
+	ParameterGroup::resized();
 
-	const int labelSize = 16;
-	const int meterWidth = 16;
-	const int spacing = 12;
-	const int labelGap = (int)(lineThickness + 0.5);
 	const int innerHeight = getBorderBounds().getHeight() - 2 * spacing;
-
 	Point<int> corner = getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
 
-	meterInL.setLabelHeight((float)labelSize);
-	meterInL.setLabelWidth(labelSize);
-	meterInL.setLabelGap(labelGap);
+	// only re-set the positions when the height or position changes
+	if (prevInnerHeight == innerHeight && prevCorner == corner) return;
+
 	meterInL.setTopLeftPosition(corner);
 	meterInL.setBarHeight(innerHeight);
-	meterInL.setBarWidth(meterWidth);
 
 	corner = meterInL.getBounds().getTopRight() + Point<int>(spacing, 0);
 
-	meterInR.setLabelHeight((float)labelSize);
 	meterInR.setTopLeftPosition(corner);
 	meterInR.setBarHeight(innerHeight);
-	meterInR.setBarWidth(meterWidth);
 
 	corner = meterInR.getBounds().getTopRight() + Point<int>(spacing, 0);
 
 	sliderInputLevel.setTopLeftPosition(corner);
-	sliderInputLevel.setLabelHeight(labelSize);
-	sliderInputLevel.slider.setGap(2.0f);
-	sliderInputLevel.slider.setMargin(0.15 * innerHeight);
-	sliderInputLevel.setLabelHeight(16.0f);
-	sliderInputLevel.setFont(16.0f);
+	sliderInputLevel.slider.setMargin(0.15f * (float)innerHeight);
 	sliderInputLevel.setHeight(innerHeight);
 
 	corner = sliderInputLevel.getBounds().getTopRight() + Point<int>(spacing, 0);
 
 	sliderOutputLevel.setTopLeftPosition(corner);
-	sliderOutputLevel.setLabelHeight(labelSize);
-	sliderOutputLevel.slider.setGap(2.0f);
-	sliderOutputLevel.slider.setMargin(0.15 * innerHeight);
-	sliderOutputLevel.setLabelHeight(16.0f);
-	sliderOutputLevel.setFont(16.0f);
+	sliderOutputLevel.slider.setMargin(0.15f * (float)innerHeight);
 	sliderOutputLevel.setHeight(innerHeight);
 
 	corner = sliderOutputLevel.getBounds().getTopRight() + Point<int>(spacing, 0);
 
 	meterOutL.setTopLeftPosition(corner);
-	meterOutL.setLabelHeight((float)labelSize);
 	meterOutL.setBarHeight(innerHeight);
-	meterOutL.setBarWidth(meterWidth);
 
 	corner = meterOutL.getBounds().getTopRight() + Point<int>(spacing, 0);
 
-	meterOutR.setLabelHeight((float)labelSize);
-	meterOutR.setLabelWidth(labelSize);
-	meterInL.setLabelGap(labelGap);
 	meterOutR.setTopLeftPosition(corner);
 	meterOutR.setBarHeight(innerHeight);
-	meterOutR.setBarWidth(meterWidth);
 
 	corner = meterOutR.getBounds().getTopRight() + Point<int>(spacing, 0);
 
-	setSize(corner.getX() - getBounds().getX() + spacing, height);
-}
-
-void LevelsGroup::paint(Graphics& g)
-{
-	ParameterGroup::paint(g);
-}
-
-
-void LevelsGroup::resized()
-{
-	ParameterGroup::resized();
+	// can now determine the width and set it, this will re-call `resized` but
+	// since the height is the same it won't re-do the calculation
+	setSize(corner.getX() - getBounds().getX(), getHeight());
 }

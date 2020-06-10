@@ -90,7 +90,7 @@ def make_standalone(name: str, code: str, defaults: Mapping[str, float]) -> str:
                 if default_value is not None:
                     used_defaults.add(par_name)
                     lines.append(
-                        f"\tvoid set_{par_name}(FAUSTFLOAT value) {{ {par_var} = value + {default_value:.6e}; }}"
+                        f"\tvoid set_{par_name}(FAUSTFLOAT value) {{ {par_var} = value + {default_value:.6e}f; }}"
                     )
                 else:
                     lines.append(

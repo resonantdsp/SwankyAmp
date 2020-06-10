@@ -19,10 +19,11 @@
 #pragma once
 
 #include <JuceHeader.h>
+
+#include "../Utils.h"
+#include "LevelMeter.h"
 #include "ParameterGroup.h"
 #include "RSliderLabel.h"
-
-#include "LevelMeter.h"
 
 class LevelsGroup : public ParameterGroup
 {
@@ -30,17 +31,15 @@ public:
 	LevelsGroup();
 	~LevelsGroup() {}
 
-	void setHeight(int /*height*/);
-
-	void paint(Graphics&) override;
+	void setHeight(int height) { setSize(0, height); }
 	void resized() override;
 
-	LevelMeterListener* getLevelMeterListenerIn(int /*channel*/);
-	LevelMeterListener* getLevelMeterListenerOut(int /*channel*/);
+	void attachVTS(AudioProcessorValueTreeState& vts);
 
-	// note: need to expose so that it can get a parameter attachment
-	RSliderLabel sliderInputLevel;
-	RSliderLabel sliderOutputLevel;
+	LevelMeterListener* getLevelMeterListenerInL() { return &meterInL; }
+	LevelMeterListener* getLevelMeterListenerInR() { return &meterInR; }
+	LevelMeterListener* getLevelMeterListenerOutL() { return &meterOutL; }
+	LevelMeterListener* getLevelMeterListenerOutR() { return &meterOutR; }
 
 private:
 	LevelMeter meterInL;
@@ -48,15 +47,12 @@ private:
 	LevelMeter meterOutL;
 	LevelMeter meterOutR;
 
-	int height = 0;
+	RSliderLabel sliderInputLevel;
+	RSliderLabel sliderOutputLevel;
 
-	// disable setting the width
-	using Component::setSize;
-	using Component::setBounds;
-	using Component::setBoundsRelative;
-	using Component::setBoundsInset;
-	using Component::setBoundsToFit;
-	using Component::centreWithSize;
+	std::unique_ptr<SliderAttachment> attInputLevel;
+	std::unique_ptr<SliderAttachment> attOutputLevel;
 
+	DISABLE_COMPONENT_RESIZE()
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (LevelsGroup)
 };

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT id="sJgmJL" name="ResonantAmp" projectType="audioplug" jucerVersion="5.4.7"
-              version="0.2.0" projectLineFeed="&#10;" companyName="Resonant DSP"
+              version="0.2.1" projectLineFeed="&#10;" companyName="Resonant DSP"
               companyWebsite="https://www.resonantdsp.com/" companyEmail="info@resonantdsp.com"
               pluginFormats="buildAAX,buildAU,buildStandalone,buildVST3" pluginName="Resonant Amp"
               pluginDesc="Tube amplifiers simulation" pluginManufacturer="Resonant DSP"
@@ -17,6 +17,8 @@
     </GROUP>
     <GROUP id="{1D5987B1-0BA7-E171-9516-427783CB7E4A}" name="Source">
       <GROUP id="{2BC335E6-8421-3F7B-5FF8-345C44B52666}" name="Components">
+        <FILE id="nUfnGB" name="AmpGroup.cpp" compile="1" resource="0" file="Source/Components/AmpGroup.cpp"/>
+        <FILE id="tOcGrQ" name="AmpGroup.h" compile="0" resource="0" file="Source/Components/AmpGroup.h"/>
         <FILE id="H8ysIN" name="CabGroup.cpp" compile="1" resource="0" file="Source/Components/CabGroup.cpp"/>
         <FILE id="BP3mX8" name="CabGroup.h" compile="0" resource="0" file="Source/Components/CabGroup.h"/>
         <FILE id="aR1yqN" name="LevelMeter.cpp" compile="1" resource="0" file="Source/Components/LevelMeter.cpp"/>
@@ -32,6 +34,8 @@
         <FILE id="cKYP56" name="PowerAmpGroup.h" compile="0" resource="0" file="Source/Components/PowerAmpGroup.h"/>
         <FILE id="lYZZuU" name="PreAmpGroup.cpp" compile="1" resource="0" file="Source/Components/PreAmpGroup.cpp"/>
         <FILE id="InSxOR" name="PreAmpGroup.h" compile="0" resource="0" file="Source/Components/PreAmpGroup.h"/>
+        <FILE id="JZcEVK" name="RButton.cpp" compile="1" resource="0" file="Source/Components/RButton.cpp"/>
+        <FILE id="RPoaOX" name="RButton.h" compile="0" resource="0" file="Source/Components/RButton.h"/>
         <FILE id="EU8W53" name="RSlider.cpp" compile="1" resource="0" file="Source/Components/RSlider.cpp"/>
         <FILE id="uaxdQh" name="RSlider.h" compile="0" resource="0" file="Source/Components/RSlider.h"/>
         <FILE id="GwS8Zn" name="RSliderLabel.cpp" compile="1" resource="0"

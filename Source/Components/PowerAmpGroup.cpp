@@ -18,56 +18,50 @@
 
 #include <JuceHeader.h>
 
-#include "LevelMeter.h"
-#include "ParameterGroup.h"
 #include "PowerAmpGroup.h"
 
 PowerAmpGroup::PowerAmpGroup() :
 	ParameterGroup("POWER AMP")
 {
-
 	addAndMakeVisible(sliderDrive);
 	sliderDrive.setLabel("DRIVE");
-	sliderDrive.slider.setPosMapLow(0.0f);
-	sliderDrive.slider.setPosMapHigh(10.0f);
-	sliderDrive.slider.setPosMapFmt("%02.0f");
 
 	addAndMakeVisible(sliderTouch);
 	sliderTouch.setLabel("TOUCH");
-	sliderTouch.slider.setPosMapLow(0.0f);
-	sliderTouch.slider.setPosMapHigh(10.0f);
-	sliderTouch.slider.setPosMapFmt("%02.0f");
 }
 
-void PowerAmpGroup::setHeight(int height) {
-	setSize(0, height);
+void PowerAmpGroup::attachVTS(AudioProcessorValueTreeState& vts)
+{
+	attDrive.reset(new SliderAttachment(vts, "idPowerAmpDrive", sliderDrive.slider));
+	attTouch.reset(new SliderAttachment(vts, "idPowerAmpTouch", sliderTouch.slider));
+}
 
-	const int labelSize = 16;
-	const int spacing = 12;
+void PowerAmpGroup::resized()
+{
+	const int prevInnerHeight = getBorderBounds().getHeight() - 2 * spacing;
+	const Point<int> prevCorner = getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
+
+	ParameterGroup::resized();
+
 	const int innerHeight = getBorderBounds().getHeight() - 2 * spacing;
-
 	Point<int> corner = getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
 
+	// only re-set the positions when the height or position changes
+	if (prevInnerHeight == innerHeight && prevCorner == corner) return;
+
 	sliderDrive.setTopLeftPosition(corner);
-	sliderDrive.setLabelHeight(labelSize);
-	sliderDrive.slider.setGap(2.0f);
-	sliderDrive.slider.setMargin(0.15 * innerHeight);
-	sliderDrive.setLabelHeight(16.0f);
-	sliderDrive.setFont(16.0f);
+	sliderDrive.slider.setMargin(0.15f * (float)innerHeight);
 	sliderDrive.setHeight(innerHeight);
 
 	corner = sliderDrive.getBounds().getTopRight() + Point<int>(spacing, 0);
 
 	sliderTouch.setTopLeftPosition(corner);
-	sliderTouch.setLabelHeight(labelSize);
-	sliderTouch.slider.setGap(2.0f);
-	sliderTouch.slider.setMargin(0.15 * innerHeight);
-	sliderTouch.setLabelHeight(16.0f);
-	sliderTouch.setFont(16.0f);
+	sliderTouch.slider.setMargin(0.15f * (float)innerHeight);
 	sliderTouch.setHeight(innerHeight);
 
 	corner = sliderTouch.getBounds().getTopRight() + Point<int>(spacing, 0);
 
-	setSize(corner.getX() - getBounds().getX() + spacing, height);
+	// can now determine the width and set it, this will re-call `resized` but
+	// since the height is the same it won't re-do the calculation
+	setSize(corner.getX() - getBounds().getX(), getHeight());
 }
-
