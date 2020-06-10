@@ -39,6 +39,8 @@ public:
 	void paint(Graphics& g) override;
 	void update(float db) override;
 
+	// NOTE: startTime just adds this to a list of timers a singleton time thread
+	// so it shoudld be inexpensive to create a timer per meter
 	void setRefreshRate(int refreshRateHz) { startTimer(refreshRateHz); }
 	void setDbLow(float db) { dbLow = db; }
 	void setDbHigh(float db) { dbHigh = db; }

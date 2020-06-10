@@ -141,14 +141,6 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 	}
 }
 
-void ResonantAmpAudioProcessor::setMeterListenerIn(LevelMeterListener* meter, int channel) {
-	meterListenersIn[channel] = meter;
-}
-
-void ResonantAmpAudioProcessor::setMeterListenerOut(LevelMeterListener* meter, int channel) {
-	meterListenersOut[channel] = meter;
-}
-
 const String ResonantAmpAudioProcessor::getName() const
 {
 	return JucePlugin_Name;
@@ -283,38 +275,48 @@ void ResonantAmpAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
 
 	const auto numSamples = buffer.getNumSamples();
 
-	for (int ichannel = 0; ichannel < jmin(totalNumInputChannels, 2); ichannel++) {
+	for (int ichannel = 0; ichannel < jmin(totalNumInputChannels, 2); ichannel++)
+	{
 		auto inLevel = buffer.getMagnitude(ichannel, 0, numSamples);
 		// convert to decibels and add the input level which ranges from -35 to +35
 		inLevel = 20 * log10f(inLevel) + (*parInputLevel * 35);
 		if (meterListenersIn[ichannel] != nullptr) meterListenersIn[ichannel]->update(inLevel);
+		if (ichannel == 0 && totalNumInputChannels < 2 && meterListenersIn[1] != nullptr)
+			meterListenersIn[1]->update(inLevel);
 	}
 
 	// mono to mono: run the amp once
-	if (totalNumInputChannels == 1 && totalNumOutputChannels == 1) {
+	if (totalNumInputChannels == 1 && totalNumOutputChannels == 1)
+	{
 		float* amp_buffer = buffer.getWritePointer(0);
 		amp_channel[0].compute(buffer.getNumSamples(), &amp_buffer, &amp_buffer);
 	}
 	// mono to stereo: run the amp once, copy the result
-	else if (totalNumInputChannels == 1 && totalNumOutputChannels == 2) {
+	else if (totalNumInputChannels == 1 && totalNumOutputChannels == 2)
+	{
 		float* amp_buffer = buffer.getWritePointer(0);
 		amp_channel[0].compute(buffer.getNumSamples(), &amp_buffer, &amp_buffer);
 		float* amp_buffer_other = buffer.getWritePointer(1);
 		std::memcpy((void*)amp_buffer_other, (void*)amp_buffer, numSamples * sizeof(float));
 	}
 	// stereo to stereo: run the amp twice
-	else if (totalNumInputChannels == 2 && totalNumOutputChannels == 2) {
-		for (int i = 0; i < 2; i++) {
+	else if (totalNumInputChannels == 2 && totalNumOutputChannels == 2)
+	{
+		for (int i = 0; i < 2; i++)
+		{
 			float* amp_buffer = buffer.getWritePointer(i);
 			amp_channel[i].compute(buffer.getNumSamples(), &amp_buffer, &amp_buffer);
 		}
 	}
 
-	for (int ichannel = 0; ichannel < jmin(totalNumOutputChannels, 2); ichannel++) {
+	for (int ichannel = 0; ichannel < jmin(totalNumOutputChannels, 2); ichannel++)
+	{
 		auto outLevel = buffer.getMagnitude(ichannel, 0, numSamples);
 		// note: the output level parameter is already factored into the buffer
 		outLevel = 20 * log10f(outLevel);
 		if (meterListenersOut[ichannel] != nullptr) meterListenersOut[ichannel]->update(outLevel);
+		if (ichannel == 0 && totalNumOutputChannels < 2 && meterListenersOut[1] != nullptr)
+			meterListenersOut[1]->update(outLevel);
 	}
 }
 

@@ -74,30 +74,6 @@ LevelsGroup::LevelsGroup() :
 	sliderOutputLevel.slider.setPosMapFmt("%+.0f dB");
 }
 
-LevelMeterListener* LevelsGroup::getLevelMeterListenerIn(int channel) {
-	if (channel == 0) {
-		return &meterInL;
-	}
-	else if (channel == 1) {
-		return &meterInR;
-	}
-	else {
-		return nullptr;
-	}
-}
-
-LevelMeterListener* LevelsGroup::getLevelMeterListenerOut(int channel) {
-	if (channel == 0) {
-		return &meterOutL;
-	}
-	else if (channel == 1) {
-		return &meterOutR;
-	}
-	else {
-		return nullptr;
-	}
-}
-
 void LevelsGroup::attachVTS(AudioProcessorValueTreeState& vts)
 {
 	attInputLevel.reset(new SliderAttachment(vts, "idInputLevel", sliderInputLevel.slider));

@@ -36,8 +36,10 @@ public:
 
 	void attachVTS(AudioProcessorValueTreeState& vts);
 
-	LevelMeterListener* getLevelMeterListenerIn(int channel);
-	LevelMeterListener* getLevelMeterListenerOut(int channel);
+	LevelMeterListener* getLevelMeterListenerInL() { return &meterInL; }
+	LevelMeterListener* getLevelMeterListenerInR() { return &meterInR; }
+	LevelMeterListener* getLevelMeterListenerOutL() { return &meterOutL; }
+	LevelMeterListener* getLevelMeterListenerOutR() { return &meterOutR; }
 
 private:
 	LevelMeter meterInL;

@@ -35,10 +35,10 @@ ResonantAmpAudioProcessorEditor::ResonantAmpAudioProcessorEditor(
 		resonantAmpLAF.getDefaultFont().getTypeface()
 	);
 
-	processor.setMeterListenerIn(ampGroup.levelsGroup.getLevelMeterListenerIn(0), 0);
-	processor.setMeterListenerIn(ampGroup.levelsGroup.getLevelMeterListenerIn(1), 1);
-	processor.setMeterListenerOut(ampGroup.levelsGroup.getLevelMeterListenerOut(0), 0);
-	processor.setMeterListenerOut(ampGroup.levelsGroup.getLevelMeterListenerOut(1), 1);
+	processor.meterListenersIn[0] = ampGroup.levelsGroup.getLevelMeterListenerInL();
+	processor.meterListenersIn[1] = ampGroup.levelsGroup.getLevelMeterListenerInR();
+	processor.meterListenersOut[0] = ampGroup.levelsGroup.getLevelMeterListenerOutL();
+	processor.meterListenersOut[1] = ampGroup.levelsGroup.getLevelMeterListenerOutR();
 
 	ampGroup.attachVTS(vts);
 
@@ -57,10 +57,10 @@ ResonantAmpAudioProcessorEditor::~ResonantAmpAudioProcessorEditor()
 	// of scope
 	setLookAndFeel(nullptr);
 	// ensure the processor doesn't used cache pointers that were freed
-	processor.setMeterListenerIn(nullptr, 0);
-	processor.setMeterListenerIn(nullptr, 1);
-	processor.setMeterListenerOut(nullptr, 0);
-	processor.setMeterListenerOut(nullptr, 1);
+	processor.meterListenersIn[0] = nullptr;
+	processor.meterListenersIn[1] = nullptr;
+	processor.meterListenersOut[0] = nullptr;
+	processor.meterListenersOut[1] = nullptr;
 }
 
 void ResonantAmpAudioProcessorEditor::paint(Graphics& g)

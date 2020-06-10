@@ -59,8 +59,6 @@ public:
 	std::atomic<float>* parPowerAmpDrive = nullptr;
 	std::atomic<float>* parPowerAmpTouch = nullptr;
 
-	void setMeterListenerIn(LevelMeterListener* meter, int channel);
-	void setMeterListenerOut(LevelMeterListener* meter, int channel);
 	void setAmpParameters();
 
 	void prepareToPlay(double sampleRate, int samplesPerBlock) override;
