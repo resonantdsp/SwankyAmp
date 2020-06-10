@@ -18,8 +18,9 @@
 
 #include <algorithm>
 
-#include "PluginProcessor.h"
 #include "PluginEditor.h"
+
+#include "PluginProcessor.h"
 
 // add parameter to the VTS with default range -1 to +1
 #define MAKE_PARAMETER_UNIT(n) std::make_unique<AudioParameterFloat>("id"#n, #n, -1.0f, 1.0f, 0.0f)
@@ -28,7 +29,6 @@
 // assign a VTS parameter to an object member of the same name
 #define ASSIGN_PARAMETER(n) par##n = parameters.getRawParameterValue("id"#n);
 
-//==============================================================================
 ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 #ifndef JucePlugin_PreferredChannelConfigurations
 	 AudioProcessor(BusesProperties()
@@ -64,9 +64,7 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 			MAKE_PARAMETER_UNIT(PowerAmpDrive),
 			MAKE_PARAMETER_UNIT(PowerAmpTouch),
 		}
-	),
-	meterListenersIn(),
-	meterListenersOut()
+	)
 {
 	ASSIGN_PARAMETER(InputLevel)
 	ASSIGN_PARAMETER(OutputLevel)
@@ -190,8 +188,7 @@ double ResonantAmpAudioProcessor::getTailLengthSeconds() const
 
 int ResonantAmpAudioProcessor::getNumPrograms()
 {
-	return 1;   // NB: some hosts don't cope very well if you tell them there are 0 programs,
-				// so this should be at least 1, even if you're not really implementing programs.
+	return 1;
 }
 
 int ResonantAmpAudioProcessor::getCurrentProgram()
@@ -201,22 +198,27 @@ int ResonantAmpAudioProcessor::getCurrentProgram()
 
 void ResonantAmpAudioProcessor::setCurrentProgram(int index)
 {
+	ignoreUnused(index);
 }
 
 const String ResonantAmpAudioProcessor::getProgramName(int index)
 {
+	ignoreUnused(index);
 	return {};
 }
 
 void ResonantAmpAudioProcessor::changeProgramName(int index, const String& newName)
 {
+	ignoreUnused(index, newName);
 }
 
 void ResonantAmpAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
+	ignoreUnused(samplesPerBlock);
+
 	// Use this method as the place to do any pre-playback
 	// initialisation that you need..
-	for (int i = 0; i < 2; i++) amp_channel[i].init(sampleRate);
+	for (int i = 0; i < 2; i++) amp_channel[i].init(jmax(1, (int)sampleRate));
 	setAmpParameters();
 }
 
@@ -261,6 +263,8 @@ bool ResonantAmpAudioProcessor::isBusesLayoutSupported(const BusesLayout& layout
 
 void ResonantAmpAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMessages)
 {
+	ignoreUnused(midiMessages);
+	
 	ScopedNoDenormals noDenormals;
 	auto totalNumInputChannels = getTotalNumInputChannels();
 	auto totalNumOutputChannels = getTotalNumOutputChannels();

@@ -21,36 +21,37 @@
 #include <JuceHeader.h>
 
 #include "../Utils.h"
-#include "LevelMeter.h"
 #include "ParameterGroup.h"
-#include "RSliderLabel.h"
+#include "LevelsGroup.h"
+#include "PreAmpGroup.h"
+#include "PowerAmpGroup.h"
+#include "StagingGroup.h"
+#include "ToneStackGroup.h"
+#include "CabGroup.h"
 
-class LevelsGroup : public ParameterGroup
+class AmpGroup : public ParameterGroup
 {
 public:
-	LevelsGroup();
-	~LevelsGroup() {}
+	AmpGroup();
+	~AmpGroup() {}
 
-	void setHeight(int height) { setSize(0, height); }
 	void resized() override;
+	void paint(Graphics& g) override;
 
 	void attachVTS(AudioProcessorValueTreeState& vts);
 
-	LevelMeterListener* getLevelMeterListenerIn(int channel);
-	LevelMeterListener* getLevelMeterListenerOut(int channel);
+	void setGroupsHeight(int height);
+
+	// TODO: for the time being keep public as need to access members, but this
+	// should be cleaned up at some point
+	LevelsGroup levelsGroup;
+	PreAmpGroup preAmpGroup;
+	PowerAmpGroup powerAmpGroup;
+	StagingGroup stagingGroup;
+	ToneStackGroup toneStackGroup;
+	CabGroup cabGroup;
 
 private:
-	LevelMeter meterInL;
-	LevelMeter meterInR;
-	LevelMeter meterOutL;
-	LevelMeter meterOutR;
-
-	RSliderLabel sliderInputLevel;
-	RSliderLabel sliderOutputLevel;
-
-	std::unique_ptr<SliderAttachment> attInputLevel;
-	std::unique_ptr<SliderAttachment> attOutputLevel;
-
 	DISABLE_COMPONENT_RESIZE()
-	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (LevelsGroup)
+	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AmpGroup)
 };

@@ -19,16 +19,13 @@
 #pragma once
 
 #include <JuceHeader.h>
+
 #include "AmpMono.h"
 #include "Components/LevelMeter.h"
 
-//==============================================================================
-/**
-*/
 class ResonantAmpAudioProcessor : public AudioProcessor
 {
 public:
-	//==============================================================================
 	ResonantAmpAudioProcessor();
 	~ResonantAmpAudioProcessor();
 
@@ -37,8 +34,8 @@ public:
 	AmpMono amp_channel[2];
 
 	// Objects with an `update` method for updating the value of input meters.
-	LevelMeterListener* meterListenersIn[2];
-	LevelMeterListener* meterListenersOut[2];
+	LevelMeterListener* meterListenersIn[2] = {nullptr, nullptr};
+	LevelMeterListener* meterListenersOut[2] = {nullptr, nullptr};
 
 	AudioProcessorValueTreeState parameters;
 
@@ -62,11 +59,10 @@ public:
 	std::atomic<float>* parPowerAmpDrive = nullptr;
 	std::atomic<float>* parPowerAmpTouch = nullptr;
 
-	void setMeterListenerIn(LevelMeterListener* /*meter*/, int /*channel*/);
-	void setMeterListenerOut(LevelMeterListener* /*meter*/, int /*channel*/);
+	void setMeterListenerIn(LevelMeterListener* meter, int channel);
+	void setMeterListenerOut(LevelMeterListener* meter, int channel);
 	void setAmpParameters();
 
-	//==============================================================================
 	void prepareToPlay(double sampleRate, int samplesPerBlock) override;
 	void releaseResources() override;
 
@@ -76,11 +72,9 @@ public:
 
 	void processBlock(AudioBuffer<float>&, MidiBuffer&) override;
 
-	//==============================================================================
 	AudioProcessorEditor* createEditor() override;
 	bool hasEditor() const override;
 
-	//==============================================================================
 	const String getName() const override;
 
 	bool acceptsMidi() const override;
@@ -88,18 +82,15 @@ public:
 	bool isMidiEffect() const override;
 	double getTailLengthSeconds() const override;
 
-	//==============================================================================
 	int getNumPrograms() override;
 	int getCurrentProgram() override;
 	void setCurrentProgram(int index) override;
 	const String getProgramName(int index) override;
 	void changeProgramName(int index, const String& newName) override;
 
-	//==============================================================================
 	void getStateInformation(MemoryBlock& destData) override;
 	void setStateInformation(const void* data, int sizeInBytes) override;
 
 private:
-	//==============================================================================
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ResonantAmpAudioProcessor)
 };

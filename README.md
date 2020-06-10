@@ -141,3 +141,10 @@ Version 0.0.2:
 * All model fits have been improved, default parameters should better ressemble the simulated circuits.
 * Parameter ranges have been refined to give better control over the distortion sound.
 * The cabinet mix has been made into a toggle for clarity.
+
+## JUCE usage in code
+
+* Following the JUCE guidelines loosely, with the notable change that the code uses tabs specifically to avoid visual indentation.
+* Components should have sensible defaults so that a default conctructor can be provided, otherwise the no copy convention causes problems.
+* The Look and Feel (LAF) contains defintions that can change on-the-fly (mainly colours). Default dimensions should be defined in component classes, as those don't need to be looked-up at each paint call.
+

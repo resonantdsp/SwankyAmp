@@ -17,10 +17,11 @@
  */
 
 #include <JuceHeader.h>
+
 #include "../Utils.h"
+
 #include "RSlider.h"
 
-//==============================================================================
 RSlider::RSlider()
 {
 	setSliderStyle(Slider::RotaryHorizontalVerticalDrag);
@@ -32,20 +33,22 @@ RSlider::RSlider()
 template<typename ... Args>
 std::string stringFormat( const std::string& format, Args ... args )
 {
-    size_t size = snprintf(nullptr, 0, format.c_str(), args ... ) + (size_t)1; // Extra space for '\0'
-    if (size <= 0)
+	size_t size = snprintf(nullptr, 0, format.c_str(), args ... ) + (size_t)1; // Extra space for '\0'
+	if (size <= 0)
 		throw std::runtime_error( "Error during formatting." );
-    std::unique_ptr<char[]> buf(new char[size]); 
-    snprintf(buf.get(), size, format.c_str(), args ... );
-    return std::string(buf.get(), buf.get() + size - 1); // We don't want the '\0' inside
+	std::unique_ptr<char[]> buf(new char[size]); 
+	snprintf(buf.get(), size, format.c_str(), args ... );
+	return std::string(buf.get(), buf.get() + size - 1); // We don't want the '\0' inside
 }
 
-String RSlider::fmtSliderPos(float sliderPos) const {
+String RSlider::fmtSliderPos(float sliderPos) const
+{
 	const float pos = sliderPos * (posMapHigh - posMapLow) + posMapLow;
 	return String(stringFormat(posMapFmt.toStdString(), pos));
 }
 
-RSliderDims RSlider::calculateDims() const {
+RSliderDims RSlider::calcDims() const
+{
 	RSliderDims dims;
 
 	dims.gap = gap;
@@ -87,4 +90,32 @@ RSliderDims RSlider::calculateDims() const {
 	);
 
 	return dims;
+}
+
+float RSlider::calcWidthForHeight(float height) const
+{
+	const RotaryParameters rotPars = getRotaryParameters();
+	const float theta = jmax(
+		fabsf(angleModulo(rotPars.startAngleRadians)),
+		fabsf(angleModulo(rotPars.endAngleRadians))
+	);
+
+	const float radiusForHeight = 
+		(height - margin) / 
+		(1.0f - cosf(theta));
+
+	return (radiusForHeight + margin) * 2.0f;
+}
+
+float RSlider::calcHeightForWidth(float width) const
+{
+	const RotaryParameters rotPars = getRotaryParameters();
+	const float theta = jmax(
+		fabsf(angleModulo(rotPars.startAngleRadians)),
+		fabsf(angleModulo(rotPars.endAngleRadians))
+	);
+
+	const float radiusForWidth = width / 2.0f - margin;
+
+	return (radiusForWidth + margin) * 2.0f;
 }

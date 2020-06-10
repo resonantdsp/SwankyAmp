@@ -45,7 +45,11 @@ public:
 
 	String fmtSliderPos(float sliderPos) const;
 
-	RSliderDims calculateDims() const;
+	// NOTE: this could be called on `resized` and cached, but it also depends on
+	// the rotary parameters, so best to call on every paint
+	RSliderDims calcDims() const;
+	float calcWidthForHeight(float height) const;
+	float calcHeightForWidth(float width) const;
 
 	void setGap(float pGap) { gap = pGap; }
 	void setMargin(float pMargin) { margin = pMargin; }
@@ -53,15 +57,23 @@ public:
 	void setPosMapHigh(float value) { posMapHigh = value; }
 	void setPosMapFmt(const String& fmt) { posMapFmt = fmt; }
 
+	enum ColourIds
+	{
+		dialColourId = 0x2000201,
+		dialOutlineColourId = 0x2000202,
+		dialTextColourId = 0x2000203,
+		dialDotColourId = 0x2000204,
+	};
+
 private:
 	using Slider::setSliderStyle;
 	using Slider::setTextBoxStyle;
 
 	float posMapLow = 0.0f;
-	float posMapHigh = 1.0f;
-	String posMapFmt;
+	float posMapHigh = 10.0f;
+	String posMapFmt = "%02.0f";
 
-	float gap = 0.0f;
+	float gap = 2.0f;
 	float margin = 0.0f;
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (RSlider)

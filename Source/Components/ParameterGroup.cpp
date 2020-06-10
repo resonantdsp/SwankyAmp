@@ -17,48 +17,63 @@
  */
 
 #include <JuceHeader.h>
+
+#include "../Utils.h"
+
 #include "ParameterGroup.h"
 
-#include "../ResonantAmpLAF.h"
-
-ParameterGroup::ParameterGroup() :
-	ParameterGroup("")
-{
-}
 
 ParameterGroup::ParameterGroup(const String& pLabel)
 {
 	setLabel(pLabel);
 	label.setJustificationType(Justification::topLeft);
-	label.setFont(ResonantAmpLAF::getDefaultFont().withHeight(24.0f));
-	label.setColour(Label::textColourId, ResonantAmpLAF::getColourDark());
+	label.setFont(24.0f);
+
+	gradient.addColour(0.0f, Colours::white);
+	gradient.addColour(0.5f, Colours::white);
+	gradient.addColour(1.0f, Colours::white);
 
 	addAndMakeVisible(label);
 }
 
-void ParameterGroup::setLabel(const String& pLabel) {
-	label.setText(pLabel, dontSendNotification);
+void ParameterGroup::setFont(const Font& font)
+{
+	label.setFont(font); 
+	// note that if the font size changes, the box will need to change
+	resized();
 }
 
-void ParameterGroup::setLineThickness(float thickness) {
+void ParameterGroup::setFont(float height)
+{
+	label.setFont(height);
+	resized();
+}
+
+void ParameterGroup::setLineThickness(float thickness)
+{
 	lineThickness = thickness;
+	// note: border bounds depend on line thickness affects paint
+	resized();
+}
+
+void ParameterGroup::setSpacing(int pSpacing)
+{
+	spacing = pSpacing;
+	resized();
 }
 
 void ParameterGroup::paint(Graphics& g)
 {
-	auto gradient = ColourGradient();
-	gradient.addColour(0.0f, Colour::fromHSV(0.64f, 0.01f, 0.95f, 1.0f));
-	gradient.addColour(0.5f, Colour::fromHSV(0.64f, 0.0f, 1.0f, 1.0f));
-	gradient.addColour(1.0f, Colour::fromHSV(0.64f, 0.01f, 0.95f, 1.0f));
-	gradient.point1 = getBorderBounds().getCentre().toFloat().translated(-0.5f * (float)getHeight(), 0.0f);
-	gradient.point2 = getBorderBounds().getCentre().toFloat().translated(+0.5f * (float)getHeight(), 0.0f);
+	gradient.setColour(0, findColour(steelColourId));
+	gradient.setColour(1, Colours::white);
+	gradient.setColour(2, findColour(steelColourId));
 
 	g.setGradientFill(gradient);
-	g.fillRoundedRectangle(getBorderBounds().toFloat(), 2.0f* lineThickness);
+	g.fillRoundedRectangle(getBorderBounds().toFloat(), 2.0f * lineThickness);
 
 	g.drawImage(bgNoise, getBorderBounds().toFloat(), RectanglePlacement::stretchToFit);
 
-	g.setColour(ResonantAmpLAF::getColourDark());
+	g.setColour(findColour(borderColourId));
 	g.drawRoundedRectangle(getBorderBounds().toFloat(), 2.0f * lineThickness, lineThickness);
 
 	g.setColour(Colour::fromHSV(0.0f, 0.0f, 1.0f, 0.5f));
@@ -71,28 +86,22 @@ void ParameterGroup::paint(Graphics& g)
 
 void ParameterGroup::resized()
 {
-	label.setBounds(getLocalBounds());
+	label.setBounds(getLocalBounds().withHeight((int)(label.getFont().getHeight() + 0.5f)));
 
-	auto noise = Image(
-		Image::PixelFormat::ARGB,
-		jmax(1, getBorderBounds().getWidth() / 20),
-		getBorderBounds().getHeight(),
-		false
-	);
-	for (int i = 0; i < noise.getWidth(); i++)
-		for (int j = 0; j < noise.getHeight(); j++)
-			noise.setPixelAt(
-				i, j,
-				Colour::fromHSV(0.0f, 0.0f, 0.0f, rng.nextFloat() * 0.03f)
-			);
-
-	bgNoise = noise;
-}
-
-Rectangle<int> ParameterGroup::getBorderBounds() const {
 	Rectangle<float> bounds = getLocalBounds().toFloat();
 	bounds.setTop(label.getFont().getHeight());
 	BorderSize<float>(lineThickness / 2.0f).subtractFrom(bounds);
-	return bounds.toNearestInt();
+	borderBounds = bounds.toNearestInt();
+
+	bgNoise = buildImageNoise(
+		// noise is not as wide, and gets stretched to create brushed metal
+		jmax(1, getBorderBounds().getWidth() / 20),
+		getBorderBounds().getHeight(),
+		rng,
+		bgNoiseAlpha
+	);
+
+	gradient.point1 = getBorderBounds().getCentre().toFloat().translated(-0.5f * (float)getHeight(), 0.0f);
+	gradient.point2 = getBorderBounds().getCentre().toFloat().translated(+0.5f * (float)getHeight(), 0.0f);
 }
 

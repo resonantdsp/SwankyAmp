@@ -19,10 +19,10 @@
 #pragma once
 
 #include <JuceHeader.h>
+
+#include "../Utils.h"
 #include "ParameterGroup.h"
 #include "RSliderLabel.h"
-
-#include "LevelMeter.h"
 
 class StagingGroup : public ParameterGroup
 {
@@ -30,22 +30,21 @@ public:
 	StagingGroup();
 	~StagingGroup() {}
 
-	void setHeight(int height);
+	void setHeight(int height) { setSize(0, height); }
+	void resized() override;
 
+	void attachVTS(AudioProcessorValueTreeState& vts);
+
+private:
 	RSliderLabel sliderStages;
 	RSliderLabel sliderSlope;
 	RSliderLabel sliderFilter;
 
-private:
-	int height = 0;
+	std::unique_ptr<SliderAttachment> attStages;
+	std::unique_ptr<SliderAttachment> attSlope;
+	std::unique_ptr<SliderAttachment> attFilter;
 
-	// disable setting the width
-	using Component::setSize;
-	using Component::setBounds;
-	using Component::setBoundsRelative;
-	using Component::setBoundsInset;
-	using Component::setBoundsToFit;
-	using Component::centreWithSize;
-
+	DISABLE_COMPONENT_RESIZE()
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (StagingGroup)
 };
+

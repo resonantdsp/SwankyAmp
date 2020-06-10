@@ -19,10 +19,10 @@
 #pragma once
 
 #include <JuceHeader.h>
+
+#include "../Utils.h"
 #include "ParameterGroup.h"
 #include "RSliderLabel.h"
-
-#include "LevelMeter.h"
 
 class PreAmpGroup : public ParameterGroup
 {
@@ -30,23 +30,20 @@ public:
 	PreAmpGroup();
 	~PreAmpGroup() {}
 
-	void setHeight(int /*height*/);
+	void setHeight(int height) { setSize(0, height); }
+	void resized() override;
 
-	// note: need to expose so that it can get a parameter attachment
+	void attachVTS(AudioProcessorValueTreeState& vts);
+
+private:
 	RSliderLabel sliderDrive;
 	RSliderLabel sliderTouch;
 	RSliderLabel sliderGrit;
 
-private:
-	int height = 0;
+	std::unique_ptr<SliderAttachment> attDrive;
+	std::unique_ptr<SliderAttachment> attTouch;
+	std::unique_ptr<SliderAttachment> attGrit;
 
-	// disable setting the width
-	using Component::setSize;
-	using Component::setBounds;
-	using Component::setBoundsRelative;
-	using Component::setBoundsInset;
-	using Component::setBoundsToFit;
-	using Component::centreWithSize;
-
+	DISABLE_COMPONENT_RESIZE()
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PreAmpGroup)
 };

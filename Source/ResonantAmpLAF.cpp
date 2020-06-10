@@ -17,17 +17,44 @@
  */
 
 #include "Utils.h"
+#include "Components/ParameterGroup.h"
 #include "Components/RSlider.h"
+#include "Components/LevelMeter.h"
+#include "Components/RButton.h"
+
 #include "ResonantAmpLAF.h"
+
+const Colour ResonantAmpLAF::colourDark = Colour::fromHSV(0.0f, 0.0f, 0.25f, 1.0f);
+const Colour ResonantAmpLAF::colourGrey = Colour::fromHSV(0.0f, 0.0f, 0.75f, 1.0f);
+const Colour ResonantAmpLAF::colourBackground = Colour::fromHSV(0.0f, 0.0f, 1.0f, 1.0f);
+const Colour ResonantAmpLAF::colourHighlight = Colour::fromHSV(0.98f, 0.6f, 0.75f, 1.0f);
+const Colour ResonantAmpLAF::colourSteel = Colour::fromHSV(0.64f, 0.02f, 0.97f, 1.0f);
 
 ResonantAmpLAF::ResonantAmpLAF()
 {
-	setColour(ResizableWindow::backgroundColourId, ResonantAmpLAF::getColourBackground());
-	setColour(Label::textColourId, ResonantAmpLAF::getColourDark());
-	setColour(Slider::textBoxTextColourId, ResonantAmpLAF::getColourDark());
+	setColour(ResizableWindow::backgroundColourId, ResonantAmpLAF::colourBackground);
+	setColour(Label::textColourId, ResonantAmpLAF::colourDark);
+	setColour(Slider::textBoxTextColourId, ResonantAmpLAF::colourDark);
+
+	setColour(ParameterGroup::borderColourId, ResonantAmpLAF::colourDark);
+	setColour(ParameterGroup::steelColourId, ResonantAmpLAF::colourSteel);
+
+	setColour(RSlider::dialColourId, ResonantAmpLAF::colourDark);
+	setColour(RSlider::dialOutlineColourId, ResonantAmpLAF::colourGrey);
+	setColour(RSlider::dialTextColourId, ResonantAmpLAF::colourGrey);
+	setColour(RSlider::dialDotColourId, ResonantAmpLAF::colourHighlight);
+
+	setColour(LevelMeter::outlineColourId, ResonantAmpLAF::colourDark);
+	setColour(LevelMeter::backgroundColourId, ResonantAmpLAF::colourBackground);
+	setColour(LevelMeter::meterColourId, ResonantAmpLAF::colourGrey);
+	setColour(LevelMeter::textColourId, ResonantAmpLAF::colourDark);
+
+	setColour(RButton::buttonColourId, ResonantAmpLAF::colourDark);
+	setColour(RButton::textColourId, ResonantAmpLAF::colourGrey);
 }
 
-const Font& ResonantAmpLAF::getDefaultFont() {
+const Font& ResonantAmpLAF::getDefaultFont()
+{
 	const static Font font = Font(
 		Typeface::createSystemTypefaceFor(
 			BinaryData::PTSansRegular_ttf,
@@ -38,7 +65,8 @@ const Font& ResonantAmpLAF::getDefaultFont() {
 	return font;
 }
 
-const Font& ResonantAmpLAF::getDefaultFontNarrow() {
+const Font& ResonantAmpLAF::getDefaultFontNarrow()
+{
 	const static Font font = Font(
 		Typeface::createSystemTypefaceFor(
 			BinaryData::PTSansNarrowRegular_ttf,
@@ -49,7 +77,8 @@ const Font& ResonantAmpLAF::getDefaultFontNarrow() {
 	return font;
 }
 
-const Font& ResonantAmpLAF::getDefaultFontBold() {
+const Font& ResonantAmpLAF::getDefaultFontBold()
+{
 	const static Font font = Font(
 		Typeface::createSystemTypefaceFor(
 			BinaryData::PTSansBold_ttf,
@@ -60,38 +89,29 @@ const Font& ResonantAmpLAF::getDefaultFontBold() {
 	return font;
 }
 
-const Colour& ResonantAmpLAF::getColourDark() {
-	const static Colour colour = Colour::fromHSV(0.0f, 0.0f, 0.25f, 1.0f);
-	return colour;
-}
 
-const Colour& ResonantAmpLAF::getColourGrey() {
-	const static Colour colour = Colour::fromHSV(0.0f, 0.0f, 0.75f, 1.0f);
-	return colour;
-}
-
-const Colour& ResonantAmpLAF::getColourBackground() {
-	const static Colour colour = Colour::fromHSV(0.0f, 0.0f, 1.0f, 1.0f);
-	return colour;
-}
-
-const Colour& ResonantAmpLAF::getColourHighlight() {
-	const static Colour colour = Colour::fromHSV(0.98f, 0.6f, 0.75f, 1.0f);
-	return colour;
+const DropShadow& ResonantAmpLAF::getDropShadow()
+{
+	const static DropShadow dropShadow(
+		Colour::fromHSV(0.0f, 0.0f, 0.0f, 0.5),
+		4,
+		Point<int>(1, 1)
+	);
+	return dropShadow;
 }
 
 Slider::SliderLayout ResonantAmpLAF::getSliderLayout(Slider& slider)
 {
-    if (!slider.isRotary() && slider.getTextBoxPosition() != Slider::TextBoxBelow)
-        return LookAndFeel_V4::getSliderLayout(slider);
+	if (!slider.isRotary() && slider.getTextBoxPosition() != Slider::TextBoxBelow)
+		return LookAndFeel_V4::getSliderLayout(slider);
 
-    auto localBounds = slider.getLocalBounds();
+	auto localBounds = slider.getLocalBounds();
 
-    Slider::SliderLayout layout;
+	Slider::SliderLayout layout;
 	layout.textBoxBounds = localBounds;
-    layout.sliderBounds = localBounds;
+	layout.sliderBounds = localBounds;
 
-    return layout;
+	return layout;
 }
 
 void ResonantAmpLAF::drawRotarySlider(
@@ -103,8 +123,8 @@ void ResonantAmpLAF::drawRotarySlider(
 	float sliderPos,
 	const float rotaryStartAngle,
 	const float rotaryEndAngle,
-	Slider& slider
-) {
+	Slider& slider)
+{
 	RSlider* rslider = dynamic_cast<RSlider*>(&slider);
 
 	if (!rslider)
@@ -122,9 +142,11 @@ void ResonantAmpLAF::drawRotarySlider(
 
 	const auto bounds = g.getClipBounds();
 
-	const RSliderDims dims = rslider->calculateDims();
+	const RSliderDims dims = rslider->calcDims();
 
-    const auto sliderAngle = angleModulo(rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle));
+	const auto sliderAngle = angleModulo(
+		rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle)
+	);
 	
 	// dial
 
@@ -141,19 +163,14 @@ void ResonantAmpLAF::drawRotarySlider(
 	);
 	dialPath.closeSubPath();
 
-	auto dialShadow = DropShadow(
-		Colour::fromHSV(0.0f, 0.0f, 0.0f, 0.5f),
-		(int)(0.333f * dims.margin + 0.5f),
-		Point<int>(1, 1)
-	);
-	dialShadow.drawForPath(g, dialPath);
+	ResonantAmpLAF::getDropShadow().drawForPath(g, dialPath);
 
-	g.setColour(ResonantAmpLAF::getColourDark());
+	g.setColour(findColour(RSlider::dialColourId));
 	g.fillPath(dialPath);
 
 	// dial outline
 
-	g.setColour(ResonantAmpLAF::getColourGrey());
+	g.setColour(findColour(RSlider::dialOutlineColourId));
 
 	Path dialOutlinePath;
 	//dialOutlinePath.startNewSubPath(dims.start + Point<float>(1.5f, 0));
@@ -178,8 +195,8 @@ void ResonantAmpLAF::drawRotarySlider(
 	// label text
 
 	const String labelText = rslider->fmtSliderPos(sliderPos);
-	g.setFont(ResonantAmpLAF::getDefaultFontNarrow().withHeight(20.0f));
-	g.setColour(ResonantAmpLAF::getColourGrey());
+	g.setFont(ResonantAmpLAF::getDefaultFontNarrow().withHeight(dims.radius / 1.5f));
+	g.setColour(findColour(RSlider::dialTextColourId));
 	g.drawText(labelText, dialBounds, Justification::centred, true);
 
 	// tick
@@ -187,9 +204,15 @@ void ResonantAmpLAF::drawRotarySlider(
 	Path pointerPath;
 	auto pointerLength = dims.radius * 0.33f;
 	auto lineThickness = 2.0f;
-	pointerPath.addRoundedRectangle(-lineThickness * 2.0f * 0.5f, -dims.radius, lineThickness * 2.0f, pointerLength, lineThickness);
+	pointerPath.addRoundedRectangle(
+		-lineThickness * 2.0f * 0.5f,
+		-dims.radius,
+		lineThickness * 2.0f,
+		pointerLength,
+		lineThickness
+	);
 	pointerPath.applyTransform(AffineTransform::rotation(sliderAngle).translated(dialBounds.getCentre()));
-	g.setColour(ResonantAmpLAF::getColourGrey());
+	g.setColour(findColour(RSlider::dialOutlineColourId));
 	g.fillPath(pointerPath);
 
 	// dots
@@ -209,11 +232,14 @@ void ResonantAmpLAF::drawRotarySlider(
 	);
 	dotClipPath.closeSubPath();
 
-	g.setColour(ResonantAmpLAF::getColourGrey());
+	g.setColour(findColour(RSlider::dialOutlineColourId));
 
 	for (int iangle = 1; iangle < 10; iangle++) {
 		const float angle = dims.theta - iangle * dims.theta / 5.0f;
-		const auto dotCenter = dialBounds.getCentre() - (dims.radius + dims.margin / 2.0f) * Point<float>(sinf(angle), cosf(angle));
+		const auto dotCenter = 
+			dialBounds.getCentre() 
+			- (dims.radius + dims.margin / 2.0f) 
+			* Point<float>(sinf(angle), cosf(angle));
 		auto dotBounds = Rectangle<float>();
 		dotBounds.setCentre(dotCenter);
 		dotBounds.translate(-dotSize / 2.0f, -dotSize / 2.0f);
@@ -221,13 +247,16 @@ void ResonantAmpLAF::drawRotarySlider(
 		g.fillEllipse(dotBounds);
 	}
 
-	g.setColour(ResonantAmpLAF::getColourHighlight());
+	g.setColour(findColour(RSlider::dialDotColourId));
 	g.saveState();
 	g.reduceClipRegion(dotClipPath);
 
 	for (int iangle = 1; iangle < 10; iangle++) {
 		const float angle = dims.theta - iangle * dims.theta / 5.0f;
-		const auto dotCenter = dialBounds.getCentre() - (dims.radius + dims.margin / 2.0f) * Point<float>(sinf(angle), cosf(angle));
+		const auto dotCenter = 
+			dialBounds.getCentre() 
+			- (dims.radius + dims.margin / 2.0f) 
+			* Point<float>(sinf(angle), cosf(angle));
 		auto dotBounds = Rectangle<float>();
 		dotBounds.setCentre(dotCenter);
 		dotBounds.translate(-dotSize / 2.0f, -dotSize / 2.0f);
@@ -244,6 +273,18 @@ void ResonantAmpLAF::drawToggleButton(
 	bool shouldDrawButtonAsHighlighted,
 	bool shouldDrawButtonAsDown)
 {
+	RButton* rbutton = dynamic_cast<RButton*>(&button);
+
+	if (!rbutton)
+		return LookAndFeel_V4::drawToggleButton(
+			g,
+			button,
+			shouldDrawButtonAsHighlighted,
+			shouldDrawButtonAsDown
+		);
+
+	ignoreUnused(shouldDrawButtonAsHighlighted, shouldDrawButtonAsDown);
+
 	const float lineWidth = 2.0f;
 
 	const float radiusForHeight = (float)g.getClipBounds().getHeight() / 4.0f - lineWidth;
@@ -265,10 +306,10 @@ void ResonantAmpLAF::drawToggleButton(
 	else
 		circle.setPosition(outer.getTopLeft().translated(0.0f, 2.0f * radius));
 
-	g.setColour(ResonantAmpLAF::getColourDark());
+	g.setColour(findColour(RButton::buttonColourId));
 	g.fillEllipse(circle);
 
-	g.setColour(ResonantAmpLAF::getColourGrey());
+	g.setColour(findColour(RButton::textColourId));
 	g.setFont(ResonantAmpLAF::getDefaultFontNarrow().withHeight(radius));
 	g.drawText(
 		button.getToggleState() ? "ON" : "OFF",
@@ -277,6 +318,6 @@ void ResonantAmpLAF::drawToggleButton(
 		true
 	);
 
-	g.setColour(ResonantAmpLAF::getColourDark());
+	g.setColour(findColour(RButton::buttonColourId));
 	g.drawRoundedRectangle(outer, radius, lineWidth);
 }

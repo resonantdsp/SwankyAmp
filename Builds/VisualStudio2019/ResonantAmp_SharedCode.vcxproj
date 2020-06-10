@@ -136,6 +136,7 @@
     </Bscmake>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\Source\Components\AmpGroup.cpp"/>
     <ClCompile Include="..\..\Source\Components\CabGroup.cpp"/>
     <ClCompile Include="..\..\Source\Components\LevelMeter.cpp"/>
     <ClCompile Include="..\..\Source\Components\LevelsGroup.cpp"/>
@@ -1991,12 +1992,14 @@
     <ClCompile Include="..\..\JuceLibraryCode\include_juce_opengl.cpp"/>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Source\Components\AmpGroup.h"/>
     <ClInclude Include="..\..\Source\Components\CabGroup.h"/>
     <ClInclude Include="..\..\Source\Components\LevelMeter.h"/>
     <ClInclude Include="..\..\Source\Components\LevelsGroup.h"/>
     <ClInclude Include="..\..\Source\Components\ParameterGroup.h"/>
     <ClInclude Include="..\..\Source\Components\PowerAmpGroup.h"/>
     <ClInclude Include="..\..\Source\Components\PreAmpGroup.h"/>
+    <ClInclude Include="..\..\Source\Components\RButton.h"/>
     <ClInclude Include="..\..\Source\Components\RSlider.h"/>
     <ClInclude Include="..\..\Source\Components\RSliderLabel.h"/>
     <ClInclude Include="..\..\Source\Components\StagingGroup.h"/>

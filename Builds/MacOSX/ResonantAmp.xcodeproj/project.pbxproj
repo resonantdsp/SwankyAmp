@@ -81,6 +81,10 @@
 			isa = PBXBuildFile;
 			fileRef = 0A400B6F77043875D7BBEF90;
 		};
+		09E5339B14114CD42CE3400D = {
+			isa = PBXBuildFile;
+			fileRef = D134DD7046C76C5361AC80BF;
+		};
 		FFD64783A33D3E410494A8FF = {
 			isa = PBXBuildFile;
 			fileRef = CD5745E5208896A780529405;
@@ -337,12 +341,12 @@
 			path = ../../Source/Components/RSliderLabel.cpp;
 			sourceTree = "SOURCE_ROOT";
 		};
-		33234A408E3F49231B4F6B5F = {
+		326C59FB6919910FA25E1B21 = {
 			isa = PBXFileReference;
-			lastKnownFileType = file;
-			name = "juce_audio_basics";
-			path = "~/JUCE/modules/juce_audio_basics";
-			sourceTree = "<absolute>";
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = Utils.cpp;
+			path = ../../Source/Utils.cpp;
+			sourceTree = "SOURCE_ROOT";
 		};
 		3A3B8185815BB6FF153325AD = {
 			isa = PBXFileReference;
@@ -386,12 +390,12 @@
 			path = System/Library/Frameworks/Carbon.framework;
 			sourceTree = SDKROOT;
 		};
-		326C59FB6919910FA25E1B21 = {
+		33234A408E3F49231B4F6B5F = {
 			isa = PBXFileReference;
-			lastKnownFileType = sourcecode.cpp.cpp;
-			name = Utils.cpp;
-			path = ../../Source/Utils.cpp;
-			sourceTree = "SOURCE_ROOT";
+			lastKnownFileType = file;
+			name = "juce_audio_basics";
+			path = "~/JUCE/modules/juce_audio_basics";
+			sourceTree = "<absolute>";
 		};
 		361876899BEE73EA3F290146 = {
 			isa = PBXFileReference;
@@ -680,6 +684,13 @@
 			path = "~/JUCE/modules/juce_audio_devices";
 			sourceTree = "<absolute>";
 		};
+		A3EDF905651742C454114185 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = RButton.h;
+			path = ../../Source/Components/RButton.h;
+			sourceTree = "SOURCE_ROOT";
+		};
 		A40E105BF5EC7E26D73B2F00 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.cpp.objcpp;
@@ -714,6 +725,13 @@
 			name = QuartzCore.framework;
 			path = System/Library/Frameworks/QuartzCore.framework;
 			sourceTree = SDKROOT;
+		};
+		B7F720F0A6051D989891B057 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = AmpGroup.h;
+			path = ../../Source/Components/AmpGroup.h;
+			sourceTree = "SOURCE_ROOT";
 		};
 		BC9ED327B4E1CF94BE1B8812 = {
 			isa = PBXFileReference;
@@ -776,6 +794,13 @@
 			lastKnownFileType = sourcecode.cpp.cpp;
 			name = CabGroup.cpp;
 			path = ../../Source/Components/CabGroup.cpp;
+			sourceTree = "SOURCE_ROOT";
+		};
+		D134DD7046C76C5361AC80BF = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = AmpGroup.cpp;
+			path = ../../Source/Components/AmpGroup.cpp;
 			sourceTree = "SOURCE_ROOT";
 		};
 		D4C08012246F74E2E3ED6117 = {
@@ -904,6 +929,8 @@
 		C8C0970D85E7EA313CFE656A = {
 			isa = PBXGroup;
 			children = (
+				D134DD7046C76C5361AC80BF,
+				B7F720F0A6051D989891B057,
 				CD5745E5208896A780529405,
 				C13CF189381BAA967D7E2293,
 				9AFBDEE7707B9B3C549B5094,
@@ -916,6 +943,7 @@
 				4414DAC183F81C8A3F77E466,
 				C74C1D329B9F33A7B1D34B7C,
 				3BB443F3D9FE041CA53857A1,
+				A3EDF905651742C454114185,
 				700A1146182081C685E35039,
 				6E35DBE7DE8F32FCFCB6C767,
 				2C19225998E4D819E2FD201C,
@@ -2031,6 +2059,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				09E5339B14114CD42CE3400D,
 				FFD64783A33D3E410494A8FF,
 				59B2B69201A6CDD359EF6DE8,
 				408D129CA5BAD8716A818176,

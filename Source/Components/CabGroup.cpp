@@ -28,12 +28,22 @@ CabGroup::CabGroup() :
 	addAndMakeVisible(buttonCabOnOff);
 }
 
-void CabGroup::setHeight(int height) {
-	setSize(height, height);
-
-	const int spacing = 12;
-	const int innerHeight = getBorderBounds().getHeight() - 2 * spacing;
-
-	buttonCabOnOff.setBounds(BorderSize<int>((int)(1.5f * (float)spacing)).subtractedFrom(getBorderBounds()));
+void CabGroup::attachVTS(AudioProcessorValueTreeState& vts)
+{
+	attCabOnOff.reset(new ButtonAttachment(vts, "idCabOnOff", buttonCabOnOff));
 }
 
+void CabGroup::setHeight(int height) {
+	setSize(height, height);
+}
+
+void CabGroup::resized()
+{
+	ParameterGroup::resized();
+
+	const int innerHeight = getBorderBounds().getHeight() - 2 * spacing;
+	buttonCabOnOff.setBounds(
+		BorderSize<int>((int)(1.5f * (float)spacing))
+		.subtractedFrom(getBorderBounds())
+	);
+}

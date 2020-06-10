@@ -19,10 +19,9 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "ParameterGroup.h"
-#include "RSliderLabel.h"
 
-#include "LevelMeter.h"
+#include "../Utils.h"
+#include "RButton.h"
 
 class CabGroup : public ParameterGroup
 {
@@ -30,20 +29,16 @@ public:
 	CabGroup();
 	~CabGroup() {}
 
-	void setHeight(int /*height*/);
+	void attachVTS(AudioProcessorValueTreeState& vts);
 
-	ToggleButton buttonCabOnOff;
+	void setHeight(int height);
+	void resized() override;
 
 private:
-	int height = 0;
+	RButton buttonCabOnOff;
 
-	// disable setting the width
-	using Component::setSize;
-	using Component::setBounds;
-	using Component::setBoundsRelative;
-	using Component::setBoundsInset;
-	using Component::setBoundsToFit;
-	using Component::centreWithSize;
+	std::unique_ptr<ButtonAttachment> attCabOnOff;
 
+	DISABLE_COMPONENT_RESIZE()
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CabGroup)
 };
