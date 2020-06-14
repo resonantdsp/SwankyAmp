@@ -56,6 +56,8 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 			MAKE_PARAMETER_UNIT(LowCut),
 
 			std::make_unique<AudioParameterBool>("idCabOnOff", "CabOnOff", true),
+			MAKE_PARAMETER_UNIT(CabBrightness),
+			MAKE_PARAMETER(CabDistance, 0.0f, 1.0f, 0.0f),
 
 			MAKE_PARAMETER_UNIT(PreAmpDrive),
 			MAKE_PARAMETER_UNIT(PreAmpTouch),
@@ -78,6 +80,8 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 	ASSIGN_PARAMETER(LowCut)
 
 	ASSIGN_PARAMETER(CabOnOff)
+	ASSIGN_PARAMETER(CabBrightness)
+	ASSIGN_PARAMETER(CabDistance)
 
 	ASSIGN_PARAMETER(PreAmpDrive)
 	ASSIGN_PARAMETER(PreAmpTouch)
@@ -118,7 +122,10 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 
 		amp_channel[i].set_gain_stages(*parGainStages);
 		amp_channel[i].set_gain_slope(*parGainSlope);
+
 		amp_channel[i].set_cab_on_off((*parCabOnOff > 0.5) ? +1.0f : -1.0f);
+		amp_channel[i].set_cab_brightness(remap_unit(*parCabBrightness, -0.6, +0.6));
+		amp_channel[i].set_cab_distance(*parCabDistance);
 
 		amp_channel[i].set_triode_hp_freq(remap_unit(*parLowCut, -1.0f, +0.75f)); 
 		amp_channel[i].set_tetrode_hp_freq(remap_unit(*parLowCut, -1.0f, +0.75f)); 

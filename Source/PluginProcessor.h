@@ -51,6 +51,8 @@ public:
 	std::atomic<float>* parLowCut = nullptr;
 
 	std::atomic<float>* parCabOnOff = nullptr;
+	std::atomic<float>* parCabBrightness = nullptr;
+	std::atomic<float>* parCabDistance = nullptr;
 
 	std::atomic<float>* parPreAmpDrive = nullptr;
 	std::atomic<float>* parPreAmpTouch = nullptr;

@@ -29,11 +29,11 @@ with {
     pre_drive = pre_drive_unit : uscale(log(1e0), log(1e3)) : exp;
     // Measured the loudness change as a function of the pre drive, this looks
     // up the correction for any drive
-    unscale_pre = ba.listInterp((+3.24e-02,-5.96e+00,-1.19e+01,-1.78e+01,-2.36e+01,-2.88e+01,-3.19e+01,-3.30e+01,-3.28e+01,-3.24e+01,-3.22e+01), (pre_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear; 
+    unscale_pre = ba.listInterp((+3.24e-02,-5.96e+00,-1.19e+01,-1.78e+01,-2.36e+01,-2.88e+01,-3.19e+01,-3.30e+01,-3.28e+01,-3.24e+01,-3.22e+01), (pre_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
 
     power_drive_unit = nentry("power_drive", 0, -1, +1, .1);
     power_drive = power_drive_unit : uscale(log(1e0), log(1e3)) : exp;
-    unscale_power = ba.listInterp((+8.24e+00,+2.26e+00,-3.69e+00,-9.55e+00,-1.52e+01,-1.96e+01,-2.18e+01,-2.22e+01,-2.19e+01,-2.12e+01,-2.01e+01), (power_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
+    unscale_power = ba.listInterp((-3.98e-01,-6.38e+00,-1.23e+01,-1.82e+01,-2.38e+01,-2.82e+01,-3.04e+01,-3.08e+01,-3.05e+01,-2.99e+01,-2.87e+01), (power_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
 
     gain_stages = nentry("gain_stages", 0, -1, +1, .1);
     gain_slope = nentry("gain_slope", 0, -1, +1, .1) : uscale(0.5, 1.5);

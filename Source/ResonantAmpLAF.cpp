@@ -303,7 +303,7 @@ void ResonantAmpLAF::drawToggleButton(
 	const float lineWidth = 2.0f;
 
 	const float radiusForHeight = (float)g.getClipBounds().getHeight() / 4.0f - lineWidth;
-	const float radiusForWidth = (float)g.getClipBounds().getHeight() / 2.0f - lineWidth;
+	const float radiusForWidth = (float)g.getClipBounds().getWidth() / 2.0f - lineWidth;
 
 	const float radius = jmin(radiusForHeight, radiusForWidth);
 
