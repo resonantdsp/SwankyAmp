@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT id="sJgmJL" name="ResonantAmp" projectType="audioplug" jucerVersion="5.4.7"
-              version="0.2.1" projectLineFeed="&#10;" companyName="Resonant DSP"
+              version="0.3.0" projectLineFeed="&#10;" companyName="Resonant DSP"
               companyWebsite="https://www.resonantdsp.com/" companyEmail="info@resonantdsp.com"
               pluginFormats="buildAAX,buildAU,buildStandalone,buildVST3" pluginName="Resonant Amp"
               pluginDesc="Tube amplifiers simulation" pluginManufacturer="Resonant DSP"
