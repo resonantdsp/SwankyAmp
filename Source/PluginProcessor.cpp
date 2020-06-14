@@ -135,7 +135,7 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 		amp_channel[i].set_triode_plate_bias(remap_unit(*parPreAmpTouch * -1.0f, -1.0f, +0.5f)); 
 		amp_channel[i].set_triode_plate_comp_ratio(remap_unit(*parPreAmpTouch * -1.0f, -1.0f, +0.0f)); 
 
-		amp_channel[i].set_triode_grid_level(remap_unit(*parPreAmpGrit * -1.0f, -0.25f, +3.0f)); 
+		amp_channel[i].set_triode_grid_level(remap_unit(*parPreAmpGrit * -1.0f, -0.2f, +3.0f)); 
 		amp_channel[i].set_triode_grid_clip(remap_unit(*parPreAmpGrit * -1.0f, -1.0f, +4.0f)); 
 		amp_channel[i].set_triode_plate_comp_level(remap_unit(*parPreAmpGrit * +1.0f, -0.0f, +1.0f)); 
 		amp_channel[i].set_triode_plate_comp_offset(remap_unit(*parPreAmpGrit * -1.0f, -0.0f, +5.0f)); 
