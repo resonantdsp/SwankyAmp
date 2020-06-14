@@ -55,7 +55,7 @@ with {
     // peak_9_l = nentry("peak_9_l", 0, -1, +1, .1);
     // peak_9_b = nentry("peak_9_b", 0, -1, +1, .1);
 
-    offset = 15;
+    offset = 5;
     hp_f = 110;
     lp_f = 11000;
     scoop_f = 950;
