@@ -26,24 +26,60 @@ CabGroup::CabGroup() :
 	ParameterGroup("CABINET")
 {
 	addAndMakeVisible(buttonCabOnOff);
+
+	addAndMakeVisible(sliderBright);
+	sliderBright.setLabel("BRIGHT");
+
+	addAndMakeVisible(sliderDistance);
+	sliderDistance.setLabel("DISTANCE");
 }
 
 void CabGroup::attachVTS(AudioProcessorValueTreeState& vts)
 {
 	attCabOnOff.reset(new ButtonAttachment(vts, "idCabOnOff", buttonCabOnOff));
-}
-
-void CabGroup::setHeight(int height) {
-	setSize(height, height);
+	attCabBrightness.reset(new SliderAttachment(vts, "idCabBrightness", sliderBright.slider));
+	attCabDistance.reset(new SliderAttachment(vts, "idCabDistance", sliderDistance.slider));
 }
 
 void CabGroup::resized()
 {
+	//ParameterGroup::resized();
+
+	//const int innerHeight = getBorderBounds().getHeight() - 2 * spacing;
+
+	const int prevInnerHeight = getBorderBounds().getHeight() - 2 * spacing;
+	const Point<int> prevCorner = getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
+
 	ParameterGroup::resized();
 
 	const int innerHeight = getBorderBounds().getHeight() - 2 * spacing;
-	buttonCabOnOff.setBounds(
-		BorderSize<int>((int)(1.5f * (float)spacing))
-		.subtractedFrom(getBorderBounds())
+	Point<int> corner = getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
+
+	// only re-set the positions when the height or position changes
+	if (prevInnerHeight == innerHeight && prevCorner == corner) return;
+
+	buttonCabOnOff.setTopLeftPosition(corner + Point<int>(spacing, spacing) / 2);
+	buttonCabOnOff.setSize(
+		(int)(buttonCabOnOff.calcWidthForHeight((float)innerHeight - spacing)),
+		(int)((float)innerHeight - spacing)
 	);
+
+
+	corner = buttonCabOnOff.getBounds().getTopRight() + Point<int>(spacing, 0);
+
+	sliderBright.setTopLeftPosition(corner + Point<int>(spacing, -spacing) / 2);
+	sliderBright.slider.setMargin(0.15f * (float)innerHeight);
+	sliderBright.setHeight(innerHeight);
+
+	corner = sliderBright.getBounds().getTopRight() + Point<int>(spacing, 0);
+
+	sliderDistance.setTopLeftPosition(corner);
+	sliderDistance.slider.setMargin(0.15f * (float)innerHeight);
+	sliderDistance.setHeight(innerHeight);
+
+	corner = sliderDistance.getBounds().getTopRight() + Point<int>(spacing, 0);
+
+	// can now determine the width and set it, this will re-call `resized` but
+	// since the height is the same it won't re-do the calculation
+	setSize(corner.getX() - getBounds().getX(), getHeight());
 }

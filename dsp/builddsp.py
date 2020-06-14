@@ -131,14 +131,15 @@ def make_standalone(name: str, code: str, defaults: Mapping[str, float]) -> str:
 
 
 def build_header(
-    path: str,
+    path_build: str,
+    path_dsp: str,
     name: str,
     defaults: Mapping[str, float],
 ) -> str:
-    path = Path(path)
-    path_dsp = Path(__file__).parent / f"{name}.dsp"
+    path_build = Path(path_build)
+    path_dsp = Path(path_dsp) / f"{name}.dsp"
 
-    path_h = compile_faust_dsp(name=name, path=path, path_dsp=path_dsp)
+    path_h = compile_faust_dsp(name=name, path=path_build, path_dsp=path_dsp)
 
     with path_h.open("r") as fio:
         code = fio.read()

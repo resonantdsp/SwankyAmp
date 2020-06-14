@@ -28,6 +28,9 @@ public:
 
 	void resized() override;
 
+	float calcWidthForHeight(float height) const { return height / 2.0f; }
+	float calcHeightForWidth(float width) const { return width * 2.0f; }
+
 	const Image& getBgNoise() const { return bgNoise; }
 
 	enum ColourIds

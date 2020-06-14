@@ -53,7 +53,10 @@ def main():
     # generate the header code for the DSP object
     os.makedirs("faust_build", exist_ok=True)
     header_code = builddsp.build_header(
-        path="faust_build", name="AmpMono", defaults=pars
+        path_build="faust_build",
+        path_dsp=".",
+        name="AmpMono",
+        defaults=pars,
     )
 
     with open("../Source/AmpMono.h", "w") as fio:

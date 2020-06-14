@@ -14,79 +14,115 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import("stdfaust.lib");
+import("common.dsp");
+
 cab = cab
 with {
-    // fit parmeters
-    hp_f = 143.90880212893683;
-    lp_f = 18066.01335304503;
-    hshelf5k_f = 5847.289563996711;
-    hshelf5k_l = -17.282484388209873;
-    bband150_f = 119.4597583331697;
-    bband150_l = 16.832043582883152;
-    bband150_q = 0.8092865892227618;
-    bband900_f = 899.9997595265272;
-    bband900_l = 14.666208917048642;
-    bband900_q = 0.14400456547145543;
-    nband3k_f = 3009.986891260162;
-    nband3k_l = -8.158529858054802;
-    nband3k_q = 9.706012982882706;
-    nband2_4k_f = 2549.989277861244;
-    nband2_4k_l = 5.661325835805933;
-    nband2_4k_q = 4.963535206412702;
-    nband2_6k_f = 2589.9434207333493;
-    nband2_6k_l = -5.399747650020267;
-    nband2_6k_q = 15.683364472667014;
-    nband3_2k_f = 3201.720511050278;
-    nband3_2k_l = 5.258437941356628;
-    nband3_2k_q = 2.041835913931366;
-    nband4_2k_f = 4277.34257145966;
-    nband4_2k_l = -9.21780161572439;
-    nband4_2k_q = 2.931945190155691;
-    nband4_8k_f = 4795.8591935019285;
-    nband4_8k_l = 10.338499026151846;
-    nband4_8k_q = 1.346754496703414;
-    nband6_7k_f = 6741.63879029361;
-    nband6_7k_l = -16.67564915674005;
-    nband6_7k_q = 19.99710202404625;
-    nband600_f = 601.9999195042174;
-    nband600_l = -7.181949517918536;
-    nband600_q = 16.2554082997895;
-    nband820_f = 825.2095562105882;
-    nband820_l = -6.614192318352746;
-    nband820_q = 17.478517841309525;
-    nband990_f = 981.0000006386933;
-    nband990_l = -8.482596344025758;
-    nband990_q = 16.82462426781975;
-    nband1_1k_f = 1125.9823511404866;
-    nband1_1k_l = -7.5178945568579785;
-    nband1_1k_q = 13.073810276044432;
-    nband1_3k_f = 1364.9990929777402;
-    nband1_3k_l = -4.684819517899527;
-    nband1_3k_q = 22.493404706589892;
-    nband1_7k_f = 1774.573022017944;
-    nband1_7k_l = -4.001788606962911;
-    nband1_7k_q = 2.0192458013159458;
+    // offset = nentry("offset", 0, -1, +1, .1);
+    // hp_f = nentry("hp_f", 0, -1, +1, .1);
+    // lp_f = nentry("lp_f", 0, -1, +1, .1);
+    // shelf_f = nentry("shelf_f", 0, -1, +1, .1);
+    // shelf_l = nentry("shelf_l", 0, -1, +1, .1);
+    // scoop_f = nentry("scoop_f", 0, -1, +1, .1);
+    // scoop_l = nentry("scoop_l", 0, -1, +1, .1);
+    // scoop_b = nentry("scoop_b", 0, -1, +1, .1);
+    // peak_1_f = nentry("peak_1_f", 0, -1, +1, .1);
+    // peak_1_l = nentry("peak_1_l", 0, -1, +1, .1);
+    // peak_1_b = nentry("peak_1_b", 0, -1, +1, .1);
+    // peak_2_f = nentry("peak_2_f", 0, -1, +1, .1);
+    // peak_2_l = nentry("peak_2_l", 0, -1, +1, .1);
+    // peak_2_b = nentry("peak_2_b", 0, -1, +1, .1);
+    // peak_3_f = nentry("peak_3_f", 0, -1, +1, .1);
+    // peak_3_l = nentry("peak_3_l", 0, -1, +1, .1);
+    // peak_3_b = nentry("peak_3_b", 0, -1, +1, .1);
+    // peak_4_f = nentry("peak_4_f", 0, -1, +1, .1);
+    // peak_4_l = nentry("peak_4_l", 0, -1, +1, .1);
+    // peak_4_b = nentry("peak_4_b", 0, -1, +1, .1);
+    // peak_5_f = nentry("peak_5_f", 0, -1, +1, .1);
+    // peak_5_l = nentry("peak_5_l", 0, -1, +1, .1);
+    // peak_5_b = nentry("peak_5_b", 0, -1, +1, .1);
+    // peak_6_f = nentry("peak_6_f", 0, -1, +1, .1);
+    // peak_6_l = nentry("peak_6_l", 0, -1, +1, .1);
+    // peak_6_b = nentry("peak_6_b", 0, -1, +1, .1);
+    // peak_7_f = nentry("peak_7_f", 0, -1, +1, .1);
+    // peak_7_l = nentry("peak_7_l", 0, -1, +1, .1);
+    // peak_7_b = nentry("peak_7_b", 0, -1, +1, .1);
+    // peak_8_f = nentry("peak_8_f", 0, -1, +1, .1);
+    // peak_8_l = nentry("peak_8_l", 0, -1, +1, .1);
+    // peak_8_b = nentry("peak_8_b", 0, -1, +1, .1);
+    // peak_9_f = nentry("peak_9_f", 0, -1, +1, .1);
+    // peak_9_l = nentry("peak_9_l", 0, -1, +1, .1);
+    // peak_9_b = nentry("peak_9_b", 0, -1, +1, .1);
+
+    offset = 5;
+    hp_f = 110;
+    lp_f = 11000;
+    scoop_f = 950;
+    scoop_l = -10;
+    scoop_b = 2800;
+    shelf_f = 5600;
+    shelf_l = -30;
+    peak_1_f = 590;
+    peak_1_l = -15;
+    peak_1_b = 60;
+    peak_2_f = 640;
+    peak_2_l = 10;
+    peak_2_b = 140;
+    peak_3_f = 1120;
+    peak_3_l = -12;
+    peak_3_b = 70;
+    peak_4_f = 1180;
+    peak_4_l = 9;
+    peak_4_b = 160;
+    peak_5_f = 1660;
+    peak_5_l = -3.5;
+    peak_5_b = 790;
+    peak_6_f = 3050;
+    peak_6_l = -9;
+    peak_6_b = 330;
+    peak_7_f = 3800;
+    peak_7_l = -6;
+    peak_7_b = 750;
+    peak_8_f = 6800;
+    peak_8_l = -30;
+    peak_8_b = 200;
+    peak_9_f = 12000;
+    peak_9_l = -30;
+    peak_9_b = 250;
+
+    brightness = nentry("cab_brightness", 0, -1, +1, .1);
+    distance = nentry("cab_distance", 0, -1, +1, .1);
 
     cab = _
-        : fi.highpass(1, hp_f)
-        : fi.lowpass(1, lp_f)
-        : fi.highshelf(11, hshelf5k_l, hshelf5k_f)
-        : fi.peak_eq_cq(bband150_l, bband150_f, bband150_q)
-        : fi.peak_eq_cq(bband900_l, bband900_f, bband900_q)
-        : fi.peak_eq_cq(nband3k_l, nband3k_f, nband3k_q)
-        : fi.peak_eq_cq(nband2_4k_l, nband2_4k_f, nband2_4k_q)
-        : fi.peak_eq_cq(nband2_6k_l, nband2_6k_f, nband2_6k_q)
-        : fi.peak_eq_cq(nband3_2k_l, nband3_2k_f, nband3_2k_q)
-        : fi.peak_eq_cq(nband4_2k_l, nband4_2k_f, nband4_2k_q)
-        : fi.peak_eq_cq(nband4_8k_l, nband4_8k_f, nband4_8k_q)
-        : fi.peak_eq_cq(nband6_7k_l, nband6_7k_f, nband6_7k_q)
-        : fi.peak_eq_cq(nband600_l, nband600_f, nband600_q)
-        : fi.peak_eq_cq(nband820_l, nband820_f, nband820_q)
-        : fi.peak_eq_cq(nband990_l, nband990_f, nband990_q)
-        : fi.peak_eq_cq(nband1_1k_l, nband1_1k_f, nband1_1k_q)
-        : fi.peak_eq_cq(nband1_3k_l, nband1_3k_f, nband1_3k_q)
-        : fi.peak_eq_cq(nband1_7k_l, nband1_7k_f, nband1_7k_q)
-        // the fit can boost up the peak level, bring it back down to zero
-        : *(ba.db2linear(-bband150_l))
+        : fi.highpass(4, hp_f)
+        : fi.lowpass(3, lp_f)
+        : fi.highshelf(7, shelf_l, shelf_f)
+
+        : fi.peak_eq(peak_1_l, peak_1_f, peak_1_b)
+        : fi.peak_eq(peak_2_l, peak_2_f, peak_2_b)
+
+        : fi.peak_eq(peak_3_l, peak_3_f, peak_3_b)
+        : fi.peak_eq(peak_4_l, peak_4_f, peak_4_b)
+
+        : fi.peak_eq(peak_5_l, peak_5_f, peak_5_b)
+
+        : fi.peak_eq(peak_6_l, peak_6_f, peak_6_b)
+        : fi.peak_eq(peak_7_l, peak_7_f, peak_7_b)
+
+        : fi.peak_eq(peak_8_l, peak_8_f, peak_8_b)
+        : fi.peak_eq(peak_9_l, peak_9_f, peak_9_b)
+
+        : fi.peak_eq(scoop_l, scoop_f, scoop_b)
+
+        : fi.low_shelf(-3 * brightness, 1100)
+        : fi.peak_eq(15 * brightness, 6000, 1000)
+
+        : fi.peak_eq(-10 * distance, 70, 100)
+        : fi.peak_eq(-17 * distance, 1200, 300)
+        : *(ba.db2linear(2 * distance))
+
+        : *(ba.db2linear(offset))
+
         : _ ;
 };

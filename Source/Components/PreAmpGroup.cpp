@@ -26,8 +26,8 @@ PreAmpGroup::PreAmpGroup() :
 	addAndMakeVisible(sliderDrive);
 	sliderDrive.setLabel("DRIVE");
 
-	addAndMakeVisible(sliderTouch);
-	sliderTouch.setLabel("TOUCH");
+	addAndMakeVisible(sliderTight);
+	sliderTight.setLabel("TIGHT");
 
 	addAndMakeVisible(sliderGrit);
 	sliderGrit.setLabel("GRIT");
@@ -36,7 +36,7 @@ PreAmpGroup::PreAmpGroup() :
 void PreAmpGroup::attachVTS(AudioProcessorValueTreeState& vts)
 {
 	attDrive.reset(new SliderAttachment(vts, "idPreAmpDrive", sliderDrive.slider));
-	attTouch.reset(new SliderAttachment(vts, "idPreAmpTouch", sliderTouch.slider));
+	attTight.reset(new SliderAttachment(vts, "idPreAmpTight", sliderTight.slider));
 	attGrit.reset(new SliderAttachment(vts, "idPreAmpGrit", sliderGrit.slider));
 }
 
@@ -59,11 +59,11 @@ void PreAmpGroup::resized()
 
 	corner = sliderDrive.getBounds().getTopRight() + Point<int>(spacing, 0);
 
-	sliderTouch.setTopLeftPosition(corner);
-	sliderTouch.slider.setMargin(0.15f * (float)innerHeight);
-	sliderTouch.setHeight(innerHeight);
+	sliderTight.setTopLeftPosition(corner);
+	sliderTight.slider.setMargin(0.15f * (float)innerHeight);
+	sliderTight.setHeight(innerHeight);
 
-	corner = sliderTouch.getBounds().getTopRight() + Point<int>(spacing, 0);
+	corner = sliderTight.getBounds().getTopRight() + Point<int>(spacing, 0);
 
 	sliderGrit.setTopLeftPosition(corner);
 	sliderGrit.slider.setMargin(0.15f * (float)innerHeight);

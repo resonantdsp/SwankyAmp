@@ -22,6 +22,7 @@
 
 #include "../Utils.h"
 #include "RButton.h"
+#include "RSliderLabel.h"
 
 class CabGroup : public ParameterGroup
 {
@@ -31,13 +32,17 @@ public:
 
 	void attachVTS(AudioProcessorValueTreeState& vts);
 
-	void setHeight(int height);
+	void setHeight(int height) { setSize(0, height); }
 	void resized() override;
 
 private:
 	RButton buttonCabOnOff;
+	RSliderLabel sliderBright;
+	RSliderLabel sliderDistance;
 
 	std::unique_ptr<ButtonAttachment> attCabOnOff;
+	std::unique_ptr<SliderAttachment> attCabBrightness;
+	std::unique_ptr<SliderAttachment> attCabDistance;
 
 	DISABLE_COMPONENT_RESIZE()
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CabGroup)
