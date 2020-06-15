@@ -45,7 +45,7 @@ Load the plugin into your favorite VST host or DAW (into a mono or stereo track)
 * Set the power amp section:
   * See the notes on the pre amp section
   * The `drive` control here has the same effect on distortion as the volume knob of an amp, but the plugin maintains an even loudness.
-  * The the `sag` control to adjust the amount of voltage sag. With large sag, when the signal is large, it will get compressed, and it will also have less overhead meaning the distortion will be heard earlier at lower levels. The distortion also responds more to how heavily the guitar is played. This control works closely in conjuction with the `tight` control.
+  * Set the `sag` control to adjust the amount by which the voltage drops in the amplifier in response to loud playing. With large sag values, the signal will be audibly compressed, and it will also have less overhead meaning the distortion will be heard at lower levels. The distortion will also be more sensitive to how heavily the guitar is played. This control works closely in conjuction with the `tight` control.
   * Note that the power amp can act as a compressor: try setting the drive to the point where softly picked notes don't distort, but heavily picked ones do. You should notice the notes souding a bit fuller as the transiet hits the distortion ceiling, and then the note rings through as the bias point shifts.
 
 * Set the cabinet:
