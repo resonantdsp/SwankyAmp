@@ -35,7 +35,10 @@ def main():
         "power_drive": 0,
         "gain_stages": 0,
         "gain_slope": 0,
+        # cabinet
         "cab_on_off": 0,
+        "cab_brightness": 0,
+        "cab_distance": 0,
         # amp
         "input_level": 0,
         "output_level": 0,
