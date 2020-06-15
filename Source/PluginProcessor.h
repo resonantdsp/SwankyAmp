@@ -60,6 +60,7 @@ public:
 
 	std::atomic<float>* parPowerAmpDrive = nullptr;
 	std::atomic<float>* parPowerAmpTight = nullptr;
+	std::atomic<float>* parPowerAmpSag = nullptr;
 
 	void setAmpParameters();
 

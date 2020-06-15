@@ -65,6 +65,7 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 
 			MAKE_PARAMETER_UNIT(PowerAmpDrive),
 			MAKE_PARAMETER_UNIT(PowerAmpTight),
+			MAKE_PARAMETER(PowerAmpSag, 0.0f, 1.0f, 0.0f),
 		}
 	)
 {
@@ -89,6 +90,7 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 
 	ASSIGN_PARAMETER(PowerAmpDrive)
 	ASSIGN_PARAMETER(PowerAmpTight)
+	ASSIGN_PARAMETER(PowerAmpSag)
 }
 
 #undef MAKE_PARAMETER_UNIT
@@ -142,9 +144,21 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 
 		amp_channel[i].set_tetrode_grid_tau(remap_unit(*parPowerAmpTight * -1.0f, -1.0f, +1.0f)); 
 		amp_channel[i].set_tetrode_grid_ratio(remap_unit(*parPowerAmpTight * -1.0f, -1.0f, +0.1f)); 
-		amp_channel[i].set_tetrode_plate_comp_tau(remap_unit(*parPowerAmpTight, -0.5f, +0.0f)); 
-		amp_channel[i].set_tetrode_plate_comp_ratio(remap_unit(*parPowerAmpTight, -0.5f, +0.0f)); 
-		amp_channel[i].set_tetrode_plate_comp_depth(remap_unit(*parPowerAmpTight * -1.0f, -1.0f, +0.5f)); 
+		amp_channel[i].set_tetrode_plate_comp_tau(remap_unit(*parPowerAmpTight, -0.5f, +0.5f));
+
+		amp_channel[i].set_tetrode_plate_sag_level(remap_unit(*parPowerAmpSag * -1.0f, -1.5f, 0.0f));
+
+		// NOTE: important to balance the depths. If comp depth is large, then the
+		// signal is already quite compressed with clipping and the power sag 
+		// compression won't come through
+		amp_channel[i].set_tetrode_plate_sag_depth(
+			remap_unit(*parPowerAmpTight * -1.0f, -1.0f, 0.0f)
+			+ remap_unit(*parPowerAmpSag, 0.0f, 1.5f)
+		);
+		amp_channel[i].set_tetrode_plate_comp_depth(
+			remap_unit(*parPowerAmpTight * -1.0f, -1.0f, 0.0f)
+			+ remap_unit(*parPowerAmpSag, 0.0f, 0.5f)
+		); 
 	}
 }
 
