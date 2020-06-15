@@ -12,7 +12,6 @@ If you prefer to download the VST3 file directly and move it into the appropriat
 
 ## Road map
 
-* Investigate rectifier sag
 * Preset management
 * More modern high gain mode
 
@@ -46,6 +45,7 @@ Load the plugin into your favorite VST host or DAW (into a mono or stereo track)
 * Set the power amp section:
   * See the notes on the pre amp section
   * The `drive` control here has the same effect on distortion as the volume knob of an amp, but the plugin maintains an even loudness.
+  * Set the `sag` control to adjust the amount by which the voltage drops in the amplifier in response to loud playing. With large sag values, the signal will be audibly compressed, and it will also have less overhead meaning the distortion will be heard at lower levels. The distortion will also be more sensitive to how heavily the guitar is played. This control works closely in conjuction with the `tight` control.
   * Note that the power amp can act as a compressor: try setting the drive to the point where softly picked notes don't distort, but heavily picked ones do. You should notice the notes souding a bit fuller as the transiet hits the distortion ceiling, and then the note rings through as the bias point shifts.
 
 * Set the cabinet:
@@ -105,6 +105,12 @@ This process generates `Source/AmpMono.h` artifact. However this file is tracked
 However this might not work for versions of FAUST other than `2.14.4` in which case you will need to dig around `dsp/builddsp.py` and fix any issues arising from that script.
 
 ## Change log
+
+Version 0.4.0:
+
+* Introduced voltage sag
+* Small changes to the default power amp model to accomodate the voltage sag
+* Overall the new power amp model is a better representation of the underlying amp
 
 Version 0.3.0:
 

@@ -42,6 +42,4 @@ process = _
     : *(input_level)
     : push_pull
     : *(output_level)
-    // Drive correction increases the volume, correct for that
-    //: *(ba.db2linear(-6.0))
     : _;

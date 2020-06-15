@@ -34,14 +34,20 @@ tetrode_plate = environment {
     clip = nentry("tetrode_plate_clip", 0, -1, +1, 1) : uscale(10, 50);
     clip_corner = nentry("tetrode_plate_clip_corner", 0, -1, +1, 1) : uscale(log(1e-1), log(1e2)) : exp;
     
-    comp_level = nentry("tetrode_plate_comp_level", 0, -1, +1, .1) : uscale(-100, +100);
     comp_tau = nentry("tetrode_plate_comp_tau", 0, -1, +1, .1) : uscale(log(1e-3), log(1e+0)) : exp;
-    comp_ratio = nentry("tetrode_plate_comp_ratio", 0, -1, +1, .1) : uscale(log(1e0), log(1e+1)) : exp;
     comp_depth = nentry("tetrode_plate_comp_depth", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+1)) : exp;
-    comp_tau1 = comp_tau : 1.0 / (ba.sec2samp(_) + 1);
-    comp_tau2 = comp_tau * comp_ratio : 1.0 / (ba.sec2samp(_) + 1);
 
     cross_corner = nentry("tetrode_plate_cross_corner", 0, -1, +1, 1) : uscale(log(1e-1), log(1e+2)) : exp;
+
+    sag_level = nentry("tetrode_plate_sag_level", 0, -1, +1, .1) : ma.tanh : +(1) /(2);
+    sag_depth = nentry("tetrode_plate_sag_depth", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+1)) : exp;
+
+    calc_comp_clip = _
+        : /(clip)
+        <: (abs : min(1.0))
+        : si.smooth(ba.tau2pole(comp_tau))
+        : clip * 1.0 / (1.0 + _ * comp_depth)
+        : _;
 
     // This is the common process for both sides of the signal
     side = _ 
@@ -54,13 +60,23 @@ tetrode_plate = environment {
         : -
 
         // Clipping at the top of the waveform with a variable level
-        <: max(comp_level) - comp_level, _
-        : calc_charge(comp_tau1, comp_tau2) * -1 * comp_depth + clip, _
+        <: calc_comp_clip, _
         : soft_clip_up(clip_corner)
 
         // Soften the cross over distortion edge
         : soft_clip_down(cross_corner, 0)
 
+        : _;
+    
+    calc_sag_comp = _
+        // rescale signal to range (0, 1) since it is no hgher than clip
+        : /(clip)
+        // compress on signal over threshold
+        : max(sag_level) - sag_level
+        // rescale to range (0, 1) but avoid small values if level is close to 1
+        : /(1.0 - sag_level + 1e-3)
+        : si.smooth(ba.tau2pole(comp_tau))
+        : 1.0 / (1.0  +  _ * sag_depth)
         : _;
     
     // Combine both sides in push-pull fashion
@@ -70,5 +86,7 @@ tetrode_plate = environment {
         : side, side
         : *(-1), _
         : +
+        <: calc_sag_comp, _
+        : *
         : _;
 };
