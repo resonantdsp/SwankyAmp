@@ -31,9 +31,6 @@ StagingGroup::StagingGroup() :
 
 	addAndMakeVisible(sliderSlope);
 	sliderSlope.setLabel("SLOPE");
-
-	addAndMakeVisible(sliderFilter);
-	sliderFilter.setLabel("FILTER");
 }
 
 
@@ -41,7 +38,6 @@ void StagingGroup::attachVTS(AudioProcessorValueTreeState& vts)
 {
 	attStages.reset(new SliderAttachment(vts, "idGainStages", sliderStages.slider));
 	attSlope.reset(new SliderAttachment(vts, "idGainSlope", sliderSlope.slider));
-	attFilter.reset(new SliderAttachment(vts, "idLowCut", sliderFilter.slider));
 }
 
 void StagingGroup::resized()
@@ -68,12 +64,6 @@ void StagingGroup::resized()
 	sliderSlope.setHeight(innerHeight);
 
 	corner = sliderSlope.getBounds().getTopRight() + Point<int>(spacing, 0);
-
-	sliderFilter.setTopLeftPosition(corner);
-	sliderFilter.slider.setMargin(0.15f * (float)innerHeight);
-	sliderFilter.setHeight(innerHeight);
-
-	corner = sliderFilter.getBounds().getTopRight() + Point<int>(spacing, 0);
 
 	// can now determine the width and set it, this will re-call `resized` but
 	// since the height is the same it won't re-do the calculation
