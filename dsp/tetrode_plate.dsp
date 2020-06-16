@@ -42,8 +42,11 @@ tetrode_plate = environment {
     sag_level = nentry("tetrode_plate_sag_level", 0, -1, +1, .1) : ma.tanh : +(1) /(2);
     sag_depth = nentry("tetrode_plate_sag_depth", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+1)) : exp;
 
+    // calculation of the power draw sag induced overhead reduction
     calc_comp_clip = _
         : /(clip)
+        // note that only the signal up to clip will make it to the speaker
+        // and cause power draw
         <: (abs : min(1.0))
         : si.smooth(ba.tau2pole(comp_tau))
         : clip * 1.0 / (1.0 + _ * comp_depth)

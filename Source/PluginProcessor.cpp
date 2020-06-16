@@ -65,7 +65,7 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 
 			MAKE_PARAMETER_UNIT(PowerAmpDrive),
 			MAKE_PARAMETER_UNIT(PowerAmpTight),
-			MAKE_PARAMETER(PowerAmpSag, 0.0f, 1.0f, 0.0f),
+			MAKE_PARAMETER(PowerAmpSag, -1.0f, 1.0f, -0.6f),
 		}
 	)
 {
@@ -101,7 +101,8 @@ ResonantAmpAudioProcessor::~ResonantAmpAudioProcessor()
 {
 }
 
-float remap_sided(float unit, float to_low, float to_high) {
+float remap_sided(float unit, float to_low, float to_high)
+{
 	if (unit >= 0) {
 		return unit * to_high;
 	}
@@ -110,15 +111,32 @@ float remap_sided(float unit, float to_low, float to_high) {
 	}
 }
 
-float remap_range(float unit, float to_low, float to_high) {
+float remap_range(float unit, float to_low, float to_high)
+{
 	return (unit + 1.0f) / 2.0f * (to_high - to_low) + to_low;
 }
 
-float remap_xy(float x, float x1, float x2, float y1, float y2) {
+float remap_xy(float x, float x1, float x2, float y1, float y2)
+{
 	x = jmax(x1, jmin(x2, x));
 	x = (x - x1) / (x2 - x1);
 	float y = x * (y2 - y1) + y1;
 	return y;
+}
+
+/** Remap a value in the range (-1, +1) to the same range, but apply log
+  * scaling to it such that the latter part of the range is more compressed.
+  * The output value will change with `slope1` at x = -1, and change with
+  * `slope2` at x = +1.
+  */
+float remap_log(float x, float slope1, float slope2)
+{
+	const float x1 = 1.0f / slope1;
+	const float x2 = 1.0f / slope2;
+	const float y1 = logf(x1);
+	const float y2 = logf(x2);
+	const float y = logf(remap_range(x, x1, x2));
+	return remap_xy(y, y1, y2, -1.0f, +1.0f);
 }
 
 // set the amp object user parameters from the VTS values
@@ -136,8 +154,8 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 		amp_channel[i].set_gain_stages(*parGainStages);
 		amp_channel[i].set_gain_slope(*parGainSlope);
 
-		amp_channel[i].set_cab_on_off((*parCabOnOff > 0.5) ? +1.0f : -1.0f);
-		amp_channel[i].set_cab_brightness(remap_sided(*parCabBrightness, -0.6, +0.6));
+		amp_channel[i].set_cab_on_off((*parCabOnOff > 0.5f) ? +1.0f : -1.0f);
+		amp_channel[i].set_cab_brightness(remap_sided(*parCabBrightness, -0.6f, +0.6f));
 		amp_channel[i].set_cab_distance(*parCabDistance);
 
 		amp_channel[i].set_triode_hp_freq(remap_sided(*parLowCut, -1.0f, +0.75f)); 
@@ -160,22 +178,35 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 		amp_channel[i].set_tetrode_grid_ratio(remap_sided(*parPowerAmpTight * -1.0f, -1.0f, +0.1f)); 
 		amp_channel[i].set_tetrode_plate_comp_tau(remap_sided(*parPowerAmpTight, -0.5f, +0.5f));
 
-		const float maxPowerAmpSag = remap_xy(*parPowerAmpDrive, -0.2f, +1.0f, 1.0f, -0.4f);
-		const float adjPowerAmpSag = remap_range(*parPowerAmpSag, -1.0f, maxPowerAmpSag);
-
-		amp_channel[i].set_tetrode_plate_sag_level(remap_sided(adjPowerAmpSag * -1.0f, -1.5f, 0.0f));
-
-		// NOTE: important to balance the depths. If comp depth is large, then the
-		// signal is already quite compressed with clipping and the power sag 
-		// compression won't come through
-		amp_channel[i].set_tetrode_plate_sag_depth(
-			remap_sided(*parPowerAmpTight * -1.0f, -1.0f, 0.0f)
-			+ remap_sided(adjPowerAmpSag, 0.0f, 1.5f)
+		// when the drive is max, the sag will be in range (-1.0, -0.5)
+		const float maxPowerAmpSag = remap_xy(*parPowerAmpDrive, -0.2f, +1.0f, 1.0f, -0.5f);
+		const float adjPowerAmpSag = remap_range(
+			// sag will change much quicker (20:1) when near -1.0 to give more
+			// control range in the upper values regions which are more audible
+			remap_log(*parPowerAmpSag, 20.0f, 1.0f),
+			-1.0f, 
+			maxPowerAmpSag
 		);
+
+		amp_channel[i].set_tetrode_plate_sag_level(remap_sided(adjPowerAmpSag * -1.0f, -1.5f, +1.0f));
+
+		// compression depth adjusts how much the overhead is reduced in response
+		// to power draw. This is a compression as the ceiling is reduced, but not
+		// so audible as it adds distortion which sounds loud
 		amp_channel[i].set_tetrode_plate_comp_depth(
-			remap_sided(*parPowerAmpTight * -1.0f, -1.0f, 0.0f)
-			+ remap_sided(adjPowerAmpSag, 0.0f, 0.5f)
+			// the max depth is 0.5, but it gets there in 1/3 of the range so
+			// that there is some parameter space where you hear just this comp
+			// without the pumping
+			+ jmin(0.5f, remap_sided(adjPowerAmpSag, -1.0f, 1.5f))
 		); 
+
+		// sag depth adjsuts how much the amplitude of the final signal is 
+		// reduced in response to power draw. Thi is the pumping compression
+		// but if its depth isn't sufficiently larger than the comp depth, then
+		// the incoming signal is already too compressed for this to be audible
+		amp_channel[i].set_tetrode_plate_sag_depth(
+			+ remap_sided(adjPowerAmpSag, -1.0f, 1.5f)
+		);
 	}
 }
 
