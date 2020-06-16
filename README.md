@@ -106,6 +106,11 @@ However this might not work for versions of FAUST other than `2.14.4` in which c
 
 ## Change log
 
+Version 0.4.2:
+
+* Reworked the sag parameter range to increase useable range and allow finer control
+* Moved the `filter` control from the Staging section to the Pre Amp section and renamed it `low cut` to make it more intuitive
+
 Version 0.4.1:
 
 * The pre amp tight control is now easier to work with as it automatically adjusts based on pre amp drive to a suitable value

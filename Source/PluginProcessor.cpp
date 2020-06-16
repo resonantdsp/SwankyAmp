@@ -154,8 +154,8 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 		amp_channel[i].set_gain_stages(*parGainStages);
 		amp_channel[i].set_gain_slope(*parGainSlope);
 
-		amp_channel[i].set_cab_on_off((*parCabOnOff > 0.5) ? +1.0f : -1.0f);
-		amp_channel[i].set_cab_brightness(remap_sided(*parCabBrightness, -0.6, +0.6));
+		amp_channel[i].set_cab_on_off((*parCabOnOff > 0.5f) ? +1.0f : -1.0f);
+		amp_channel[i].set_cab_brightness(remap_sided(*parCabBrightness, -0.6f, +0.6f));
 		amp_channel[i].set_cab_distance(*parCabDistance);
 
 		amp_channel[i].set_triode_hp_freq(remap_sided(*parLowCut, -1.0f, +0.75f)); 
@@ -178,7 +178,7 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 		amp_channel[i].set_tetrode_grid_ratio(remap_sided(*parPowerAmpTight * -1.0f, -1.0f, +0.1f)); 
 		amp_channel[i].set_tetrode_plate_comp_tau(remap_sided(*parPowerAmpTight, -0.5f, +0.5f));
 
-		// when the drive is max, the sag will be in range (-1.0, -0.6)
+		// when the drive is max, the sag will be in range (-1.0, -0.5)
 		const float maxPowerAmpSag = remap_xy(*parPowerAmpDrive, -0.2f, +1.0f, 1.0f, -0.5f);
 		const float adjPowerAmpSag = remap_range(
 			// sag will change much quicker (20:1) when near -1.0 to give more
