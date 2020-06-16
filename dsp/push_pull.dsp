@@ -33,7 +33,7 @@ with {
 
     power_drive_unit = nentry("power_drive", 0, -1, +1, .1);
     power_drive = power_drive_unit : uscale(log(1e0), log(1e3)) : exp;
-    unscale_power = ba.listInterp((+9.60e+00,+3.62e+00,-2.33e+00,-8.19e+00,-1.38e+01,-1.82e+01,-2.04e+01,-2.08e+01,-2.05e+01,-1.99e+01,-1.87e+01), (power_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
+    unscale_power = ba.listInterp((+9.47e+00,+3.54e+00,-2.31e+00,-8.06e+00,-1.37e+01,-1.81e+01,-2.03e+01,-2.09e+01,-2.08e+01,-2.07e+01,-2.06e+01), (power_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
 
     gain_stages = nentry("gain_stages", 0, -1, +1, .1);
     gain_slope = nentry("gain_slope", 0, -1, +1, .1) : uscale(0.5, 1.5);
