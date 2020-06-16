@@ -30,12 +30,12 @@ Load the plugin into your favorite VST host or DAW (into a mono or stereo track)
   * Set the `drive` control (a.k.a. gain) to get the desired pre amp distortion.
   * Increase the `tight` control to get to tighten the tube dynamics. This is especially helpful at high drive. Lower values with less drive lead to more touch sensitivity, higher values lead to a more modern sound.
   * Tune the `grit` control to get different distortion tones. This effectively changes the overhead available in the pre amp tubes.
+  * Increase `low cut` control to remove low end build up. A lower value can lead to a fuller sound, but it can be less stable.
   * Note: the plugin will attempt to maintain an even perceived loudness when modyfing the drive. This way you can use the drive to set the desired distortion, and then use the output level to adjust... well the output level.
 
 * Set the staging:
   * Set the `stages` control to determine the number of pre amp tubes the signal is routed to. Increase this for a more even high gain distortion.
   * Tune the `slope` control to determine how much harder each successive tube is pushed (smaller values can help even out the distortion).
-  * Increase `filter` control to remove low end build up in the pre-amp stage. A lower value can lead to a fuller sound, but it can be less stable.
 
 * Set the tone stack:
   * The `low` control affects the amount of bass in your sound. Increase it for a fatter sound. Too much and the sound can become more washed out, muddy, and loose precision.
@@ -45,7 +45,7 @@ Load the plugin into your favorite VST host or DAW (into a mono or stereo track)
 * Set the power amp section:
   * See the notes on the pre amp section
   * The `drive` control here has the same effect on distortion as the volume knob of an amp, but the plugin maintains an even loudness.
-  * Set the `sag` control to adjust the amount by which the voltage drops in the amplifier in response to loud playing. With large sag values, the signal will be audibly compressed, and it will also have less overhead meaning the distortion will be heard at lower levels. The distortion will also be more sensitive to how heavily the guitar is played. This control works closely in conjuction with the `tight` control.
+  * Set the `sag` control to adjust the amount by which the voltage drops in the amplifier in response to loud playing. At small values you will start to notice the distortion coming up for smaller signals, reducing the overhead. As the value increases, this will turn into a subtle compression where the trasients get a bit quieter. Near the end of the range the compression will be very audible and pumping. Note that this and the `tight` parameters affect one-another, and that large `drive` values will grealty reduce the impact of the sag.
   * Note that the power amp can act as a compressor: try setting the drive to the point where softly picked notes don't distort, but heavily picked ones do. You should notice the notes souding a bit fuller as the transiet hits the distortion ceiling, and then the note rings through as the bias point shifts.
 
 * Set the cabinet:
