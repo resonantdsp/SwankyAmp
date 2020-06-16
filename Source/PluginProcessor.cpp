@@ -101,13 +101,24 @@ ResonantAmpAudioProcessor::~ResonantAmpAudioProcessor()
 {
 }
 
-float remap_unit(float unit, float to_low, float to_high) {
+float remap_sided(float unit, float to_low, float to_high) {
 	if (unit >= 0) {
 		return unit * to_high;
 	}
 	else {
 		return -unit * to_low;
 	}
+}
+
+float remap_range(float unit, float to_low, float to_high) {
+	return (unit + 1.0f) / 2.0f * (to_high - to_low) + to_low;
+}
+
+float remap_xy(float x, float x1, float x2, float y1, float y2) {
+	x = jmax(x1, jmin(x2, x));
+	x = (x - x1) / (x2 - x1);
+	float y = x * (y2 - y1) + y1;
+	return y;
 }
 
 // set the amp object user parameters from the VTS values
@@ -126,38 +137,44 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 		amp_channel[i].set_gain_slope(*parGainSlope);
 
 		amp_channel[i].set_cab_on_off((*parCabOnOff > 0.5) ? +1.0f : -1.0f);
-		amp_channel[i].set_cab_brightness(remap_unit(*parCabBrightness, -0.6, +0.6));
+		amp_channel[i].set_cab_brightness(remap_sided(*parCabBrightness, -0.6, +0.6));
 		amp_channel[i].set_cab_distance(*parCabDistance);
 
-		amp_channel[i].set_triode_hp_freq(remap_unit(*parLowCut, -1.0f, +0.75f)); 
-		amp_channel[i].set_tetrode_hp_freq(remap_unit(*parLowCut, -1.0f, +0.75f)); 
+		amp_channel[i].set_triode_hp_freq(remap_sided(*parLowCut, -1.0f, +0.75f)); 
+		amp_channel[i].set_tetrode_hp_freq(remap_sided(*parLowCut, -1.0f, +0.75f)); 
 
-		amp_channel[i].set_triode_grid_tau(remap_unit(*parPreAmpTight * -1.0f, -0.5f, +0.1f)); 
-		amp_channel[i].set_triode_grid_ratio(remap_unit(*parPreAmpTight * -1.0f, -1.0f, +0.1f)); 
-		amp_channel[i].set_triode_plate_bias(remap_unit(*parPreAmpTight, -1.0f, +0.5f)); 
-		amp_channel[i].set_triode_plate_comp_ratio(remap_unit(*parPreAmpTight, -1.0f, +0.0f)); 
+		const float minPreAmpTight = remap_xy(*parPreAmpDrive, -0.5f, +1.0f, -1.0f, 0.0f);
+		const float adjPreAmpTight = remap_range(*parPreAmpTight, minPreAmpTight, +1.0f);
 
-		amp_channel[i].set_triode_grid_level(remap_unit(*parPreAmpGrit * -1.0f, -0.2f, +3.0f)); 
-		amp_channel[i].set_triode_grid_clip(remap_unit(*parPreAmpGrit * -1.0f, -1.0f, +4.0f)); 
-		amp_channel[i].set_triode_plate_comp_level(remap_unit(*parPreAmpGrit * +1.0f, -0.0f, +1.0f)); 
-		amp_channel[i].set_triode_plate_comp_offset(remap_unit(*parPreAmpGrit * -1.0f, -0.0f, +5.0f)); 
+		amp_channel[i].set_triode_grid_tau(remap_sided(adjPreAmpTight * -1.0f, -0.5f, +0.1f)); 
+		amp_channel[i].set_triode_grid_ratio(remap_sided(adjPreAmpTight * -1.0f, -1.0f, +0.1f)); 
+		amp_channel[i].set_triode_plate_bias(remap_sided(adjPreAmpTight, -1.0f, +0.5f)); 
+		amp_channel[i].set_triode_plate_comp_ratio(remap_sided(adjPreAmpTight, -1.0f, +0.0f)); 
 
-		amp_channel[i].set_tetrode_grid_tau(remap_unit(*parPowerAmpTight * -1.0f, -1.0f, +1.0f)); 
-		amp_channel[i].set_tetrode_grid_ratio(remap_unit(*parPowerAmpTight * -1.0f, -1.0f, +0.1f)); 
-		amp_channel[i].set_tetrode_plate_comp_tau(remap_unit(*parPowerAmpTight, -0.5f, +0.5f));
+		amp_channel[i].set_triode_grid_level(remap_sided(*parPreAmpGrit * -1.0f, -0.2f, +3.0f)); 
+		amp_channel[i].set_triode_grid_clip(remap_sided(*parPreAmpGrit * -1.0f, -1.0f, +4.0f)); 
+		amp_channel[i].set_triode_plate_comp_level(remap_sided(*parPreAmpGrit * +1.0f, -0.0f, +1.0f)); 
+		amp_channel[i].set_triode_plate_comp_offset(remap_sided(*parPreAmpGrit * -1.0f, -0.0f, +5.0f)); 
 
-		amp_channel[i].set_tetrode_plate_sag_level(remap_unit(*parPowerAmpSag * -1.0f, -1.5f, 0.0f));
+		amp_channel[i].set_tetrode_grid_tau(remap_sided(*parPowerAmpTight * -1.0f, -1.0f, +1.0f)); 
+		amp_channel[i].set_tetrode_grid_ratio(remap_sided(*parPowerAmpTight * -1.0f, -1.0f, +0.1f)); 
+		amp_channel[i].set_tetrode_plate_comp_tau(remap_sided(*parPowerAmpTight, -0.5f, +0.5f));
+
+		const float maxPowerAmpSag = remap_xy(*parPowerAmpDrive, -0.2f, +1.0f, 1.0f, -0.4f);
+		const float adjPowerAmpSag = remap_range(*parPowerAmpSag, -1.0f, maxPowerAmpSag);
+
+		amp_channel[i].set_tetrode_plate_sag_level(remap_sided(adjPowerAmpSag * -1.0f, -1.5f, 0.0f));
 
 		// NOTE: important to balance the depths. If comp depth is large, then the
 		// signal is already quite compressed with clipping and the power sag 
 		// compression won't come through
 		amp_channel[i].set_tetrode_plate_sag_depth(
-			remap_unit(*parPowerAmpTight * -1.0f, -1.0f, 0.0f)
-			+ remap_unit(*parPowerAmpSag, 0.0f, 1.5f)
+			remap_sided(*parPowerAmpTight * -1.0f, -1.0f, 0.0f)
+			+ remap_sided(adjPowerAmpSag, 0.0f, 1.5f)
 		);
 		amp_channel[i].set_tetrode_plate_comp_depth(
-			remap_unit(*parPowerAmpTight * -1.0f, -1.0f, 0.0f)
-			+ remap_unit(*parPowerAmpSag, 0.0f, 0.5f)
+			remap_sided(*parPowerAmpTight * -1.0f, -1.0f, 0.0f)
+			+ remap_sided(adjPowerAmpSag, 0.0f, 0.5f)
 		); 
 	}
 }
