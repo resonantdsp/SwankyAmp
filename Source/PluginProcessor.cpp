@@ -178,8 +178,8 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 		amp_channel[i].set_tetrode_grid_ratio(remap_sided(*parPowerAmpTight * -1.0f, -1.0f, +0.1f)); 
 		amp_channel[i].set_tetrode_plate_comp_tau(remap_sided(*parPowerAmpTight, -0.5f, +0.5f));
 
-		// when the drive is max, the sag will be in range (-1.0, -0.5)
-		const float maxPowerAmpSag = remap_xy(*parPowerAmpDrive, -0.2f, +1.0f, 1.0f, -0.5f);
+		// when drive goes from 0 to 1, max sag goes from 1 to 0
+		const float maxPowerAmpSag = remap_xy(*parPowerAmpDrive, 0.0f, 1.0f, 1.0f, 0.0f);
 		const float adjPowerAmpSag = remap_range(
 			// sag will change much quicker (20:1) when near -1.0 to give more
 			// control range in the upper values regions which are more audible
@@ -194,10 +194,8 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 		// to power draw. This is a compression as the ceiling is reduced, but not
 		// so audible as it adds distortion which sounds loud
 		amp_channel[i].set_tetrode_plate_comp_depth(
-			// the max depth is 0.5, but it gets there in 1/3 of the range so
-			// that there is some parameter space where you hear just this comp
-			// without the pumping
-			+ jmin(0.5f, remap_sided(adjPowerAmpSag, -1.0f, 1.5f))
+			// note: here the max value is 0.5, but it reaches it in 1/3 the range
+			jmin(0.5f, remap_sided(adjPowerAmpSag, -1.0f, 1.5f))
 		); 
 
 		// sag depth adjsuts how much the amplitude of the final signal is 
@@ -205,7 +203,7 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 		// but if its depth isn't sufficiently larger than the comp depth, then
 		// the incoming signal is already too compressed for this to be audible
 		amp_channel[i].set_tetrode_plate_sag_depth(
-			+ remap_sided(adjPowerAmpSag, -1.0f, 1.5f)
+			remap_sided(adjPowerAmpSag, -1.0f, 1.0f)
 		);
 	}
 }
