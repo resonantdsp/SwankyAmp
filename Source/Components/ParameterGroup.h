@@ -62,7 +62,7 @@ protected:
 	float lineThickness = 2.0f;
 	int spacing = 12;
 	Rectangle<int> borderBounds;
-	float bgNoiseAlpha =  0.03f;
+	float bgNoiseAlpha =  0.05f;
 
 	ColourGradient gradient;
 	Image bgNoise;

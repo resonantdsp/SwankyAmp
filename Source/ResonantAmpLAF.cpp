@@ -28,7 +28,7 @@ const Colour ResonantAmpLAF::colourDark = Colour::fromHSV(0.0f, 0.0f, 0.25f, 1.0
 const Colour ResonantAmpLAF::colourGrey = Colour::fromHSV(0.0f, 0.0f, 0.75f, 1.0f);
 const Colour ResonantAmpLAF::colourBackground = Colour::fromHSV(0.0f, 0.0f, 1.0f, 1.0f);
 const Colour ResonantAmpLAF::colourHighlight = Colour::fromHSV(0.98f, 0.6f, 0.75f, 1.0f);
-const Colour ResonantAmpLAF::colourSteel = Colour::fromHSV(0.64f, 0.02f, 0.97f, 1.0f);
+const Colour ResonantAmpLAF::colourSteel = Colour::fromHSV(0.0f, 0.0f, 0.96f, 1.0f);
 
 ResonantAmpLAF::ResonantAmpLAF()
 {
@@ -94,7 +94,7 @@ const DropShadow& ResonantAmpLAF::getDropShadow()
 {
 	const static DropShadow dropShadow(
 		Colour::fromHSV(0.0f, 0.0f, 0.0f, 0.5),
-		4,
+		6,
 		Point<int>(1, 1)
 	);
 	return dropShadow;

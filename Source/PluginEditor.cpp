@@ -117,7 +117,7 @@ void ResonantAmpAudioProcessorEditor::resized()
 {
 	// build noise to texture background
 	rng.setSeed(1234);
-	bgNoise = buildImageNoise(getWidth(), getHeight(), rng, 0.03f);
+	bgNoise = buildImageNoise(getWidth(), getHeight(), rng, 0.05f);
 
 	// rebuild on re-size to track bottom right corner, could be built once then
 	// translated, but in future might want to re-scale as well
