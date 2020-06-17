@@ -94,5 +94,5 @@ void AmpGroup::resized()
 	toneStackGroup.setTopLeftPosition(spacing + powerAmpGroup.getRight(), spacing + preAmpGroup.getBottom());
 	cabGroup.setTopLeftPosition(spacing + levelsGroup.getRight(), spacing);
 
-	setSize(cabGroup.getRight() + spacing, toneStackGroup.getBottom() + spacing);
+	setSize(toneStackGroup.getRight() + spacing, toneStackGroup.getBottom() + spacing);
 }

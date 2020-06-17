@@ -29,6 +29,9 @@ PowerAmpGroup::PowerAmpGroup() :
 	addAndMakeVisible(sliderTight);
 	sliderTight.setLabel("TIGHT");
 
+	addAndMakeVisible(sliderGrit);
+	sliderGrit.setLabel("GRIT");
+
 	addAndMakeVisible(sliderSag);
 	sliderSag.setLabel("SAG");
 }
@@ -37,6 +40,7 @@ void PowerAmpGroup::attachVTS(AudioProcessorValueTreeState& vts)
 {
 	attDrive.reset(new SliderAttachment(vts, "idPowerAmpDrive", sliderDrive.slider));
 	attTight.reset(new SliderAttachment(vts, "idPowerAmpTight", sliderTight.slider));
+	attGrit.reset(new SliderAttachment(vts, "idPowerAmpGrit", sliderGrit.slider));
 	attSag.reset(new SliderAttachment(vts, "idPowerAmpSag", sliderSag.slider));
 }
 
@@ -64,6 +68,12 @@ void PowerAmpGroup::resized()
 	sliderTight.setHeight(innerHeight);
 
 	corner = sliderTight.getBounds().getTopRight() + Point<int>(spacing, 0);
+
+	sliderGrit.setTopLeftPosition(corner);
+	sliderGrit.slider.setMargin(0.15f * (float)innerHeight);
+	sliderGrit.setHeight(innerHeight);
+
+	corner = sliderGrit.getBounds().getTopRight() + Point<int>(spacing, 0);
 
 	sliderSag.setTopLeftPosition(corner);
 	sliderSag.slider.setMargin(0.15f * (float)innerHeight);

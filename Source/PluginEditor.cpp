@@ -46,7 +46,7 @@ ResonantAmpAudioProcessorEditor::ResonantAmpAudioProcessorEditor(
 
 	addAndMakeVisible(ampGroup);
 
-	setSize(800, 600);
+	setSize((int)(1.5f * 600 + 0.5f), 600);
 }
 
 #undef ATTACH_SLIDER

@@ -65,6 +65,7 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 
 			MAKE_PARAMETER_UNIT(PowerAmpDrive),
 			MAKE_PARAMETER_UNIT(PowerAmpTight),
+			MAKE_PARAMETER_UNIT(PowerAmpGrit),
 			MAKE_PARAMETER(PowerAmpSag, -1.0f, 1.0f, -0.6f),
 		}
 	)
@@ -90,6 +91,7 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 
 	ASSIGN_PARAMETER(PowerAmpDrive)
 	ASSIGN_PARAMETER(PowerAmpTight)
+	ASSIGN_PARAMETER(PowerAmpGrit)
 	ASSIGN_PARAMETER(PowerAmpSag)
 }
 
@@ -177,6 +179,10 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 		amp_channel[i].set_tetrode_grid_tau(remap_sided(*parPowerAmpTight * -1.0f, -1.0f, +1.0f)); 
 		amp_channel[i].set_tetrode_grid_ratio(remap_sided(*parPowerAmpTight * -1.0f, -1.0f, +0.1f)); 
 		amp_channel[i].set_tetrode_plate_comp_tau(remap_sided(*parPowerAmpTight, -0.5f, +0.5f));
+
+		amp_channel[i].set_tetrode_grid_level(remap_sided(*parPowerAmpGrit * -1.0f, -0.25f, +0.5f));
+		amp_channel[i].set_tetrode_plate_drift_level(remap_sided(*parPowerAmpGrit * -1.0f, -0.5f, +0.5f));
+		amp_channel[i].set_tetrode_plate_drift_depth(remap_sided(*parPowerAmpGrit, -0.25f, +0.0f));
 
 		// when drive goes from 0 to 1, max sag goes from 1 to 0
 		const float maxPowerAmpSag = remap_xy(*parPowerAmpDrive, 0.0f, 1.0f, 1.0f, 0.0f);

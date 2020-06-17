@@ -38,10 +38,12 @@ public:
 private:
 	RSliderLabel sliderDrive;
 	RSliderLabel sliderTight;
+	RSliderLabel sliderGrit;
 	RSliderLabel sliderSag;
 
 	std::unique_ptr<SliderAttachment> attDrive;
 	std::unique_ptr<SliderAttachment> attTight;
+	std::unique_ptr<SliderAttachment> attGrit;
 	std::unique_ptr<SliderAttachment> attSag;
 
 	DISABLE_COMPONENT_RESIZE()
