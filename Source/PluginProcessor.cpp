@@ -51,7 +51,7 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 			MAKE_PARAMETER_UNIT(TsMid),
 			MAKE_PARAMETER_UNIT(TsHigh),
 
-			MAKE_PARAMETER(GainStages, 1.0f, 5.0f, 2.0f),
+			MAKE_PARAMETER(GainStages, 1.0f, 7.0f, 2.0f),
 			MAKE_PARAMETER_UNIT(GainSlope),
 			MAKE_PARAMETER_UNIT(LowCut),
 
@@ -59,7 +59,7 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 			MAKE_PARAMETER_UNIT(CabBrightness),
 			MAKE_PARAMETER(CabDistance, 0.0f, 1.0f, 0.0f),
 
-			MAKE_PARAMETER_UNIT(PreAmpDrive),
+			MAKE_PARAMETER(PreAmpDrive, -1.0f, 1.0f, -0.4f),
 			MAKE_PARAMETER_UNIT(PreAmpTight),
 			MAKE_PARAMETER(PreAmpGrit, -1.0f, 1.0f, -0.5f),
 

@@ -26,14 +26,14 @@ import("cabinet.dsp");
 push_pull = push_pull
 with {
     pre_drive_unit = nentry("pre_drive", 0, -1, +1, .1);
-    pre_drive = pre_drive_unit : uscale(log(1e0), log(1e3)) : exp;
+    pre_drive = pre_drive_unit : uscale(log(1e0), log(2e3)) : exp;
     // Measured the loudness change as a function of the pre drive, this looks
     // up the correction for any drive
-    unscale_pre = ba.listInterp((+3.24e-02,-5.96e+00,-1.19e+01,-1.78e+01,-2.36e+01,-2.88e+01,-3.19e+01,-3.30e+01,-3.28e+01,-3.24e+01,-3.22e+01), (pre_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
+    unscale_pre = ba.listInterp((+3.24e-02,-6.56e+00,-1.31e+01,-1.96e+01,-2.58e+01,-3.06e+01,-3.28e+01,-3.29e+01,-3.25e+01,-3.22e+01,-3.21e+01), (pre_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
 
     power_drive_unit = nentry("power_drive", 0, -1, +1, .1);
     power_drive = power_drive_unit : uscale(log(1e0), log(1e3)) : exp;
-    unscale_power = ba.listInterp((+9.47e+00,+3.54e+00,-2.31e+00,-8.06e+00,-1.37e+01,-1.81e+01,-2.03e+01,-2.09e+01,-2.08e+01,-2.07e+01,-2.06e+01), (power_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
+    unscale_power = ba.listInterp((+9.49e+00,+3.56e+00,-2.29e+00,-8.04e+00,-1.36e+01,-1.81e+01,-2.03e+01,-2.09e+01,-2.08e+01,-2.07e+01,-2.06e+01), (power_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
 
     gain_stages = nentry("gain_stages", 0, -1, +1, .1);
     gain_slope = nentry("gain_slope", 0, -1, +1, .1) : uscale(0.5, 1.5);
@@ -43,6 +43,8 @@ with {
     stage_2_mix = max(0, min(3, gain_stages) - 1) / 2.0;
     // likewise for the range 3 to 5
     stage_3_mix = max(0, min(5, gain_stages) - 3) / 2.0;
+    // likewise for the range 5 to 7
+    stage_4_mix = max(0, min(7, gain_stages) - 5) / 2.0;
 
     gain_stage = _
         : triode_grid 
@@ -79,6 +81,7 @@ with {
         // and so that there is symmetric clipping at higher gains
         <: stage_2_mix, (*(gain_slope^1) : gain_stage : gain_stage : *(gain_slope^-1)), _ : mix_wet_dry
         <: stage_3_mix, (*(gain_slope^2) : gain_stage : gain_stage : *(gain_slope^-2)), _ : mix_wet_dry
+        <: stage_4_mix, (*(gain_slope^3) : gain_stage : gain_stage : *(gain_slope^-3)), _ : mix_wet_dry
 
         // Correct for the loudness resulting from the pre-drive
         : *(unscale_pre)
