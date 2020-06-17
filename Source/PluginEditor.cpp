@@ -79,10 +79,8 @@ void ResonantAmpAudioProcessorEditor::paint(Graphics& g)
 	logoSvg->setTransformToFit(Rectangle<float>(logoX, logoY, logoWidth, logoHeight), RectanglePlacement::centred);
 	logoSvg->draw(g, 1.0f);
 
-	g.setColour(Colour::fromHSV(0.0f, 0.0f, 0.0f, 0.05f));
-	g.fillPath(bgPattern);
 	g.setColour(Colour::fromHSV(0.0f, 0.0f, 0.0f, 0.1f));
-	g.strokePath(bgPattern, PathStrokeType(1.0f));
+	g.fillPath(bgPattern);
 }
 
 #undef GROUP_DROP_SHADOW
@@ -91,42 +89,73 @@ void ResonantAmpAudioProcessorEditor::buildBgPattern()
 {
 	bgPattern.clear();
 
-	rng.setSeed(3);
+	const float scale = (float)getLocalBounds().getHeight() * 0.667f;
 
-	const float patternScale = 24.0f;
-	Rectangle<float> element;
-	element.setSize(patternScale * 0.8f, patternScale * 0.8f);
+	const Point<float> corner(getLocalBounds().getBottomRight().toFloat());
 
-	for (int i = 0; i < 15; i++) {
-		for (int j = 0; j < 10; j++) {
-			const float distance = 
-				powf(((float)(i * i) + (float)(j * j)), 0.5f) 
-				/ powf((float)(14*14 + 9*9), 0.5f);
-			if (rng.nextFloat() < 0.3 + 0.7 * distance) continue;
+	bgPattern.startNewSubPath(corner - Point<float>(scale, 0.0f));
+	bgPattern.addCentredArc(
+		corner.getX(),
+		corner.getY(),
+		scale,
+		scale,
+		0.0f,
+		-MathConstants<float>::halfPi,
+		0.0f,
+		false
+	);
+	bgPattern.lineTo(corner - Point<float>(0.0f, scale * 7.0f / 8.0f));
+	bgPattern.addCentredArc(
+		corner.getX(),
+		corner.getY(),
+		scale * 7.0f / 8.0f,
+		scale * 7.0f / 8.0f,
+		0.0f,
+		0.0f,
+		-MathConstants<float>::halfPi,
+		false
+	);
+	bgPattern.closeSubPath();
 
-			Point<float> corner(getLocalBounds().getBottomRight().toFloat());
-			corner += Point<float>(-patternScale * (i + 0.5f), -patternScale * (j + 0.5f));
-			corner += Point<float>(-patternScale / 2.0f, -patternScale / 2.0f);
-			element.setPosition(corner);
-			bgPattern.addRoundedRectangle(element, 2.0f);
-		}
-	}
+	bgPattern.startNewSubPath(corner - Point<float>(scale * 6.0f / 8.0f, 0.0f));
+	bgPattern.addCentredArc(
+		corner.getX(),
+		corner.getY(),
+		scale * 6.0f / 8.0f,
+		scale * 6.0f / 8.0f,
+		0.0f,
+		-MathConstants<float>::halfPi,
+		0.0f,
+		false
+	);
+	bgPattern.lineTo(corner - Point<float>(0.0f, scale * 2.0f / 8.0f));
+	bgPattern.addCentredArc(
+		corner.getX(),
+		corner.getY(),
+		scale * 2.0f / 8.0f,
+		scale * 2.0f / 8.0f,
+		0.0f,
+		0.0f,
+		-MathConstants<float>::halfPi,
+		false
+	);
+	bgPattern.closeSubPath();
 }
 
 void ResonantAmpAudioProcessorEditor::resized()
 {
 	// build noise to texture background
 	rng.setSeed(1234);
-	bgNoise = buildImageNoise(getWidth(), getHeight(), rng, 0.05f);
-
-	// rebuild on re-size to track bottom right corner, could be built once then
-	// translated, but in future might want to re-scale as well
-	buildBgPattern();
+	bgNoise = buildImageNoise(getWidth(), getHeight(), rng, 0.04f);
 
 	ampGroup.setGroupsHeight(128);
 	const int marginX = jmax(0, getWidth() - ampGroup.getWidth());
 	const int marginY = jmax(0, getHeight() - ampGroup.getHeight());
 
 	ampGroup.setTopLeftPosition(marginX / 2, marginY / 2);
+
+	// rebuild on re-size to track bottom right corner, could be built once then
+	// translated, but in future might want to re-scale as well
+	buildBgPattern();
 }
 

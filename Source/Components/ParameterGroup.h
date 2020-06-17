@@ -50,6 +50,7 @@ public:
 	void setBgNoiseAlpha(float alpha) { bgNoiseAlpha = alpha; }
 
 	float getLineThickness() const { return lineThickness; }
+	int getSpacing() const  { return spacing; }
 
 	enum ColourIds
 	{
@@ -62,7 +63,7 @@ protected:
 	float lineThickness = 2.0f;
 	int spacing = 12;
 	Rectangle<int> borderBounds;
-	float bgNoiseAlpha =  0.05f;
+	float bgNoiseAlpha =  0.04f;
 
 	ColourGradient gradient;
 	Image bgNoise;
