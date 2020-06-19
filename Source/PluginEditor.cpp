@@ -27,7 +27,8 @@ ResonantAmpAudioProcessorEditor::ResonantAmpAudioProcessorEditor(
 	:
 	AudioProcessorEditor(&p),
 	processor(p),
-	valueTreeState(vts)
+	valueTreeState(vts),
+	presetManager(valueTreeState, presetGroup.presetSelector, &presetGroup.btnSave)
 {
 	setLookAndFeel(&resonantAmpLAF);
 
@@ -45,6 +46,7 @@ ResonantAmpAudioProcessorEditor::ResonantAmpAudioProcessorEditor(
 	logoSvg = Drawable::createFromSVG(*XmlDocument::parse(BinaryData::logo_svg));
 
 	addAndMakeVisible(ampGroup);
+	addAndMakeVisible(presetGroup);
 
 	setSize((int)(1.5f * 600 + 0.5f), 600);
 }
@@ -69,11 +71,11 @@ void ResonantAmpAudioProcessorEditor::paint(Graphics& g)
 
 	g.drawImage(bgNoise, getLocalBounds().toFloat());
 
-	const float logoHeight = 24.0f;
-	const float logoPadding = 16.0f;
+	const float logoHeight = (float)headerHeight;
+	const float logoPadding = (float)headerPadding;
 
 	const float logoRatio = (float)logoSvg->getWidth() / (float)logoSvg->getHeight();
-	const float logoWidth = logoRatio * logoHeight;
+	const float logoWidth = logoRatio * (float)headerHeight;
 	const float logoX = getBounds().getRight() - logoPadding - logoWidth;
 	const float logoY = getBounds().getY() + logoPadding;
 	logoSvg->setTransformToFit(Rectangle<float>(logoX, logoY, logoWidth, logoHeight), RectanglePlacement::centred);
@@ -153,6 +155,9 @@ void ResonantAmpAudioProcessorEditor::resized()
 	const int marginY = jmax(0, getHeight() - ampGroup.getHeight());
 
 	ampGroup.setTopLeftPosition(marginX / 2, marginY / 2);
+
+	presetGroup.setHeight(headerHeight + 4);
+	presetGroup.setTopLeftPosition(headerPadding - 2, headerPadding - 2);
 
 	// rebuild on re-size to track bottom right corner, could be built once then
 	// translated, but in future might want to re-scale as well

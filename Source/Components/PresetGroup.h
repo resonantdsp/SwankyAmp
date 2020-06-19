@@ -22,29 +22,34 @@
 
 #include "../Utils.h"
 #include "ParameterGroup.h"
-#include "RButton.h"
-#include "RSliderLabel.h"
 
-class CabGroup : public ParameterGroup
+class PresetGroup : public ParameterGroup
 {
 public:
-	CabGroup();
-	~CabGroup() {}
+	PresetGroup();
+	~PresetGroup() {}
 
-	void attachVTS(AudioProcessorValueTreeState& vts);
+	void attachVTS(AudioProcessorValueTreeState&) {}
+	void addPresetListener(ComboBox::Listener* listener) { presetSelector.addListener(listener); }
 
 	void setHeight(int height) { setSize(0, height); }
+	void paint(Graphics& g) override;
 	void resized() override;
 
-private:
-	RButton buttonCabOnOff;
-	RSliderLabel sliderBright;
-	RSliderLabel sliderDistance;
+	enum ComboIds
+	{
+		PresetInit = 1,
+		PresetOther = 2,
+	};
 
-	std::unique_ptr<ButtonAttachment> attCabOnOff;
-	std::unique_ptr<SliderAttachment> attCabBrightness;
-	std::unique_ptr<SliderAttachment> attCabDistance;
+	// public so the preset manager can modify it
+	ComboBox presetSelector;
+	DrawableButton btnSave;
+
+private:
+	DrawablePath saveIcon;
+	DrawablePath saveIconHighlight;
 
 	DISABLE_COMPONENT_RESIZE()
-	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CabGroup)
+	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PresetGroup)
 };

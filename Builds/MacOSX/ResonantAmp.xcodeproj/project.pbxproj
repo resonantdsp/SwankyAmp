@@ -109,6 +109,10 @@
 			isa = PBXBuildFile;
 			fileRef = C74C1D329B9F33A7B1D34B7C;
 		};
+		09420510C08E1D76DFACEBDD = {
+			isa = PBXBuildFile;
+			fileRef = 770B3ACDF988E53FB21014C9;
+		};
 		F71186EA05F0019642623DAA = {
 			isa = PBXBuildFile;
 			fileRef = FA89622FEE47796427D7B2F8;
@@ -144,6 +148,10 @@
 		2516937FF938F9180ECB5554 = {
 			isa = PBXBuildFile;
 			fileRef = 7906EB419323495FEF6AFE48;
+		};
+		08A348691882E4DAE152691E = {
+			isa = PBXBuildFile;
+			fileRef = 46C95ABAC74139798C04941A;
 		};
 		798621D7DBAE4FC6FB812E33 = {
 			isa = PBXBuildFile;
@@ -268,6 +276,13 @@
 			path = "~/JUCE/modules/juce_cryptography";
 			sourceTree = "<absolute>";
 		};
+		0BCB05080F51C8876A8CCD0A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = PresetGroup.h;
+			path = ../../Source/Components/PresetGroup.h;
+			sourceTree = "SOURCE_ROOT";
+		};
 		0E9627B6119F822F5DAC890A = {
 			isa = PBXFileReference;
 			lastKnownFileType = wrapper.framework;
@@ -338,19 +353,19 @@
 			path = "~/JUCE/modules/juce_audio_plugin_client";
 			sourceTree = "<absolute>";
 		};
-		2C19225998E4D819E2FD201C = {
-			isa = PBXFileReference;
-			lastKnownFileType = sourcecode.cpp.cpp;
-			name = RSliderLabel.cpp;
-			path = ../../Source/Components/RSliderLabel.cpp;
-			sourceTree = "SOURCE_ROOT";
-		};
 		326C59FB6919910FA25E1B21 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.cpp.cpp;
 			name = Utils.cpp;
 			path = ../../Source/Utils.cpp;
 			sourceTree = "SOURCE_ROOT";
+		};
+		33234A408E3F49231B4F6B5F = {
+			isa = PBXFileReference;
+			lastKnownFileType = file;
+			name = "juce_audio_basics";
+			path = "~/JUCE/modules/juce_audio_basics";
+			sourceTree = "<absolute>";
 		};
 		3A3B8185815BB6FF153325AD = {
 			isa = PBXFileReference;
@@ -373,6 +388,13 @@
 			path = ResonantAmp.component;
 			sourceTree = "BUILT_PRODUCTS_DIR";
 		};
+		2C19225998E4D819E2FD201C = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = RSliderLabel.cpp;
+			path = ../../Source/Components/RSliderLabel.cpp;
+			sourceTree = "SOURCE_ROOT";
+		};
 		2CFFE32D339DB4701C8A2DF8 = {
 			isa = PBXFileReference;
 			lastKnownFileType = wrapper.framework;
@@ -393,13 +415,6 @@
 			name = Carbon.framework;
 			path = System/Library/Frameworks/Carbon.framework;
 			sourceTree = SDKROOT;
-		};
-		33234A408E3F49231B4F6B5F = {
-			isa = PBXFileReference;
-			lastKnownFileType = file;
-			name = "juce_audio_basics";
-			path = "~/JUCE/modules/juce_audio_basics";
-			sourceTree = "<absolute>";
 		};
 		361876899BEE73EA3F290146 = {
 			isa = PBXFileReference;
@@ -443,6 +458,13 @@
 			path = ../../Source/Components/PowerAmpGroup.h;
 			sourceTree = "SOURCE_ROOT";
 		};
+		46C95ABAC74139798C04941A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = PresetManager.cpp;
+			path = ../../Source/PresetManager.cpp;
+			sourceTree = "SOURCE_ROOT";
+		};
 		49D1E5D1A3B1F965BB7E838D = {
 			isa = PBXFileReference;
 			lastKnownFileType = text.plist.xml;
@@ -476,6 +498,13 @@
 			lastKnownFileType = file.ttf;
 			name = "PTSans-Regular.ttf";
 			path = "../../Resources/PTSans/PTSans-Regular.ttf";
+			sourceTree = "SOURCE_ROOT";
+		};
+		58259A1EEEEB2D19003511DF = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = PresetManager.h;
+			path = ../../Source/PresetManager.h;
 			sourceTree = "SOURCE_ROOT";
 		};
 		5B071824680FCDE93CAB5834 = {
@@ -588,6 +617,13 @@
 			lastKnownFileType = sourcecode.c.h;
 			name = ToneStackGroup.h;
 			path = ../../Source/Components/ToneStackGroup.h;
+			sourceTree = "SOURCE_ROOT";
+		};
+		770B3ACDF988E53FB21014C9 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = PresetGroup.cpp;
+			path = ../../Source/Components/PresetGroup.cpp;
 			sourceTree = "SOURCE_ROOT";
 		};
 		78BC8005FF8A8B16705B0647 = {
@@ -954,6 +990,8 @@
 				4414DAC183F81C8A3F77E466,
 				C74C1D329B9F33A7B1D34B7C,
 				3BB443F3D9FE041CA53857A1,
+				770B3ACDF988E53FB21014C9,
+				0BCB05080F51C8876A8CCD0A,
 				FA89622FEE47796427D7B2F8,
 				A3EDF905651742C454114185,
 				700A1146182081C685E35039,
@@ -981,6 +1019,8 @@
 				073DFBC834356E1C6F4482F1,
 				7906EB419323495FEF6AFE48,
 				F3ACB6EB51A49238B20A01E0,
+				46C95ABAC74139798C04941A,
+				58259A1EEEEB2D19003511DF,
 			);
 			name = Source;
 			sourceTree = "<group>";
@@ -2078,6 +2118,7 @@
 				C0B2653E9B3B830871B2BDB2,
 				C0A84343B9A847D9443225D3,
 				423B678E38C8D433847DDB32,
+				09420510C08E1D76DFACEBDD,
 				F71186EA05F0019642623DAA,
 				30DCAB6A6A272D9CEF759597,
 				CCA32FF67F68A292E842803F,
@@ -2087,6 +2128,7 @@
 				4A72EAE1C26D19CB47240495,
 				0ECF095E595A3F61003AB096,
 				2516937FF938F9180ECB5554,
+				08A348691882E4DAE152691E,
 				798621D7DBAE4FC6FB812E33,
 				84B3774CBA909862EB8084AF,
 				6D2D34B9CD0DCD525AB1515A,

@@ -143,6 +143,7 @@
     <ClCompile Include="..\..\Source\Components\ParameterGroup.cpp"/>
     <ClCompile Include="..\..\Source\Components\PowerAmpGroup.cpp"/>
     <ClCompile Include="..\..\Source\Components\PreAmpGroup.cpp"/>
+    <ClCompile Include="..\..\Source\Components\PresetGroup.cpp"/>
     <ClCompile Include="..\..\Source\Components\RButton.cpp"/>
     <ClCompile Include="..\..\Source\Components\RSlider.cpp"/>
     <ClCompile Include="..\..\Source\Components\RSliderLabel.cpp"/>
@@ -152,6 +153,7 @@
     <ClCompile Include="..\..\Source\ResonantAmpLAF.cpp"/>
     <ClCompile Include="..\..\Source\PluginProcessor.cpp"/>
     <ClCompile Include="..\..\Source\PluginEditor.cpp"/>
+    <ClCompile Include="..\..\Source\PresetManager.cpp"/>
     <ClCompile Include="..\..\..\..\..\..\..\JUCE\modules\juce_audio_basics\buffers\juce_AudioChannelSet.cpp">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </ClCompile>
@@ -2000,6 +2002,7 @@
     <ClInclude Include="..\..\Source\Components\ParameterGroup.h"/>
     <ClInclude Include="..\..\Source\Components\PowerAmpGroup.h"/>
     <ClInclude Include="..\..\Source\Components\PreAmpGroup.h"/>
+    <ClInclude Include="..\..\Source\Components\PresetGroup.h"/>
     <ClInclude Include="..\..\Source\Components\RButton.h"/>
     <ClInclude Include="..\..\Source\Components\RSlider.h"/>
     <ClInclude Include="..\..\Source\Components\RSliderLabel.h"/>
@@ -2010,6 +2013,7 @@
     <ClInclude Include="..\..\Source\AmpMono.h"/>
     <ClInclude Include="..\..\Source\PluginProcessor.h"/>
     <ClInclude Include="..\..\Source\PluginEditor.h"/>
+    <ClInclude Include="..\..\Source\PresetManager.h"/>
     <ClInclude Include="..\..\..\..\..\..\..\JUCE\modules\juce_audio_basics\audio_play_head\juce_AudioPlayHead.h"/>
     <ClInclude Include="..\..\..\..\..\..\..\JUCE\modules\juce_audio_basics\buffers\juce_AudioChannelSet.h"/>
     <ClInclude Include="..\..\..\..\..\..\..\JUCE\modules\juce_audio_basics\buffers\juce_AudioDataConverters.h"/>

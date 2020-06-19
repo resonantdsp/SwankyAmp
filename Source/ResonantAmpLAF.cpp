@@ -33,7 +33,6 @@ const Colour ResonantAmpLAF::colourSteel = Colour::fromHSV(0.0f, 0.0f, 0.96f, 1.
 ResonantAmpLAF::ResonantAmpLAF()
 {
 	setColour(ResizableWindow::backgroundColourId, ResonantAmpLAF::colourBackground);
-	setColour(Label::textColourId, ResonantAmpLAF::colourDark);
 	setColour(Slider::textBoxTextColourId, ResonantAmpLAF::colourDark);
 
 	setColour(ParameterGroup::borderColourId, ResonantAmpLAF::colourDark);
@@ -51,6 +50,36 @@ ResonantAmpLAF::ResonantAmpLAF()
 
 	setColour(RButton::buttonColourId, ResonantAmpLAF::colourDark);
 	setColour(RButton::textColourId, ResonantAmpLAF::colourGrey);
+
+	setColour(ComboBox::backgroundColourId, ResonantAmpLAF::colourBackground);
+	setColour(ComboBox::textColourId, ResonantAmpLAF::colourDark);
+	setColour(ComboBox::outlineColourId, ResonantAmpLAF::colourDark);
+	setColour(ComboBox::buttonColourId, ResonantAmpLAF::colourDark);
+	setColour(ComboBox::arrowColourId, ResonantAmpLAF::colourDark);
+	setColour(ComboBox::focusedOutlineColourId, ResonantAmpLAF::colourHighlight);
+
+	setColour(PopupMenu::backgroundColourId, ResonantAmpLAF::colourBackground);
+	setColour(PopupMenu::textColourId, ResonantAmpLAF::colourDark);
+	setColour(PopupMenu::headerTextColourId, ResonantAmpLAF::colourDark);
+	setColour(PopupMenu::highlightedBackgroundColourId, ResonantAmpLAF::colourDark);
+	setColour(PopupMenu::highlightedTextColourId, ResonantAmpLAF::colourBackground);
+
+	setColour(TextEditor::backgroundColourId, ResonantAmpLAF::colourBackground);
+	setColour(TextEditor::textColourId, ResonantAmpLAF::colourDark);
+	setColour(TextEditor::highlightColourId, ResonantAmpLAF::colourGrey);
+	setColour(TextEditor::highlightedTextColourId, ResonantAmpLAF::colourDark);
+	setColour(TextEditor::outlineColourId, Colours::transparentBlack);
+	setColour(TextEditor::focusedOutlineColourId, Colours::transparentBlack);
+	setColour(TextEditor::shadowColourId, Colours::transparentBlack);
+
+	setColour(Label::textColourId, ResonantAmpLAF::colourDark);
+	setColour(Label::backgroundColourId, Colours::transparentBlack);
+	setColour(Label::outlineColourId, Colours::transparentBlack);
+	setColour(Label::backgroundWhenEditingColourId, Colours::transparentBlack);
+	setColour(Label::textWhenEditingColourId, ResonantAmpLAF::colourDark);
+	setColour(Label::outlineWhenEditingColourId, Colours::transparentBlack);
+
+	setColour(CaretComponent::caretColourId, ResonantAmpLAF::colourGrey);
 }
 
 const Font& ResonantAmpLAF::getDefaultFont()
@@ -98,6 +127,53 @@ const DropShadow& ResonantAmpLAF::getDropShadow()
 		Point<int>(1, 1)
 	);
 	return dropShadow;
+}
+
+Path ResonantAmpLAF::getSaveIconPath(float d)
+{
+	Path path;
+
+	path.startNewSubPath(0.5f, 0.0f);
+	path.lineTo(0.75f, 0.0f);
+	path.lineTo(1.0f, 0.25f);
+	path.lineTo(1.0f, 0.75f);
+	path.addCentredArc(0.75f, 0.75f, 0.25f, 0.25f, 0.0f, MathConstants<float>::halfPi, MathConstants<float>::pi);
+	path.lineTo(0.25f, 1.0f);
+	path.addCentredArc(0.25f, 0.75f, 0.25f, 0.25f, 0.0f, MathConstants<float>::pi, 3.0f * MathConstants<float>::halfPi);
+	path.lineTo(0.0f, 0.25f);
+	path.addCentredArc(0.25f, 0.25f, 0.25f, 0.25f, 0.0f, 3.0 * MathConstants<float>::halfPi, 2.0f * MathConstants<float>::pi);
+	path.closeSubPath();
+
+	path.startNewSubPath(0.25f, 0.0f);
+	path.lineTo(0.25f, 2.0f / 5.0f);
+	path.lineTo(0.75f, 2.0f / 5.0f);
+	path.lineTo(0.75f, 2.0f / 5.0f  * 0.5f);
+
+	path.startNewSubPath(0.75f - 1.0f / 6.0f, 2.0f / 5.0f);
+	path.lineTo(0.75f - 1.0f / 6.0f, 2.0f / 5.0f * 0.25f);
+
+	path.scaleToFit(0, 0, d, d, true);
+
+	return path;
+}
+
+Path ResonantAmpLAF::getTickShape(float height)
+{
+	const float padding = height / 5.0f;
+
+    Path path;
+
+	// explicitely add padding to the path otherwise it will get resized, this
+	// is kind of nasty (e.g. if someones tries to draw instead of fill), but it
+	// seems the alternative is to re-implemment the entire popup draw
+	path.startNewSubPath(0, height / 2.0f);
+	path.lineTo(padding, height / 2.0f);
+	path.startNewSubPath(height, height / 2.0f);
+	path.lineTo(height - padding, height / 2.0f);
+
+	path.addEllipse(padding, padding, height - 2.0f * padding, height - 2.0f * padding);
+
+    return path;
 }
 
 Slider::SliderLayout ResonantAmpLAF::getSliderLayout(Slider& slider)
@@ -357,4 +433,38 @@ void ResonantAmpLAF::drawToggleButton(
 
 	g.setColour(findColour(RButton::buttonColourId));
 	g.drawRoundedRectangle(outer, radius, lineWidth);
+}
+
+
+void ResonantAmpLAF::drawComboBox(
+	Graphics& g,
+	int width,
+	int height,
+	bool, int, int, int, int,
+	ComboBox& box)
+{
+	const float lineThickness = 2.0f;
+	const float cornerSize = 2.0f;
+    Rectangle<int> boxBounds (0, 0, width, height);
+
+    g.setColour(box.findColour (ComboBox::backgroundColourId));
+    g.fillRoundedRectangle(boxBounds.toFloat(), cornerSize);
+
+    g.setColour(box.findColour (ComboBox::outlineColourId));
+    g.drawRoundedRectangle(
+		boxBounds.toFloat().reduced(lineThickness / 2.0f, lineThickness / 2.0f),
+		cornerSize,
+		lineThickness
+	);
+
+    Rectangle<float> arrowZone((float)(width - height), 0.0f, (float)height, (float)height);
+	arrowZone.reduce(height / 3.0f, height / 2.5f);
+
+    Path path;
+	path.startNewSubPath(arrowZone.getTopLeft());
+    path.lineTo(arrowZone.getCentre().withY(arrowZone.getBottom()));
+    path.lineTo(arrowZone.getTopRight());
+
+    g.setColour(box.findColour(ComboBox::arrowColourId).withAlpha((box.isEnabled() ? 0.9f : 0.2f)));
+    g.strokePath(path, PathStrokeType(2.0f));
 }

@@ -43,10 +43,6 @@ void CabGroup::attachVTS(AudioProcessorValueTreeState& vts)
 
 void CabGroup::resized()
 {
-	//ParameterGroup::resized();
-
-	//const int innerHeight = getBorderBounds().getHeight() - 2 * spacing;
-
 	const int prevInnerHeight = getBorderBounds().getHeight() - 2 * spacing;
 	const Point<int> prevCorner = getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
 

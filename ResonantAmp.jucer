@@ -34,6 +34,8 @@
         <FILE id="cKYP56" name="PowerAmpGroup.h" compile="0" resource="0" file="Source/Components/PowerAmpGroup.h"/>
         <FILE id="lYZZuU" name="PreAmpGroup.cpp" compile="1" resource="0" file="Source/Components/PreAmpGroup.cpp"/>
         <FILE id="InSxOR" name="PreAmpGroup.h" compile="0" resource="0" file="Source/Components/PreAmpGroup.h"/>
+        <FILE id="UNzKbn" name="PresetGroup.cpp" compile="1" resource="0" file="Source/Components/PresetGroup.cpp"/>
+        <FILE id="Wj7nqe" name="PresetGroup.h" compile="0" resource="0" file="Source/Components/PresetGroup.h"/>
         <FILE id="JZcEVK" name="RButton.cpp" compile="1" resource="0" file="Source/Components/RButton.cpp"/>
         <FILE id="RPoaOX" name="RButton.h" compile="0" resource="0" file="Source/Components/RButton.h"/>
         <FILE id="EU8W53" name="RSlider.cpp" compile="1" resource="0" file="Source/Components/RSlider.cpp"/>
@@ -63,6 +65,9 @@
       <FILE id="Khe84g" name="PluginEditor.cpp" compile="1" resource="0"
             file="Source/PluginEditor.cpp"/>
       <FILE id="ApQwAz" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
+      <FILE id="feb1e3" name="PresetManager.cpp" compile="1" resource="0"
+            file="Source/PresetManager.cpp"/>
+      <FILE id="y9okPZ" name="PresetManager.h" compile="0" resource="0" file="Source/PresetManager.h"/>
     </GROUP>
   </MAINGROUP>
   <EXPORTFORMATS>
