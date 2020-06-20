@@ -61,7 +61,11 @@ public:
 	std::atomic<float>* parPowerAmpDrive = nullptr;
 	std::atomic<float>* parPowerAmpTight = nullptr;
 	std::atomic<float>* parPowerAmpGrit = nullptr;
+
 	std::atomic<float>* parPowerAmpSag = nullptr;
+	std::atomic<float>* parPowerAmpSagTime = nullptr;
+	std::atomic<float>* parPowerAmpSagRatio = nullptr;
+	std::atomic<float>* parPowerAmpSagSlope = nullptr;
 
 	void setAmpParameters();
 

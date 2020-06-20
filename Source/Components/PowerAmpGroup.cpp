@@ -29,19 +29,19 @@ PowerAmpGroup::PowerAmpGroup() :
 	addAndMakeVisible(sliderTight);
 	sliderTight.setLabel("TIGHT");
 
-	addAndMakeVisible(sliderGrit);
-	sliderGrit.setLabel("GRIT");
-
 	addAndMakeVisible(sliderSag);
 	sliderSag.setLabel("SAG");
+
+	addAndMakeVisible(sliderSagTime);
+	sliderSagTime.setLabel("SAG TIME");
 }
 
 void PowerAmpGroup::attachVTS(AudioProcessorValueTreeState& vts)
 {
 	attDrive.reset(new SliderAttachment(vts, "idPowerAmpDrive", sliderDrive.slider));
 	attTight.reset(new SliderAttachment(vts, "idPowerAmpTight", sliderTight.slider));
-	attGrit.reset(new SliderAttachment(vts, "idPowerAmpGrit", sliderGrit.slider));
 	attSag.reset(new SliderAttachment(vts, "idPowerAmpSag", sliderSag.slider));
+	attSagTime.reset(new SliderAttachment(vts, "idPowerAmpSagTime", sliderSagTime.slider));
 }
 
 void PowerAmpGroup::resized()
@@ -69,18 +69,17 @@ void PowerAmpGroup::resized()
 
 	corner = sliderTight.getBounds().getTopRight() + Point<int>(spacing, 0);
 
-	sliderGrit.setTopLeftPosition(corner);
-	sliderGrit.slider.setMargin(0.15f * (float)innerHeight);
-	sliderGrit.setHeight(innerHeight);
-
-	corner = sliderGrit.getBounds().getTopRight() + Point<int>(spacing, 0);
-
 	sliderSag.setTopLeftPosition(corner);
 	sliderSag.slider.setMargin(0.15f * (float)innerHeight);
 	sliderSag.setHeight(innerHeight);
 
 	corner = sliderSag.getBounds().getTopRight() + Point<int>(spacing, 0);
 
+	sliderSagTime.setTopLeftPosition(corner);
+	sliderSagTime.slider.setMargin(0.15f * (float)innerHeight);
+	sliderSagTime.setHeight(innerHeight);
+
+	corner = sliderSagTime.getBounds().getTopRight() + Point<int>(spacing, 0);
 
 	// can now determine the width and set it, this will re-call `resized` but
 	// since the height is the same it won't re-do the calculation
