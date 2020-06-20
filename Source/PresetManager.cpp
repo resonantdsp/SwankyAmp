@@ -184,6 +184,11 @@ bool PresetManager::setState(const SerializedState& state)
 	if (!state->hasTagName(vts.state.getType()))
 		return false;
 
+	const auto inputLevelPar = vts.getParameter("idInputLevel");
+	const auto outputLevelPar = vts.getParameter("idOutputLevel");
+	const float inputLevelVal = inputLevelPar != nullptr ? inputLevelPar->getValue() : 0.0f;
+	const float outputLevelVal = outputLevelPar != nullptr ? outputLevelPar->getValue() : 0.0f;
+
 	// copy the state into the plugin
 	vts.replaceState(ValueTree::fromXml(*state));
 
@@ -195,6 +200,15 @@ bool PresetManager::setState(const SerializedState& state)
 			continue;
 		parameter->sendValueChangedMessageToListeners(parameter->getValue());
 	}
+
+	// TODO: this is a bit messy, an alternative is to go over all parameters
+	// get it from the state if available, and set the others to default vavlues,
+	// other than the levels. But the defaulting is already taken care of with
+	// `replaceState`, so it's convenient to work with it.
+
+	// preserve the levels
+	if (inputLevelPar != nullptr) inputLevelPar->setValueNotifyingHost(inputLevelVal);
+	if (outputLevelPar != nullptr) outputLevelPar->setValueNotifyingHost(outputLevelVal);
 
 	return true;
 }
