@@ -156,9 +156,14 @@ void PresetManager::comboBoxChanged(ComboBox* pComboBox)
 	currentIdx = pComboBox->getSelectedItemIndex();
 
 	if (!map.contains(currentName))
+	{
 		currentIdx = addPreset(currentName, SerializedState(vts.state.createXml()));
+		savePreset(currentName, states[map[currentName]]);
+	}
 	else
+	{
 		setState(states[map[currentName]]);
+	}
 }
 
 bool PresetManager::setState(const SerializedState& state)
