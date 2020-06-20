@@ -68,7 +68,7 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 			MAKE_PARAMETER_UNIT(PowerAmpTight),
 			MAKE_PARAMETER_UNIT(PowerAmpGrit),
 
-			MAKE_PARAMETER(PowerAmpSag, -1.0f, 1.0f, -1.0f),
+			MAKE_PARAMETER(PowerAmpSag, -1.0f, 1.0f, -0.6f),
 			MAKE_PARAMETER_UNIT(PowerAmpSagRatio),
 			MAKE_PARAMETER(PowerAmpSagSlope, -1.0f, 1.0f, -0.25f),
 		}

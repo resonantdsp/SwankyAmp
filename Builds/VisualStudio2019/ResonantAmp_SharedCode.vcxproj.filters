@@ -4751,6 +4751,9 @@
     <None Include="..\..\Resources\logo.svg">
       <Filter>ResonantAmp\Resources</Filter>
     </None>
+    <None Include="..\..\Resources\presets.xml">
+      <Filter>ResonantAmp\Resources</Filter>
+    </None>
     <None Include="..\..\Resources\PTSans\PTSans-Bold.ttf">
       <Filter>ResonantAmp\Resources</Filter>
     </None>

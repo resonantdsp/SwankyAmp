@@ -19,6 +19,7 @@
 #include "PresetManager.h"
 #include "Components/PresetGroup.h"
 
+using PresetOrder = std::tuple<int, String, size_t>;
 
 std::vector<Identifier> getParameterIds(const SerializedState& state)
 {
@@ -42,6 +43,61 @@ std::vector<Identifier> getParameterIds(const SerializedState& state)
 	return parameterIds;
 }
 
+void loadPreset(
+	std::vector<PresetOrder>& order,
+	std::vector<SerializedState>& states,
+	SerializedState state)
+{
+	const String& name = state->getStringAttribute("presetName");
+	const int orderValue =
+		state->hasAttribute("presetOrder") 
+		? state->getIntAttribute("presetOrder") 
+		: INT_MAX;
+
+	order.push_back(std::make_tuple(orderValue, name, states.size()));
+	states.push_back(std::move(state));
+}
+
+void loadPresetsFromXml(
+	std::vector<PresetOrder>& order,
+	std::vector<SerializedState>& states,
+	const std::unique_ptr<XmlElement>& xml,
+	const Identifier& stateType)
+{
+	XmlElement* stateXml = xml->getFirstChildElement();
+	while (stateXml != nullptr)
+	{
+		if (stateXml->hasTagName(stateType) && stateXml->hasAttribute("presetName"))
+		{
+			// make a deep copy of the preset state and take ownership
+			SerializedState state = std::make_unique<XmlElement>(*stateXml);
+			loadPreset(order, states, std::move(state));
+		}
+
+		stateXml = stateXml->getNextElement();
+	}
+}
+
+void loadPresetsFromDir(
+	std::vector<PresetOrder>& order,
+	std::vector<SerializedState>& states,
+	const File& dir,
+	const Identifier& stateType)
+{
+	const auto files = dir.findChildFiles(File::TypesOfFileToFind::findFiles, false);
+
+	for (int i = 0; i < files.size(); i++)
+	{
+		const File& file = files[i];
+		if (file.getFileExtension() != ".xml" && file.getFileExtension() != ".XML")
+			continue;
+
+		SerializedState state = XmlDocument::parse(file);
+		if (state->hasTagName(stateType) && state->hasAttribute("presetName"))
+			loadPreset(order, states, std::move(state));
+	}
+}
+
 PresetManager::PresetManager(
 	AudioProcessorValueTreeState& vts,
 	ComboBox& comboBox,
@@ -62,6 +118,8 @@ PresetManager::PresetManager(
 	// vst.state.getNumParameters() returns zero until it initializes its object.
 	parameterIds = getParameterIds(SerializedState(vts.state.createXml()));
 
+	const auto factoryPresets = XmlDocument::parse(BinaryData::presets_xml);
+
 	comboBox.addListener(this);
 	// NOTE: possible to work without saving capability
 	if (saveButton != nullptr)
@@ -69,37 +127,14 @@ PresetManager::PresetManager(
 
 	addPreset("init", SerializedState(nullptr));
 
-	// TODO: load factory presets from binary data
-
-	// TODO: move this mess into a function
-
+	const Identifier stateType = vts.state.getType();
 	std::vector<std::tuple<int, String, size_t>> presetOrder;
-	std::vector< SerializedState> presetStates;
-	size_t presetIdx = 0;
+	std::vector<SerializedState> presetStates;
 
-	const auto presetFiles = presetDir.findChildFiles(File::TypesOfFileToFind::findFiles, false);
-	for (int i = 0; i < presetFiles.size(); i++)
-	{
-		const File& file = presetFiles[i];
-		if (file.getFileExtension() != ".xml" && file.getFileExtension() != ".XML")
-			continue;
-
-		SerializedState state = XmlDocument::parse(file);
-		if (!state->hasTagName(vts.state.getType()))
-			continue;
-		if (!state->hasAttribute("presetName"))
-			continue;
-
-		const String& name = state->getStringAttribute("presetName");
-		const int order = state->hasAttribute("presetOrder") ? state->getIntAttribute("presetOrder") : INT_MAX;
-
-		presetOrder.push_back(std::make_tuple(order, name, presetIdx));
-		presetStates.push_back(std::move(state));
-		presetIdx += (size_t)1;
-	}
+	loadPresetsFromXml(presetOrder, presetStates, factoryPresets, stateType);
+	loadPresetsFromDir(presetOrder, presetStates, presetDir, stateType);
 
 	std::sort(presetOrder.begin(), presetOrder.end());
-
 	for (const auto& order : presetOrder)
 	{
 		const String& name = std::get<1>(order);

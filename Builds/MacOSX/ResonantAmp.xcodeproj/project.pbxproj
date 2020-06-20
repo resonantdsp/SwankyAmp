@@ -248,6 +248,13 @@
 			path = "../../JuceLibraryCode/include_juce_audio_processors.mm";
 			sourceTree = "SOURCE_ROOT";
 		};
+		0728243CEF505E36A5D57B8C = {
+			isa = PBXFileReference;
+			lastKnownFileType = file.xml;
+			name = presets.xml;
+			path = ../../Resources/presets.xml;
+			sourceTree = "SOURCE_ROOT";
+		};
 		073DFBC834356E1C6F4482F1 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.c.h;
@@ -353,19 +360,12 @@
 			path = "~/JUCE/modules/juce_audio_plugin_client";
 			sourceTree = "<absolute>";
 		};
-		326C59FB6919910FA25E1B21 = {
+		2C19225998E4D819E2FD201C = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.cpp.cpp;
-			name = Utils.cpp;
-			path = ../../Source/Utils.cpp;
+			name = RSliderLabel.cpp;
+			path = ../../Source/Components/RSliderLabel.cpp;
 			sourceTree = "SOURCE_ROOT";
-		};
-		33234A408E3F49231B4F6B5F = {
-			isa = PBXFileReference;
-			lastKnownFileType = file;
-			name = "juce_audio_basics";
-			path = "~/JUCE/modules/juce_audio_basics";
-			sourceTree = "<absolute>";
 		};
 		3A3B8185815BB6FF153325AD = {
 			isa = PBXFileReference;
@@ -373,6 +373,13 @@
 			includeInIndex = 0;
 			path = ResonantAmp.vst3;
 			sourceTree = "BUILT_PRODUCTS_DIR";
+		};
+		529A38DC6B0E839FF2B1756E = {
+			isa = PBXFileReference;
+			lastKnownFileType = file.ttf;
+			name = "PTSans-Regular.ttf";
+			path = "../../Resources/PTSans/PTSans-Regular.ttf";
+			sourceTree = "SOURCE_ROOT";
 		};
 		B6D598D8AEA1FF5BC3D4BD92 = {
 			isa = PBXFileReference;
@@ -387,13 +394,6 @@
 			includeInIndex = 0;
 			path = ResonantAmp.component;
 			sourceTree = "BUILT_PRODUCTS_DIR";
-		};
-		2C19225998E4D819E2FD201C = {
-			isa = PBXFileReference;
-			lastKnownFileType = sourcecode.cpp.cpp;
-			name = RSliderLabel.cpp;
-			path = ../../Source/Components/RSliderLabel.cpp;
-			sourceTree = "SOURCE_ROOT";
 		};
 		2CFFE32D339DB4701C8A2DF8 = {
 			isa = PBXFileReference;
@@ -415,6 +415,20 @@
 			name = Carbon.framework;
 			path = System/Library/Frameworks/Carbon.framework;
 			sourceTree = SDKROOT;
+		};
+		326C59FB6919910FA25E1B21 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = Utils.cpp;
+			path = ../../Source/Utils.cpp;
+			sourceTree = "SOURCE_ROOT";
+		};
+		33234A408E3F49231B4F6B5F = {
+			isa = PBXFileReference;
+			lastKnownFileType = file;
+			name = "juce_audio_basics";
+			path = "~/JUCE/modules/juce_audio_basics";
+			sourceTree = "<absolute>";
 		};
 		361876899BEE73EA3F290146 = {
 			isa = PBXFileReference;
@@ -492,13 +506,6 @@
 			name = "juce_opengl";
 			path = "~/JUCE/modules/juce_opengl";
 			sourceTree = "<absolute>";
-		};
-		529A38DC6B0E839FF2B1756E = {
-			isa = PBXFileReference;
-			lastKnownFileType = file.ttf;
-			name = "PTSans-Regular.ttf";
-			path = "../../Resources/PTSans/PTSans-Regular.ttf";
-			sourceTree = "SOURCE_ROOT";
 		};
 		58259A1EEEEB2D19003511DF = {
 			isa = PBXFileReference;
@@ -966,6 +973,7 @@
 			isa = PBXGroup;
 			children = (
 				6E45CB46D8D671BE4ECFA041,
+				0728243CEF505E36A5D57B8C,
 				D4C08012246F74E2E3ED6117,
 				529A38DC6B0E839FF2B1756E,
 				8F406035EFC8B04531C8C9F4,

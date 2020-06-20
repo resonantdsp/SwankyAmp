@@ -2751,6 +2751,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\Resources\logo.svg"/>
+    <None Include="..\..\Resources\presets.xml"/>
     <None Include="..\..\Resources\PTSans\PTSans-Bold.ttf"/>
     <None Include="..\..\Resources\PTSans\PTSans-Regular.ttf"/>
     <None Include="..\..\Resources\PTSansNarrow\PTSansNarrow-Regular.ttf"/>
