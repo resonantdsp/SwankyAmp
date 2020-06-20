@@ -39,10 +39,12 @@ private:
 	RSliderLabel sliderLow;
 	RSliderLabel sliderMid;
 	RSliderLabel sliderHigh;
+	RSliderLabel sliderPresence;
 
 	std::unique_ptr<SliderAttachment> attLow;
 	std::unique_ptr<SliderAttachment> attMid;
 	std::unique_ptr<SliderAttachment> attHigh;
+	std::unique_ptr<SliderAttachment> attPresence;
 
 	DISABLE_COMPONENT_RESIZE()
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ToneStackGroup)

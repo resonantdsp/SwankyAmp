@@ -30,6 +30,7 @@ def main():
         "ts_low": 0,
         "ts_mid": 0,
         "ts_high": 0,
+        "ts_presence": 0,
         # psuh pull amp
         "pre_drive": 0,
         "power_drive": 0,

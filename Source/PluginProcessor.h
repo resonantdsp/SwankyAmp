@@ -45,6 +45,7 @@ public:
 	std::atomic<float>* parTsLow = nullptr;
 	std::atomic<float>* parTsMid = nullptr;
 	std::atomic<float>* parTsHigh = nullptr;
+	std::atomic<float>* parTsPresence = nullptr;
 
 	std::atomic<float>* parGainStages = nullptr;
 	std::atomic<float>* parGainSlope = nullptr;

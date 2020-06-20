@@ -50,10 +50,11 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 			MAKE_PARAMETER_UNIT(TsLow),
 			MAKE_PARAMETER_UNIT(TsMid),
 			MAKE_PARAMETER_UNIT(TsHigh),
+			MAKE_PARAMETER_UNIT(TsPresence),
 
 			MAKE_PARAMETER(GainStages, 1.0f, 7.0f, 2.0f),
 			MAKE_PARAMETER_UNIT(GainSlope),
-			MAKE_PARAMETER_UNIT(LowCut),
+			MAKE_PARAMETER(LowCut, -1.0f, 1.0f, 0.4f),
 
 			std::make_unique<AudioParameterBool>("idCabOnOff", "CabOnOff", true),
 			MAKE_PARAMETER_UNIT(CabBrightness),
@@ -80,6 +81,7 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 	ASSIGN_PARAMETER(TsLow)
 	ASSIGN_PARAMETER(TsMid)
 	ASSIGN_PARAMETER(TsHigh)
+	ASSIGN_PARAMETER(TsPresence)
 
 	ASSIGN_PARAMETER(GainStages)
 	ASSIGN_PARAMETER(GainSlope)
@@ -161,6 +163,7 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 		amp_channel[i].set_ts_low(*parTsLow);
 		amp_channel[i].set_ts_mid(*parTsMid);
 		amp_channel[i].set_ts_high(*parTsHigh);
+		amp_channel[i].set_ts_presence(*parTsPresence);
 
 		amp_channel[i].set_gain_stages(*parGainStages);
 		amp_channel[i].set_gain_slope(*parGainSlope);
