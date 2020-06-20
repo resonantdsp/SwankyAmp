@@ -88,11 +88,11 @@ void AmpGroup::resized()
 	ParameterGroup::resized();
 
 	levelsGroup.setTopLeftPosition(spacing, spacing);
-	toneStackGroup.setTopLeftPosition(spacing + levelsGroup.getRight(), spacing);
 	preAmpGroup.setTopLeftPosition(spacing, spacing + levelsGroup.getBottom());
 	powerAmpGroup.setTopLeftPosition(spacing, spacing + preAmpGroup.getBottom());
 	stagingGroup.setTopLeftPosition(spacing + preAmpGroup.getRight(), spacing + levelsGroup.getBottom());
-	cabGroup.setTopLeftPosition(spacing + powerAmpGroup.getRight(), spacing + preAmpGroup.getBottom());
+	toneStackGroup.setTopLeftPosition(spacing + powerAmpGroup.getRight(), spacing + preAmpGroup.getBottom());
+	cabGroup.setTopLeftPosition(spacing + levelsGroup.getRight(), spacing);
 
-	setSize(toneStackGroup.getRight() + spacing, cabGroup.getBottom() + spacing);
+	setSize(toneStackGroup.getRight() + spacing, toneStackGroup.getBottom() + spacing);
 }

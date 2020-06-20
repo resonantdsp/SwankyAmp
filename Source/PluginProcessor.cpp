@@ -69,7 +69,6 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 			MAKE_PARAMETER_UNIT(PowerAmpGrit),
 
 			MAKE_PARAMETER(PowerAmpSag, -1.0f, 1.0f, -1.0f),
-			MAKE_PARAMETER_UNIT(PowerAmpSagTime),
 			MAKE_PARAMETER_UNIT(PowerAmpSagRatio),
 			MAKE_PARAMETER(PowerAmpSagSlope, -1.0f, 1.0f, -0.25f),
 		}
@@ -101,7 +100,6 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 	ASSIGN_PARAMETER(PowerAmpSag)
 
 	ASSIGN_PARAMETER(PowerAmpSag)
-	ASSIGN_PARAMETER(PowerAmpSagTime)
 	ASSIGN_PARAMETER(PowerAmpSagRatio)
 	ASSIGN_PARAMETER(PowerAmpSagSlope)
 }
@@ -190,7 +188,8 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 
 		amp_channel[i].set_tetrode_grid_tau(remap_sided(*parPowerAmpTight * -1.0f, -1.0f, +1.0f)); 
 		amp_channel[i].set_tetrode_grid_ratio(remap_sided(*parPowerAmpTight * -1.0f, -1.0f, +0.1f)); 
-		amp_channel[i].set_tetrode_plate_comp_depth(remap_sided(*parPowerAmpTight * -1.0f, -1.0f, +0.0f)); 
+		amp_channel[i].set_tetrode_plate_comp_depth(remap_sided(*parPowerAmpTight * -1.0f, -0.5f, +0.0f)); 
+		amp_channel[i].set_tetrode_plate_sag_tau(remap_sided(*parPowerAmpTight * -1.0f, -1.0f, +1.0f));
 
 		const float sagOffset = jmax(0.0f, (float)*parPowerAmpDrive) + 0.5f * jmax(0.0f, (float)*parPreAmpDrive);
 		const float sagRange = 1.0f / (1.0f + sagOffset * 2.0f);
@@ -203,7 +202,6 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 			-1.0f - sagOffset,
 			-1.0f - sagOffset + 2.0f * sagRange
 		));
-		amp_channel[i].set_tetrode_plate_sag_tau(remap_sided(*parPowerAmpSagTime, -1.0f, +1.0f));
 		amp_channel[i].set_tetrode_plate_sag_ratio(*parPowerAmpSagRatio);
 		amp_channel[i].set_tetrode_plate_sag_onset(*parPowerAmpSagSlope);
 	}

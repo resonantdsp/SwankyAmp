@@ -44,7 +44,7 @@ tetrode_plate = environment {
 
     sag_toggle = nentry("tetrode_plate_sag_toggle", 0, -1, +1, .1) : uscale(0, 1);
     sag_depth = nentry("tetrode_plate_sag_depth", 0, -1, +1, .1) : uscale(log(1e-1), log(1e1)) : exp;
-    sag_tau = nentry("tetrode_plate_sag_tau", 0, -1, +1, .1) : uscale(log(1e-2), log(1e0)) : exp;
+    sag_tau = nentry("tetrode_plate_sag_tau", 0, -1, +1, .1) : uscale(log(1e-2), log(5e-1)) : exp;
     sag_ratio = nentry("tetrode_plate_sag_ratio", 0, -1, +1, .1) : uscale(log(1e0), log(1e1)) : exp;
     sag_onset = nentry("tetrode_plate_sag_onset", 0, -1, +1, .1) : uscale(log(1e-1), log(1e1)) : exp;
 

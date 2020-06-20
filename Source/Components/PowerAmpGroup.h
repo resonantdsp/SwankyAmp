@@ -39,12 +39,10 @@ private:
 	RSliderLabel sliderDrive;
 	RSliderLabel sliderTight;
 	RSliderLabel sliderSag;
-	RSliderLabel sliderSagTime;
 
 	std::unique_ptr<SliderAttachment> attDrive;
 	std::unique_ptr<SliderAttachment> attTight;
 	std::unique_ptr<SliderAttachment> attSag;
-	std::unique_ptr<SliderAttachment> attSagTime;
 
 	DISABLE_COMPONENT_RESIZE()
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PowerAmpGroup)
