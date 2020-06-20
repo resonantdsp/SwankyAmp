@@ -71,7 +71,6 @@ void PowerAmpGroup::resized()
 
 	corner = sliderSag.getBounds().getTopRight() + Point<int>(spacing, 0);
 
-
 	// can now determine the width and set it, this will re-call `resized` but
 	// since the height is the same it won't re-do the calculation
 	setSize(corner.getX() - getBounds().getX(), getHeight());

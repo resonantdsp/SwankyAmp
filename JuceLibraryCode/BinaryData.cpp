@@ -107,8 +107,236 @@ static const unsigned char temp_binary_data_0[] =
 
 const char* logo_svg = (const char*) temp_binary_data_0;
 
-//================== PTSans-Bold.ttf ==================
+//================== presets.xml ==================
 static const unsigned char temp_binary_data_1[] =
+"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n"
+"\r\n"
+"<presets>\r\n"
+"  <APVTSResonantAmp pluginVersion=\"0.4.2\" presetName=\"clean\" presetOrder=\"1\">\r\n"
+"    <PARAM id=\"idCabBrightness\" value=\"0.3\"/>\r\n"
+"    <PARAM id=\"idCabDistance\" value=\"0.3\"/>\r\n"
+"    <PARAM id=\"idCabOnOff\" value=\"1.0\"/>\r\n"
+"    <PARAM id=\"idGainSlope\" value=\"-0.4\"/>\r\n"
+"    <PARAM id=\"idGainStages\" value=\"3.0\"/>\r\n"
+"    <PARAM id=\"idLowCut\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpDrive\" value=\"-0.3\"/>\r\n"
+"    <PARAM id=\"idPowerAmpGrit\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSag\" value=\"-0.6\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSagRatio\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSagSlope\" value=\"-0.25\"/>\r\n"
+"    <PARAM id=\"idPowerAmpTight\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPreAmpDrive\" value=\"-1.0\"/>\r\n"
+"    <PARAM id=\"idPreAmpGrit\" value=\"-0.5\"/>\r\n"
+"    <PARAM id=\"idPreAmpTight\" value=\"-1.0\"/>\r\n"
+"    <PARAM id=\"idTsHigh\" value=\"0.4\"/>\r\n"
+"    <PARAM id=\"idTsLow\" value=\"-0.25\"/>\r\n"
+"    <PARAM id=\"idTsMid\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idTsPresence\" value=\"0.25\"/>\r\n"
+"  </APVTSResonantAmp>\r\n"
+"\r\n"
+"  <APVTSResonantAmp pluginVersion=\"0.4.2\" presetName=\"edge scoop\" presetOrder=\"2\">\r\n"
+"    <PARAM id=\"idCabBrightness\" value=\"-0.3\"/>\r\n"
+"    <PARAM id=\"idCabDistance\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idCabOnOff\" value=\"1.0\"/>\r\n"
+"    <PARAM id=\"idGainSlope\" value=\"-0.4\"/>\r\n"
+"    <PARAM id=\"idGainStages\" value=\"3.0\"/>\r\n"
+"    <PARAM id=\"idLowCut\" value=\"0.3\"/>\r\n"
+"    <PARAM id=\"idPowerAmpDrive\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpGrit\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSag\" value=\"-0.4\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSagRatio\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSagSlope\" value=\"-0.25\"/>\r\n"
+"    <PARAM id=\"idPowerAmpTight\" value=\"-0.3\"/>\r\n"
+"    <PARAM id=\"idPreAmpDrive\" value=\"-0.35\"/>\r\n"
+"    <PARAM id=\"idPreAmpGrit\" value=\"-0.5\"/>\r\n"
+"    <PARAM id=\"idPreAmpTight\" value=\"-0.5\"/>\r\n"
+"    <PARAM id=\"idTsHigh\" value=\"0.6\"/>\r\n"
+"    <PARAM id=\"idTsLow\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idTsMid\" value=\"-0.25\"/>\r\n"
+"    <PARAM id=\"idTsPresence\" value=\"0.25\"/>\r\n"
+"  </APVTSResonantAmp>\r\n"
+"\r\n"
+"  <APVTSResonantAmp pluginVersion=\"0.4.2\" presetName=\"edge mids\" presetOrder=\"3\">\r\n"
+"    <PARAM id=\"idCabBrightness\" value=\"-0.35\"/>\r\n"
+"    <PARAM id=\"idCabDistance\" value=\"0.3\"/>\r\n"
+"    <PARAM id=\"idCabOnOff\" value=\"1.0\"/>\r\n"
+"    <PARAM id=\"idGainSlope\" value=\"-0.4\"/>\r\n"
+"    <PARAM id=\"idGainStages\" value=\"3.0\"/>\r\n"
+"    <PARAM id=\"idLowCut\" value=\"0.4\"/>\r\n"
+"    <PARAM id=\"idPowerAmpDrive\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpGrit\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSag\" value=\"-0.4\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSagRatio\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSagSlope\" value=\"-0.25\"/>\r\n"
+"    <PARAM id=\"idPowerAmpTight\" value=\"-0.3\"/>\r\n"
+"    <PARAM id=\"idPreAmpDrive\" value=\"-0.35\"/>\r\n"
+"    <PARAM id=\"idPreAmpGrit\" value=\"-0.5\"/>\r\n"
+"    <PARAM id=\"idPreAmpTight\" value=\"-0.5\"/>\r\n"
+"    <PARAM id=\"idTsHigh\" value=\"0.3\"/>\r\n"
+"    <PARAM id=\"idTsLow\" value=\"-0.25\"/>\r\n"
+"    <PARAM id=\"idTsMid\" value=\"0.5\"/>\r\n"
+"    <PARAM id=\"idTsPresence\" value=\"0.45\"/>\r\n"
+"  </APVTSResonantAmp>\r\n"
+"\r\n"
+"  <APVTSResonantAmp pluginVersion=\"0.4.2\" presetName=\"distort\" presetOrder=\"6\">\r\n"
+"    <PARAM id=\"idCabBrightness\" value=\"-0.3\"/>\r\n"
+"    <PARAM id=\"idCabDistance\" value=\"0.65\"/>\r\n"
+"    <PARAM id=\"idCabOnOff\" value=\"1.0\"/>\r\n"
+"    <PARAM id=\"idGainSlope\" value=\"-0.35\"/>\r\n"
+"    <PARAM id=\"idGainStages\" value=\"3.5\"/>\r\n"
+"    <PARAM id=\"idLowCut\" value=\"0.3\"/>\r\n"
+"    <PARAM id=\"idPowerAmpDrive\" value=\"0.1\"/>\r\n"
+"    <PARAM id=\"idPowerAmpGrit\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSag\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSagRatio\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSagSlope\" value=\"-0.25\"/>\r\n"
+"    <PARAM id=\"idPowerAmpTight\" value=\"-0.3\"/>\r\n"
+"    <PARAM id=\"idPreAmpDrive\" value=\"0.07\"/>\r\n"
+"    <PARAM id=\"idPreAmpGrit\" value=\"-0.35\"/>\r\n"
+"    <PARAM id=\"idPreAmpTight\" value=\"-0.4\"/>\r\n"
+"    <PARAM id=\"idTsHigh\" value=\"0.45\"/>\r\n"
+"    <PARAM id=\"idTsLow\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idTsMid\" value=\"0.2\"/>\r\n"
+"    <PARAM id=\"idTsPresence\" value=\"0.25\"/>\r\n"
+"  </APVTSResonantAmp>\r\n"
+"\r\n"
+"  <APVTSResonantAmp pluginVersion=\"0.4.2\" presetName=\"dirty distort\" presetOrder=\"7\">\r\n"
+"    <PARAM id=\"idCabBrightness\" value=\"-0.17\"/>\r\n"
+"    <PARAM id=\"idCabDistance\" value=\"0.3\"/>\r\n"
+"    <PARAM id=\"idCabOnOff\" value=\"1.0\"/>\r\n"
+"    <PARAM id=\"idGainSlope\" value=\"0.5\"/>\r\n"
+"    <PARAM id=\"idGainStages\" value=\"2.5\"/>\r\n"
+"    <PARAM id=\"idLowCut\" value=\"0.3\"/>\r\n"
+"    <PARAM id=\"idPowerAmpDrive\" value=\"0.1\"/>\r\n"
+"    <PARAM id=\"idPowerAmpGrit\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSag\" value=\"0.02\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSagRatio\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSagSlope\" value=\"-0.25\"/>\r\n"
+"    <PARAM id=\"idPowerAmpTight\" value=\"-0.45\"/>\r\n"
+"    <PARAM id=\"idPreAmpDrive\" value=\"0.25\"/>\r\n"
+"    <PARAM id=\"idPreAmpGrit\" value=\"0.4\"/>\r\n"
+"    <PARAM id=\"idPreAmpTight\" value=\"-0.01\"/>\r\n"
+"    <PARAM id=\"idTsHigh\" value=\"0.35\"/>\r\n"
+"    <PARAM id=\"idTsLow\" value=\"0.2\"/>\r\n"
+"    <PARAM id=\"idTsMid\" value=\"0.5\"/>\r\n"
+"    <PARAM id=\"idTsPresence\" value=\"0.2\"/>\r\n"
+"  </APVTSResonantAmp>\r\n"
+"\r\n"
+"  <APVTSResonantAmp pluginVersion=\"0.4.2\" presetName=\"pre drive\" presetOrder=\"8\">\r\n"
+"    <PARAM id=\"idCabBrightness\" value=\"-0.2\"/>\r\n"
+"    <PARAM id=\"idCabDistance\" value=\"0.6\"/>\r\n"
+"    <PARAM id=\"idCabOnOff\" value=\"1.0\"/>\r\n"
+"    <PARAM id=\"idGainSlope\" value=\"-0.35\"/>\r\n"
+"    <PARAM id=\"idGainStages\" value=\"4.5\"/>\r\n"
+"    <PARAM id=\"idLowCut\" value=\"0.3\"/>\r\n"
+"    <PARAM id=\"idPowerAmpDrive\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpGrit\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSag\" value=\"-0.6\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSagRatio\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSagSlope\" value=\"-0.25\"/>\r\n"
+"    <PARAM id=\"idPowerAmpTight\" value=\"-0.3\"/>\r\n"
+"    <PARAM id=\"idPreAmpDrive\" value=\"0.5\"/>\r\n"
+"    <PARAM id=\"idPreAmpGrit\" value=\"-0.4\"/>\r\n"
+"    <PARAM id=\"idPreAmpTight\" value=\"0.7\"/>\r\n"
+"    <PARAM id=\"idTsHigh\" value=\"0.25\"/>\r\n"
+"    <PARAM id=\"idTsLow\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idTsMid\" value=\"0.3\"/>\r\n"
+"    <PARAM id=\"idTsPresence\" value=\"0.45\"/>\r\n"
+"  </APVTSResonantAmp>\r\n"
+"\r\n"
+"  <APVTSResonantAmp pluginVersion=\"0.4.2\" presetName=\"power drive\" presetOrder=\"9\">\r\n"
+"    <PARAM id=\"idCabBrightness\" value=\"0.3\"/>\r\n"
+"    <PARAM id=\"idCabDistance\" value=\"0.7\"/>\r\n"
+"    <PARAM id=\"idCabOnOff\" value=\"1.0\"/>\r\n"
+"    <PARAM id=\"idGainSlope\" value=\"-0.35\"/>\r\n"
+"    <PARAM id=\"idGainStages\" value=\"2.5\"/>\r\n"
+"    <PARAM id=\"idLowCut\" value=\"0.3\"/>\r\n"
+"    <PARAM id=\"idPowerAmpDrive\" value=\"0.6\"/>\r\n"
+"    <PARAM id=\"idPowerAmpGrit\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSag\" value=\"-0.4\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSagRatio\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSagSlope\" value=\"-0.25\"/>\r\n"
+"    <PARAM id=\"idPowerAmpTight\" value=\"0.35\"/>\r\n"
+"    <PARAM id=\"idPreAmpDrive\" value=\"-0.3\"/>\r\n"
+"    <PARAM id=\"idPreAmpGrit\" value=\"-0.4\"/>\r\n"
+"    <PARAM id=\"idPreAmpTight\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idTsHigh\" value=\"0.3\"/>\r\n"
+"    <PARAM id=\"idTsLow\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idTsMid\" value=\"0.2\"/>\r\n"
+"    <PARAM id=\"idTsPresence\" value=\"0.5\"/>\r\n"
+"  </APVTSResonantAmp>\r\n"
+"\r\n"
+"  <APVTSResonantAmp pluginVersion=\"0.4.2\" presetName=\"full drive\" presetOrder=\"10\">\r\n"
+"    <PARAM id=\"idCabBrightness\" value=\"-0.3\"/>\r\n"
+"    <PARAM id=\"idCabDistance\" value=\"0.8\"/>\r\n"
+"    <PARAM id=\"idCabOnOff\" value=\"1.0\"/>\r\n"
+"    <PARAM id=\"idGainSlope\" value=\"0.05\"/>\r\n"
+"    <PARAM id=\"idGainStages\" value=\"3.0\"/>\r\n"
+"    <PARAM id=\"idLowCut\" value=\"0.3\"/>\r\n"
+"    <PARAM id=\"idPowerAmpDrive\" value=\"0.65\"/>\r\n"
+"    <PARAM id=\"idPowerAmpGrit\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSag\" value=\"-0.55\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSagRatio\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSagSlope\" value=\"-0.25\"/>\r\n"
+"    <PARAM id=\"idPowerAmpTight\" value=\"0.75\"/>\r\n"
+"    <PARAM id=\"idPreAmpDrive\" value=\"0.7\"/>\r\n"
+"    <PARAM id=\"idPreAmpGrit\" value=\"-0.5\"/>\r\n"
+"    <PARAM id=\"idPreAmpTight\" value=\"0.5\"/>\r\n"
+"    <PARAM id=\"idTsHigh\" value=\"0.45\"/>\r\n"
+"    <PARAM id=\"idTsLow\" value=\"-0.2\"/>\r\n"
+"    <PARAM id=\"idTsMid\" value=\"0.25\"/>\r\n"
+"    <PARAM id=\"idTsPresence\" value=\"0.4\"/>\r\n"
+"  </APVTSResonantAmp>\r\n"
+"\r\n"
+"  <APVTSResonantAmp pluginVersion=\"0.4.2\" presetName=\"high gain\" presetOrder=\"11\">\r\n"
+"    <PARAM id=\"idCabBrightness\" value=\"-0.3\"/>\r\n"
+"    <PARAM id=\"idCabDistance\" value=\"0.75\"/>\r\n"
+"    <PARAM id=\"idCabOnOff\" value=\"1.0\"/>\r\n"
+"    <PARAM id=\"idGainSlope\" value=\"0.6\"/>\r\n"
+"    <PARAM id=\"idGainStages\" value=\"5.5\"/>\r\n"
+"    <PARAM id=\"idLowCut\" value=\"0.3\"/>\r\n"
+"    <PARAM id=\"idPowerAmpDrive\" value=\"0.2\"/>\r\n"
+"    <PARAM id=\"idPowerAmpGrit\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSag\" value=\"-1.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSagRatio\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSagSlope\" value=\"-0.25\"/>\r\n"
+"    <PARAM id=\"idPowerAmpTight\" value=\"0.45\"/>\r\n"
+"    <PARAM id=\"idPreAmpDrive\" value=\"0.7\"/>\r\n"
+"    <PARAM id=\"idPreAmpGrit\" value=\"0.35\"/>\r\n"
+"    <PARAM id=\"idPreAmpTight\" value=\"0.85\"/>\r\n"
+"    <PARAM id=\"idTsHigh\" value=\"0.5\"/>\r\n"
+"    <PARAM id=\"idTsLow\" value=\"0.25\"/>\r\n"
+"    <PARAM id=\"idTsMid\" value=\"-0.25\"/>\r\n"
+"    <PARAM id=\"idTsPresence\" value=\"-0.3\"/>\r\n"
+"  </APVTSResonantAmp>\r\n"
+"\r\n"
+"  <APVTSResonantAmp pluginVersion=\"0.4.2\" presetName=\"level 11\" presetOrder=\"12\">\r\n"
+"    <PARAM id=\"idCabBrightness\" value=\"-0.25\"/>\r\n"
+"    <PARAM id=\"idCabDistance\" value=\"0.8\"/>\r\n"
+"    <PARAM id=\"idCabOnOff\" value=\"1.0\"/>\r\n"
+"    <PARAM id=\"idGainSlope\" value=\"0.05\"/>\r\n"
+"    <PARAM id=\"idGainStages\" value=\"3.0\"/>\r\n"
+"    <PARAM id=\"idLowCut\" value=\"0.5\"/>\r\n"
+"    <PARAM id=\"idPowerAmpDrive\" value=\"1.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpGrit\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSag\" value=\"-0.55\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSagRatio\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idPowerAmpSagSlope\" value=\"-0.25\"/>\r\n"
+"    <PARAM id=\"idPowerAmpTight\" value=\"0.75\"/>\r\n"
+"    <PARAM id=\"idPreAmpDrive\" value=\"1.0\"/>\r\n"
+"    <PARAM id=\"idPreAmpGrit\" value=\"-0.5\"/>\r\n"
+"    <PARAM id=\"idPreAmpTight\" value=\"0.5\"/>\r\n"
+"    <PARAM id=\"idTsHigh\" value=\"0.28\"/>\r\n"
+"    <PARAM id=\"idTsLow\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idTsMid\" value=\"0.45\"/>\r\n"
+"    <PARAM id=\"idTsPresence\" value=\"0.5\"/>\r\n"
+"  </APVTSResonantAmp>\r\n"
+"</presets>";
+
+const char* presets_xml = (const char*) temp_binary_data_1;
+
+//================== PTSans-Bold.ttf ==================
+static const unsigned char temp_binary_data_2[] =
 { 0,1,0,0,0,17,1,0,0,4,0,16,71,80,79,83,219,216,213,150,0,4,38,32,0,0,55,2,71,83,85,66,116,194,133,73,0,4,93,36,0,0,7,154,79,83,47,50,142,66,121,204,0,3,82,160,0,0,0,96,99,109,97,112,165,70,123,95,0,3,218,200,0,0,2,252,99,118,116,32,10,55,2,82,0,3,224,
 232,0,0,0,44,102,112,103,109,158,72,217,111,0,3,221,196,0,0,1,147,103,97,115,112,0,17,0,9,0,4,38,16,0,0,0,16,103,108,121,102,244,27,235,57,0,0,1,28,0,3,58,131,104,100,109,120,47,183,217,159,0,3,83,0,0,0,135,200,104,101,97,100,244,196,40,255,0,3,71,4,
 0,0,0,54,104,104,101,97,7,33,5,166,0,3,82,124,0,0,0,36,104,109,116,120,229,75,92,36,0,3,71,60,0,0,11,64,108,111,99,97,4,252,207,54,0,3,59,192,0,0,11,68,109,97,120,112,5,1,11,184,0,3,59,160,0,0,0,32,110,97,109,101,82,163,102,134,0,3,225,20,0,0,47,40,112,
@@ -3501,10 +3729,10 @@ static const unsigned char temp_binary_data_1[] =
 56,0,0,0,1,0,0,0,13,0,3,0,1,0,70,0,1,0,80,0,0,0,1,0,0,0,13,0,3,0,2,0,46,0,52,0,1,0,20,0,0,0,1,0,0,0,13,0,1,0,1,0,68,0,3,0,2,0,20,0,26,0,1,0,36,0,0,0,1,0,0,0,13,0,1,0,1,0,17,0,2,0,1,0,19,0,28,0,0,0,1,0,1,0,82,0,1,0,0,0,1,0,8,0,2,0,12,0,3,0,108,0,124,2,
 97,0,1,0,3,0,68,0,82,1,55,0,0,0,0 };
 
-const char* PTSansBold_ttf = (const char*) temp_binary_data_1;
+const char* PTSansBold_ttf = (const char*) temp_binary_data_2;
 
 //================== PTSans-Regular.ttf ==================
-static const unsigned char temp_binary_data_2[] =
+static const unsigned char temp_binary_data_3[] =
 { 0,1,0,0,0,17,1,0,0,4,0,16,71,80,79,83,0,78,16,121,0,4,3,236,0,0,51,14,71,83,85,66,116,194,133,73,0,4,54,252,0,0,7,154,79,83,47,50,141,22,119,226,0,3,51,44,0,0,0,96,99,109,97,112,165,70,123,95,0,3,184,128,0,0,2,252,99,118,116,32,2,138,10,76,0,3,190,188,
 0,0,0,54,102,112,103,109,158,44,225,111,0,3,187,124,0,0,1,147,103,97,115,112,0,25,0,9,0,4,3,220,0,0,0,16,103,108,121,102,147,102,48,54,0,0,1,28,0,3,27,14,104,100,109,120,26,146,194,233,0,3,51,140,0,0,132,244,104,101,97,100,244,129,40,253,0,3,39,144,0,
 0,0,54,104,104,101,97,6,223,5,123,0,3,51,8,0,0,0,36,104,109,116,120,201,250,133,196,0,3,39,200,0,0,11,64,108,111,99,97,4,217,246,84,0,3,28,76,0,0,11,68,109,97,120,112,5,1,16,224,0,3,28,44,0,0,0,32,110,97,109,101,81,126,99,116,0,3,190,244,0,0,47,18,112,
@@ -6753,10 +6981,10 @@ static const unsigned char temp_binary_data_2[] =
 0,3,0,1,0,88,0,1,0,56,0,0,0,1,0,0,0,13,0,3,0,1,0,70,0,1,0,80,0,0,0,1,0,0,0,13,0,3,0,2,0,46,0,52,0,1,0,20,0,0,0,1,0,0,0,13,0,1,0,1,0,68,0,3,0,2,0,20,0,26,0,1,0,36,0,0,0,1,0,0,0,13,0,1,0,1,0,17,0,2,0,1,0,19,0,28,0,0,0,1,0,1,0,82,0,1,0,0,0,1,0,8,0,2,0,12,
 0,3,0,108,0,124,2,97,0,1,0,3,0,68,0,82,1,55,0,0,0,0 };
 
-const char* PTSansRegular_ttf = (const char*) temp_binary_data_2;
+const char* PTSansRegular_ttf = (const char*) temp_binary_data_3;
 
 //================== PTSansNarrow-Regular.ttf ==================
-static const unsigned char temp_binary_data_3[] =
+static const unsigned char temp_binary_data_4[] =
 { 0,1,0,0,0,17,1,0,0,4,0,16,71,80,79,83,244,78,11,211,0,3,86,48,0,0,53,20,71,83,85,66,116,194,133,73,0,3,139,68,0,0,7,154,79,83,47,50,141,22,119,128,0,2,139,88,0,0,0,96,99,109,97,112,165,70,123,95,0,3,11,4,0,0,2,252,99,118,116,32,9,190,1,192,0,3,16,240,
 0,0,0,48,102,112,103,109,158,72,226,111,0,3,14,0,0,0,1,147,103,97,115,112,0,26,0,9,0,3,86,32,0,0,0,16,103,108,121,102,124,62,80,238,0,0,1,28,0,2,115,59,104,100,109,120,182,66,116,253,0,2,139,184,0,0,127,76,104,101,97,100,243,158,40,240,0,2,127,188,0,
 0,0,54,104,104,101,97,5,252,4,207,0,2,139,52,0,0,0,36,104,109,116,120,180,37,102,186,0,2,127,244,0,0,11,64,108,111,99,97,3,201,172,182,0,2,116,120,0,0,11,68,109,97,120,112,5,1,8,145,0,2,116,88,0,0,0,32,110,97,109,101,83,138,103,141,0,3,17,32,0,0,47,44,
@@ -9480,7 +9708,7 @@ static const unsigned char temp_binary_data_3[] =
 0,49,0,6,0,0,0,4,0,14,0,32,0,50,0,76,0,3,0,1,0,88,0,1,0,56,0,0,0,1,0,0,0,13,0,3,0,1,0,70,0,1,0,80,0,0,0,1,0,0,0,13,0,3,0,2,0,46,0,52,0,1,0,20,0,0,0,1,0,0,0,13,0,1,0,1,0,68,0,3,0,2,0,20,0,26,0,1,0,36,0,0,0,1,0,0,0,13,0,1,0,1,0,17,0,2,0,1,0,19,0,28,0,0,
 0,1,0,1,0,82,0,1,0,0,0,1,0,8,0,2,0,12,0,3,0,108,0,124,2,97,0,1,0,3,0,68,0,82,1,55,0,0,0,0 };
 
-const char* PTSansNarrowRegular_ttf = (const char*) temp_binary_data_3;
+const char* PTSansNarrowRegular_ttf = (const char*) temp_binary_data_4;
 
 
 const char* getNamedResource (const char* resourceNameUTF8, int& numBytes)
@@ -9494,6 +9722,7 @@ const char* getNamedResource (const char* resourceNameUTF8, int& numBytes)
     switch (hash)
     {
         case 0x78dee5d0:  numBytes = 8088; return logo_svg;
+        case 0xc1329ecc:  numBytes = 9680; return presets_xml;
         case 0xc9b4bb03:  numBytes = 287936; return PTSansBold_ttf;
         case 0x1200a58c:  numBytes = 278168; return PTSansRegular_ttf;
         case 0xadb49371:  numBytes = 234208; return PTSansNarrowRegular_ttf;
@@ -9507,6 +9736,7 @@ const char* getNamedResource (const char* resourceNameUTF8, int& numBytes)
 const char* namedResourceList[] =
 {
     "logo_svg",
+    "presets_xml",
     "PTSansBold_ttf",
     "PTSansRegular_ttf",
     "PTSansNarrowRegular_ttf"
@@ -9515,6 +9745,7 @@ const char* namedResourceList[] =
 const char* originalFilenames[] =
 {
     "logo.svg",
+    "presets.xml",
     "PTSans-Bold.ttf",
     "PTSans-Regular.ttf",
     "PTSansNarrow-Regular.ttf"

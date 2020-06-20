@@ -109,6 +109,10 @@
 			isa = PBXBuildFile;
 			fileRef = C74C1D329B9F33A7B1D34B7C;
 		};
+		09420510C08E1D76DFACEBDD = {
+			isa = PBXBuildFile;
+			fileRef = 770B3ACDF988E53FB21014C9;
+		};
 		F71186EA05F0019642623DAA = {
 			isa = PBXBuildFile;
 			fileRef = FA89622FEE47796427D7B2F8;
@@ -144,6 +148,10 @@
 		2516937FF938F9180ECB5554 = {
 			isa = PBXBuildFile;
 			fileRef = 7906EB419323495FEF6AFE48;
+		};
+		08A348691882E4DAE152691E = {
+			isa = PBXBuildFile;
+			fileRef = 46C95ABAC74139798C04941A;
 		};
 		798621D7DBAE4FC6FB812E33 = {
 			isa = PBXBuildFile;
@@ -240,6 +248,13 @@
 			path = "../../JuceLibraryCode/include_juce_audio_processors.mm";
 			sourceTree = "SOURCE_ROOT";
 		};
+		0728243CEF505E36A5D57B8C = {
+			isa = PBXFileReference;
+			lastKnownFileType = file.xml;
+			name = presets.xml;
+			path = ../../Resources/presets.xml;
+			sourceTree = "SOURCE_ROOT";
+		};
 		073DFBC834356E1C6F4482F1 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.c.h;
@@ -267,6 +282,13 @@
 			name = "juce_cryptography";
 			path = "~/JUCE/modules/juce_cryptography";
 			sourceTree = "<absolute>";
+		};
+		0BCB05080F51C8876A8CCD0A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = PresetGroup.h;
+			path = ../../Source/Components/PresetGroup.h;
+			sourceTree = "SOURCE_ROOT";
 		};
 		0E9627B6119F822F5DAC890A = {
 			isa = PBXFileReference;
@@ -345,19 +367,19 @@
 			path = ../../Source/Components/RSliderLabel.cpp;
 			sourceTree = "SOURCE_ROOT";
 		};
-		326C59FB6919910FA25E1B21 = {
-			isa = PBXFileReference;
-			lastKnownFileType = sourcecode.cpp.cpp;
-			name = Utils.cpp;
-			path = ../../Source/Utils.cpp;
-			sourceTree = "SOURCE_ROOT";
-		};
 		3A3B8185815BB6FF153325AD = {
 			isa = PBXFileReference;
 			explicitFileType = wrapper.cfbundle;
 			includeInIndex = 0;
 			path = ResonantAmp.vst3;
 			sourceTree = "BUILT_PRODUCTS_DIR";
+		};
+		529A38DC6B0E839FF2B1756E = {
+			isa = PBXFileReference;
+			lastKnownFileType = file.ttf;
+			name = "PTSans-Regular.ttf";
+			path = "../../Resources/PTSans/PTSans-Regular.ttf";
+			sourceTree = "SOURCE_ROOT";
 		};
 		B6D598D8AEA1FF5BC3D4BD92 = {
 			isa = PBXFileReference;
@@ -393,6 +415,13 @@
 			name = Carbon.framework;
 			path = System/Library/Frameworks/Carbon.framework;
 			sourceTree = SDKROOT;
+		};
+		326C59FB6919910FA25E1B21 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = Utils.cpp;
+			path = ../../Source/Utils.cpp;
+			sourceTree = "SOURCE_ROOT";
 		};
 		33234A408E3F49231B4F6B5F = {
 			isa = PBXFileReference;
@@ -443,6 +472,13 @@
 			path = ../../Source/Components/PowerAmpGroup.h;
 			sourceTree = "SOURCE_ROOT";
 		};
+		46C95ABAC74139798C04941A = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = PresetManager.cpp;
+			path = ../../Source/PresetManager.cpp;
+			sourceTree = "SOURCE_ROOT";
+		};
 		49D1E5D1A3B1F965BB7E838D = {
 			isa = PBXFileReference;
 			lastKnownFileType = text.plist.xml;
@@ -471,11 +507,11 @@
 			path = "~/JUCE/modules/juce_opengl";
 			sourceTree = "<absolute>";
 		};
-		529A38DC6B0E839FF2B1756E = {
+		58259A1EEEEB2D19003511DF = {
 			isa = PBXFileReference;
-			lastKnownFileType = file.ttf;
-			name = "PTSans-Regular.ttf";
-			path = "../../Resources/PTSans/PTSans-Regular.ttf";
+			lastKnownFileType = sourcecode.c.h;
+			name = PresetManager.h;
+			path = ../../Source/PresetManager.h;
 			sourceTree = "SOURCE_ROOT";
 		};
 		5B071824680FCDE93CAB5834 = {
@@ -588,6 +624,13 @@
 			lastKnownFileType = sourcecode.c.h;
 			name = ToneStackGroup.h;
 			path = ../../Source/Components/ToneStackGroup.h;
+			sourceTree = "SOURCE_ROOT";
+		};
+		770B3ACDF988E53FB21014C9 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = PresetGroup.cpp;
+			path = ../../Source/Components/PresetGroup.cpp;
 			sourceTree = "SOURCE_ROOT";
 		};
 		78BC8005FF8A8B16705B0647 = {
@@ -930,6 +973,7 @@
 			isa = PBXGroup;
 			children = (
 				6E45CB46D8D671BE4ECFA041,
+				0728243CEF505E36A5D57B8C,
 				D4C08012246F74E2E3ED6117,
 				529A38DC6B0E839FF2B1756E,
 				8F406035EFC8B04531C8C9F4,
@@ -954,6 +998,8 @@
 				4414DAC183F81C8A3F77E466,
 				C74C1D329B9F33A7B1D34B7C,
 				3BB443F3D9FE041CA53857A1,
+				770B3ACDF988E53FB21014C9,
+				0BCB05080F51C8876A8CCD0A,
 				FA89622FEE47796427D7B2F8,
 				A3EDF905651742C454114185,
 				700A1146182081C685E35039,
@@ -981,6 +1027,8 @@
 				073DFBC834356E1C6F4482F1,
 				7906EB419323495FEF6AFE48,
 				F3ACB6EB51A49238B20A01E0,
+				46C95ABAC74139798C04941A,
+				58259A1EEEEB2D19003511DF,
 			);
 			name = Source;
 			sourceTree = "<group>";
@@ -1138,8 +1186,8 @@
 					"_DEBUG=1",
 					"DEBUG=1",
 					"JUCER_XCODE_MAC_F6D2F4CF=1",
-					"JUCE_APP_VERSION=0.4.2",
-					"JUCE_APP_VERSION_HEX=0x402",
+					"JUCE_APP_VERSION=0.5.0",
+					"JUCE_APP_VERSION_HEX=0x500",
 					"JucePlugin_Build_VST=0",
 					"JucePlugin_Build_VST3=1",
 					"JucePlugin_Build_AU=0",
@@ -1192,8 +1240,8 @@
 					"_NDEBUG=1",
 					"NDEBUG=1",
 					"JUCER_XCODE_MAC_F6D2F4CF=1",
-					"JUCE_APP_VERSION=0.4.2",
-					"JUCE_APP_VERSION_HEX=0x402",
+					"JUCE_APP_VERSION=0.5.0",
+					"JUCE_APP_VERSION_HEX=0x500",
 					"JucePlugin_Build_VST=0",
 					"JucePlugin_Build_VST3=1",
 					"JucePlugin_Build_AU=0",
@@ -1248,8 +1296,8 @@
 					"_DEBUG=1",
 					"DEBUG=1",
 					"JUCER_XCODE_MAC_F6D2F4CF=1",
-					"JUCE_APP_VERSION=0.4.2",
-					"JUCE_APP_VERSION_HEX=0x402",
+					"JUCE_APP_VERSION=0.5.0",
+					"JUCE_APP_VERSION_HEX=0x500",
 					"JucePlugin_Build_VST=0",
 					"JucePlugin_Build_VST3=0",
 					"JucePlugin_Build_AU=0",
@@ -1306,8 +1354,8 @@
 					"_NDEBUG=1",
 					"NDEBUG=1",
 					"JUCER_XCODE_MAC_F6D2F4CF=1",
-					"JUCE_APP_VERSION=0.4.2",
-					"JUCE_APP_VERSION_HEX=0x402",
+					"JUCE_APP_VERSION=0.5.0",
+					"JUCE_APP_VERSION_HEX=0x500",
 					"JucePlugin_Build_VST=0",
 					"JucePlugin_Build_VST3=0",
 					"JucePlugin_Build_AU=0",
@@ -1366,8 +1414,8 @@
 					"_DEBUG=1",
 					"DEBUG=1",
 					"JUCER_XCODE_MAC_F6D2F4CF=1",
-					"JUCE_APP_VERSION=0.4.2",
-					"JUCE_APP_VERSION_HEX=0x402",
+					"JUCE_APP_VERSION=0.5.0",
+					"JUCE_APP_VERSION_HEX=0x500",
 					"JucePlugin_Build_VST=0",
 					"JucePlugin_Build_VST3=0",
 					"JucePlugin_Build_AU=1",
@@ -1421,8 +1469,8 @@
 					"_NDEBUG=1",
 					"NDEBUG=1",
 					"JUCER_XCODE_MAC_F6D2F4CF=1",
-					"JUCE_APP_VERSION=0.4.2",
-					"JUCE_APP_VERSION_HEX=0x402",
+					"JUCE_APP_VERSION=0.5.0",
+					"JUCE_APP_VERSION_HEX=0x500",
 					"JucePlugin_Build_VST=0",
 					"JucePlugin_Build_VST3=0",
 					"JucePlugin_Build_AU=1",
@@ -1476,8 +1524,8 @@
 					"_DEBUG=1",
 					"DEBUG=1",
 					"JUCER_XCODE_MAC_F6D2F4CF=1",
-					"JUCE_APP_VERSION=0.4.2",
-					"JUCE_APP_VERSION_HEX=0x402",
+					"JUCE_APP_VERSION=0.5.0",
+					"JUCE_APP_VERSION_HEX=0x500",
 					"JucePlugin_Build_VST=0",
 					"JucePlugin_Build_VST3=0",
 					"JucePlugin_Build_AU=0",
@@ -1524,8 +1572,8 @@
 					"_NDEBUG=1",
 					"NDEBUG=1",
 					"JUCER_XCODE_MAC_F6D2F4CF=1",
-					"JUCE_APP_VERSION=0.4.2",
-					"JUCE_APP_VERSION_HEX=0x402",
+					"JUCE_APP_VERSION=0.5.0",
+					"JUCE_APP_VERSION_HEX=0x500",
 					"JucePlugin_Build_VST=0",
 					"JucePlugin_Build_VST3=0",
 					"JucePlugin_Build_AU=0",
@@ -1574,8 +1622,8 @@
 					"_DEBUG=1",
 					"DEBUG=1",
 					"JUCER_XCODE_MAC_F6D2F4CF=1",
-					"JUCE_APP_VERSION=0.4.2",
-					"JUCE_APP_VERSION_HEX=0x402",
+					"JUCE_APP_VERSION=0.5.0",
+					"JUCE_APP_VERSION_HEX=0x500",
 					"JucePlugin_Build_VST=0",
 					"JucePlugin_Build_VST3=1",
 					"JucePlugin_Build_AU=1",
@@ -1622,8 +1670,8 @@
 					"_NDEBUG=1",
 					"NDEBUG=1",
 					"JUCER_XCODE_MAC_F6D2F4CF=1",
-					"JUCE_APP_VERSION=0.4.2",
-					"JUCE_APP_VERSION_HEX=0x402",
+					"JUCE_APP_VERSION=0.5.0",
+					"JUCE_APP_VERSION_HEX=0x500",
 					"JucePlugin_Build_VST=0",
 					"JucePlugin_Build_VST3=1",
 					"JucePlugin_Build_AU=1",
@@ -2078,6 +2126,7 @@
 				C0B2653E9B3B830871B2BDB2,
 				C0A84343B9A847D9443225D3,
 				423B678E38C8D433847DDB32,
+				09420510C08E1D76DFACEBDD,
 				F71186EA05F0019642623DAA,
 				30DCAB6A6A272D9CEF759597,
 				CCA32FF67F68A292E842803F,
@@ -2087,6 +2136,7 @@
 				4A72EAE1C26D19CB47240495,
 				0ECF095E595A3F61003AB096,
 				2516937FF938F9180ECB5554,
+				08A348691882E4DAE152691E,
 				798621D7DBAE4FC6FB812E33,
 				84B3774CBA909862EB8084AF,
 				6D2D34B9CD0DCD525AB1515A,

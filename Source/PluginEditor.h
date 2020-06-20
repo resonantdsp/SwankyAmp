@@ -22,7 +22,9 @@
 #include "PluginProcessor.h"
 
 #include "ResonantAmpLAF.h"
+#include "PresetManager.h"
 #include "Components/AmpGroup.h"
+#include "Components/PresetGroup.h"
 
 typedef AudioProcessorValueTreeState::SliderAttachment SliderAttachment;
 typedef AudioProcessorValueTreeState::ButtonAttachment ButtonAttachment;
@@ -41,14 +43,21 @@ private:
 	const int padding = 64;
 	const int spacing = 32;
 	const int groupHeight = 128;
+	const int headerHeight = 24;
+	const int headerPadding = 16;
 
 	ResonantAmpLAF resonantAmpLAF;
+
 	// This reference is provided as a quick way for your editor to
 	// access the processor object that created it.
 	ResonantAmpAudioProcessor& processor;
 	AudioProcessorValueTreeState& valueTreeState;
 
 	AmpGroup ampGroup;
+	PresetGroup presetGroup;
+
+	// NOTE: must be declared *AFTER* valueTreeState AND presetGroup
+	PresetManager presetManager;
 
 	std::unique_ptr<Drawable> logoSvg;
 

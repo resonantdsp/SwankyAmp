@@ -23,6 +23,7 @@ with {
     low_ctrl = nentry("ts_low", 0, -1, +1, .1);
     mid_ctrl = nentry("ts_mid", 0, -1, +1, .1);
     high_ctrl = nentry("ts_high", 0, -1, +1, .1);
+    presence_ctrl = nentry("ts_presence", 0, -1, +1, .1);
 
     interp_ctrl(c, a, b) = (1.0 - (c + 1.0) / 2.0) * a + (c + 1.0) / 2.0 * b;
 
@@ -33,7 +34,7 @@ with {
 
     mid_db = -14.0 + 10.0 * mid_ctrl;
     mid_freq = 500.0;
-    mid_band = 1.2e3 + ba.if(low_ctrl < 0, 800.0, 0.0) * mid_ctrl;
+    mid_band = 1e3 + ba.if(low_ctrl < 0, 800.0, 0.0) * mid_ctrl;
 
     mid_proc = fi.peak_eq(mid_db, mid_freq, mid_band);
     
@@ -42,5 +43,10 @@ with {
 
     high_proc = fi.highshelf(1, high_db, high_freq);
 
-    tone_stack = low_proc : mid_proc : high_proc;
+    presence_db = 10.0f * presence_ctrl;
+    presence_freq = 4e3;
+
+    presence_proc = fi.peak_eq(presence_db, 4e3, 2e3);
+
+    tone_stack = low_proc : mid_proc : high_proc : presence_proc;
 };

@@ -50,22 +50,27 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 			MAKE_PARAMETER_UNIT(TsLow),
 			MAKE_PARAMETER_UNIT(TsMid),
 			MAKE_PARAMETER_UNIT(TsHigh),
+			MAKE_PARAMETER_UNIT(TsPresence),
 
-			MAKE_PARAMETER(GainStages, 1.0f, 5.0f, 2.0f),
+			MAKE_PARAMETER(GainStages, 1.0f, 7.0f, 2.0f),
 			MAKE_PARAMETER_UNIT(GainSlope),
-			MAKE_PARAMETER_UNIT(LowCut),
+			MAKE_PARAMETER(LowCut, -1.0f, 1.0f, 0.4f),
 
 			std::make_unique<AudioParameterBool>("idCabOnOff", "CabOnOff", true),
 			MAKE_PARAMETER_UNIT(CabBrightness),
 			MAKE_PARAMETER(CabDistance, 0.0f, 1.0f, 0.0f),
 
-			MAKE_PARAMETER_UNIT(PreAmpDrive),
+			MAKE_PARAMETER(PreAmpDrive, -1.0f, 1.0f, -0.4f),
 			MAKE_PARAMETER_UNIT(PreAmpTight),
 			MAKE_PARAMETER(PreAmpGrit, -1.0f, 1.0f, -0.5f),
 
 			MAKE_PARAMETER_UNIT(PowerAmpDrive),
 			MAKE_PARAMETER_UNIT(PowerAmpTight),
+			MAKE_PARAMETER_UNIT(PowerAmpGrit),
+
 			MAKE_PARAMETER(PowerAmpSag, -1.0f, 1.0f, -0.6f),
+			MAKE_PARAMETER_UNIT(PowerAmpSagRatio),
+			MAKE_PARAMETER(PowerAmpSagSlope, -1.0f, 1.0f, -0.25f),
 		}
 	)
 {
@@ -75,6 +80,7 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 	ASSIGN_PARAMETER(TsLow)
 	ASSIGN_PARAMETER(TsMid)
 	ASSIGN_PARAMETER(TsHigh)
+	ASSIGN_PARAMETER(TsPresence)
 
 	ASSIGN_PARAMETER(GainStages)
 	ASSIGN_PARAMETER(GainSlope)
@@ -90,7 +96,12 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 
 	ASSIGN_PARAMETER(PowerAmpDrive)
 	ASSIGN_PARAMETER(PowerAmpTight)
+	ASSIGN_PARAMETER(PowerAmpGrit)
 	ASSIGN_PARAMETER(PowerAmpSag)
+
+	ASSIGN_PARAMETER(PowerAmpSag)
+	ASSIGN_PARAMETER(PowerAmpSagRatio)
+	ASSIGN_PARAMETER(PowerAmpSagSlope)
 }
 
 #undef MAKE_PARAMETER_UNIT
@@ -150,6 +161,7 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 		amp_channel[i].set_ts_low(*parTsLow);
 		amp_channel[i].set_ts_mid(*parTsMid);
 		amp_channel[i].set_ts_high(*parTsHigh);
+		amp_channel[i].set_ts_presence(*parTsPresence);
 
 		amp_channel[i].set_gain_stages(*parGainStages);
 		amp_channel[i].set_gain_slope(*parGainSlope);
@@ -176,37 +188,22 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 
 		amp_channel[i].set_tetrode_grid_tau(remap_sided(*parPowerAmpTight * -1.0f, -1.0f, +1.0f)); 
 		amp_channel[i].set_tetrode_grid_ratio(remap_sided(*parPowerAmpTight * -1.0f, -1.0f, +0.1f)); 
-		amp_channel[i].set_tetrode_plate_comp_tau(remap_sided(*parPowerAmpTight, -0.5f, +0.5f));
+		amp_channel[i].set_tetrode_plate_comp_depth(remap_sided(*parPowerAmpTight * -1.0f, -0.5f, +0.0f)); 
+		amp_channel[i].set_tetrode_plate_sag_tau(remap_sided(*parPowerAmpTight * -1.0f, -1.0f, +1.0f));
 
-		// when the drive is max, the sag will be in range (-1.0, -0.5)
-		const float maxPowerAmpSag = remap_xy(*parPowerAmpDrive, -0.2f, +1.0f, 1.0f, -0.5f);
-		const float adjPowerAmpSag = remap_range(
-			// sag will change much quicker (20:1) when near -1.0 to give more
-			// control range in the upper values regions which are more audible
-			remap_log(*parPowerAmpSag, 20.0f, 1.0f),
-			-1.0f, 
-			maxPowerAmpSag
-		);
+		const float sagOffset = jmax(0.0f, (float)*parPowerAmpDrive) + 0.5f * jmax(0.0f, (float)*parPreAmpDrive);
+		const float sagRange = 1.0f / (1.0f + sagOffset * 2.0f);
 
-		amp_channel[i].set_tetrode_plate_sag_level(remap_sided(adjPowerAmpSag * -1.0f, -1.5f, +1.0f));
-
-		// compression depth adjusts how much the overhead is reduced in response
-		// to power draw. This is a compression as the ceiling is reduced, but not
-		// so audible as it adds distortion which sounds loud
-		amp_channel[i].set_tetrode_plate_comp_depth(
-			// the max depth is 0.5, but it gets there in 1/3 of the range so
-			// that there is some parameter space where you hear just this comp
-			// without the pumping
-			+ jmin(0.5f, remap_sided(adjPowerAmpSag, -1.0f, 1.5f))
-		); 
-
-		// sag depth adjsuts how much the amplitude of the final signal is 
-		// reduced in response to power draw. Thi is the pumping compression
-		// but if its depth isn't sufficiently larger than the comp depth, then
-		// the incoming signal is already too compressed for this to be audible
-		amp_channel[i].set_tetrode_plate_sag_depth(
-			+ remap_sided(adjPowerAmpSag, -1.0f, 1.5f)
-		);
+		amp_channel[i].set_tetrode_plate_sag_toggle(*parPowerAmpSag > -0.999f ? 1.0f : 0.0f);
+		amp_channel[i].set_tetrode_plate_sag_depth(remap_xy(
+			*parPowerAmpSag,
+			-1.0f,
+			1.0f,
+			-1.0f - sagOffset,
+			-1.0f - sagOffset + 2.0f * sagRange
+		));
+		amp_channel[i].set_tetrode_plate_sag_ratio(*parPowerAmpSagRatio);
+		amp_channel[i].set_tetrode_plate_sag_onset(*parPowerAmpSagSlope);
 	}
 }
 
@@ -402,13 +399,13 @@ AudioProcessorEditor* ResonantAmpAudioProcessor::createEditor()
 void ResonantAmpAudioProcessor::getStateInformation(MemoryBlock& destData)
 {
 	auto state = parameters.copyState();
-	std::unique_ptr<XmlElement> xml (state.createXml());
+	std::unique_ptr<XmlElement> xml(state.createXml());
 	copyXmlToBinary(*xml, destData);
 }
 
 void ResonantAmpAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
-	std::unique_ptr<XmlElement> xmlState(getXmlFromBinary (data, sizeInBytes));
+	std::unique_ptr<XmlElement> xmlState(getXmlFromBinary(data, sizeInBytes));
 	if (xmlState.get() != nullptr)
 		if (xmlState->hasTagName(parameters.state.getType()))
 			parameters.replaceState(ValueTree::fromXml(*xmlState));

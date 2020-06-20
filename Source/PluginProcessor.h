@@ -45,10 +45,10 @@ public:
 	std::atomic<float>* parTsLow = nullptr;
 	std::atomic<float>* parTsMid = nullptr;
 	std::atomic<float>* parTsHigh = nullptr;
+	std::atomic<float>* parTsPresence = nullptr;
 
 	std::atomic<float>* parGainStages = nullptr;
 	std::atomic<float>* parGainSlope = nullptr;
-	std::atomic<float>* parLowCut = nullptr;
 
 	std::atomic<float>* parCabOnOff = nullptr;
 	std::atomic<float>* parCabBrightness = nullptr;
@@ -57,10 +57,15 @@ public:
 	std::atomic<float>* parPreAmpDrive = nullptr;
 	std::atomic<float>* parPreAmpTight = nullptr;
 	std::atomic<float>* parPreAmpGrit = nullptr;
+	std::atomic<float>* parLowCut = nullptr;
 
 	std::atomic<float>* parPowerAmpDrive = nullptr;
 	std::atomic<float>* parPowerAmpTight = nullptr;
+	std::atomic<float>* parPowerAmpGrit = nullptr;
+
 	std::atomic<float>* parPowerAmpSag = nullptr;
+	std::atomic<float>* parPowerAmpSagRatio = nullptr;
+	std::atomic<float>* parPowerAmpSagSlope = nullptr;
 
 	void setAmpParameters();
 

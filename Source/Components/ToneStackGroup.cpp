@@ -31,6 +31,9 @@ ToneStackGroup::ToneStackGroup() :
 
 	addAndMakeVisible(sliderHigh);
 	sliderHigh.setLabel("HIGH");
+
+	addAndMakeVisible(sliderPresence);
+	sliderPresence.setLabel("PRESENCE");
 }
 
 void ToneStackGroup::attachVTS(AudioProcessorValueTreeState& vts)
@@ -38,6 +41,7 @@ void ToneStackGroup::attachVTS(AudioProcessorValueTreeState& vts)
 	attLow.reset(new SliderAttachment(vts, "idTsLow", sliderLow.slider));
 	attMid.reset(new SliderAttachment(vts, "idTsMid", sliderMid.slider));
 	attHigh.reset(new SliderAttachment(vts, "idTsHigh", sliderHigh.slider));
+	attPresence.reset(new SliderAttachment(vts, "idTsPresence", sliderPresence.slider));
 }
 
 void ToneStackGroup::resized()
@@ -70,6 +74,12 @@ void ToneStackGroup::resized()
 	sliderHigh.setHeight(innerHeight);
 
 	corner = sliderHigh.getBounds().getTopRight() + Point<int>(spacing, 0);
+
+	sliderPresence.setTopLeftPosition(corner);
+	sliderPresence.slider.setMargin(0.15f * (float)innerHeight);
+	sliderPresence.setHeight(innerHeight);
+
+	corner = sliderPresence.getBounds().getTopRight() + Point<int>(spacing, 0);
 
 	// can now determine the width and set it, this will re-call `resized` but
 	// since the height is the same it won't re-do the calculation

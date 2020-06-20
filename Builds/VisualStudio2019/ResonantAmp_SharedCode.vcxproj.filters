@@ -460,6 +460,9 @@
     <ClCompile Include="..\..\Source\Components\PreAmpGroup.cpp">
       <Filter>ResonantAmp\Source\Components</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Source\Components\PresetGroup.cpp">
+      <Filter>ResonantAmp\Source\Components</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Source\Components\RButton.cpp">
       <Filter>ResonantAmp\Source\Components</Filter>
     </ClCompile>
@@ -485,6 +488,9 @@
       <Filter>ResonantAmp\Source</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\PluginEditor.cpp">
+      <Filter>ResonantAmp\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Source\PresetManager.cpp">
       <Filter>ResonantAmp\Source</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\..\..\..\..\JUCE\modules\juce_audio_basics\buffers\juce_AudioChannelSet.cpp">
@@ -2502,6 +2508,9 @@
     <ClInclude Include="..\..\Source\Components\PreAmpGroup.h">
       <Filter>ResonantAmp\Source\Components</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Source\Components\PresetGroup.h">
+      <Filter>ResonantAmp\Source\Components</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\Components\RButton.h">
       <Filter>ResonantAmp\Source\Components</Filter>
     </ClInclude>
@@ -2530,6 +2539,9 @@
       <Filter>ResonantAmp\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\PluginEditor.h">
+      <Filter>ResonantAmp\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\PresetManager.h">
       <Filter>ResonantAmp\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\..\..\..\JUCE\modules\juce_audio_basics\audio_play_head\juce_AudioPlayHead.h">
@@ -4737,6 +4749,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\Resources\logo.svg">
+      <Filter>ResonantAmp\Resources</Filter>
+    </None>
+    <None Include="..\..\Resources\presets.xml">
       <Filter>ResonantAmp\Resources</Filter>
     </None>
     <None Include="..\..\Resources\PTSans\PTSans-Bold.ttf">

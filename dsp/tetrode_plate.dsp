@@ -27,9 +27,12 @@ tetrode_plate = environment {
     // The working point
     point = nentry("tetrode_plate_point", 0, -1, +1, 1) : uscale(0, 20);
 
-    drift_level = nentry("tetrode_plate_drift_level", 0, -1, +1, .1) : uscale(-10, 10) : exp;
+    drift_level = nentry("tetrode_plate_drift_level", 0, -1, +1, .1) : uscale(-100, 100);
     drift_tau = nentry("tetrode_plate_drift_tau", 0, -1, +1, .1) : uscale(log(1e-3), log(1e+0)) : exp;
     drift_depth = nentry("tetrode_plate_drift_depth", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+1)) : exp;
+
+    drift2_level = nentry("tetrode_plate_drift2_level", 0, -1, +1, .1) : uscale(-50, 50);
+    drift2_depth = nentry("tetrode_plate_drift2_depth", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+1)) : exp;
 
     clip = nentry("tetrode_plate_clip", 0, -1, +1, 1) : uscale(10, 50);
     clip_corner = nentry("tetrode_plate_clip_corner", 0, -1, +1, 1) : uscale(log(1e-1), log(1e2)) : exp;
@@ -39,15 +42,20 @@ tetrode_plate = environment {
 
     cross_corner = nentry("tetrode_plate_cross_corner", 0, -1, +1, 1) : uscale(log(1e-1), log(1e+2)) : exp;
 
-    sag_level = nentry("tetrode_plate_sag_level", 0, -1, +1, .1) : ma.tanh : +(1) /(2);
-    sag_depth = nentry("tetrode_plate_sag_depth", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+1)) : exp;
+    sag_toggle = nentry("tetrode_plate_sag_toggle", 0, -1, +1, .1) : uscale(0, 1);
+    sag_depth = nentry("tetrode_plate_sag_depth", 0, -1, +1, .1) : uscale(log(1e-1), log(1e1)) : exp;
+    sag_tau = nentry("tetrode_plate_sag_tau", 0, -1, +1, .1) : uscale(log(1e-2), log(5e-1)) : exp;
+    sag_ratio = nentry("tetrode_plate_sag_ratio", 0, -1, +1, .1) : uscale(log(1e0), log(1e1)) : exp;
+    sag_onset = nentry("tetrode_plate_sag_onset", 0, -1, +1, .1) : uscale(log(1e-1), log(1e1)) : exp;
+
+    sag_tau1 = sag_tau : 1.0 / (ba.sec2samp(_) + 1.0);
+    sag_tau2 = sag_tau * sag_ratio : 1.0 / (ba.sec2samp(_) + 1.0);
 
     // calculation of the power draw sag induced overhead reduction
     calc_comp_clip = _
         : /(clip)
-        // note that only the signal up to clip will make it to the speaker
-        // and cause power draw
-        <: (abs : min(1.0))
+        : abs
+        : min(1.0)
         : si.smooth(ba.tau2pole(comp_tau))
         : clip * 1.0 / (1.0 + _ * comp_depth)
         : _;
@@ -72,24 +80,33 @@ tetrode_plate = environment {
         : _;
     
     calc_sag_comp = _
-        // rescale signal to range (0, 1) since it is no hgher than clip
         : /(clip)
-        // compress on signal over threshold
-        : max(sag_level) - sag_level
-        // rescale to range (0, 1) but avoid small values if level is close to 1
-        : /(1.0 - sag_level + 1e-3)
-        : si.smooth(ba.tau2pole(comp_tau))
-        : 1.0 / (1.0  +  _ * sag_depth)
+        : abs
+        <: min(1.0), max(1.0) - 1.0
+        : sag_onset * _ + _
+        : calc_charge(sag_tau1, sag_tau2)
+        : 1.0 / (1.0  +  _ * sag_depth * sag_toggle)
         : _;
     
     // Combine both sides in push-pull fashion
     full = _
         : *(scale)
-        <: *(-1), _
-        : side, side
-        : *(-1), _
-        : +
-        <: calc_sag_comp, _
+        <: _, _
+
+        : _, (_ <: *(-1), _)
+        : _, side, side
+        : _, *(-1), _
+        : _, +
+
+        : calc_sag_comp, _
         : *
+        : *(1.0 + sag_depth * sag_toggle)
+
+        // TODO: this is really only needed for fitting
+        <: _, abs
+        : _, max(drift2_level) - drift2_level
+        : _, si.smooth(ba.tau2pole(drift_tau)) * drift2_depth * -1
+        : -
+
         : _;
 };

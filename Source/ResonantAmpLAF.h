@@ -45,6 +45,9 @@ public:
 
 	static const DropShadow& getDropShadow();
 
+	static Path getSaveIconPath(float d);
+
+	Path getTickShape(float height) override;
 	Slider::SliderLayout getSliderLayout(Slider& slider) override;
 
 	void drawRotarySlider(
@@ -64,6 +67,14 @@ public:
 		ToggleButton& button,
 		bool shouldDrawButtonAsHighlighted,
 		bool shouldDrawButtonAsDown
+	) override;
+
+	void drawComboBox(
+		Graphics& g,
+		int width,
+		int height,
+		bool, int, int, int, int,
+		ComboBox& box
 	) override;
 };
 

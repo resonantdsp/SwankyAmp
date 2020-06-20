@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT id="sJgmJL" name="ResonantAmp" projectType="audioplug" jucerVersion="5.4.7"
-              version="0.4.2" projectLineFeed="&#10;" companyName="Resonant DSP"
+              version="0.5.0" projectLineFeed="&#10;" companyName="Resonant DSP"
               companyWebsite="https://www.resonantdsp.com/" companyEmail="info@resonantdsp.com"
               pluginFormats="buildAAX,buildAU,buildStandalone,buildVST3" pluginName="Resonant Amp"
               pluginDesc="Tube amplifiers simulation" pluginManufacturer="Resonant DSP"
@@ -9,6 +9,7 @@
   <MAINGROUP id="qolZJU" name="ResonantAmp">
     <GROUP id="{DE71F08C-9BB3-E05B-B09D-49D3564FD2D1}" name="Resources">
       <FILE id="A3p67q" name="logo.svg" compile="0" resource="1" file="Resources/logo.svg"/>
+      <FILE id="HEJpbx" name="presets.xml" compile="0" resource="1" file="Resources/presets.xml"/>
       <FILE id="Cro6kc" name="PTSans-Bold.ttf" compile="0" resource="1" file="Resources/PTSans/PTSans-Bold.ttf"/>
       <FILE id="hIVvsZ" name="PTSans-Regular.ttf" compile="0" resource="1"
             file="Resources/PTSans/PTSans-Regular.ttf"/>
@@ -34,6 +35,8 @@
         <FILE id="cKYP56" name="PowerAmpGroup.h" compile="0" resource="0" file="Source/Components/PowerAmpGroup.h"/>
         <FILE id="lYZZuU" name="PreAmpGroup.cpp" compile="1" resource="0" file="Source/Components/PreAmpGroup.cpp"/>
         <FILE id="InSxOR" name="PreAmpGroup.h" compile="0" resource="0" file="Source/Components/PreAmpGroup.h"/>
+        <FILE id="UNzKbn" name="PresetGroup.cpp" compile="1" resource="0" file="Source/Components/PresetGroup.cpp"/>
+        <FILE id="Wj7nqe" name="PresetGroup.h" compile="0" resource="0" file="Source/Components/PresetGroup.h"/>
         <FILE id="JZcEVK" name="RButton.cpp" compile="1" resource="0" file="Source/Components/RButton.cpp"/>
         <FILE id="RPoaOX" name="RButton.h" compile="0" resource="0" file="Source/Components/RButton.h"/>
         <FILE id="EU8W53" name="RSlider.cpp" compile="1" resource="0" file="Source/Components/RSlider.cpp"/>
@@ -63,6 +66,9 @@
       <FILE id="Khe84g" name="PluginEditor.cpp" compile="1" resource="0"
             file="Source/PluginEditor.cpp"/>
       <FILE id="ApQwAz" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
+      <FILE id="feb1e3" name="PresetManager.cpp" compile="1" resource="0"
+            file="Source/PresetManager.cpp"/>
+      <FILE id="y9okPZ" name="PresetManager.h" compile="0" resource="0" file="Source/PresetManager.h"/>
     </GROUP>
   </MAINGROUP>
   <EXPORTFORMATS>

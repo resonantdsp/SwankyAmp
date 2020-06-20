@@ -21,6 +21,7 @@
 #include <JuceHeader.h>
 
 #include "../Utils.h"
+#include "ParameterGroup.h"
 #include "RButton.h"
 #include "RSliderLabel.h"
 

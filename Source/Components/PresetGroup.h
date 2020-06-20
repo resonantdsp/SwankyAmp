@@ -22,30 +22,34 @@
 
 #include "../Utils.h"
 #include "ParameterGroup.h"
-#include "RSliderLabel.h"
 
-class ToneStackGroup : public ParameterGroup
+class PresetGroup : public ParameterGroup
 {
 public:
-	ToneStackGroup();
-	~ToneStackGroup() {}
+	PresetGroup();
+	~PresetGroup() {}
 
-	void attachVTS(AudioProcessorValueTreeState& vts);
+	void attachVTS(AudioProcessorValueTreeState&) {}
+	void addPresetListener(ComboBox::Listener* listener) { presetSelector.addListener(listener); }
 
 	void setHeight(int height) { setSize(0, height); }
+	void paint(Graphics& g) override;
 	void resized() override;
 
-private:
-	RSliderLabel sliderLow;
-	RSliderLabel sliderMid;
-	RSliderLabel sliderHigh;
-	RSliderLabel sliderPresence;
+	enum ComboIds
+	{
+		PresetInit = 1,
+		PresetOther = 2,
+	};
 
-	std::unique_ptr<SliderAttachment> attLow;
-	std::unique_ptr<SliderAttachment> attMid;
-	std::unique_ptr<SliderAttachment> attHigh;
-	std::unique_ptr<SliderAttachment> attPresence;
+	// public so the preset manager can modify it
+	ComboBox presetSelector;
+	DrawableButton btnSave;
+
+private:
+	DrawablePath saveIcon;
+	DrawablePath saveIconHighlight;
 
 	DISABLE_COMPONENT_RESIZE()
-	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ToneStackGroup)
+	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PresetGroup)
 };

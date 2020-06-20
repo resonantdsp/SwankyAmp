@@ -10,11 +10,6 @@ If you prefer to download the VST3 file directly and move it into the appropriat
 
 <https://drive.google.com/open?id=1BrrAsjQ0f8kNIKv2-GHh7Hjl1CVIRMka>
 
-## Road map
-
-* Preset management
-* More modern high gain mode
-
 ## Usage
 
 Load the plugin into your favorite VST host or DAW (into a mono or stereo track), and have fun!
@@ -23,8 +18,6 @@ Load the plugin into your favorite VST host or DAW (into a mono or stereo track)
     * Set the `input` control such that a strummed open chord just reaches the `S` tick mark for a single coil pickeup, or `H` for a hummbucker.
     * Set the `output` control to get the desired volume. Generally the -15 dB range is typical.
     * Note: these are suggested values. You can safely increase the input level to mimick the use of a clean boost pedal, or if you know your pickups are hotter than typical.
-
-* Generally speaking, you'll want to leave the `cabinet` control to `on`, unless you'd rather use your own cabinet plugin downstream of the amp.
 
 * Set the pre amp section
   * Set the `drive` control (a.k.a. gain) to get the desired pre amp distortion.
@@ -38,19 +31,19 @@ Load the plugin into your favorite VST host or DAW (into a mono or stereo track)
   * Tune the `slope` control to determine how much harder each successive tube is pushed (smaller values can help even out the distortion).
 
 * Set the tone stack:
-  * The `low` control affects the amount of bass in your sound. Increase it for a fatter sound. Too much and the sound can become more washed out, muddy, and loose precision.
-  * The `mid` control affects the amount of mids in your sound. Increase it to help the guitar stand out in a mix, to add aggression to the sound, and also to increase the sustain. Too much and the guitar sounds like its being played through a telephone speaker.
-  * The `high` control affects the amout of high frequencies in your sound. Increase it get a brighter tone with more chime. Too much and the guitar can sound thin and brittle.
+  * The `low` control affects the amount of bass in your sound. Increase it for a fatter sound. Too much and the sound can become more washed out, muddy, and lose precision.
+  * The `mid` control affects the amount of mids in your sound. Increase it to thicken out the guitar, add aggression, and also to increase the sustain. Too much and the guitar sounds like its being played through a telephone speaker.
+  * The `high` control affects the amout of high frequencies in your sound. Increase it get a brighter tone with more chime. Too much and the guitar can sound thin. Reduce to help remove hiss and fatiguing distoriton noise.
+  * The `presence` control affects the frequencie around 4 kHz. This helps add clarity and definiton to the sound without making it too brittle. Too much and the sound will become harsher.
 
 * Set the power amp section:
   * See the notes on the pre amp section
   * The `drive` control here has the same effect on distortion as the volume knob of an amp, but the plugin maintains an even loudness.
-  * Set the `sag` control to adjust the amount by which the voltage drops in the amplifier in response to loud playing. At small values you will start to notice the distortion coming up for smaller signals, reducing the overhead. As the value increases, this will turn into a subtle compression where the trasients get a bit quieter. Near the end of the range the compression will be very audible and pumping. Note that this and the `tight` parameters affect one-another, and that large `drive` values will grealty reduce the impact of the sag.
-  * Note that the power amp can act as a compressor: try setting the drive to the point where softly picked notes don't distort, but heavily picked ones do. You should notice the notes souding a bit fuller as the transiet hits the distortion ceiling, and then the note rings through as the bias point shifts.
+  * Set the `sag` control affects the compression of the signal due to insufficient power supply. This isn't a transparent compression: the compresion isn't directly related to the loudness of the signal, and it is accompanied by audible distortion.
 
 * Set the cabinet:
-  * Leave the cabinet on unless you are using a dedicated cabinet emulator downstream of this plugin, or if you want a really experimental sound.
-  * The `bright` control affects the brightness of the cabinet speaker by decreasing the lows and mids, and bumping up the precense. Decreasing this will do the opposite, darkening the sound.
+  * Leave the cabinet on unless you are using a dedicated cabinet emulator downstream of this plugin.
+  * The `bright` control affects the microphone position in a way which relates to the overall brightness of the sound.
   * The `distance` control affects the distance of the microphone to the cabinet. Increase it to scoop out some lows as well as some high mids.
 
 ## The model
@@ -105,6 +98,13 @@ This process generates `Source/AmpMono.h` artifact. However this file is tracked
 However this might not work for versions of FAUST other than `2.14.4` in which case you will need to dig around `dsp/builddsp.py` and fix any issues arising from that script.
 
 ## Change log
+
+Version 0.5.0:
+
+* preset management
+* reworked sag model
+* imporved high gain behaviour
+* minor pass on the UI
 
 Version 0.4.2:
 
