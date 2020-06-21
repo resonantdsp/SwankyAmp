@@ -100,6 +100,11 @@ However this might not work for versions of FAUST other than `2.14.4` in which c
 
 ## Change log
 
+Version 0.5.3:
+
+* tweaked sag ranged based on power amp drive to get more steady level
+* tweaked presets accordingly
+
 Version 0.5.2:
 
 * fix pre amp drive calibration so that it doesn't get louder at higher levels
