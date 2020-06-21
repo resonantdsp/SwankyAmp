@@ -55,6 +55,7 @@ def make_standalone(name: str, code: str, defaults: Mapping[str, float]) -> str:
     in_reset = False
 
     used_defaults = set()
+    missing_defaults = set()
 
     # find the names of user input parameters
     re_par = re.compile(r'\("([^"]+)", &(fEntry[0-9]+), ')
@@ -93,6 +94,7 @@ def make_standalone(name: str, code: str, defaults: Mapping[str, float]) -> str:
                         f"\tvoid set_{par_name}(FAUSTFLOAT value) {{ {par_var} = value + {default_value:.6e}f; }}"
                     )
                 else:
+                    missing_defaults.add(par_name)
                     lines.append(
                         f"\tvoid set_{par_name}(FAUSTFLOAT value) {{ {par_var} = value; }}"
                     )
@@ -124,6 +126,9 @@ def make_standalone(name: str, code: str, defaults: Mapping[str, float]) -> str:
     unused_defaults = set(defaults.keys()) - used_defaults
     if unused_defaults:
         warnings.warn("unused defaults: {}".format(", ".join(unused_defaults)))
+
+    if missing_defaults:
+        warnings.warn("missing defaults: {}".format(", ".join(missing_defaults)))
 
     parameters = [n for n, _ in parameters]
 
