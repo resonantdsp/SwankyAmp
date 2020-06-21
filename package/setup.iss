@@ -11,5 +11,5 @@ LicenseFile=../LICENSE
 Uninstallable = no
  
 [Files]
-Source: "../Builds\VisualStudio2019\x64\Release\VST3\ResonantAmp.vst3"; DestDir: "{app}"
+Source: "../Builds\VisualStudio2019\x64\Release\VST3\ResonantAmp.vst3"; Flags: replacesameversion; DestDir: "{app}"
 
