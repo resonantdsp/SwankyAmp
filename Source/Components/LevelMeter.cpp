@@ -130,7 +130,7 @@ void LevelMeter::timerCallback()
 	auto callbackLevel = maxLevel.exchange(0.0);
 
 	const float refreshRateHz = 1.0f / getTimerInterval() * 1e3f;
-	const float decayFactor = std::powf(0.5f, 1.0f / (decayTau * refreshRateHz));
+	const float decayFactor = powf(0.5f, 1.0f / (decayTau * refreshRateHz));
 
 	if (callbackLevel > level)
 		level = callbackLevel;
