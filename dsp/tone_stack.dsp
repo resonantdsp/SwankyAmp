@@ -32,11 +32,14 @@ with {
 
     low_proc = fi.lowshelf(1, low_db, low_freq) : fi.highpass(1, 10.0);
 
-    mid_db = -14.0 + 10.0 * mid_ctrl;
+    mid_db = -14.0 + interp_ctrl(mid_ctrl, 10.0, 5.0) * mid_ctrl;
     mid_freq = 500.0;
-    mid_band = 1e3 + ba.if(low_ctrl < 0, 800.0, 0.0) * mid_ctrl;
+    mid_band = 1.2e3 + 800.0 * mid_ctrl;
 
-    mid_proc = fi.peak_eq(mid_db, mid_freq, mid_band);
+    mid_db2 = ba.if(mid_ctrl > 0, 5.0, 0.0) * mid_ctrl;
+    mid_band2 = 1000.0;
+
+    mid_proc = fi.peak_eq(mid_db, mid_freq, mid_band) : fi.peak_eq(mid_db2, mid_freq, mid_band2);
     
     high_db = ba.if(high_ctrl < 0, 18.0, 9.0) * high_ctrl;
     high_freq = 2e3 + ba.if(high_ctrl < 0, high_ctrl * 1.5e3, 0.0);

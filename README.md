@@ -100,6 +100,11 @@ However this might not work for versions of FAUST other than `2.14.4` in which c
 
 ## Change log
 
+Version 0.5.1:
+
+* modify tone stack so that the upper lows stay cut when mids change
+* additional mids boost is now narrower
+
 Version 0.5.0:
 
 * preset management
