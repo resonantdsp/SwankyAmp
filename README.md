@@ -40,6 +40,7 @@ Load the plugin into your favorite VST host or DAW (into a mono or stereo track)
   * See the notes on the pre amp section
   * The `drive` control here has the same effect on distortion as the volume knob of an amp, but the plugin maintains an even loudness.
   * Set the `sag` control affects the compression of the signal due to insufficient power supply. This isn't a transparent compression: the compresion isn't directly related to the loudness of the signal, and it is accompanied by audible distortion.
+  * Note that the `tight` control affects the attack time of the sag, so the two should be used in conjunction to achieve the desried effect.
 
 * Set the cabinet:
   * Leave the cabinet on unless you are using a dedicated cabinet emulator downstream of this plugin.
