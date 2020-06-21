@@ -23,28 +23,10 @@ import builddsp
 
 
 def main():
-    # default values for the parameters, when calling `set_value` the values 
-    # will be relative to these (0 is default).
     pars = {
-        # tone stack
-        "ts_low": 0,
-        "ts_mid": 0,
-        "ts_high": 0,
-        "ts_presence": 0,
-        # psuh pull amp
-        "pre_drive": 0,
-        "power_drive": 0,
-        "gain_stages": 0,
-        "gain_slope": 0,
-        # cabinet
-        "cab_on_off": 0,
-        "cab_brightness": 0,
-        "cab_distance": 0,
-        # amp
         "input_level": 0,
         "output_level": 0,
     }
-
     with open("triode_grid.json", "r") as fio:
         pars.update(json.load(fio))
     with open("triode_plate.json", "r") as fio:
@@ -52,6 +34,8 @@ def main():
     with open("tetrode_grid.json", "r") as fio:
         pars.update(json.load(fio))
     with open("tetrode_plate.json", "r") as fio:
+        pars.update(json.load(fio))
+    with open("global.json", "r") as fio:
         pars.update(json.load(fio))
 
     # generate the header code for the DSP object
