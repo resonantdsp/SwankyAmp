@@ -191,8 +191,8 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 		amp_channel[i].set_tetrode_plate_comp_depth(remap_sided(*parPowerAmpTight * -1.0f, -0.5f, +0.0f)); 
 		amp_channel[i].set_tetrode_plate_sag_tau(remap_sided(*parPowerAmpTight * -1.0f, -1.0f, +1.0f));
 
-		const float sagOffset = jmax(0.0f, (float)*parPowerAmpDrive) + 0.5f * jmax(0.0f, (float)*parPreAmpDrive);
-		const float sagRange = 1.0f / (1.0f + sagOffset * 2.0f);
+		const float sagOffset = jmax(0.0f, 2.0f * (float)*parPowerAmpDrive) + 0.5f * jmax(0.0f, (float)*parPreAmpDrive);
+		const float sagRange = 1.0f / (1.0f + sagOffset * 1.0f);
 
 		amp_channel[i].set_tetrode_plate_sag_toggle(*parPowerAmpSag > -0.999f ? 1.0f : 0.0f);
 		amp_channel[i].set_tetrode_plate_sag_depth(remap_xy(

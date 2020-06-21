@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <presets>
-  <APVTSResonantAmp pluginVersion="0.5.0" presetName="clean" presetOrder="1">
+  <APVTSResonantAmp pluginVersion="0.5.3" presetName="clean" presetOrder="1">
     <PARAM id="idCabBrightness" value="0.3"/>
     <PARAM id="idCabDistance" value="0.3"/>
     <PARAM id="idCabOnOff" value="1.0"/>
     <PARAM id="idGainSlope" value="-0.4"/>
     <PARAM id="idGainStages" value="3.0"/>
     <PARAM id="idLowCut" value="0.0"/>
-    <PARAM id="idPowerAmpDrive" value="-0.3"/>
+    <PARAM id="idPowerAmpDrive" value="-0.7"/>
     <PARAM id="idPowerAmpSag" value="-0.6"/>
     <PARAM id="idPowerAmpSagRatio" value="0.0"/>
     <PARAM id="idPowerAmpSagSlope" value="-0.25"/>
@@ -22,14 +22,14 @@
     <PARAM id="idTsPresence" value="0.25"/>
   </APVTSResonantAmp>
 
-  <APVTSResonantAmp pluginVersion="0.5.0" presetName="edge scoop" presetOrder="2">
+  <APVTSResonantAmp pluginVersion="0.5.3" presetName="edge scoop" presetOrder="2">
     <PARAM id="idCabBrightness" value="0.0"/>
     <PARAM id="idCabDistance" value="0.0"/>
     <PARAM id="idCabOnOff" value="1.0"/>
     <PARAM id="idGainSlope" value="-0.4"/>
     <PARAM id="idGainStages" value="3.0"/>
     <PARAM id="idLowCut" value="0.3"/>
-    <PARAM id="idPowerAmpDrive" value="-0.2"/>
+    <PARAM id="idPowerAmpDrive" value="-0.35"/>
     <PARAM id="idPowerAmpSag" value="-0.6"/>
     <PARAM id="idPowerAmpSagRatio" value="0.0"/>
     <PARAM id="idPowerAmpSagSlope" value="-0.25"/>
@@ -43,14 +43,14 @@
     <PARAM id="idTsPresence" value="0.25"/>
   </APVTSResonantAmp>
 
-  <APVTSResonantAmp pluginVersion="0.5.0" presetName="edge mids" presetOrder="3">
+  <APVTSResonantAmp pluginVersion="0.5.3" presetName="edge mids" presetOrder="3">
     <PARAM id="idCabBrightness" value="0.0"/>
     <PARAM id="idCabDistance" value="0.3"/>
     <PARAM id="idCabOnOff" value="1.0"/>
     <PARAM id="idGainSlope" value="-0.4"/>
     <PARAM id="idGainStages" value="3.0"/>
     <PARAM id="idLowCut" value="0.4"/>
-    <PARAM id="idPowerAmpDrive" value="-0.2"/>
+    <PARAM id="idPowerAmpDrive" value="-0.35"/>
     <PARAM id="idPowerAmpSag" value="-0.6"/>
     <PARAM id="idPowerAmpSagRatio" value="0.0"/>
     <PARAM id="idPowerAmpSagSlope" value="-0.25"/>
@@ -64,7 +64,7 @@
     <PARAM id="idTsPresence" value="0.45"/>
   </APVTSResonantAmp>
 
-  <APVTSResonantAmp pluginVersion="0.5.0" presetName="distort" presetOrder="6">
+  <APVTSResonantAmp pluginVersion="0.5.3" presetName="distort" presetOrder="6">
     <PARAM id="idCabBrightness" value="0.0"/>
     <PARAM id="idCabDistance" value="0.65"/>
     <PARAM id="idCabOnOff" value="1.0"/>
@@ -85,7 +85,7 @@
     <PARAM id="idTsPresence" value="0.4"/>
   </APVTSResonantAmp>
 
-  <APVTSResonantAmp pluginVersion="0.5.0" presetName="dirty distort" presetOrder="7">
+  <APVTSResonantAmp pluginVersion="0.5.3" presetName="dirty distort" presetOrder="7">
     <PARAM id="idCabBrightness" value="-0.17"/>
     <PARAM id="idCabDistance" value="0.3"/>
     <PARAM id="idCabOnOff" value="1.0"/>
@@ -93,7 +93,7 @@
     <PARAM id="idGainStages" value="2.5"/>
     <PARAM id="idLowCut" value="0.0"/>
     <PARAM id="idPowerAmpDrive" value="0.1"/>
-    <PARAM id="idPowerAmpSag" value="0.0"/>
+    <PARAM id="idPowerAmpSag" value="-0.2"/>
     <PARAM id="idPowerAmpSagRatio" value="0.0"/>
     <PARAM id="idPowerAmpSagSlope" value="-0.25"/>
     <PARAM id="idPowerAmpTight" value="-0.4"/>
@@ -106,14 +106,14 @@
     <PARAM id="idTsPresence" value="0.2"/>
   </APVTSResonantAmp>
 
-  <APVTSResonantAmp pluginVersion="0.5.0" presetName="pre drive" presetOrder="8">
+  <APVTSResonantAmp pluginVersion="0.5.3" presetName="pre drive" presetOrder="8">
     <PARAM id="idCabBrightness" value="-0.2"/>
     <PARAM id="idCabDistance" value="0.6"/>
     <PARAM id="idCabOnOff" value="1.0"/>
     <PARAM id="idGainSlope" value="-0.35"/>
     <PARAM id="idGainStages" value="4.5"/>
     <PARAM id="idLowCut" value="-0.05"/>
-    <PARAM id="idPowerAmpDrive" value="-0.2"/>
+    <PARAM id="idPowerAmpDrive" value="-0.5"/>
     <PARAM id="idPowerAmpSag" value="-0.6"/>
     <PARAM id="idPowerAmpSagRatio" value="0.0"/>
     <PARAM id="idPowerAmpSagSlope" value="-0.25"/>
@@ -129,7 +129,7 @@
     <PARAM id="idOutputLevel" value="0.3"/>
   </APVTSResonantAmp>
 
-  <APVTSResonantAmp pluginVersion="0.5.0" presetName="power drive" presetOrder="9">
+  <APVTSResonantAmp pluginVersion="0.5.3" presetName="power drive" presetOrder="9">
     <PARAM id="idCabBrightness" value="0.0"/>
     <PARAM id="idCabDistance" value="0.7"/>
     <PARAM id="idCabOnOff" value="1.0"/>
@@ -152,7 +152,7 @@
     <PARAM id="idOutputLevel" value="0.3"/>
   </APVTSResonantAmp>
 
-  <APVTSResonantAmp pluginVersion="0.5.0" presetName="full drive" presetOrder="10">
+  <APVTSResonantAmp pluginVersion="0.5.3" presetName="full drive" presetOrder="10">
     <PARAM id="idCabBrightness" value="-0.3"/>
     <PARAM id="idCabDistance" value="0.8"/>
     <PARAM id="idCabOnOff" value="1.0"/>
@@ -175,7 +175,7 @@
     <PARAM id="idOutputLevel" value="0.3"/>
   </APVTSResonantAmp>
 
-  <APVTSResonantAmp pluginVersion="0.5.0" presetName="high gain" presetOrder="11">
+  <APVTSResonantAmp pluginVersion="0.5.3" presetName="high gain" presetOrder="11">
     <PARAM id="idCabBrightness" value="-0.2"/>
     <PARAM id="idCabDistance" value="0.75"/>
     <PARAM id="idCabOnOff" value="1.0"/>
@@ -198,7 +198,7 @@
     <PARAM id="idOutputLevel" value="0.3"/>
   </APVTSResonantAmp>
 
-  <APVTSResonantAmp pluginVersion="0.5.0" presetName="level 11" presetOrder="12">
+  <APVTSResonantAmp pluginVersion="0.5.3" presetName="level 11" presetOrder="12">
     <PARAM id="idCabBrightness" value="-0.25"/>
     <PARAM id="idCabDistance" value="0.8"/>
     <PARAM id="idCabOnOff" value="1.0"/>
