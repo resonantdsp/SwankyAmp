@@ -35,6 +35,11 @@ with {
     power_drive = power_drive_unit : uscale(log(1e0), log(1e3)) : exp;
     unscale_power = ba.listInterp((-5.19e-01,-6.03e+00,-1.15e+01,-1.66e+01,-1.97e+01,-2.08e+01,-2.10e+01,-2.11e+01,-2.10e+01,-2.10e+01,-2.10e+01), (power_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
 
+    // correcting for perceived level changes, seems to be a problem with the
+    // automatic calibration which always leaves the pre-amp upper drive range
+    // too loud
+    global_unscale = ba.listInterp((0.0, 0.0, 0.0, -5.0), (pre_drive_unit + 1.0) / 2.0 * 4) : ba.db2linear;
+
     gain_stages = nentry("gain_stages", 0, -1, +1, .1);
     gain_slope = nentry("gain_slope", 0, -1, +1, .1) : uscale(0.5, 1.5);
     cab_on_off = nentry("cab_on_off", 0, -1, +1, .1);
@@ -49,9 +54,11 @@ with {
     gain_stage = _
         : triode_grid 
         : triode_plate.full
+
         // The model fit to the signal includes the scale imparted by the amp
         // circuitry. But want only to keep the distortion, not the scaling.
         : /(triode_plate.scale)
+
         : _;
 
     power_stage = _
@@ -83,15 +90,18 @@ with {
         <: stage_3_mix, (*(gain_slope^2) : gain_stage : gain_stage : *(gain_slope^-2)), _ : mix_wet_dry
         <: stage_4_mix, (*(gain_slope^3) : gain_stage : gain_stage : *(gain_slope^-3)), _ : mix_wet_dry
 
-        // Correct for the loudness resulting from the pre-drive
-        : *(unscale_pre)
         : tone_stack
+
+        : *(unscale_pre)
 
         : *(power_drive)
         : power_stage
-        : *(unscale_power)
 
         <: ba.if(cab_on_off > 0, cab, _)
+
+        : *(unscale_power)
+
+        : *(global_unscale)
 
         : _;
 };
