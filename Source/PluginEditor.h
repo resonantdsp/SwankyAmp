@@ -53,6 +53,7 @@ private:
 	ResonantAmpAudioProcessor& processor;
 	AudioProcessorValueTreeState& valueTreeState;
 
+	Label versionLabel;
 	AmpGroup ampGroup;
 	PresetGroup presetGroup;
 

@@ -78,8 +78,6 @@ ResonantAmpLAF::ResonantAmpLAF()
 	setColour(Label::backgroundWhenEditingColourId, Colours::transparentBlack);
 	setColour(Label::textWhenEditingColourId, ResonantAmpLAF::colourDark);
 	setColour(Label::outlineWhenEditingColourId, Colours::transparentBlack);
-
-	setColour(CaretComponent::caretColourId, ResonantAmpLAF::colourGrey);
 }
 
 const Font& ResonantAmpLAF::getDefaultFont()
@@ -134,26 +132,40 @@ Path ResonantAmpLAF::getSaveIconPath(float d)
 	Path path;
 
 	path.startNewSubPath(0.5f, 0.0f);
-	path.lineTo(0.75f, 0.0f);
-	path.lineTo(1.0f, 0.25f);
-	path.lineTo(1.0f, 0.75f);
-	path.addCentredArc(0.75f, 0.75f, 0.25f, 0.25f, 0.0f, MathConstants<float>::halfPi, MathConstants<float>::pi);
-	path.lineTo(0.25f, 1.0f);
-	path.addCentredArc(0.25f, 0.75f, 0.25f, 0.25f, 0.0f, MathConstants<float>::pi, 3.0f * MathConstants<float>::halfPi);
-	path.lineTo(0.0f, 0.25f);
-	path.addCentredArc(0.25f, 0.25f, 0.25f, 0.25f, 0.0f, 3.0 * MathConstants<float>::halfPi, 2.0f * MathConstants<float>::pi);
+	path.lineTo(0.875f, 0.0f);
+	path.lineTo(1.0f, 0.125f);
+	path.lineTo(1.0f, 0.875f);
+	path.addCentredArc(0.875f, 0.875f, 0.125f, 0.125f, 0.0f, MathConstants<float>::halfPi, MathConstants<float>::pi);
+	path.lineTo(0.125f, 1.0f);
+	path.addCentredArc(0.125f, 0.875f, 0.125f, 0.125f, 0.0f, MathConstants<float>::pi, 3.0f * MathConstants<float>::halfPi);
+	path.lineTo(0.0f, 0.125f);
+	path.addCentredArc(0.125f, 0.125f, 0.125f, 0.125f, 0.0f, 3.0f * MathConstants<float>::halfPi, 2.0f * MathConstants<float>::pi);
 	path.closeSubPath();
 
 	path.startNewSubPath(0.25f, 0.0f);
 	path.lineTo(0.25f, 2.0f / 5.0f);
 	path.lineTo(0.75f, 2.0f / 5.0f);
-	path.lineTo(0.75f, 2.0f / 5.0f  * 0.5f);
+	path.lineTo(0.75f, 0.0f);
 
 	path.startNewSubPath(0.75f - 1.0f / 6.0f, 2.0f / 5.0f);
-	path.lineTo(0.75f - 1.0f / 6.0f, 2.0f / 5.0f * 0.25f);
+	path.lineTo(0.75f - 1.0f / 6.0f, 0.0f);
 
 	path.scaleToFit(0, 0, d, d, true);
+	return path;
+}
 
+Path ResonantAmpLAF::getRemoveIconPath(float d)
+{
+	Path path;
+
+	path.addRoundedRectangle(0.0f, 0.0f, 1.0f, 1.0f, 0.125f, 0.125f);
+
+	path.startNewSubPath(0.25f, 0.25f);
+	path.lineTo(0.75f, 0.75f);
+	path.startNewSubPath(0.25f, 0.75f);
+	path.lineTo(0.75f, 0.25f);
+
+	path.scaleToFit(0, 0, d, d, true);
 	return path;
 }
 

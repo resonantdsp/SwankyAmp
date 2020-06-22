@@ -19,42 +19,75 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <unordered_map>
 
 using SerializedState = std::unique_ptr<XmlElement>;
 
+struct StateEntry
+{
+	StateEntry(
+		int order,
+		const String& name,
+		File file,
+		int stateIdx,
+		int factoryStateIdx);
+	StateEntry();
+
+	bool operator>(const StateEntry& other);
+
+	int order;
+	String name;
+	File file;
+	int stateIdx;
+	int factoryStateIdx;
+};
+
 /** Connects a value tree state to a combo box and preset directory. */
-class PresetManager : public ComboBox::Listener, Button::Listener
+class PresetManager : public AudioProcessorValueTreeState::Listener
 {
 public:
-    PresetManager(AudioProcessorValueTreeState& vts, ComboBox& comboBox, Button* saveButton);
+    PresetManager(
+		AudioProcessorValueTreeState& vts,
+		ComboBox& comboBox,
+		Button& bntSave,
+		Button& bntRemove
+	);
     ~PresetManager() {}
 
-	void comboBoxChanged(ComboBox* pComboBox) override;
-	void buttonClicked(Button* button) override;
+	void comboBoxChanged();
+	void buttonSaveClicked();
+	void buttonRemoveClicked();
+	void parameterChanged(const String& id, float newValue);
 
-	bool setState(const SerializedState& state);
+	const std::vector<String>& getParameterIds() const { return parameterIds; }
+
+	void setState(const SerializedState& state);
 
 private:
-	int addPreset(
-		const String& name,
-		SerializedState state
+	void loadPreset(SerializedState state, File file, bool isFactory);
+	void loadPresetsFromXml(
+		const std::unique_ptr<XmlElement>& xml,
+		const Identifier& stateType,
+		bool isFactory
+	);
+	void loadPresetsFromDir(
+		const File& dir,
+		const Identifier& stateType,
+		bool isFactory
 	);
 
-	void savePreset(
-		const String& name,
-		const SerializedState& state
-	);
+	void clearUI();
+	void updateComboBox();
 
     AudioProcessorValueTreeState& vts;
-	const ValueTree& initState;
 	ComboBox& comboBox;
+	Button& buttonSave;
+	Button& buttonRemove;
 	File presetDir;
 
-	std::vector<Identifier> parameterIds;
-	String currentName = "";
-	int currentIdx = -1;
+	std::vector<String> parameterIds;
 
+	StateEntry* currentEntry = nullptr;
+	std::unordered_map<String, StateEntry> stateEntries;
 	std::vector<SerializedState> states;
-	// map a state name to its index in the states vector
-	HashMap<String, size_t> map;
 };
