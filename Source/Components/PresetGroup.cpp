@@ -24,18 +24,25 @@
 #include "PresetGroup.h"
 
 PresetGroup::PresetGroup() :
-	btnSave("presetGroupBtnSave", DrawableButton::ButtonStyle::ImageFitted)
+	buttonSave("presetGroupButtonSave", DrawableButton::ButtonStyle::ImageFitted),
+	buttonRemove("presetGroupButtonRemove", DrawableButton::ButtonStyle::ImageFitted)
 {
 	presetSelector.setEditableText(true);
 	addAndMakeVisible(presetSelector);
 
 	saveIcon.setFill(Colours::transparentBlack);
 	saveIcon.setStrokeFill(ResonantAmpLAF::colourDark);
-
 	saveIconHighlight.setFill(Colours::transparentBlack);
 	saveIconHighlight.setStrokeFill(ResonantAmpLAF::colourHighlight);
 
-	addAndMakeVisible(btnSave);
+	addAndMakeVisible(buttonSave);
+
+	removeIcon.setFill(Colours::transparentBlack);
+	removeIcon.setStrokeFill(ResonantAmpLAF::colourDark);
+	removeIconHighlight.setFill(Colours::transparentBlack);
+	removeIconHighlight.setStrokeFill(ResonantAmpLAF::colourHighlight);
+
+	addAndMakeVisible(buttonRemove);
 }
 
 void PresetGroup::paint(Graphics& g)
@@ -54,10 +61,20 @@ void PresetGroup::resized()
 	saveIcon.setStrokeType(PathStrokeType(3.0f));
 	saveIconHighlight.setStrokeType(PathStrokeType(3.0f));
 	saveIconHighlight.setPath(ResonantAmpLAF::getSaveIconPath((float)getHeight()));
-	btnSave.setImages(&saveIcon, &saveIconHighlight);
+	buttonSave.setImages(&saveIcon, &saveIconHighlight);
 
-	btnSave.setSize(getHeight(), getHeight());
-	btnSave.setTopLeftPosition(presetSelector.getBounds().getTopRight() + Point<int>(spacing, 0));
-	setSize(btnSave.getRight(), getHeight());
+	buttonSave.setSize(getHeight(), getHeight());
+	buttonSave.setTopLeftPosition(presetSelector.getBounds().getTopRight() + Point<int>(spacing, 0));
+
+	removeIcon.setPath(ResonantAmpLAF::getRemoveIconPath((float)getHeight()));
+	removeIcon.setStrokeType(PathStrokeType(3.0f));
+	removeIconHighlight.setStrokeType(PathStrokeType(3.0f));
+	removeIconHighlight.setPath(ResonantAmpLAF::getRemoveIconPath((float)getHeight()));
+	buttonRemove.setImages(&removeIcon, &removeIconHighlight);
+
+	buttonRemove.setSize(getHeight(), getHeight());
+	buttonRemove.setTopLeftPosition(buttonSave.getBounds().getTopRight() + Point<int>(jmax(1, spacing / 2), 0));
+
+	setSize(buttonRemove.getRight(), getHeight());
 }
 

@@ -46,6 +46,7 @@ public:
 	static const DropShadow& getDropShadow();
 
 	static Path getSaveIconPath(float d);
+	static Path getRemoveIconPath(float d);
 
 	Path getTickShape(float height) override;
 	Slider::SliderLayout getSliderLayout(Slider& slider) override;

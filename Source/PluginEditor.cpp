@@ -23,12 +23,16 @@
 
 ResonantAmpAudioProcessorEditor::ResonantAmpAudioProcessorEditor(
 	ResonantAmpAudioProcessor& p,
-	AudioProcessorValueTreeState& vts)
-	:
+	AudioProcessorValueTreeState& vts) :
 	AudioProcessorEditor(&p),
 	processor(p),
 	valueTreeState(vts),
-	presetManager(valueTreeState, presetGroup.presetSelector, &presetGroup.btnSave)
+	presetManager(
+		valueTreeState,
+		presetGroup.presetSelector,
+		presetGroup.buttonSave,
+		presetGroup.buttonRemove
+	)
 {
 	setLookAndFeel(&resonantAmpLAF);
 
@@ -42,6 +46,9 @@ ResonantAmpAudioProcessorEditor::ResonantAmpAudioProcessorEditor(
 	processor.meterListenersOut[1] = ampGroup.levelsGroup.getLevelMeterListenerOutR();
 
 	ampGroup.attachVTS(vts);
+
+	for (const auto& parameterId : presetManager.getParameterIds())
+		valueTreeState.addParameterListener(parameterId, &presetManager);
 
 	logoSvg = Drawable::createFromSVG(*XmlDocument::parse(BinaryData::logo_svg));
 

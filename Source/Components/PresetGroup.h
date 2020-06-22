@@ -44,11 +44,15 @@ public:
 
 	// public so the preset manager can modify it
 	ComboBox presetSelector;
-	DrawableButton btnSave;
+	DrawableButton buttonSave;
+	DrawableButton buttonRemove;
 
 private:
 	DrawablePath saveIcon;
 	DrawablePath saveIconHighlight;
+
+	DrawablePath removeIcon;
+	DrawablePath removeIconHighlight;
 
 	DISABLE_COMPONENT_RESIZE()
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PresetGroup)
