@@ -52,8 +52,14 @@ ResonantAmpAudioProcessorEditor::ResonantAmpAudioProcessorEditor(
 
 	logoSvg = Drawable::createFromSVG(*XmlDocument::parse(BinaryData::logo_svg));
 
+	versionLabel.setText("v" JucePlugin_VersionString, dontSendNotification);
+	versionLabel.setColour(Label::textColourId, ResonantAmpLAF::colourDark);
+	versionLabel.setFont(16.0f);
+	versionLabel.setJustificationType(Justification::centredRight);
+
 	addAndMakeVisible(ampGroup);
 	addAndMakeVisible(presetGroup);
+	addAndMakeVisible(versionLabel);
 
 	setSize((int)(1.5f * 600 + 0.5f), 600);
 }
@@ -165,6 +171,13 @@ void ResonantAmpAudioProcessorEditor::resized()
 
 	presetGroup.setHeight(headerHeight + 4);
 	presetGroup.setTopLeftPosition(headerPadding - 2, headerPadding - 2);
+
+	const int fontSize = (int)(versionLabel.getFont().getHeight() + 0.5f);
+	versionLabel.setSize(fontSize * 6, fontSize);
+	versionLabel.setTopLeftPosition(
+		getLocalBounds().getRight() - fontSize * 6 - 4,
+		getLocalBounds().getBottom() - fontSize - 4
+	);
 
 	// rebuild on re-size to track bottom right corner, could be built once then
 	// translated, but in future might want to re-scale as well
