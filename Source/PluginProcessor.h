@@ -68,6 +68,8 @@ public:
 	std::atomic<float>* parPowerAmpSagSlope = nullptr;
 
 	const std::vector<String> parameterIds = {
+		"idInputLevel",
+		"idOutputLevel",
 		"idTsLow",
 		"idTsMid",
 		"idTsHigh",
