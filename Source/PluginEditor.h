@@ -53,6 +53,8 @@ private:
 	ResonantAmpAudioProcessor& processor;
 	AudioProcessorValueTreeState& valueTreeState;
 
+	std::vector<String> managerListenIds;
+
 	Label versionLabel;
 	AmpGroup ampGroup;
 	PresetGroup presetGroup;

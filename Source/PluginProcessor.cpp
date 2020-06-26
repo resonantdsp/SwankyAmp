@@ -17,6 +17,7 @@
  */
 
 #include <algorithm>
+#include <unordered_map>
 
 #include "PluginEditor.h"
 
@@ -408,7 +409,60 @@ void ResonantAmpAudioProcessor::setStateInformation(const void* data, int sizeIn
 	std::unique_ptr<XmlElement> xmlState(getXmlFromBinary(data, sizeInBytes));
 	if (xmlState.get() != nullptr)
 		if (xmlState->hasTagName(parameters.state.getType()))
-			parameters.replaceState(ValueTree::fromXml(*xmlState));
+			setStateInformation(xmlState, true);
+}
+
+std::unordered_map<String, double> mapParameterValues(const SerializedState& state)
+{
+	std::unordered_map<String, double> values;
+
+	XmlElement* element = state->getFirstChildElement();
+
+	while (element != nullptr)
+	{
+		if (
+			element->getTagName() == "PARAM"
+			&& element->hasAttribute("id")
+			&& element->hasAttribute("value"))
+		{
+			const String& id = element->getStringAttribute("id");
+			const double value = element->getDoubleAttribute("value");
+			values[id] = value;
+		}
+
+		element = element->getNextElement();
+	}
+
+	return values;
+}
+
+void ResonantAmpAudioProcessor::setStateInformation(const std::unique_ptr<XmlElement>& state, bool useLevels)
+{
+	std::unordered_map<String, double> values;
+	if (state != nullptr)
+		values = mapParameterValues(state);
+
+	// Not clear if multiple threads trying to set state could cause issues as
+	// they would both trigger notirications to the host (the parameters changes
+	// are atomic so that aspect should be ok). This is a precaution.
+	setStateMutex.enter();
+
+	for (const auto& id : parameterIds)
+	{
+		if (!useLevels && (id == "idInputLevel" || id == "idOutputLevel"))
+			continue;
+
+		auto parameter = parameters.getParameter(id);
+		if (parameter == nullptr)
+			continue;
+
+		if (values.find(id) == values.end())
+			parameter->setValueNotifyingHost(parameter->getDefaultValue());
+		else
+			parameter->setValueNotifyingHost(parameter->convertTo0to1((float)values[id]));
+	}
+
+	setStateMutex.exit();
 }
 
 AudioProcessor* JUCE_CALLTYPE createPluginFilter()
