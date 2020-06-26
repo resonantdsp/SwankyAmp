@@ -23,6 +23,9 @@
 
 std::vector<String> buildParameterIds(const SerializedState& state)
 {
+	if (state == nullptr)
+		return {};
+
 	std::vector<String> parameterIds;
 
 	XmlElement* element = state->getFirstChildElement();
@@ -43,36 +46,12 @@ std::vector<String> buildParameterIds(const SerializedState& state)
 	return parameterIds;
 }
 
-std::unordered_map<String, double> mapParameterValues(const SerializedState& state)
-{
-	std::unordered_map<String, double> values;
-
-	XmlElement* element = state->getFirstChildElement();
-
-	while (element != nullptr)
-	{
-		if (
-			element->getTagName() == "PARAM"
-			&& element->hasAttribute("id")
-			&& element->hasAttribute("value"))
-		{
-			const String& id = element->getStringAttribute("id");
-			const double value = element->getDoubleAttribute("value");
-			values[id] = value;
-		}
-
-		element = element->getNextElement();
-	}
-
-	return values;
-}
-
 StateEntry::StateEntry(
 	int order,
 	const String& name,
 	File file,
-	int stateIdx,
-	int factoryStateIdx) :
+	std::optional<size_t> stateIdx,
+	std::optional<size_t> factoryStateIdx) :
 	order(order),
 	name(name),
 	file(file),
@@ -84,8 +63,8 @@ StateEntry::StateEntry() :
 	order(INT_MAX),
 	name(),
 	file(),
-	stateIdx(-1),
-	factoryStateIdx(-1)
+	stateIdx(std::nullopt),
+	factoryStateIdx(std::nullopt)
 {}
 
 bool StateEntry::operator>(const StateEntry& other)
@@ -97,10 +76,12 @@ bool StateEntry::operator>(const StateEntry& other)
 }
 
 PresetManager::PresetManager(
+	ResonantAmpAudioProcessor& processor,
 	AudioProcessorValueTreeState& vts,
 	ComboBox& comboBox,
 	Button& buttonSave,
 	Button& buttonRemove) :
+	processor(processor),
 	vts(vts),
 	comboBox(comboBox),
 	buttonSave(buttonSave),
@@ -121,7 +102,7 @@ PresetManager::PresetManager(
 	const auto factoryPresets = XmlDocument::parse(BinaryData::presets_xml);
 	const Identifier stateType = vts.state.getType();
 
-	stateEntries["init"] = StateEntry(0, "init", File(), -1, -1);
+	stateEntries["init"] = StateEntry(0, "init", File(), std::nullopt, std::nullopt);
 	loadPresetsFromXml(factoryPresets, stateType, true);
 	loadPresetsFromDir(presetDir, stateType, false);
 
@@ -133,11 +114,22 @@ PresetManager::PresetManager(
 	clearUI();
 }
 
+PresetManager::~PresetManager()
+{
+	// UI elements can outlive the manager, ensure they don't try to use callbacks
+	comboBox.onChange = [](){};
+	buttonSave.onClick = [](){};
+	buttonRemove.onClick = [](){};
+}
+
 void PresetManager::loadPreset(
 	SerializedState state,
 	File file,
 	bool isFactory)
 {
+	if (state == nullptr)
+		return;
+
 	const String& name = state->getStringAttribute("presetName");
 	const int orderValue =
 		state->hasAttribute("presetOrder") 
@@ -145,13 +137,22 @@ void PresetManager::loadPreset(
 		: INT_MAX;
 
 	states.push_back(std::move(state));
-	stateEntries[name] = StateEntry(
-		orderValue,
-		name,
-		file,
-		isFactory ? -1 : (int)states.size() - 1,
-		isFactory ? (int)states.size() - 1 : -1
-	);
+	if (isFactory)
+		stateEntries[name] = StateEntry(
+			orderValue,
+			name,
+			file,
+			std::nullopt,
+			{ states.size() - 1 }
+		);
+	else
+		stateEntries[name] = StateEntry(
+			orderValue,
+			name,
+			file,
+			{ states.size() - 1 },
+			std::nullopt
+		);
 }
 
 void PresetManager::loadPresetsFromXml(
@@ -159,6 +160,9 @@ void PresetManager::loadPresetsFromXml(
 	const Identifier& stateType,
 	bool isFactory)
 {
+	if (xml == nullptr)
+		return;
+
 	XmlElement* stateXml = xml->getFirstChildElement();
 	while (stateXml != nullptr)
 	{
@@ -188,7 +192,7 @@ void PresetManager::loadPresetsFromDir(
 			continue;
 
 		SerializedState state = XmlDocument::parse(file);
-		if (state->hasTagName(stateType) && state->hasAttribute("presetName"))
+		if (state != nullptr && state->hasTagName(stateType) && state->hasAttribute("presetName"))
 			loadPreset(std::move(state), file, isFactory);
 	}
 }
@@ -224,8 +228,8 @@ void PresetManager::comboBoxChanged()
 			(int)stateEntries.size(),
 			name,
 			File(),
-			(int)states.size() - 1,
-			-1
+			states.size() - 1,
+			std::nullopt
 		);
 		currentEntry = &stateEntries[name];
 		comboBox.addItem(name, comboBox.getNumItems() + 1);
@@ -237,17 +241,17 @@ void PresetManager::comboBoxChanged()
 	else
 	{
 		currentEntry = &stateEntries[name];
-		if (currentEntry->stateIdx >= 0)
+		if (currentEntry != nullptr && currentEntry->stateIdx != std::nullopt)
 		{
-			setState(states[currentEntry->stateIdx]);
+			setState(states[currentEntry->stateIdx.value()]);
 			// this is a custom state, can be removed
 			buttonRemove.setEnabled(true);
 			// can't save until modified
 			buttonSave.setEnabled(false);
 		}
-		else if (currentEntry->factoryStateIdx >= 0)
+		else if (currentEntry != nullptr && currentEntry->factoryStateIdx != std::nullopt)
 		{
-			setState(states[currentEntry->factoryStateIdx]);
+			setState(states[currentEntry->factoryStateIdx.value()]);
 			// can't remove factory presets
 			buttonRemove.setEnabled(false);
 			buttonSave.setEnabled(false);
@@ -302,7 +306,7 @@ void PresetManager::buttonSaveClicked()
 	
 
 	states.push_back(std::move(state));
-	currentEntry->stateIdx = (int)states.size() - 1;
+	currentEntry->stateIdx = { states.size() - 1 };
 	currentEntry->file = xmlFile;
 
 	// can't save again until something changes
@@ -330,8 +334,8 @@ void PresetManager::buttonRemoveClicked()
 		}
 		currentEntry->file = File();
 	}
-	if (currentEntry->factoryStateIdx >= 0)
-		currentEntry->stateIdx = -1;
+	if (currentEntry->factoryStateIdx != std::nullopt)
+		currentEntry->stateIdx = std::nullopt;
 	else
 		stateEntries.erase(currentEntry->name);
 
@@ -353,24 +357,6 @@ void PresetManager::parameterChanged(const String& id, float)
 
 void PresetManager::setState(const SerializedState& state)
 {
-	// handle the init state, just use parameter defaults
-	std::unordered_map<String, double> values;
-	if (state != nullptr)
-		values = mapParameterValues(state);
-
-	for (const auto& id : parameterIds)
-	{
-		if (id == "idInputLevel" || id == "idOutputLevel")
-			continue;
-
-		auto parameter = vts.getParameter(id);
-		if (parameter == nullptr)
-			continue;
-
-		if (values.find(id) == values.end())
-			parameter->setValueNotifyingHost(parameter->getDefaultValue());
-		else
-			parameter->setValueNotifyingHost(parameter->convertTo0to1((float)values[id]));
-	}
+	processor.setStateInformation(state, false);
 }
 

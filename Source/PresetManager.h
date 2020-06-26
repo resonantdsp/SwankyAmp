@@ -20,6 +20,9 @@
 
 #include <JuceHeader.h>
 #include <unordered_map>
+#include <optional>
+
+#include "PluginProcessor.h"
 
 using SerializedState = std::unique_ptr<XmlElement>;
 
@@ -29,8 +32,8 @@ struct StateEntry
 		int order,
 		const String& name,
 		File file,
-		int stateIdx,
-		int factoryStateIdx);
+		std::optional<size_t> stateIdx,
+		std::optional<size_t> factoryStateIdx);
 	StateEntry();
 
 	bool operator>(const StateEntry& other);
@@ -38,8 +41,8 @@ struct StateEntry
 	int order;
 	String name;
 	File file;
-	int stateIdx;
-	int factoryStateIdx;
+	std::optional<size_t> stateIdx;
+	std::optional<size_t> factoryStateIdx;
 };
 
 /** Connects a value tree state to a combo box and preset directory. */
@@ -47,12 +50,13 @@ class PresetManager : public AudioProcessorValueTreeState::Listener
 {
 public:
     PresetManager(
+		ResonantAmpAudioProcessor& processor,
 		AudioProcessorValueTreeState& vts,
 		ComboBox& comboBox,
 		Button& bntSave,
 		Button& bntRemove
 	);
-    ~PresetManager() {}
+    ~PresetManager();
 
 	void comboBoxChanged();
 	void buttonSaveClicked();
@@ -79,6 +83,7 @@ private:
 	void clearUI();
 	void updateComboBox();
 
+	ResonantAmpAudioProcessor& processor;
     AudioProcessorValueTreeState& vts;
 	ComboBox& comboBox;
 	Button& buttonSave;

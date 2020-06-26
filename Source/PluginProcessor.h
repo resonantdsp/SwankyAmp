@@ -67,6 +67,28 @@ public:
 	std::atomic<float>* parPowerAmpSagRatio = nullptr;
 	std::atomic<float>* parPowerAmpSagSlope = nullptr;
 
+	const std::vector<String> parameterIds = {
+		"idTsLow",
+		"idTsMid",
+		"idTsHigh",
+		"idTsPresence",
+		"idGainStages",
+		"idGainSlope",
+		"idCabOnOff",
+		"idCabBrightness",
+		"idCabDistance",
+		"idPreAmpDrive",
+		"idPreAmpTight",
+		"idPreAmpGrit",
+		"idLowCut",
+		"idPowerAmpDrive",
+		"idPowerAmpTight",
+		"idPowerAmpGrit",
+		"idPowerAmpSag",
+		"idPowerAmpSagRatio",
+		"idPowerAmpSagSlope",
+	};
+
 	void setAmpParameters();
 
 	void prepareToPlay(double sampleRate, int samplesPerBlock) override;
@@ -96,7 +118,10 @@ public:
 
 	void getStateInformation(MemoryBlock& destData) override;
 	void setStateInformation(const void* data, int sizeInBytes) override;
+	void setStateInformation(const std::unique_ptr<XmlElement>& state, bool useLevels = true);
 
 private:
+	CriticalSection setStateMutex;
+
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ResonantAmpAudioProcessor)
 };

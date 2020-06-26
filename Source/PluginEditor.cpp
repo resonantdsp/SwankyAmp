@@ -28,6 +28,7 @@ ResonantAmpAudioProcessorEditor::ResonantAmpAudioProcessorEditor(
 	processor(p),
 	valueTreeState(vts),
 	presetManager(
+		processor,
 		valueTreeState,
 		presetGroup.presetSelector,
 		presetGroup.buttonSave,
@@ -48,7 +49,10 @@ ResonantAmpAudioProcessorEditor::ResonantAmpAudioProcessorEditor(
 	ampGroup.attachVTS(vts);
 
 	for (const auto& parameterId : presetManager.getParameterIds())
+	{
 		valueTreeState.addParameterListener(parameterId, &presetManager);
+		managerListenIds.push_back(parameterId);
+	}
 
 	logoSvg = Drawable::createFromSVG(*XmlDocument::parse(BinaryData::logo_svg));
 
@@ -76,6 +80,9 @@ ResonantAmpAudioProcessorEditor::~ResonantAmpAudioProcessorEditor()
 	processor.meterListenersIn[1] = nullptr;
 	processor.meterListenersOut[0] = nullptr;
 	processor.meterListenersOut[1] = nullptr;
+
+	for (const auto& parameterId : managerListenIds)
+		valueTreeState.removeParameterListener(parameterId, &presetManager);
 }
 
 void ResonantAmpAudioProcessorEditor::paint(Graphics& g)
