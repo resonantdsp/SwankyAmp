@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT id="sJgmJL" name="ResonantAmp" projectType="audioplug" jucerVersion="5.4.7"
-              version="0.6.1" projectLineFeed="&#10;" companyName="Resonant DSP"
+              version="0.6.2" projectLineFeed="&#10;" companyName="Resonant DSP"
               companyWebsite="https://www.resonantdsp.com/" companyEmail="info@resonantdsp.com"
               pluginFormats="buildAAX,buildAU,buildStandalone,buildVST3" pluginName="Resonant Amp"
               pluginDesc="Tube amplifiers simulation" pluginManufacturer="Resonant DSP"
               pluginAAXCategory="8192" pluginRTASCategory="8192" splashScreenColour="Light"
-              cppLanguageStandard="17">
+              cppLanguageStandard="17" displaySplashScreen="1">
   <MAINGROUP id="qolZJU" name="ResonantAmp">
     <GROUP id="{DE71F08C-9BB3-E05B-B09D-49D3564FD2D1}" name="Resources">
       <FILE id="A3p67q" name="logo.svg" compile="0" resource="1" file="Resources/logo.svg"/>
