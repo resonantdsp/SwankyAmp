@@ -25,15 +25,19 @@ PreAmpGroup::PreAmpGroup() :
 {
 	addAndMakeVisible(sliderDrive);
 	sliderDrive.setLabel("DRIVE");
+	sliderDrive.slider.setPosMapDownFmt("%4.1f");
 
 	addAndMakeVisible(sliderTight);
 	sliderTight.setLabel("TIGHT");
+	sliderTight.slider.setPosMapDownFmt("%4.1f");
 
 	addAndMakeVisible(sliderGrit);
 	sliderGrit.setLabel("GRIT");
+	sliderGrit.slider.setPosMapDownFmt("%4.1f");
 
 	addAndMakeVisible(sliderFilter);
 	sliderFilter.setLabel("LOW CUT");
+	sliderFilter.slider.setPosMapDownFmt("%4.1f");
 }
 
 void PreAmpGroup::attachVTS(AudioProcessorValueTreeState& vts)

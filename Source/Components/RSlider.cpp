@@ -44,7 +44,10 @@ std::string stringFormat( const std::string& format, Args ... args )
 String RSlider::fmtSliderPos(float sliderPos) const
 {
 	const float pos = sliderPos * (posMapHigh - posMapLow) + posMapLow;
-	return String(stringFormat(posMapFmt.toStdString(), pos));
+	if (isMouseButtonDown() && posMapDownFmt.length() > 0)
+		return String(stringFormat(posMapDownFmt.toStdString(), pos));
+	else
+		return String(stringFormat(posMapFmt.toStdString(), pos));
 }
 
 RSliderDims RSlider::calcDims() const

@@ -28,9 +28,11 @@ StagingGroup::StagingGroup() :
 	sliderStages.setLabel("STAGES");
 	sliderStages.slider.setPosMapLow(1.0f);
 	sliderStages.slider.setPosMapHigh(7.0f);
+	sliderStages.slider.setPosMapDownFmt("%4.1f");
 
 	addAndMakeVisible(sliderSlope);
 	sliderSlope.setLabel("SLOPE");
+	sliderSlope.slider.setPosMapDownFmt("%4.1f");
 }
 
 

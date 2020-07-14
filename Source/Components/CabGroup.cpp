@@ -29,9 +29,11 @@ CabGroup::CabGroup() :
 
 	addAndMakeVisible(sliderBright);
 	sliderBright.setLabel("BRIGHT");
+	sliderBright.slider.setPosMapDownFmt("%4.1f");
 
 	addAndMakeVisible(sliderDistance);
 	sliderDistance.setLabel("DISTANCE");
+	sliderDistance.slider.setPosMapDownFmt("%4.1f");
 }
 
 void CabGroup::attachVTS(AudioProcessorValueTreeState& vts)

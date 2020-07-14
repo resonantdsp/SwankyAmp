@@ -25,15 +25,19 @@ ToneStackGroup::ToneStackGroup() :
 {
 	addAndMakeVisible(sliderLow);
 	sliderLow.setLabel("LOW");
+	sliderLow.slider.setPosMapDownFmt("%4.1f");
 
 	addAndMakeVisible(sliderMid);
 	sliderMid.setLabel("MID");
+	sliderMid.slider.setPosMapDownFmt("%4.1f");
 
 	addAndMakeVisible(sliderHigh);
 	sliderHigh.setLabel("HIGH");
+	sliderHigh.slider.setPosMapDownFmt("%4.1f");
 
 	addAndMakeVisible(sliderPresence);
 	sliderPresence.setLabel("PRESENCE");
+	sliderPresence.slider.setPosMapDownFmt("%4.1f");
 }
 
 void ToneStackGroup::attachVTS(AudioProcessorValueTreeState& vts)
