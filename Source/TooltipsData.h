@@ -18,32 +18,17 @@
 
 #pragma once
 
+#include <unordered_map>
 #include <JuceHeader.h>
 
-#include "../Utils.h"
-#include "ParameterGroup.h"
-#include "RSliderLabel.h"
-
-class StagingGroup : public ParameterGroup
+class TooltipsData
 {
 public:
-	StagingGroup();
-	~StagingGroup() {}
+	TooltipsData(const std::unique_ptr<XmlElement>& xml);
+	~TooltipsData() {}
 
-	void setHeight(int height) { setSize(0, height); }
-	void resized() override;
-
-	void attachVTS(AudioProcessorValueTreeState& vts);
-	void attachTooltips(const TooltipsData& tooltips) override;
+	const String& getForParam(const String& name) const;
 
 private:
-	RSliderLabel sliderStages;
-	RSliderLabel sliderSlope;
-
-	std::unique_ptr<SliderAttachment> attStages;
-	std::unique_ptr<SliderAttachment> attSlope;
-
-	DISABLE_COMPONENT_RESIZE()
-	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (StagingGroup)
+	std::unordered_map<String, String> paramStrings;
 };
-

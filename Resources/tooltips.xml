@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<tooltips>
+	<param id="idInputLevel">
+		Use to gain stage the guitar singal. A lightly strummed open chord should peak just above the "S" level for a single coil pickup, or "H" for humbucker pickup.
+	</param>
+	<param id="idOutputLevel">
+		Use to gain stage the overall plugin master volume. This affects only how loud the plugin will sound.
+	</param>
+	<param id="idCabBrightness">
+		Affects the microphone position in a way which relates to the overall brightness of the sound.
+	</param>
+	<param id="idCabDistance">
+		Affects the microphone distance which will remove some lows and upper mids. This can have the effect of creating a clearer sound.
+	</param>
+	<param id="idCabOnOff">
+		Disables the cabinet enumation. Turn off if you want to run a separate cabinet emulation after the plugin.
+	</param>
+	<param id="idGainSlope">
+		Affects how much the signal grows as it enters successive gain stages. Adjust to get different harshness to the distortion.
+	</param>
+	<param id="idGainStages">
+		The number of gain stages through the signal passes prior to reaching the power amp. Increase for a high-gain sound.
+	</param>
+	<param id="idLowCut">
+		How much of the lows are cut out from the pre amp stage. Increase to remove bass. Decrease to get fuller distortion.
+	</param>
+	<param id="idPreAmpDrive">
+		The amount of distortion in the pre amp stage (a.k.a. amp gain). The plugin will adjust the output level to compensate.
+	</param>
+	<param id="idPreAmpGrit">
+		Affects the amount of overhead available in the tubes. Decrease remove harsh artifacts from the tube distortion.
+	</param>
+	<param id="idPreAmpTight">
+		Affects the time scale and depth of the tube amp dynamics. Increase to get a cleaner distoriton. Decrease for more touch sensitivity.
+	</param>
+	<param id="idPowerAmpDrive">
+		The amount of distortion in the power amp stage (a.k.a. amp volume). The plugin will adjust the output level to compensate.
+	</param>
+	<param id="idPowerAmpTight">
+		Affects the time scale and depth of the power amp dynamics. Has large effect on the sag compression attack and release.
+	</param>
+	<param id="idPowerAmpSag">
+		Affects how much the amplified level drop in response to a large signal. Increase for a more compressed sound.
+	</param>
+	<param id="idTsHigh">
+		The amount of high end going into the power amp. Increase for a brighter tone. Decrase to reduce harsh distortion noise.
+	</param>
+	<param id="idTsMid">
+		The amount of mids going into the power amp. Increase for a more aggressive, punchier tone. Decrease for a cleaner tone
+	</param>
+	<param id="idTsLow">
+		The amount of bass going into the power amp. Increase for a fuller sound. Decrease for more definition and more brightness.
+	</param>
+	<param id="idTsPresence">
+		The amoutn of signal in the higher mids, lower highs. Increase for more definition, more detail. Decrease to reduce brittle harshness.
+	</param>
+</tooltips>

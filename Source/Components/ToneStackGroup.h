@@ -31,6 +31,7 @@ public:
 	~ToneStackGroup() {}
 
 	void attachVTS(AudioProcessorValueTreeState& vts);
+	void attachTooltips(const TooltipsData& tooltips) override;
 
 	void setHeight(int height) { setSize(0, height); }
 	void resized() override;

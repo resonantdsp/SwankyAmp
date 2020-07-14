@@ -71,6 +71,16 @@ void AmpGroup::attachVTS(AudioProcessorValueTreeState& vts)
 	cabGroup.attachVTS(vts);
 }
 
+void AmpGroup::attachTooltips(const TooltipsData& tooltips)
+{
+	levelsGroup.attachTooltips(tooltips);
+	preAmpGroup.attachTooltips(tooltips);
+	powerAmpGroup.attachTooltips(tooltips);
+	stagingGroup.attachTooltips(tooltips);
+	toneStackGroup.attachTooltips(tooltips);
+	cabGroup.attachTooltips(tooltips);
+}
+
 void AmpGroup::paint(Graphics& g)
 {
 	// skip  painting the group background and borders

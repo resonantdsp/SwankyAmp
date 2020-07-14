@@ -33,13 +33,17 @@ ResonantAmpAudioProcessorEditor::ResonantAmpAudioProcessorEditor(
 		presetGroup.presetSelector,
 		presetGroup.buttonSave,
 		presetGroup.buttonRemove
-	)
+	),
+	// TODO: how to handle localization?
+	tooltipsData(XmlDocument::parse(BinaryData::tooltips_xml)),
+	tooltipWindow(this)
 {
-	setLookAndFeel(&resonantAmpLAF);
-
 	LookAndFeel::getDefaultLookAndFeel().setDefaultSansSerifTypeface(
 		resonantAmpLAF.getDefaultFont().getTypeface()
 	);
+	setLookAndFeel(&resonantAmpLAF);
+	tooltipWindow.setLookAndFeel(&resonantAmpLAF);
+	tooltipWindow.setOpaque(false);
 
 	processor.meterListenersIn[0] = ampGroup.levelsGroup.getLevelMeterListenerInL();
 	processor.meterListenersIn[1] = ampGroup.levelsGroup.getLevelMeterListenerInR();
@@ -47,6 +51,7 @@ ResonantAmpAudioProcessorEditor::ResonantAmpAudioProcessorEditor(
 	processor.meterListenersOut[1] = ampGroup.levelsGroup.getLevelMeterListenerOutR();
 
 	ampGroup.attachVTS(vts);
+	ampGroup.attachTooltips(tooltipsData);
 
 	for (const auto& parameterId : presetManager.getParameterIds())
 	{
@@ -75,6 +80,9 @@ ResonantAmpAudioProcessorEditor::~ResonantAmpAudioProcessorEditor()
 	// the LAF can be called from ... who knows where, after the Editor goes out
 	// of scope
 	setLookAndFeel(nullptr);
+	// not sure destruction order could be an issue
+	tooltipWindow.setLookAndFeel(nullptr);
+
 	// ensure the processor doesn't used cache pointers that were freed
 	processor.meterListenersIn[0] = nullptr;
 	processor.meterListenersIn[1] = nullptr;

@@ -9710,6 +9710,69 @@ static const unsigned char temp_binary_data_4[] =
 
 const char* PTSansNarrowRegular_ttf = (const char*) temp_binary_data_4;
 
+//================== tooltips.xml ==================
+static const unsigned char temp_binary_data_5[] =
+"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n"
+"\r\n"
+"<tooltips>\r\n"
+"\t<param id=\"idInputLevel\">\r\n"
+"\t\tUse to gain stage the guitar singal. A lightly strummed open chord should peak just above the \"S\" level for a single coil pickup, or \"H\" for humbucker pickup.\r\n"
+"\t</param>\r\n"
+"\t<param id=\"idOutputLevel\">\r\n"
+"\t\tUse to gain stage the overall plugin master volume. This affects only how loud the plugin will sound.\r\n"
+"\t</param>\r\n"
+"\t<param id=\"idCabBrightness\">\r\n"
+"\t\tAffects the microphone position in a way which relates to the overall brightness of the sound.\r\n"
+"\t</param>\r\n"
+"\t<param id=\"idCabDistance\">\r\n"
+"\t\tAffects the microphone distance which will remove some lows and upper mids. This can have the effect of creating a clearer sound.\r\n"
+"\t</param>\r\n"
+"\t<param id=\"idCabOnOff\">\r\n"
+"\t\tDisables the cabinet enumation. Turn off if you want to run a separate cabinet emulation after the plugin.\r\n"
+"\t</param>\r\n"
+"\t<param id=\"idGainSlope\">\r\n"
+"\t\tAffects how much the signal grows as it enters successive gain stages. Adjust to get different harshness to the distortion.\r\n"
+"\t</param>\r\n"
+"\t<param id=\"idGainStages\">\r\n"
+"\t\tThe number of gain stages through the signal passes prior to reaching the power amp. Increase for a high-gain sound.\r\n"
+"\t</param>\r\n"
+"\t<param id=\"idLowCut\">\r\n"
+"\t\tHow much of the lows are cut out from the pre amp stage. Increase to remove bass. Decrease to get fuller distortion.\r\n"
+"\t</param>\r\n"
+"\t<param id=\"idPreAmpDrive\">\r\n"
+"\t\tThe amount of distortion in the pre amp stage (a.k.a. amp gain). The plugin will adjust the output level to compensate.\r\n"
+"\t</param>\r\n"
+"\t<param id=\"idPreAmpGrit\">\r\n"
+"\t\tAffects the amount of overhead available in the tubes. Decrease remove harsh artifacts from the tube distortion.\r\n"
+"\t</param>\r\n"
+"\t<param id=\"idPreAmpTight\">\r\n"
+"\t\tAffects the time scale and depth of the tube amp dynamics. Increase to get a cleaner distoriton. Decrease for more touch sensitivity.\r\n"
+"\t</param>\r\n"
+"\t<param id=\"idPowerAmpDrive\">\r\n"
+"\t\tThe amount of distortion in the power amp stage (a.k.a. amp volume). The plugin will adjust the output level to compensate.\r\n"
+"\t</param>\r\n"
+"\t<param id=\"idPowerAmpTight\">\r\n"
+"\t\tAffects the time scale and depth of the power amp dynamics. Has large effect on the sag compression attack and release.\r\n"
+"\t</param>\r\n"
+"\t<param id=\"idPowerAmpSag\">\r\n"
+"\t\tAffects how much the amplified level drop in response to a large signal. Increase for a more compressed sound.\r\n"
+"\t</param>\r\n"
+"\t<param id=\"idTsHigh\">\r\n"
+"\t\tThe amount of high end going into the power amp. Increase for a brighter tone. Decrase to reduce harsh distortion noise.\r\n"
+"\t</param>\r\n"
+"\t<param id=\"idTsMid\">\r\n"
+"\t\tThe amount of mids going into the power amp. Increase for a more aggressive, punchier tone. Decrease for a cleaner tone\r\n"
+"\t</param>\r\n"
+"\t<param id=\"idTsLow\">\r\n"
+"\t\tThe amount of bass going into the power amp. Increase for a fuller sound. Decrease for more definition and more brightness.\r\n"
+"\t</param>\r\n"
+"\t<param id=\"idTsPresence\">\r\n"
+"\t\tThe amoutn of signal in the higher mids, lower highs. Increase for more definition, more detail. Decrease to reduce brittle harshness.\r\n"
+"\t</param>\r\n"
+"</tooltips>\r\n";
+
+const char* tooltips_xml = (const char*) temp_binary_data_5;
+
 
 const char* getNamedResource (const char* resourceNameUTF8, int& numBytes)
 {
@@ -9726,6 +9789,7 @@ const char* getNamedResource (const char* resourceNameUTF8, int& numBytes)
         case 0xc9b4bb03:  numBytes = 287936; return PTSansBold_ttf;
         case 0x1200a58c:  numBytes = 278168; return PTSansRegular_ttf;
         case 0xadb49371:  numBytes = 234208; return PTSansNarrowRegular_ttf;
+        case 0x0e764828:  numBytes = 2989; return tooltips_xml;
         default: break;
     }
 
@@ -9739,7 +9803,8 @@ const char* namedResourceList[] =
     "presets_xml",
     "PTSansBold_ttf",
     "PTSansRegular_ttf",
-    "PTSansNarrowRegular_ttf"
+    "PTSansNarrowRegular_ttf",
+    "tooltips_xml"
 };
 
 const char* originalFilenames[] =
@@ -9748,7 +9813,8 @@ const char* originalFilenames[] =
     "presets.xml",
     "PTSans-Bold.ttf",
     "PTSans-Regular.ttf",
-    "PTSansNarrow-Regular.ttf"
+    "PTSansNarrow-Regular.ttf",
+    "tooltips.xml"
 };
 
 const char* getNamedResourceOriginalFilename (const char* resourceNameUTF8)

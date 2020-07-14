@@ -40,6 +40,12 @@ void StagingGroup::attachVTS(AudioProcessorValueTreeState& vts)
 	attSlope.reset(new SliderAttachment(vts, "idGainSlope", sliderSlope.slider));
 }
 
+void StagingGroup::attachTooltips(const TooltipsData& tooltips)
+{
+	sliderStages.slider.setTooltip(tooltips.getForParam("idGainStages"));
+	sliderSlope.slider.setTooltip(tooltips.getForParam("idGainSlope"));
+}
+
 void StagingGroup::resized()
 {
 	const int prevInnerHeight = getBorderBounds().getHeight() - 2 * spacing;

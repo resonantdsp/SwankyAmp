@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT id="sJgmJL" name="ResonantAmp" projectType="audioplug" jucerVersion="5.4.7"
-              version="0.6.1" projectLineFeed="&#10;" companyName="Resonant DSP"
+              version="0.6.2" projectLineFeed="&#10;" companyName="Resonant DSP"
               companyWebsite="https://www.resonantdsp.com/" companyEmail="info@resonantdsp.com"
               pluginFormats="buildAAX,buildAU,buildStandalone,buildVST3" pluginName="Resonant Amp"
               pluginDesc="Tube amplifiers simulation" pluginManufacturer="Resonant DSP"
               pluginAAXCategory="8192" pluginRTASCategory="8192" splashScreenColour="Light"
-              cppLanguageStandard="17">
+              cppLanguageStandard="17" displaySplashScreen="1">
   <MAINGROUP id="qolZJU" name="ResonantAmp">
     <GROUP id="{DE71F08C-9BB3-E05B-B09D-49D3564FD2D1}" name="Resources">
       <FILE id="A3p67q" name="logo.svg" compile="0" resource="1" file="Resources/logo.svg"/>
@@ -16,6 +16,7 @@
             file="Resources/PTSans/PTSans-Regular.ttf"/>
       <FILE id="MoC8Of" name="PTSansNarrow-Regular.ttf" compile="0" resource="1"
             file="Resources/PTSansNarrow/PTSansNarrow-Regular.ttf"/>
+      <FILE id="Mk7N22" name="tooltips.xml" compile="0" resource="1" file="Resources/tooltips.xml"/>
     </GROUP>
     <GROUP id="{1D5987B1-0BA7-E171-9516-427783CB7E4A}" name="Source">
       <GROUP id="{2BC335E6-8421-3F7B-5FF8-345C44B52666}" name="Components">
@@ -70,6 +71,9 @@
       <FILE id="feb1e3" name="PresetManager.cpp" compile="1" resource="0"
             file="Source/PresetManager.cpp"/>
       <FILE id="y9okPZ" name="PresetManager.h" compile="0" resource="0" file="Source/PresetManager.h"/>
+      <FILE id="gAE38G" name="TooltipsData.cpp" compile="1" resource="0"
+            file="Source/TooltipsData.cpp"/>
+      <FILE id="pwenL3" name="TooltipsData.h" compile="0" resource="0" file="Source/TooltipsData.h"/>
     </GROUP>
   </MAINGROUP>
   <EXPORTFORMATS>

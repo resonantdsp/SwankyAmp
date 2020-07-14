@@ -78,6 +78,10 @@ ResonantAmpLAF::ResonantAmpLAF()
 	setColour(Label::backgroundWhenEditingColourId, Colours::transparentBlack);
 	setColour(Label::textWhenEditingColourId, ResonantAmpLAF::colourDark);
 	setColour(Label::outlineWhenEditingColourId, Colours::transparentBlack);
+
+	setColour(TooltipWindow::backgroundColourId, ResonantAmpLAF::colourBackground);
+	setColour(TooltipWindow::textColourId, ResonantAmpLAF::colourDark);
+	setColour(TooltipWindow::outlineColourId, ResonantAmpLAF::colourDark);
 }
 
 const Font& ResonantAmpLAF::getDefaultFont()
@@ -479,4 +483,47 @@ void ResonantAmpLAF::drawComboBox(
 
     g.setColour(box.findColour(ComboBox::arrowColourId).withAlpha((box.isEnabled() ? 0.9f : 0.2f)));
     g.strokePath(path, PathStrokeType(2.0f));
+}
+
+Rectangle<int> ResonantAmpLAF::getTooltipBounds(const String&, Point<int>, Rectangle<int> parentArea)
+{
+	const int lineHeight = 16;
+	const int margin = lineHeight;
+	const int padding = 4;
+	const int shadowMargin = getDropShadow().radius;
+
+	Rectangle<int> area(parentArea.withPosition(0, 0));
+	area.setBottom(area.getBottom() - margin);
+	area.setTop(area.getBottom() - 2 * lineHeight - 2 * padding - 2 * shadowMargin);
+	area.setLeft((int)(area.getWidth() * 0.4f + 0.5f));
+	area.setRight(area.getRight() - margin);
+
+	return area;
+}
+
+void ResonantAmpLAF::drawTooltip(Graphics& g, const String& text, int width, int height)
+{
+	const float lineHeight = 16.0f;
+	const float lineThickness = 1.0f;
+	const float padding = 4.0f;
+
+	const DropShadow& shadow = getDropShadow();
+	Rectangle<int> areaShadow(width, height);
+	Rectangle<float> area = areaShadow.reduced(shadow.radius).toFloat();
+
+	shadow.drawForRectangle(g, areaShadow.reduced(shadow.radius));
+
+	g.setColour(findColour(TooltipWindow::backgroundColourId));
+	g.fillRect(area);
+
+	g.setColour(findColour(TooltipWindow::outlineColourId));
+	g.drawRect(area, lineThickness);
+
+	AttributedString text2;
+	text2.setJustification(Justification::centredLeft);
+	text2.append(text, Font(lineHeight), findColour(TooltipWindow::textColourId));
+
+	TextLayout text3;
+	text3.createLayout(text2, (float)(area.reduced(padding).getWidth()));
+	text3.draw(g, area.reduced(padding));
 }

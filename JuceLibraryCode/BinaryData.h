@@ -23,8 +23,11 @@ namespace BinaryData
     extern const char*   PTSansNarrowRegular_ttf;
     const int            PTSansNarrowRegular_ttfSize = 234208;
 
+    extern const char*   tooltips_xml;
+    const int            tooltips_xmlSize = 2989;
+
     // Number of elements in the namedResourceList and originalFileNames arrays.
-    const int namedResourceListSize = 5;
+    const int namedResourceListSize = 6;
 
     // Points to the start of a list of resource names.
     extern const char* namedResourceList[];

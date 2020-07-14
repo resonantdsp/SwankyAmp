@@ -40,6 +40,13 @@ void PowerAmpGroup::attachVTS(AudioProcessorValueTreeState& vts)
 	attSag.reset(new SliderAttachment(vts, "idPowerAmpSag", sliderSag.slider));
 }
 
+void PowerAmpGroup::attachTooltips(const TooltipsData& tooltips)
+{
+	sliderDrive.slider.setTooltip(tooltips.getForParam("idPowerAmpDrive"));
+	sliderTight.slider.setTooltip(tooltips.getForParam("idPowerAmpTight"));
+	sliderSag.slider.setTooltip(tooltips.getForParam("idPowerAmpSag"));
+}
+
 void PowerAmpGroup::resized()
 {
 	const int prevInnerHeight = getBorderBounds().getHeight() - 2 * spacing;
