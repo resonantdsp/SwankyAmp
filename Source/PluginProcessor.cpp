@@ -61,9 +61,9 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 			MAKE_PARAMETER_UNIT(CabBrightness),
 			MAKE_PARAMETER(CabDistance, 0.0f, 1.0f, 0.0f),
 
-			MAKE_PARAMETER(PreAmpDrive, -1.0f, 1.0f, -0.4f),
+			MAKE_PARAMETER_UNIT(PreAmpDrive),
 			MAKE_PARAMETER_UNIT(PreAmpTight),
-			MAKE_PARAMETER(PreAmpGrit, -1.0f, 1.0f, -0.5f),
+			MAKE_PARAMETER_UNIT(PreAmpGrit),
 
 			MAKE_PARAMETER_UNIT(PowerAmpDrive),
 			MAKE_PARAMETER_UNIT(PowerAmpTight),
@@ -201,7 +201,7 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 			-1.0f,
 			1.0f,
 			-1.0f - sagOffset,
-			-1.0f - sagOffset + 2.0f * sagRange
+			-1.0f - sagOffset + 1.0f * sagRange
 		));
 		amp_channel[i].set_tetrode_plate_sag_ratio(*parPowerAmpSagRatio);
 		amp_channel[i].set_tetrode_plate_sag_onset(*parPowerAmpSagSlope);
@@ -436,11 +436,44 @@ std::unordered_map<String, double> mapParameterValues(const SerializedState& sta
 	return values;
 }
 
+double transformUnitScale(double value, double lower, double upper, double lowerPost, double upperPost)
+{
+	const double post =
+		2.0 / (upperPost - lowerPost) 
+		* (
+			(value + 1.0) / 2.0 
+			* (upper - lower) + lower 
+			- lowerPost
+		) 
+		- 1.0;
+	return jmin(1.0, jmax(-1.0, post));
+}
+
 void ResonantAmpAudioProcessor::setStateInformation(const std::unique_ptr<XmlElement>& state, bool useLevels)
 {
 	std::unordered_map<String, double> values;
 	if (state != nullptr)
 		values = mapParameterValues(state);
+
+	// TODO: proper version string comparison
+	// TODO: move to a function
+
+	// range changes from 0.6 to 0.7
+	if (state != nullptr && state->hasAttribute("pluginVersion") && state->getStringAttribute("pluginVersion") < "0.7.0")
+	{
+		if (values.find("idPowerAmpDrive") != values.end())
+		{
+			const double value = values["idPowerAmpDrive"];
+			const double post = transformUnitScale(value, log(1.0), log(1e3), log(0.5), log(5e2));
+			values["idPowerAmpDrive"] = post;
+		}
+		if (values.find("idPowerAmpSag") != values.end())
+		{
+			const double value = values["idPowerAmpSag"];
+			const double post = transformUnitScale(value, 0.0, 1.0, 0.0, 0.5);
+			values["idPowerAmpSag"] = post;
+		}
+	}
 
 	// Not clear if multiple threads trying to set state could cause issues as
 	// they would both trigger notirications to the host (the parameters changes

@@ -100,6 +100,11 @@ However this might not work for versions of FAUST other than `2.14.4` in which c
 
 ## Change log
 
+Version 0.7.0:
+
+* improve filtering
+* improve power amp drive and sag
+
 Version 0.6.2:
 
 * add tooltips

@@ -29,11 +29,11 @@ with {
     pre_drive = pre_drive_unit : uscale(log(1e0), log(2e3)) : exp;
     // Measured the loudness change as a function of the pre drive, this looks
     // up the correction for any drive
-    unscale_pre = ba.listInterp((+1.08e+01,+4.20e+00,-2.33e+00,-8.93e+00,-1.55e+01,-2.03e+01,-2.28e+01,-2.38e+01,-2.44e+01,-2.51e+01,-2.57e+01), (pre_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
+    unscale_pre = ba.listInterp((+1.08e+01,+4.20e+00,-2.33e+00,-8.91e+00,-1.55e+01,-2.03e+01,-2.27e+01,-2.38e+01,-2.44e+01,-2.51e+01,-2.57e+01), (pre_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
 
     power_drive_unit = nentry("power_drive", 0, -1, +1, .1);
-    power_drive = power_drive_unit : uscale(log(1e0), log(1e3)) : exp;
-    unscale_power = ba.listInterp((-5.19e-01,-6.03e+00,-1.15e+01,-1.66e+01,-1.97e+01,-2.08e+01,-2.10e+01,-2.11e+01,-2.10e+01,-2.10e+01,-2.10e+01), (power_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
+    power_drive = power_drive_unit : uscale(log(5e-1), log(5e2)) : exp;
+    unscale_power = ba.listInterp((+5.14e+00,-4.50e-01,-5.74e+00,-1.11e+01,-1.65e+01,-1.98e+01,-2.08e+01,-2.10e+01,-2.09e+01,-2.08e+01,-2.08e+01), (power_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
 
     // correcting for perceived level changes, seems to be a problem with the
     // automatic calibration which always leaves the pre-amp upper drive range
@@ -100,7 +100,6 @@ with {
         <: ba.if(cab_on_off > 0, cab, _)
 
         : *(unscale_power)
-
         : *(global_unscale)
 
         : _;
