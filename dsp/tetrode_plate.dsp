@@ -51,6 +51,10 @@ tetrode_plate = environment {
     sag_tau1 = sag_tau : 1.0 / (ba.sec2samp(_) + 1.0);
     sag_tau2 = sag_tau * sag_ratio : 1.0 / (ba.sec2samp(_) + 1.0);
 
+    nyquist = 1.0 / (2.0 * ba.samp2sec(1));
+    hp_freq = nentry("tetrode_hp_freq", 0, -1, +1, .1) : uscale(log(1e1), log(1e2)) : exp : min(nyquist);
+    lp_freq = nentry("tetrode_lp_freq", 0, -1, +1, .1) : uscale(log(5e3), log(15e3)) : exp : min(nyquist);
+
     // calculation of the power draw sag induced overhead reduction
     calc_comp_clip = _
         : /(clip)
@@ -101,6 +105,8 @@ tetrode_plate = environment {
         : calc_sag_comp, _
         : *
         : *(1.0 + sag_depth * sag_toggle)
+
+        : fi.bandpass(1, hp_freq, lp_freq)
 
         // TODO: this is really only needed for fitting
         <: _, abs
