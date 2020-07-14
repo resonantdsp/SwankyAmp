@@ -34,6 +34,7 @@ public:
 	void resized() override;
 
 	void attachVTS(AudioProcessorValueTreeState& vts);
+	void attachTooltips(const TooltipsData& tooltips) override;
 
 private:
 	RSliderLabel sliderDrive;

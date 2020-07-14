@@ -23,6 +23,7 @@
 
 #include "ResonantAmpLAF.h"
 #include "PresetManager.h"
+#include "TooltipsData.h"
 #include "Components/AmpGroup.h"
 #include "Components/PresetGroup.h"
 
@@ -61,6 +62,9 @@ private:
 
 	// NOTE: must be declared *AFTER* valueTreeState AND presetGroup
 	PresetManager presetManager;
+
+	TooltipsData tooltipsData;
+	TooltipWindow tooltipWindow;
 
 	std::unique_ptr<Drawable> logoSvg;
 

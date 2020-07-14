@@ -511,6 +511,9 @@
     <ClCompile Include="..\..\Source\PresetManager.cpp">
       <Filter>ResonantAmp\Source</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Source\TooltipsData.cpp">
+      <Filter>ResonantAmp\Source</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\..\..\..\JUCE\modules\juce_audio_basics\buffers\juce_AudioChannelSet.cpp">
       <Filter>JUCE Modules\juce_audio_basics\buffers</Filter>
     </ClCompile>
@@ -2656,6 +2659,9 @@
       <Filter>ResonantAmp\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\PresetManager.h">
+      <Filter>ResonantAmp\Source</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\TooltipsData.h">
       <Filter>ResonantAmp\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\..\..\..\..\..\JUCE\modules\juce_audio_basics\audio_play_head\juce_AudioPlayHead.h">
@@ -4962,6 +4968,9 @@
       <Filter>ResonantAmp\Resources</Filter>
     </None>
     <None Include="..\..\Resources\PTSansNarrow\PTSansNarrow-Regular.ttf">
+      <Filter>ResonantAmp\Resources</Filter>
+    </None>
+    <None Include="..\..\Resources\tooltips.xml">
       <Filter>ResonantAmp\Resources</Filter>
     </None>
     <None Include="..\..\..\..\..\..\..\JUCE\modules\juce_audio_devices\native\oboe\CMakeLists.txt">

@@ -154,6 +154,7 @@
     <ClCompile Include="..\..\Source\PluginProcessor.cpp"/>
     <ClCompile Include="..\..\Source\PluginEditor.cpp"/>
     <ClCompile Include="..\..\Source\PresetManager.cpp"/>
+    <ClCompile Include="..\..\Source\TooltipsData.cpp"/>
     <ClCompile Include="..\..\..\..\..\..\..\JUCE\modules\juce_audio_basics\buffers\juce_AudioChannelSet.cpp">
       <ExcludedFromBuild>true</ExcludedFromBuild>
     </ClCompile>
@@ -2113,6 +2114,7 @@
     <ClInclude Include="..\..\Source\PluginProcessor.h"/>
     <ClInclude Include="..\..\Source\PluginEditor.h"/>
     <ClInclude Include="..\..\Source\PresetManager.h"/>
+    <ClInclude Include="..\..\Source\TooltipsData.h"/>
     <ClInclude Include="..\..\..\..\..\..\..\JUCE\modules\juce_audio_basics\audio_play_head\juce_AudioPlayHead.h"/>
     <ClInclude Include="..\..\..\..\..\..\..\JUCE\modules\juce_audio_basics\buffers\juce_AudioChannelSet.h"/>
     <ClInclude Include="..\..\..\..\..\..\..\JUCE\modules\juce_audio_basics\buffers\juce_AudioDataConverters.h"/>
@@ -2883,6 +2885,7 @@
     <None Include="..\..\Resources\PTSans\PTSans-Bold.ttf"/>
     <None Include="..\..\Resources\PTSans\PTSans-Regular.ttf"/>
     <None Include="..\..\Resources\PTSansNarrow\PTSansNarrow-Regular.ttf"/>
+    <None Include="..\..\Resources\tooltips.xml"/>
     <None Include="..\..\..\..\..\..\..\JUCE\modules\juce_audio_devices\native\oboe\CMakeLists.txt"/>
     <None Include="..\..\..\..\..\..\..\JUCE\modules\juce_audio_devices\native\oboe\readme.md"/>
     <None Include="..\..\..\..\..\..\..\JUCE\modules\juce_audio_formats\codecs\flac\Flac Licence.txt"/>

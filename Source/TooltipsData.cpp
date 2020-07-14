@@ -16,34 +16,31 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#pragma once
+#include "ToolTipsData.h"
 
-#include <JuceHeader.h>
-
-#include "../Utils.h"
-#include "ParameterGroup.h"
-#include "RSliderLabel.h"
-
-class StagingGroup : public ParameterGroup
+TooltipsData::TooltipsData(const std::unique_ptr<XmlElement>& xml)
 {
-public:
-	StagingGroup();
-	~StagingGroup() {}
+	if (xml == nullptr)
+		return;
 
-	void setHeight(int height) { setSize(0, height); }
-	void resized() override;
+	XmlElement* element = xml->getFirstChildElement();
+	while (element != nullptr)
+	{
+		if (element->hasTagName("param") && element->hasAttribute("id"))
+		{
+			const String& id = element->getStringAttribute("id");
+			const String& text = element->getAllSubText().trimStart().trimEnd();
+			paramStrings.insert(std::pair<const String&, const String&>(id, text));
+		}
 
-	void attachVTS(AudioProcessorValueTreeState& vts);
-	void attachTooltips(const TooltipsData& tooltips) override;
+		element = element->getNextElement();
+	}
+}
 
-private:
-	RSliderLabel sliderStages;
-	RSliderLabel sliderSlope;
-
-	std::unique_ptr<SliderAttachment> attStages;
-	std::unique_ptr<SliderAttachment> attSlope;
-
-	DISABLE_COMPONENT_RESIZE()
-	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (StagingGroup)
-};
-
+const String& TooltipsData::getForParam(const String& name) const
+{
+	if (paramStrings.find(name) == paramStrings.end())
+		return "";
+	else
+		return paramStrings.at(name);
+}

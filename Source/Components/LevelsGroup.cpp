@@ -80,6 +80,12 @@ void LevelsGroup::attachVTS(AudioProcessorValueTreeState& vts)
 	attOutputLevel.reset(new SliderAttachment(vts, "idOutputLevel", sliderOutputLevel.slider));
 }
 
+void LevelsGroup::attachTooltips(const TooltipsData& tooltips)
+{
+	sliderInputLevel.slider.setTooltip(tooltips.getForParam("idInputLevel"));
+	sliderOutputLevel.slider.setTooltip(tooltips.getForParam("idOutputLevel"));
+}
+
 void LevelsGroup::resized()
 {
 	const int prevInnerHeight = getBorderBounds().getHeight() - 2 * spacing;

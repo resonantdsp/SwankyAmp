@@ -44,6 +44,14 @@ void ToneStackGroup::attachVTS(AudioProcessorValueTreeState& vts)
 	attPresence.reset(new SliderAttachment(vts, "idTsPresence", sliderPresence.slider));
 }
 
+void ToneStackGroup::attachTooltips(const TooltipsData& tooltips)
+{
+	sliderLow.slider.setTooltip(tooltips.getForParam("idTsLow"));
+	sliderMid.slider.setTooltip(tooltips.getForParam("idTsMid"));
+	sliderHigh.slider.setTooltip(tooltips.getForParam("idTsHigh"));
+	sliderPresence.slider.setTooltip(tooltips.getForParam("idTsPresence"));
+}
+
 void ToneStackGroup::resized()
 {
 	const int prevInnerHeight = getBorderBounds().getHeight() - 2 * spacing;

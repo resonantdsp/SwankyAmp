@@ -153,6 +153,10 @@
 			isa = PBXBuildFile;
 			fileRef = 46C95ABAC74139798C04941A;
 		};
+		B575E933A124B240A0BEA06D = {
+			isa = PBXBuildFile;
+			fileRef = CE43B9611D6454397223E841;
+		};
 		798621D7DBAE4FC6FB812E33 = {
 			isa = PBXBuildFile;
 			fileRef = AD76CE282F92F0B99439D1BB;
@@ -379,6 +383,13 @@
 			lastKnownFileType = file.ttf;
 			name = "PTSans-Regular.ttf";
 			path = "../../Resources/PTSans/PTSans-Regular.ttf";
+			sourceTree = "SOURCE_ROOT";
+		};
+		5D40A7937E0F8E42459A9F9B = {
+			isa = PBXFileReference;
+			lastKnownFileType = file.xml;
+			name = tooltips.xml;
+			path = ../../Resources/tooltips.xml;
 			sourceTree = "SOURCE_ROOT";
 		};
 		B6D598D8AEA1FF5BC3D4BD92 = {
@@ -787,6 +798,13 @@
 			path = ../../Source/Components/AmpGroup.h;
 			sourceTree = "SOURCE_ROOT";
 		};
+		BA24E3517552EC73B03EDF90 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = TooltipsData.h;
+			path = ../../Source/TooltipsData.h;
+			sourceTree = "SOURCE_ROOT";
+		};
 		BC9ED327B4E1CF94BE1B8812 = {
 			isa = PBXFileReference;
 			lastKnownFileType = file;
@@ -848,6 +866,13 @@
 			lastKnownFileType = sourcecode.cpp.cpp;
 			name = CabGroup.cpp;
 			path = ../../Source/Components/CabGroup.cpp;
+			sourceTree = "SOURCE_ROOT";
+		};
+		CE43B9611D6454397223E841 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = TooltipsData.cpp;
+			path = ../../Source/TooltipsData.cpp;
 			sourceTree = "SOURCE_ROOT";
 		};
 		D134DD7046C76C5361AC80BF = {
@@ -984,6 +1009,7 @@
 				D4C08012246F74E2E3ED6117,
 				529A38DC6B0E839FF2B1756E,
 				8F406035EFC8B04531C8C9F4,
+				5D40A7937E0F8E42459A9F9B,
 			);
 			name = Resources;
 			sourceTree = "<group>";
@@ -1036,6 +1062,8 @@
 				F3ACB6EB51A49238B20A01E0,
 				46C95ABAC74139798C04941A,
 				58259A1EEEEB2D19003511DF,
+				CE43B9611D6454397223E841,
+				BA24E3517552EC73B03EDF90,
 			);
 			name = Source;
 			sourceTree = "<group>";
@@ -2159,6 +2187,7 @@
 				0ECF095E595A3F61003AB096,
 				2516937FF938F9180ECB5554,
 				08A348691882E4DAE152691E,
+				B575E933A124B240A0BEA06D,
 				798621D7DBAE4FC6FB812E33,
 				84B3774CBA909862EB8084AF,
 				6D2D34B9CD0DCD525AB1515A,

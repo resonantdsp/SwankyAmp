@@ -21,6 +21,7 @@
 #include <JuceHeader.h>
 
 #include "../Utils.h"
+#include "../TooltipsData.h"
 
 typedef AudioProcessorValueTreeState::SliderAttachment SliderAttachment;
 typedef AudioProcessorValueTreeState::ButtonAttachment ButtonAttachment;
@@ -39,6 +40,7 @@ public:
 	virtual void resized() override;
 
 	virtual void attachVTS(AudioProcessorValueTreeState& vts) = 0;
+	virtual void attachTooltips(const TooltipsData&) {}
 
 	const Rectangle<int>& getBorderBounds() const { return borderBounds; }
 

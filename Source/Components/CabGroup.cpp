@@ -41,6 +41,13 @@ void CabGroup::attachVTS(AudioProcessorValueTreeState& vts)
 	attCabDistance.reset(new SliderAttachment(vts, "idCabDistance", sliderDistance.slider));
 }
 
+void CabGroup::attachTooltips(const TooltipsData& tooltips)
+{
+	buttonCabOnOff.setTooltip(tooltips.getForParam("idCabOnOff"));
+	sliderBright.slider.setTooltip(tooltips.getForParam("idCabBrightness"));
+	sliderDistance.slider.setTooltip(tooltips.getForParam("idCabDistance"));
+}
+
 void CabGroup::resized()
 {
 	const int prevInnerHeight = getBorderBounds().getHeight() - 2 * spacing;

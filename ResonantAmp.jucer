@@ -16,6 +16,7 @@
             file="Resources/PTSans/PTSans-Regular.ttf"/>
       <FILE id="MoC8Of" name="PTSansNarrow-Regular.ttf" compile="0" resource="1"
             file="Resources/PTSansNarrow/PTSansNarrow-Regular.ttf"/>
+      <FILE id="Mk7N22" name="tooltips.xml" compile="0" resource="1" file="Resources/tooltips.xml"/>
     </GROUP>
     <GROUP id="{1D5987B1-0BA7-E171-9516-427783CB7E4A}" name="Source">
       <GROUP id="{2BC335E6-8421-3F7B-5FF8-345C44B52666}" name="Components">
@@ -70,6 +71,9 @@
       <FILE id="feb1e3" name="PresetManager.cpp" compile="1" resource="0"
             file="Source/PresetManager.cpp"/>
       <FILE id="y9okPZ" name="PresetManager.h" compile="0" resource="0" file="Source/PresetManager.h"/>
+      <FILE id="gAE38G" name="TooltipsData.cpp" compile="1" resource="0"
+            file="Source/TooltipsData.cpp"/>
+      <FILE id="pwenL3" name="TooltipsData.h" compile="0" resource="0" file="Source/TooltipsData.h"/>
     </GROUP>
   </MAINGROUP>
   <EXPORTFORMATS>

@@ -44,6 +44,14 @@ void PreAmpGroup::attachVTS(AudioProcessorValueTreeState& vts)
 	attFilter.reset(new SliderAttachment(vts, "idLowCut", sliderFilter.slider));
 }
 
+void PreAmpGroup::attachTooltips(const TooltipsData& tooltips)
+{
+	sliderDrive.slider.setTooltip(tooltips.getForParam("idPreAmpDrive"));
+	sliderTight.slider.setTooltip(tooltips.getForParam("idPreAmpTight"));
+	sliderGrit.slider.setTooltip(tooltips.getForParam("idPreAmpGrit"));
+	sliderFilter.slider.setTooltip(tooltips.getForParam("idLowCut"));
+}
+
 void PreAmpGroup::resized()
 {
 	const int prevInnerHeight = getBorderBounds().getHeight() - 2 * spacing;
