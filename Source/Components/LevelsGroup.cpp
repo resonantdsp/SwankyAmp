@@ -66,12 +66,14 @@ LevelsGroup::LevelsGroup() :
 	sliderInputLevel.slider.setPosMapHigh(35.0f);
 	sliderInputLevel.slider.setPosMapLow(-35.0f);
 	sliderInputLevel.slider.setPosMapFmt("%+.0f dB");
+	sliderInputLevel.slider.setPosMapDownFmt("%+.1f");
 
 	addAndMakeVisible(sliderOutputLevel);
 	sliderOutputLevel.setLabel("OUTPUT");
 	sliderOutputLevel.slider.setPosMapHigh(35.0f);
 	sliderOutputLevel.slider.setPosMapLow(-35.0f);
 	sliderOutputLevel.slider.setPosMapFmt("%+.0f dB");
+	sliderOutputLevel.slider.setPosMapDownFmt("%+.1f");
 }
 
 void LevelsGroup::attachVTS(AudioProcessorValueTreeState& vts)

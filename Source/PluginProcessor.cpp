@@ -19,14 +19,16 @@
 #include <algorithm>
 #include <unordered_map>
 
+#include <JuceHeader.h>
+
 #include "PluginEditor.h"
 
 #include "PluginProcessor.h"
 
 // add parameter to the VTS with default range -1 to +1
-#define MAKE_PARAMETER_UNIT(n) std::make_unique<AudioParameterFloat>("id"#n, #n, -1.0f, 1.0f, 0.0f)
+#define MAKE_PARAMETER_UNIT(n) std::make_unique<AudioParameterFloat>("id"#n, #n, NormalisableRange<float>(-1.0f, 1.0f, 2.0f / 1e3f), 0.0f)
 // add parameter to the VTS with custom range
-#define MAKE_PARAMETER(n, l, h, d) std::make_unique<AudioParameterFloat>("id"#n, #n, l, h, d)
+#define MAKE_PARAMETER(n, l, h, d) std::make_unique<AudioParameterFloat>("id"#n, #n, NormalisableRange<float>(l, h, fabs(h - l) / 1e3f), 0.0f)
 // assign a VTS parameter to an object member of the same name
 #define ASSIGN_PARAMETER(n) par##n = parameters.getRawParameterValue("id"#n);
 

@@ -58,6 +58,7 @@ public:
 	void setPosMapLow(float value) { posMapLow = value; }
 	void setPosMapHigh(float value) { posMapHigh = value; }
 	void setPosMapFmt(const String& fmt) { posMapFmt = fmt; }
+	void setPosMapDownFmt(const String& fmt) { posMapDownFmt = fmt; }
 
 	const Image& getBgNoise() const { return bgNoise; }
 
@@ -76,6 +77,7 @@ private:
 	float posMapLow = 0.0f;
 	float posMapHigh = 10.0f;
 	String posMapFmt = "%02.0f";
+	String posMapDownFmt = "";
 
 	float gap = 2.0f;
 	float margin = 0.0f;

@@ -25,12 +25,15 @@ PowerAmpGroup::PowerAmpGroup() :
 {
 	addAndMakeVisible(sliderDrive);
 	sliderDrive.setLabel("DRIVE");
+	sliderDrive.slider.setPosMapDownFmt("%4.1f");
 
 	addAndMakeVisible(sliderTight);
 	sliderTight.setLabel("TIGHT");
+	sliderTight.slider.setPosMapDownFmt("%4.1f");
 
 	addAndMakeVisible(sliderSag);
 	sliderSag.setLabel("SAG");
+	sliderSag.slider.setPosMapDownFmt("%4.1f");
 }
 
 void PowerAmpGroup::attachVTS(AudioProcessorValueTreeState& vts)
