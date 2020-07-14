@@ -2,13 +2,9 @@
 
 Resonant Amp is a tube amplifier simulation DSP plugin which aims to capture the details in the dynamics of tube amplifiers.
 
-The software is currently in beta and is distributed only as a VST3 for 64-bit Windows systems. You can find the installer here:
+The software is currently in beta and is distributed only as a VST3 for 64-bit Windows systems. You can find the installers on the website:
 
-<https://drive.google.com/open?id=1aOKUJyCAkUSvM0FRaJP6nhsQv2_noSLS>
-
-If you prefer to download the VST3 file directly and move it into the appropriate folder (typically `C:\Program Files\Common Files\VST3`), you can get it here:
-
-<https://drive.google.com/open?id=1BrrAsjQ0f8kNIKv2-GHh7Hjl1CVIRMka>
+<http://www.resonantdsp.com/resonantamp/>
 
 ## Usage
 
@@ -99,6 +95,11 @@ This process generates `Source/AmpMono.h` artifact. However this file is tracked
 However this might not work for versions of FAUST other than `2.14.4` in which case you will need to dig around `dsp/builddsp.py` and fix any issues arising from that script.
 
 ## Change log
+
+Version 0.7.1:
+
+* added decimal places to knob values when adjusting
+* improved knob sensitivity
 
 Version 0.7.0:
 
