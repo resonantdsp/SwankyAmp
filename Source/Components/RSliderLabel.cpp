@@ -26,6 +26,7 @@ RSliderLabel::RSliderLabel()
 	addAndMakeVisible(label);
 	label.setJustificationType(Justification::centredTop);
 	label.setFont(16.0f);
+	slider.setMouseDragSensitivity(400);
 }
 
 void RSliderLabel::setWidth(int width) {
