@@ -16,7 +16,7 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "ToolTipsData.h"
+#include "TooltipsData.h"
 
 TooltipsData::TooltipsData(const std::unique_ptr<XmlElement>& xml)
 {
