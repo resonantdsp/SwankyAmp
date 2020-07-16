@@ -29,20 +29,16 @@ using SerializedState = std::unique_ptr<XmlElement>;
 struct StateEntry
 {
 	StateEntry(
-		int order,
+		int id,
 		const String& name,
 		File file,
-		std::optional<size_t> stateIdx,
-		std::optional<size_t> factoryStateIdx);
-	StateEntry();
+		std::optional<size_t> stateIdx);
+	StateEntry() {}
 
-	bool operator>(const StateEntry& other);
-
-	int order;
+	int id = 0;
 	String name;
 	File file;
-	std::optional<size_t> stateIdx;
-	std::optional<size_t> factoryStateIdx;
+	std::optional<size_t> stateIdx = std::nullopt;
 };
 
 /** Connects a value tree state to a combo box and preset directory. */
@@ -54,13 +50,17 @@ public:
 		AudioProcessorValueTreeState& vts,
 		ComboBox& comboBox,
 		Button& bntSave,
-		Button& bntRemove
+		Button& bntRemove,
+		Button& bntNext,
+		Button& bntPrev
 	);
     ~PresetManager();
 
 	void comboBoxChanged();
 	void buttonSaveClicked();
 	void buttonRemoveClicked();
+	void buttonNextClicked();
+	void buttonPrevClicked();
 	void parameterChanged(const String& id, float newValue);
 
 	const std::vector<String>& getParameterIds() const { return parameterIds; }
@@ -68,31 +68,30 @@ public:
 	void setState(const SerializedState& state);
 
 private:
-	void loadPreset(SerializedState state, File file, bool isFactory);
-	void loadPresetsFromXml(
-		const std::unique_ptr<XmlElement>& xml,
-		const Identifier& stateType,
-		bool isFactory
-	);
-	void loadPresetsFromDir(
-		const File& dir,
-		const Identifier& stateType,
-		bool isFactory
-	);
+	void loadPreset(SerializedState state, File file, const String& name);
+	void loadFactoryPresets();
+	void loadPresetsFromDir();
+	void loadPresetsFromMaster();
 
 	void clearUI();
 	void updateComboBox();
+	void updatePresetMaster();
 
 	ResonantAmpAudioProcessor& processor;
     AudioProcessorValueTreeState& vts;
 	ComboBox& comboBox;
 	Button& buttonSave;
 	Button& buttonRemove;
+	Button& buttonNext;
+	Button& buttonPrev;
 	File presetDir;
+	File presetMaster;
 
 	std::vector<String> parameterIds;
 
 	StateEntry* currentEntry = nullptr;
 	std::unordered_map<String, StateEntry> stateEntries;
 	std::vector<SerializedState> states;
+	// ids used by the combo box, note that idx 0 is never used
+	std::vector<bool> usedIds = { false };
 };

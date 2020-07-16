@@ -32,7 +32,9 @@ ResonantAmpAudioProcessorEditor::ResonantAmpAudioProcessorEditor(
 		valueTreeState,
 		presetGroup.presetSelector,
 		presetGroup.buttonSave,
-		presetGroup.buttonRemove
+		presetGroup.buttonRemove,
+		presetGroup.buttonNext,
+		presetGroup.buttonPrev
 	),
 	// TODO: how to handle localization?
 	tooltipsData(XmlDocument::parse(BinaryData::tooltips_xml)),

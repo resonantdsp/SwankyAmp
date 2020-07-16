@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <presets>
-  <APVTSResonantAmp pluginVersion="0.7.0" presetName="clean" presetOrder="1">
+  <APVTSResonantAmp pluginVersion="0.7.0" presetName="clean">
     <PARAM id="idCabBrightness" value="0.2999999523162842"/>
     <PARAM id="idCabDistance" value="0.2999999821186066"/>
     <PARAM id="idCabOnOff" value="1.0"/>
@@ -25,7 +25,7 @@
     <PARAM id="idTsPresence" value="0.25"/>
   </APVTSResonantAmp>
 
-  <APVTSResonantAmp pluginVersion="0.7.0" presetName="edge scoop" presetOrder="2">
+  <APVTSResonantAmp pluginVersion="0.7.0" presetName="edge scoop">
     <PARAM id="idCabBrightness" value="0.0"/>
     <PARAM id="idCabDistance" value="0.0"/>
     <PARAM id="idCabOnOff" value="1.0"/>
@@ -49,7 +49,7 @@
     <PARAM id="idTsPresence" value="0.25"/>
   </APVTSResonantAmp>
 
-  <APVTSResonantAmp pluginVersion="0.7.0" presetName="edge mids" presetOrder="3">
+  <APVTSResonantAmp pluginVersion="0.7.0" presetName="edge mids">
     <PARAM id="idCabBrightness" value="0.0"/>
     <PARAM id="idCabDistance" value="0.2999999821186066"/>
     <PARAM id="idCabOnOff" value="1.0"/>
@@ -73,7 +73,7 @@
     <PARAM id="idTsPresence" value="0.4499999284744263"/>
   </APVTSResonantAmp>
 
-  <APVTSResonantAmp pluginVersion="0.7.0" presetName="distort" presetOrder="4">
+  <APVTSResonantAmp pluginVersion="0.7.0" presetName="distort">
     <PARAM id="idCabBrightness" value="0.0"/>
     <PARAM id="idCabDistance" value="0.6499999761581421"/>
     <PARAM id="idCabOnOff" value="1.0"/>
@@ -97,7 +97,7 @@
     <PARAM id="idTsPresence" value="0.3999999761581421"/>
   </APVTSResonantAmp>
 
-  <APVTSResonantAmp pluginVersion="0.7.0" presetName="dirty distort" presetOrder="5">
+  <APVTSResonantAmp pluginVersion="0.7.0" presetName="dirty distort">
     <PARAM id="idCabBrightness" value="-0.1700000166893005"/>
     <PARAM id="idCabDistance" value="0.2999999821186066"/>
     <PARAM id="idCabOnOff" value="1.0"/>
@@ -121,7 +121,7 @@
     <PARAM id="idTsPresence" value="0.1999999284744263"/>
   </APVTSResonantAmp>
 
-  <APVTSResonantAmp pluginVersion="0.7.0" presetName="pre drive" presetOrder="6">
+  <APVTSResonantAmp pluginVersion="0.7.0" presetName="pre drive">
     <PARAM id="idCabBrightness" value="-0.2000000476837158"/>
     <PARAM id="idCabDistance" value="0.5999999642372131"/>
     <PARAM id="idCabOnOff" value="1.0"/>
@@ -145,7 +145,7 @@
     <PARAM id="idTsPresence" value="0.04999995231628418"/>
   </APVTSResonantAmp>
 
-  <APVTSResonantAmp pluginVersion="0.7.0" presetName="power drive" presetOrder="7">
+  <APVTSResonantAmp pluginVersion="0.7.0" presetName="power drive">
     <PARAM id="idCabBrightness" value="0.0"/>
     <PARAM id="idCabDistance" value="0.699999988079071"/>
     <PARAM id="idCabOnOff" value="1.0"/>
@@ -169,7 +169,7 @@
     <PARAM id="idTsPresence" value="0.5"/>
   </APVTSResonantAmp>
 
-  <APVTSResonantAmp pluginVersion="0.7.0" presetName="full drive" presetOrder="8">
+  <APVTSResonantAmp pluginVersion="0.7.0" presetName="full drive">
     <PARAM id="idCabBrightness" value="-0.300000011920929"/>
     <PARAM id="idCabDistance" value="0.7999999523162842"/>
     <PARAM id="idCabOnOff" value="1.0"/>
@@ -193,7 +193,7 @@
     <PARAM id="idTsPresence" value="0.0"/>
   </APVTSResonantAmp>
 
-  <APVTSResonantAmp pluginVersion="0.7.0" presetName="high gain" presetOrder="9">
+  <APVTSResonantAmp pluginVersion="0.7.0" presetName="high gain">
     <PARAM id="idCabBrightness" value="-0.2000000476837158"/>
     <PARAM id="idCabDistance" value="0.75"/>
     <PARAM id="idCabOnOff" value="1.0"/>
@@ -217,7 +217,7 @@
     <PARAM id="idTsPresence" value="-0.4000000357627869"/>
   </APVTSResonantAmp>
 
-  <APVTSResonantAmp pluginVersion="0.7.0" presetName="level 11" presetOrder="10">
+  <APVTSResonantAmp pluginVersion="0.7.0" presetName="level 11">
     <PARAM id="idCabBrightness" value="-0.25"/>
     <PARAM id="idCabDistance" value="0.7999999523162842"/>
     <PARAM id="idCabOnOff" value="1.0"/>

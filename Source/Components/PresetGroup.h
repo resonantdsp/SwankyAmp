@@ -46,13 +46,18 @@ public:
 	ComboBox presetSelector;
 	DrawableButton buttonSave;
 	DrawableButton buttonRemove;
+	DrawableButton buttonNext;
+	DrawableButton buttonPrev;
 
 private:
 	DrawablePath saveIcon;
 	DrawablePath saveIconHighlight;
-
 	DrawablePath removeIcon;
 	DrawablePath removeIconHighlight;
+	DrawablePath nextIcon;
+	DrawablePath nextIconHighlight;
+	DrawablePath prevIcon;
+	DrawablePath prevIconHighlight;
 
 	DISABLE_COMPONENT_RESIZE()
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PresetGroup)

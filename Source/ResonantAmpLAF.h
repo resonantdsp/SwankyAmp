@@ -47,6 +47,8 @@ public:
 
 	static Path getSaveIconPath(float d);
 	static Path getRemoveIconPath(float d);
+	static Path getNextIconPath(float d);
+	static Path getPrevIconPath(float d);
 
 	Path getTickShape(float height) override;
 	Slider::SliderLayout getSliderLayout(Slider& slider) override;
