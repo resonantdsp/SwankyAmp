@@ -29,13 +29,13 @@ using SerializedState = std::unique_ptr<XmlElement>;
 struct StateEntry
 {
 	StateEntry(
-		size_t order,
+		int id,
 		const String& name,
 		File file,
 		std::optional<size_t> stateIdx);
 	StateEntry() {}
 
-	size_t order = 0;
+	int id = 0;
 	String name;
 	File file;
 	std::optional<size_t> stateIdx = std::nullopt;
@@ -50,13 +50,17 @@ public:
 		AudioProcessorValueTreeState& vts,
 		ComboBox& comboBox,
 		Button& bntSave,
-		Button& bntRemove
+		Button& bntRemove,
+		Button& bntNext,
+		Button& bntPrev
 	);
     ~PresetManager();
 
 	void comboBoxChanged();
 	void buttonSaveClicked();
 	void buttonRemoveClicked();
+	void buttonNextClicked();
+	void buttonPrevClicked();
 	void parameterChanged(const String& id, float newValue);
 
 	const std::vector<String>& getParameterIds() const { return parameterIds; }
@@ -78,6 +82,8 @@ private:
 	ComboBox& comboBox;
 	Button& buttonSave;
 	Button& buttonRemove;
+	Button& buttonNext;
+	Button& buttonPrev;
 	File presetDir;
 	File presetMaster;
 
@@ -86,5 +92,6 @@ private:
 	StateEntry* currentEntry = nullptr;
 	std::unordered_map<String, StateEntry> stateEntries;
 	std::vector<SerializedState> states;
-	size_t nextOrderValue = 0;
+	// ids used by the combo box, note that idx 0 is never used
+	std::vector<bool> usedIds = { false };
 };

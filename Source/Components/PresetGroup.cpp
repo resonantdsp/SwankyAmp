@@ -25,7 +25,9 @@
 
 PresetGroup::PresetGroup() :
 	buttonSave("presetGroupButtonSave", DrawableButton::ButtonStyle::ImageFitted),
-	buttonRemove("presetGroupButtonRemove", DrawableButton::ButtonStyle::ImageFitted)
+	buttonRemove("presetGroupButtonRemove", DrawableButton::ButtonStyle::ImageFitted),
+	buttonNext("presetGroupButtonNext", DrawableButton::ButtonStyle::ImageFitted),
+	buttonPrev("presetGroupButtonPrev", DrawableButton::ButtonStyle::ImageFitted)
 {
 	presetSelector.setEditableText(true);
 	addAndMakeVisible(presetSelector);
@@ -34,15 +36,25 @@ PresetGroup::PresetGroup() :
 	saveIcon.setStrokeFill(ResonantAmpLAF::colourDark);
 	saveIconHighlight.setFill(Colours::transparentBlack);
 	saveIconHighlight.setStrokeFill(ResonantAmpLAF::colourHighlight);
-
 	addAndMakeVisible(buttonSave);
 
 	removeIcon.setFill(Colours::transparentBlack);
 	removeIcon.setStrokeFill(ResonantAmpLAF::colourDark);
 	removeIconHighlight.setFill(Colours::transparentBlack);
 	removeIconHighlight.setStrokeFill(ResonantAmpLAF::colourHighlight);
-
 	addAndMakeVisible(buttonRemove);
+
+	nextIcon.setFill(Colours::transparentBlack);
+	nextIcon.setStrokeFill(ResonantAmpLAF::colourDark);
+	nextIconHighlight.setFill(Colours::transparentBlack);
+	nextIconHighlight.setStrokeFill(ResonantAmpLAF::colourHighlight);
+	addAndMakeVisible(buttonNext);
+
+	prevIcon.setFill(Colours::transparentBlack);
+	prevIcon.setStrokeFill(ResonantAmpLAF::colourDark);
+	prevIconHighlight.setFill(Colours::transparentBlack);
+	prevIconHighlight.setStrokeFill(ResonantAmpLAF::colourHighlight);
+	addAndMakeVisible(buttonPrev);
 }
 
 void PresetGroup::paint(Graphics& g)
@@ -75,6 +87,24 @@ void PresetGroup::resized()
 	buttonRemove.setSize(getHeight(), getHeight());
 	buttonRemove.setTopLeftPosition(buttonSave.getBounds().getTopRight() + Point<int>(jmax(1, spacing / 2), 0));
 
-	setSize(buttonRemove.getRight(), getHeight());
+	prevIcon.setPath(ResonantAmpLAF::getPrevIconPath((float)getHeight()));
+	prevIcon.setStrokeType(PathStrokeType(3.0f));
+	prevIconHighlight.setStrokeType(PathStrokeType(3.0f));
+	prevIconHighlight.setPath(ResonantAmpLAF::getPrevIconPath((float)getHeight()));
+	buttonPrev.setImages(&prevIcon, &prevIconHighlight);
+
+	buttonPrev.setSize(getHeight(), getHeight());
+	buttonPrev.setTopLeftPosition(buttonRemove.getBounds().getTopRight() + Point<int>(jmax(1, spacing / 2), 0));
+
+	nextIcon.setPath(ResonantAmpLAF::getNextIconPath((float)getHeight()));
+	nextIcon.setStrokeType(PathStrokeType(3.0f));
+	nextIconHighlight.setStrokeType(PathStrokeType(3.0f));
+	nextIconHighlight.setPath(ResonantAmpLAF::getNextIconPath((float)getHeight()));
+	buttonNext.setImages(&nextIcon, &nextIconHighlight);
+
+	buttonNext.setSize(getHeight(), getHeight());
+	buttonNext.setTopLeftPosition(buttonPrev.getBounds().getTopRight() + Point<int>(jmax(1, spacing / 2), 0));
+
+	setSize(buttonNext.getRight(), getHeight());
 }
 

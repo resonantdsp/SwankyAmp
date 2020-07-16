@@ -173,6 +173,34 @@ Path ResonantAmpLAF::getRemoveIconPath(float d)
 	return path;
 }
 
+Path ResonantAmpLAF::getNextIconPath(float d)
+{
+	Path path;
+
+	path.addRoundedRectangle(0.0f, 0.0f, 1.0f, 1.0f, 0.125f, 0.125f);
+
+	path.startNewSubPath(0.333f, 0.25f);
+	path.lineTo(0.667f, 0.5f);
+	path.lineTo(0.333f, 0.75f);
+
+	path.scaleToFit(0, 0, d, d, true);
+	return path;
+}
+
+Path ResonantAmpLAF::getPrevIconPath(float d)
+{
+	Path path;
+
+	path.addRoundedRectangle(0.0f, 0.0f, 1.0f, 1.0f, 0.125f, 0.125f);
+
+	path.startNewSubPath(0.667f, 0.25f);
+	path.lineTo(0.333f, 0.5f);
+	path.lineTo(0.667f, 0.75f);
+
+	path.scaleToFit(0, 0, d, d, true);
+	return path;
+}
+
 Path ResonantAmpLAF::getTickShape(float height)
 {
 	const float padding = height / 5.0f;
