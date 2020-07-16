@@ -21,6 +21,8 @@
 #include "PresetManager.h"
 #include "Components/PresetGroup.h"
 
+// TODO: no longer used but could be useful for building parameter list in
+// processor?
 std::vector<String> buildParameterIds(const SerializedState& state)
 {
 	if (state == nullptr)
@@ -47,33 +49,15 @@ std::vector<String> buildParameterIds(const SerializedState& state)
 }
 
 StateEntry::StateEntry(
-	int order,
+	size_t order,
 	const String& name,
 	File file,
-	std::optional<size_t> stateIdx,
-	std::optional<size_t> factoryStateIdx) :
+	std::optional<size_t> stateIdx) :
 	order(order),
 	name(name),
 	file(file),
-	stateIdx(stateIdx),
-	factoryStateIdx(factoryStateIdx)
+	stateIdx(stateIdx)
 {}
-
-StateEntry::StateEntry() :
-	order(INT_MAX),
-	name(),
-	file(),
-	stateIdx(std::nullopt),
-	factoryStateIdx(std::nullopt)
-{}
-
-bool StateEntry::operator>(const StateEntry& other)
-{
-	return
-		order != other.order ?
-		order > other.order :
-		name > other.name;
-}
 
 PresetManager::PresetManager(
 	ResonantAmpAudioProcessor& processor,
@@ -94,17 +78,23 @@ PresetManager::PresetManager(
 	presetDir = presetDir.getChildFile(JucePlugin_Manufacturer).getChildFile(JucePlugin_Name);
 	// silent if invalid, will only notify user when they try to save
 	presetDir.createDirectory();
+	// preset master file indicates which presets to use
+	presetMaster = presetDir.getChildFile("presetMaster.xml");
 
-	// get the list of parameter ids up front since it's not accessible at first;
-	// vst.state.getNumParameters() returns zero until it initializes its object.
-	parameterIds = buildParameterIds(SerializedState(vts.state.createXml()));
+	stateEntries["init"] = StateEntry(nextOrderValue++, "init", File(), std::nullopt);
 
-	const auto factoryPresets = XmlDocument::parse(BinaryData::presets_xml);
-	const Identifier stateType = vts.state.getType();
-
-	stateEntries["init"] = StateEntry(0, "init", File(), std::nullopt, std::nullopt);
-	loadPresetsFromXml(factoryPresets, stateType, true);
-	loadPresetsFromDir(presetDir, stateType, false);
+	// if not yet found, write factory presets to disk and build initial master
+	// (also finds any existing presets in the directory)
+	if (!presetMaster.existsAsFile())
+	{
+		loadPresetsFromDir();
+		loadFactoryPresets();
+		updatePresetMaster();
+	}
+	else
+	{
+		loadPresetsFromMaster();
+	}
 
 	comboBox.onChange = [&]() { comboBoxChanged(); };
 	buttonSave.onClick = [&]() { buttonSaveClicked(); };
@@ -125,75 +115,98 @@ PresetManager::~PresetManager()
 void PresetManager::loadPreset(
 	SerializedState state,
 	File file,
-	bool isFactory)
+	const String& name)
 {
 	if (state == nullptr)
 		return;
 
-	const String& name = state->getStringAttribute("presetName");
-	const int orderValue =
-		state->hasAttribute("presetOrder") 
-		? state->getIntAttribute("presetOrder") 
-		: INT_MAX;
-
 	states.push_back(std::move(state));
-	if (isFactory)
-		stateEntries[name] = StateEntry(
-			orderValue,
-			name,
-			file,
-			std::nullopt,
-			{ states.size() - 1 }
-		);
-	else
-		stateEntries[name] = StateEntry(
-			orderValue,
-			name,
-			file,
-			{ states.size() - 1 },
-			std::nullopt
-		);
+	stateEntries[name] = StateEntry(
+		nextOrderValue++,
+		name.isNotEmpty() ? name : state->getStringAttribute("presetName"),
+		file,
+		{ states.size() - 1 }
+	);
 }
 
-void PresetManager::loadPresetsFromXml(
-	const std::unique_ptr<XmlElement>& xml,
-	const Identifier& stateType,
-	bool isFactory)
+void PresetManager::loadFactoryPresets()
 {
+	const std::unique_ptr<XmlElement> xml = XmlDocument::parse(BinaryData::presets_xml);
 	if (xml == nullptr)
 		return;
+
+	bool writingSuccess = true;
+	const Identifier& stateType = vts.state.getType();
 
 	XmlElement* stateXml = xml->getFirstChildElement();
 	while (stateXml != nullptr)
 	{
 		if (stateXml->hasTagName(stateType) && stateXml->hasAttribute("presetName"))
 		{
-			// make a deep copy of the preset state and take ownership
-			SerializedState state = std::make_unique<XmlElement>(*stateXml);
-			loadPreset(std::move(state), File(), isFactory);
+			const String& presetName = stateXml->getStringAttribute("presetName");
+			File presetFile = presetDir.getChildFile(presetName + ".xml");
+			if (!presetFile.existsAsFile())
+			{
+				writingSuccess &= stateXml->writeTo(presetFile);
+				loadPreset(std::make_unique<XmlElement>(*stateXml), presetFile, presetName);
+			}
 		}
-
 		stateXml = stateXml->getNextElement();
+	}
+
+	if (!writingSuccess)
+	{
+		AlertWindow::showMessageBox(
+			AlertWindow::AlertIconType::WarningIcon,
+			"Factory preset failure",
+			"Unalble to persist factory presets to disk"
+		);
 	}
 }
 
-void PresetManager::loadPresetsFromDir(
-	const File& dir,
-	const Identifier& stateType,
-	bool isFactory)
+void PresetManager::loadPresetsFromDir()
 {
 	std::vector<String> filePaths;
-	const auto files = dir.findChildFiles(File::TypesOfFileToFind::findFiles, false);
+	auto files = presetDir.findChildFiles(File::TypesOfFileToFind::findFiles, false);
+	std::sort(files.begin(), files.end());
+
+	const Identifier& stateType = vts.state.getType();
 
 	for (int i = 0; i < files.size(); i++)
 	{
-		const File& file = files[i];
-		if (file.getFileExtension() != ".xml" && file.getFileExtension() != ".XML")
+		const File& presetFile = files[i];
+		if (presetFile.getFileExtension() != ".xml" && presetFile.getFileExtension() != ".XML")
 			continue;
 
-		SerializedState state = XmlDocument::parse(file);
-		if (state != nullptr && state->hasTagName(stateType) && state->hasAttribute("presetName"))
-			loadPreset(std::move(state), file, isFactory);
+		SerializedState stateXml = XmlDocument::parse(presetFile);
+
+		if (stateXml->hasTagName(stateType) && stateXml->hasAttribute("presetName"))
+		{
+			const String& presetName = stateXml->getStringAttribute("presetName");
+			loadPreset(std::make_unique<XmlElement>(*stateXml), presetFile, presetName);
+		}
+	}
+}
+
+void PresetManager::loadPresetsFromMaster()
+{
+	XmlDocument master(presetMaster);
+	std::unique_ptr<XmlElement> xml = master.getDocumentElement();
+
+	if (xml->getTagName() != "presetList")
+		return;
+
+	XmlElement* entry = xml->getFirstChildElement();
+	while (entry != nullptr)
+	{
+		if (entry->getTagName() == "entry" && entry->hasAttribute("name") && entry->hasAttribute("file"))
+		{
+			const String& name = entry->getStringAttribute("name");
+			const File& file = entry->getStringAttribute("file");
+			if (file.existsAsFile())
+				loadPreset(XmlDocument(file).getDocumentElement(), file, name);
+		}
+		entry = entry->getNextElement();
 	}
 }
 
@@ -208,28 +221,56 @@ void PresetManager::updateComboBox()
 {
 	comboBox.clear();
 
-	std::vector<std::pair<int, String>> keyOrder;
+	std::vector<std::pair<size_t, String>> keyOrder;
 	for (const auto& item : stateEntries)
-		keyOrder.push_back(std::pair<int, String>(item.second.order, item.second.name));
+		keyOrder.push_back(std::pair<size_t, String>(item.second.order, item.second.name));
 	std::sort(keyOrder.begin(), keyOrder.end());
 
 	for (const auto& item : keyOrder)
 		comboBox.addItem(item.second, comboBox.getNumItems() + 1);
 }
 
+void PresetManager::updatePresetMaster()
+{
+	XmlElement master = XmlElement("presetList");
+
+	std::vector<std::pair<size_t, String>> keyOrder;
+	for (const auto& item : stateEntries)
+		keyOrder.push_back(std::pair<size_t, String>(item.second.order, item.second.name));
+	std::sort(keyOrder.begin(), keyOrder.end());
+
+	for (const auto& item : keyOrder)
+	{
+		const String& name = item.second;
+		const File& file = stateEntries[name].file;
+		if (file.existsAsFile())
+		{
+			XmlElement* presetEntry = new XmlElement("entry");
+			presetEntry->setAttribute("name", name);
+			presetEntry->setAttribute("file", file.getFullPathName());
+			master.addChildElement(presetEntry);
+		}
+	}
+
+	master.writeTo(presetMaster);
+}
+
 void PresetManager::comboBoxChanged()
 {
 	const String& name = comboBox.getText();
 
-	if (name != "" && stateEntries.find(name) == stateEntries.end())
+	if (name == "")
+		return;
+
+	if (stateEntries.find(name) == stateEntries.end())
 	{
+		// new entry
 		states.push_back(std::move(SerializedState(vts.state.createXml())));
 		stateEntries[name] = StateEntry(
-			(int)stateEntries.size(),
+			nextOrderValue++,
 			name,
 			File(),
-			states.size() - 1,
-			std::nullopt
+			states.size() - 1
 		);
 		currentEntry = &stateEntries[name];
 		comboBox.addItem(name, comboBox.getNumItems() + 1);
@@ -237,27 +278,24 @@ void PresetManager::comboBoxChanged()
 		buttonRemove.setEnabled(true);
 		// this can be saved as a new preset with the current state
 		buttonSave.setEnabled(true);
+		// NOTE: don't yet add to master as it is not persisted
 	}
 	else
 	{
+		// existing entry
 		currentEntry = &stateEntries[name];
 		if (currentEntry != nullptr && currentEntry->stateIdx != std::nullopt)
 		{
+			// load the state for this entry
 			setState(states[currentEntry->stateIdx.value()]);
 			// this is a custom state, can be removed
 			buttonRemove.setEnabled(true);
 			// can't save until modified
 			buttonSave.setEnabled(false);
 		}
-		else if (currentEntry != nullptr && currentEntry->factoryStateIdx != std::nullopt)
-		{
-			setState(states[currentEntry->factoryStateIdx.value()]);
-			// can't remove factory presets
-			buttonRemove.setEnabled(false);
-			buttonSave.setEnabled(false);
-		}
 		else
 		{
+			// the init preset
 			setState(nullptr);
 			buttonRemove.setEnabled(false);
 			buttonSave.setEnabled(false);
@@ -278,7 +316,6 @@ void PresetManager::buttonSaveClicked()
 
 	state->setAttribute("pluginVersion", JucePlugin_VersionString);
 	state->setAttribute("presetName", currentEntry->name);
-	state->setAttribute("presetOrder", currentEntry->order);
 
 	// TODO: sanitize preset names for valid file paths... could be tricky with
 	// multiple os support
@@ -303,15 +340,16 @@ void PresetManager::buttonSaveClicked()
 		);
 		return;
 	}
-	
 
 	states.push_back(std::move(state));
 	currentEntry->stateIdx = { states.size() - 1 };
 	currentEntry->file = xmlFile;
 
+	// once a state is persisted, update the master
+	updatePresetMaster();
+
 	// can't save again until something changes
 	buttonSave.setEnabled(false);
-	// can definitely remove this preset (can't be factory)
 	buttonRemove.setEnabled(true);
 }
 
@@ -319,29 +357,18 @@ void PresetManager::buttonRemoveClicked()
 {
 	if (currentEntry == nullptr)
 		return;
-	if (currentEntry->name == "")
-		return;
+
 	if (currentEntry->file.getFullPathName() != "")
 	{
-		if (!currentEntry->file.deleteFile())
-		{
-			AlertWindow::showMessageBox(
-				AlertWindow::AlertIconType::WarningIcon,
-				"Failed to remove",
-				"Failed to remove preset file"
-			);
-			return;
-		}
+		currentEntry->file.deleteFile();
 		currentEntry->file = File();
 	}
-	if (currentEntry->factoryStateIdx != std::nullopt)
-		currentEntry->stateIdx = std::nullopt;
-	else
-		stateEntries.erase(currentEntry->name);
 
+	stateEntries.erase(currentEntry->name);
 	currentEntry = nullptr;
-	// TODO: separate sync UI state, here order of calls matters!
+
 	updateComboBox();
+	updatePresetMaster();
 	clearUI();
 }
 

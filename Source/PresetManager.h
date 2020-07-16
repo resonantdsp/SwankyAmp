@@ -29,20 +29,16 @@ using SerializedState = std::unique_ptr<XmlElement>;
 struct StateEntry
 {
 	StateEntry(
-		int order,
+		size_t order,
 		const String& name,
 		File file,
-		std::optional<size_t> stateIdx,
-		std::optional<size_t> factoryStateIdx);
-	StateEntry();
+		std::optional<size_t> stateIdx);
+	StateEntry() {}
 
-	bool operator>(const StateEntry& other);
-
-	int order;
+	size_t order = 0;
 	String name;
 	File file;
-	std::optional<size_t> stateIdx;
-	std::optional<size_t> factoryStateIdx;
+	std::optional<size_t> stateIdx = std::nullopt;
 };
 
 /** Connects a value tree state to a combo box and preset directory. */
@@ -68,20 +64,14 @@ public:
 	void setState(const SerializedState& state);
 
 private:
-	void loadPreset(SerializedState state, File file, bool isFactory);
-	void loadPresetsFromXml(
-		const std::unique_ptr<XmlElement>& xml,
-		const Identifier& stateType,
-		bool isFactory
-	);
-	void loadPresetsFromDir(
-		const File& dir,
-		const Identifier& stateType,
-		bool isFactory
-	);
+	void loadPreset(SerializedState state, File file, const String& name);
+	void loadFactoryPresets();
+	void loadPresetsFromDir();
+	void loadPresetsFromMaster();
 
 	void clearUI();
 	void updateComboBox();
+	void updatePresetMaster();
 
 	ResonantAmpAudioProcessor& processor;
     AudioProcessorValueTreeState& vts;
@@ -89,10 +79,12 @@ private:
 	Button& buttonSave;
 	Button& buttonRemove;
 	File presetDir;
+	File presetMaster;
 
 	std::vector<String> parameterIds;
 
 	StateEntry* currentEntry = nullptr;
 	std::unordered_map<String, StateEntry> stateEntries;
 	std::vector<SerializedState> states;
+	size_t nextOrderValue = 0;
 };

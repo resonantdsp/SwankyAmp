@@ -12,7 +12,7 @@ namespace BinaryData
     const int            logo_svgSize = 8088;
 
     extern const char*   presets_xml;
-    const int            presets_xmlSize = 12248;
+    const int            presets_xmlSize = 12087;
 
     extern const char*   PTSansBold_ttf;
     const int            PTSansBold_ttfSize = 287936;
