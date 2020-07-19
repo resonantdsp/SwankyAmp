@@ -21,8 +21,7 @@
 #include "PresetManager.h"
 #include "Components/PresetGroup.h"
 
-// TODO: no longer used but could be useful for building parameter list in
-// processor?
+// TODO: could be useful for building parameter list in processor?
 std::vector<String> buildParameterIds(const SerializedState& state)
 {
 	if (state == nullptr)
@@ -84,6 +83,8 @@ PresetManager::PresetManager(
 	presetDir.createDirectory();
 	// preset master file indicates which presets to use
 	presetMaster = presetDir.getChildFile("presetMaster.xml");
+
+	parameterIds = buildParameterIds(SerializedState(vts.state.createXml()));
 
 	stateEntries["init"] = StateEntry((int)usedIds.size(), "init", File(), std::nullopt);
 	usedIds.push_back(true);
