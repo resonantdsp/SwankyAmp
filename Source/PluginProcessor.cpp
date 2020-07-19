@@ -497,6 +497,10 @@ void ResonantAmpAudioProcessor::setStateInformation(const std::unique_ptr<XmlEle
 			parameter->setValueNotifyingHost(parameter->convertTo0to1((float)values[id]));
 	}
 
+	// clear the amp state so that buffered values don't decay too slowly with new
+	// parameters
+	for (int i = 0; i < 2; i++) amp_channel[i].instanceClear();
+
 	setStateMutex.exit();
 }
 
