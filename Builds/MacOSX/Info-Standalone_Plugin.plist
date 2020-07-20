@@ -8,11 +8,11 @@
     <key>CFBundleIconFile</key>
     <string></string>
     <key>CFBundleIdentifier</key>
-    <string>com.ResonantDSP.ResonantAmp</string>
+    <string>com.ResonantDSP.SwankyAmp</string>
     <key>CFBundleName</key>
-    <string>ResonantAmp</string>
+    <string>SwankyAmp</string>
     <key>CFBundleDisplayName</key>
-    <string>ResonantAmp</string>
+    <string>SwankyAmp</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleSignature</key>
