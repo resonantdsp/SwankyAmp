@@ -9,7 +9,7 @@
 namespace BinaryData
 {
     extern const char*   logo_svg;
-    const int            logo_svgSize = 8088;
+    const int            logo_svgSize = 7224;
 
     extern const char*   presets_xml;
     const int            presets_xmlSize = 12087;
