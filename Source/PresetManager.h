@@ -29,13 +29,11 @@ using SerializedState = std::unique_ptr<XmlElement>;
 struct StateEntry
 {
 	StateEntry(
-		int id,
 		const String& name,
 		File file,
 		std::optional<size_t> stateIdx);
 	StateEntry() {}
 
-	int id = 0;
 	String name;
 	File file;
 	std::optional<size_t> stateIdx = std::nullopt;
@@ -77,6 +75,10 @@ private:
 	void updateComboBox();
 	void updatePresetMaster();
 
+	void addStateEntry(const String& name, const File& file, SerializedState state);
+	void removeStateEntry(const String& name);
+	void moveStateEntry(size_t idx, size_t newIdx);
+
 	ResonantAmpAudioProcessor& processor;
     AudioProcessorValueTreeState& vts;
 	ComboBox& comboBox;
@@ -89,9 +91,8 @@ private:
 
 	std::vector<String> parameterIds;
 
-	StateEntry* currentEntry = nullptr;
-	std::unordered_map<String, StateEntry> stateEntries;
+	std::optional<String> currentName = std::nullopt;
+	std::vector<StateEntry> stateEntries;
+	std::unordered_map<String, size_t> stateEntryIdx;
 	std::vector<SerializedState> states;
-	// ids used by the combo box, note that idx 0 is never used
-	std::vector<bool> usedIds = { false };
 };
