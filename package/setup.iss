@@ -1,15 +1,15 @@
 [Setup]
-AppName=ResonantAmp
+AppName=SwankyAmp
 AppVersion=0.7.3
 DefaultDirName={commoncf64}\VST3
 DirExistsWarning=no
 DisableDirPage=no
-DefaultGroupName=ResonantAmp
-OutputBaseFilename=ResonantAmp-win64
+DefaultGroupName=SwankyAmp
+OutputBaseFilename=SwankyAmp-win64
 OutputDir=.
 LicenseFile=../LICENSE
 Uninstallable = no
  
 [Files]
-Source: "../Builds\VisualStudio2019\x64\Release\VST3\ResonantAmp.vst3"; Flags: replacesameversion; DestDir: "{app}"
+Source: "../Builds\VisualStudio2019\x64\Release\VST3\SwankyAmp.vst3"; Flags: replacesameversion; DestDir: "{app}"
 

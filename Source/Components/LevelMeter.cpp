@@ -1,5 +1,5 @@
 /*
- *  Resonant Amp tube amplifier simulation
+ *  Swanky Amp tube amplifier simulation
  *  Copyright (C) 2020  Garrin McGoldrick
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -20,7 +20,7 @@
 
 #include <JuceHeader.h>
 
-#include "../ResonantAmpLAF.h"
+#include "../SwankyAmpLAF.h"
 
 #include "LevelMeter.h"
 
@@ -62,7 +62,7 @@ void LevelMeter::paint(Graphics& g)
 
 	const float lw = 2.0f;
 	const float corner = 2.0f;
-	const Font& font = ResonantAmpLAF::getDefaultFontNarrow().withHeight(labelHeight);
+	const Font& font = SwankyAmpLAF::getDefaultFontNarrow().withHeight(labelHeight);
 
 	const auto clippedLevel = jmax(0.0f, jmin(1.0f, level));
 

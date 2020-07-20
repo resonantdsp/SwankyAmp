@@ -1,10 +1,10 @@
-# Resonant Amp
+# Swanky Amp
 
-Resonant Amp is a tube amplifier simulation DSP plugin which aims to capture the details in the dynamics of tube amplifiers.
+Swanky Amp is a tube amplifier simulation DSP plugin which aims to capture the details in the dynamics of tube amplifiers.
 
 The software is currently in beta and is distributed only as a VST3 for 64-bit Windows systems. You can find the installers on the website:
 
-<http://www.resonantdsp.com/resonantamp/>
+<http://www.resonantdsp.com/swankyamp/>
 
 ## Usage
 
@@ -68,7 +68,7 @@ You will need the following softare to compile the plugin for windows:
 
 The project is configured assuming the VST3 SDK is found at: `C:\SDKs\VST_SDK\VST3_SDK\`, and that the JUCE SDK is found at `C:\JUCE\modules`. This can be changed in the VS solution files.
 
-* Open the VS solution file at: `Builds\VisualStudio2019\ResonantAmp.sln`
+* Open the VS solution file at: `Builds\VisualStudio2019\SwankyAmp.sln`
 * Change the target in VS to the x64 Release.
 * Build the VST3 target.
 * Move the VST3 to your VST3 system directory (usually `C:\Program Files\Common Files\VST3`)
@@ -81,7 +81,7 @@ This hasn't yet been attempted, but in theory it is possible.
 
 * Move into the `package` directory
 * Open the Inno Setup script `setup.iss`
-* Compile the installer, it should be created at `package\ResonantAmp-win64.exe`
+* Compile the installer, it should be created at `package\SwankyAmp-win64.exe`
 
 ### FAUST code
 

@@ -499,7 +499,7 @@
     <ClCompile Include="..\..\Source\Utils.cpp">
       <Filter>SwankyAmp\Source</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Source\ResonantAmpLAF.cpp">
+    <ClCompile Include="..\..\Source\SwankyAmpLAF.cpp">
       <Filter>SwankyAmp\Source</Filter>
     </ClCompile>
     <ClCompile Include="..\..\Source\PluginProcessor.cpp">
@@ -2646,7 +2646,7 @@
     <ClInclude Include="..\..\Source\Utils.h">
       <Filter>SwankyAmp\Source</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\ResonantAmpLAF.h">
+    <ClInclude Include="..\..\Source\SwankyAmpLAF.h">
       <Filter>SwankyAmp\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\AmpMono.h">

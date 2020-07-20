@@ -1,5 +1,5 @@
 /*
- *  Resonant Amp tube amplifier simulation
+ *  Swanky Amp tube amplifier simulation
  *  Copyright (C) 2020  Garrin McGoldrick
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -18,7 +18,7 @@
 
 #include <JuceHeader.h>
 
-#include "../ResonantAmpLAF.h"
+#include "../SwankyAmpLAF.h"
 #include "LevelMeter.h"
 #include "ParameterGroup.h"
 #include "PresetGroup.h"
@@ -33,27 +33,27 @@ PresetGroup::PresetGroup() :
 	addAndMakeVisible(presetSelector);
 
 	saveIcon.setFill(Colours::transparentBlack);
-	saveIcon.setStrokeFill(ResonantAmpLAF::colourDark);
+	saveIcon.setStrokeFill(SwankyAmpLAF::colourDark);
 	saveIconHighlight.setFill(Colours::transparentBlack);
-	saveIconHighlight.setStrokeFill(ResonantAmpLAF::colourHighlight);
+	saveIconHighlight.setStrokeFill(SwankyAmpLAF::colourHighlight);
 	addAndMakeVisible(buttonSave);
 
 	removeIcon.setFill(Colours::transparentBlack);
-	removeIcon.setStrokeFill(ResonantAmpLAF::colourDark);
+	removeIcon.setStrokeFill(SwankyAmpLAF::colourDark);
 	removeIconHighlight.setFill(Colours::transparentBlack);
-	removeIconHighlight.setStrokeFill(ResonantAmpLAF::colourHighlight);
+	removeIconHighlight.setStrokeFill(SwankyAmpLAF::colourHighlight);
 	addAndMakeVisible(buttonRemove);
 
 	nextIcon.setFill(Colours::transparentBlack);
-	nextIcon.setStrokeFill(ResonantAmpLAF::colourDark);
+	nextIcon.setStrokeFill(SwankyAmpLAF::colourDark);
 	nextIconHighlight.setFill(Colours::transparentBlack);
-	nextIconHighlight.setStrokeFill(ResonantAmpLAF::colourHighlight);
+	nextIconHighlight.setStrokeFill(SwankyAmpLAF::colourHighlight);
 	addAndMakeVisible(buttonNext);
 
 	prevIcon.setFill(Colours::transparentBlack);
-	prevIcon.setStrokeFill(ResonantAmpLAF::colourDark);
+	prevIcon.setStrokeFill(SwankyAmpLAF::colourDark);
 	prevIconHighlight.setFill(Colours::transparentBlack);
-	prevIconHighlight.setStrokeFill(ResonantAmpLAF::colourHighlight);
+	prevIconHighlight.setStrokeFill(SwankyAmpLAF::colourHighlight);
 	addAndMakeVisible(buttonPrev);
 }
 
@@ -69,37 +69,37 @@ void PresetGroup::resized()
 	presetSelector.setTopLeftPosition(0, 0);
 	presetSelector.setSize(getHeight() * 8, getHeight());
 
-	saveIcon.setPath(ResonantAmpLAF::getSaveIconPath((float)getHeight()));
+	saveIcon.setPath(SwankyAmpLAF::getSaveIconPath((float)getHeight()));
 	saveIcon.setStrokeType(PathStrokeType(3.0f));
 	saveIconHighlight.setStrokeType(PathStrokeType(3.0f));
-	saveIconHighlight.setPath(ResonantAmpLAF::getSaveIconPath((float)getHeight()));
+	saveIconHighlight.setPath(SwankyAmpLAF::getSaveIconPath((float)getHeight()));
 	buttonSave.setImages(&saveIcon, &saveIconHighlight);
 
 	buttonSave.setSize(getHeight(), getHeight());
 	buttonSave.setTopLeftPosition(presetSelector.getBounds().getTopRight() + Point<int>(spacing, 0));
 
-	removeIcon.setPath(ResonantAmpLAF::getRemoveIconPath((float)getHeight()));
+	removeIcon.setPath(SwankyAmpLAF::getRemoveIconPath((float)getHeight()));
 	removeIcon.setStrokeType(PathStrokeType(3.0f));
 	removeIconHighlight.setStrokeType(PathStrokeType(3.0f));
-	removeIconHighlight.setPath(ResonantAmpLAF::getRemoveIconPath((float)getHeight()));
+	removeIconHighlight.setPath(SwankyAmpLAF::getRemoveIconPath((float)getHeight()));
 	buttonRemove.setImages(&removeIcon, &removeIconHighlight);
 
 	buttonRemove.setSize(getHeight(), getHeight());
 	buttonRemove.setTopLeftPosition(buttonSave.getBounds().getTopRight() + Point<int>(jmax(1, spacing / 2), 0));
 
-	prevIcon.setPath(ResonantAmpLAF::getPrevIconPath((float)getHeight()));
+	prevIcon.setPath(SwankyAmpLAF::getPrevIconPath((float)getHeight()));
 	prevIcon.setStrokeType(PathStrokeType(3.0f));
 	prevIconHighlight.setStrokeType(PathStrokeType(3.0f));
-	prevIconHighlight.setPath(ResonantAmpLAF::getPrevIconPath((float)getHeight()));
+	prevIconHighlight.setPath(SwankyAmpLAF::getPrevIconPath((float)getHeight()));
 	buttonPrev.setImages(&prevIcon, &prevIconHighlight);
 
 	buttonPrev.setSize(getHeight(), getHeight());
 	buttonPrev.setTopLeftPosition(buttonRemove.getBounds().getTopRight() + Point<int>(jmax(1, spacing / 2), 0));
 
-	nextIcon.setPath(ResonantAmpLAF::getNextIconPath((float)getHeight()));
+	nextIcon.setPath(SwankyAmpLAF::getNextIconPath((float)getHeight()));
 	nextIcon.setStrokeType(PathStrokeType(3.0f));
 	nextIconHighlight.setStrokeType(PathStrokeType(3.0f));
-	nextIconHighlight.setPath(ResonantAmpLAF::getNextIconPath((float)getHeight()));
+	nextIconHighlight.setPath(SwankyAmpLAF::getNextIconPath((float)getHeight()));
 	buttonNext.setImages(&nextIcon, &nextIconHighlight);
 
 	buttonNext.setSize(getHeight(), getHeight());

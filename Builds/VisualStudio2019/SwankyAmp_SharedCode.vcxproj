@@ -150,7 +150,7 @@
     <ClCompile Include="..\..\Source\Components\StagingGroup.cpp"/>
     <ClCompile Include="..\..\Source\Components\ToneStackGroup.cpp"/>
     <ClCompile Include="..\..\Source\Utils.cpp"/>
-    <ClCompile Include="..\..\Source\ResonantAmpLAF.cpp"/>
+    <ClCompile Include="..\..\Source\SwankyAmpLAF.cpp"/>
     <ClCompile Include="..\..\Source\PluginProcessor.cpp"/>
     <ClCompile Include="..\..\Source\PluginEditor.cpp"/>
     <ClCompile Include="..\..\Source\PresetManager.cpp"/>
@@ -2109,7 +2109,7 @@
     <ClInclude Include="..\..\Source\Components\StagingGroup.h"/>
     <ClInclude Include="..\..\Source\Components\ToneStackGroup.h"/>
     <ClInclude Include="..\..\Source\Utils.h"/>
-    <ClInclude Include="..\..\Source\ResonantAmpLAF.h"/>
+    <ClInclude Include="..\..\Source\SwankyAmpLAF.h"/>
     <ClInclude Include="..\..\Source\AmpMono.h"/>
     <ClInclude Include="..\..\Source\PluginProcessor.h"/>
     <ClInclude Include="..\..\Source\PluginEditor.h"/>

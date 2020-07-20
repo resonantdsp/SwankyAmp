@@ -56,10 +56,9 @@
       </GROUP>
       <FILE id="cyaozc" name="Utils.cpp" compile="1" resource="0" file="Source/Utils.cpp"/>
       <FILE id="BkB5cF" name="Utils.h" compile="0" resource="0" file="Source/Utils.h"/>
-      <FILE id="BF767l" name="ResonantAmpLAF.cpp" compile="1" resource="0"
-            file="Source/ResonantAmpLAF.cpp"/>
-      <FILE id="TBMLgx" name="ResonantAmpLAF.h" compile="0" resource="0"
-            file="Source/ResonantAmpLAF.h"/>
+      <FILE id="BF767l" name="SwankyAmpLAF.cpp" compile="1" resource="0"
+            file="Source/SwankyAmpLAF.cpp"/>
+      <FILE id="TBMLgx" name="SwankyAmpLAF.h" compile="0" resource="0" file="Source/SwankyAmpLAF.h"/>
       <FILE id="CNVd3V" name="AmpMono.h" compile="0" resource="0" file="Source/AmpMono.h"/>
       <FILE id="m1Xtuh" name="PluginProcessor.cpp" compile="1" resource="0"
             file="Source/PluginProcessor.cpp"/>

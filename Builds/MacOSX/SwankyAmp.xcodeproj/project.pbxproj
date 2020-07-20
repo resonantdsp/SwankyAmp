@@ -137,9 +137,9 @@
 			isa = PBXBuildFile;
 			fileRef = 326C59FB6919910FA25E1B21;
 		};
-		4A72EAE1C26D19CB47240495 = {
+		BA477DFE6582F7DB6EAA06D2 = {
 			isa = PBXBuildFile;
-			fileRef = 42727C086331B38DF243E9F3;
+			fileRef = F2C34EDA4715EA9D7F3FD676;
 		};
 		0ECF095E595A3F61003AB096 = {
 			isa = PBXBuildFile;
@@ -271,6 +271,13 @@
 			lastKnownFileType = sourcecode.cpp.cpp;
 			name = "include_juce_audio_plugin_client_utils.cpp";
 			path = "../../JuceLibraryCode/include_juce_audio_plugin_client_utils.cpp";
+			sourceTree = "SOURCE_ROOT";
+		};
+		08B1F82EAEC82C474E0B266D = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = SwankyAmpLAF.h;
+			path = ../../Source/SwankyAmpLAF.h;
 			sourceTree = "SOURCE_ROOT";
 		};
 		0A400B6F77043875D7BBEF90 = {
@@ -467,13 +474,6 @@
 			lastKnownFileType = sourcecode.cpp.objcpp;
 			name = "include_juce_audio_plugin_client_AAX.mm";
 			path = "../../JuceLibraryCode/include_juce_audio_plugin_client_AAX.mm";
-			sourceTree = "SOURCE_ROOT";
-		};
-		42727C086331B38DF243E9F3 = {
-			isa = PBXFileReference;
-			lastKnownFileType = sourcecode.cpp.cpp;
-			name = ResonantAmpLAF.cpp;
-			path = ../../Source/ResonantAmpLAF.cpp;
 			sourceTree = "SOURCE_ROOT";
 		};
 		4414DAC183F81C8A3F77E466 = {
@@ -728,13 +728,6 @@
 			path = ../../Source/Components/LevelMeter.cpp;
 			sourceTree = "SOURCE_ROOT";
 		};
-		A07B94944A44C5F1FBB1468A = {
-			isa = PBXFileReference;
-			lastKnownFileType = sourcecode.c.h;
-			name = ResonantAmpLAF.h;
-			path = ../../Source/ResonantAmpLAF.h;
-			sourceTree = "SOURCE_ROOT";
-		};
 		A1718CD5B181B95CD59D5605 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.c.h;
@@ -973,6 +966,13 @@
 			path = ../../Source/Components/LevelsGroup.h;
 			sourceTree = "SOURCE_ROOT";
 		};
+		F2C34EDA4715EA9D7F3FD676 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = SwankyAmpLAF.cpp;
+			path = ../../Source/SwankyAmpLAF.cpp;
+			sourceTree = "SOURCE_ROOT";
+		};
 		F3ACB6EB51A49238B20A01E0 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.c.h;
@@ -1053,8 +1053,8 @@
 				C8C0970D85E7EA313CFE656A,
 				326C59FB6919910FA25E1B21,
 				7C3774B124CCED85E17DAD78,
-				42727C086331B38DF243E9F3,
-				A07B94944A44C5F1FBB1468A,
+				F2C34EDA4715EA9D7F3FD676,
+				08B1F82EAEC82C474E0B266D,
 				B38F5D260E42B2637835E14E,
 				638CA5035ACEADC1AF340E2F,
 				073DFBC834356E1C6F4482F1,
@@ -2183,7 +2183,7 @@
 				A7B76C7EDF4B4DFF31480049,
 				107F585F3EEA213368CC16C5,
 				23003AA9386C538CCEC5C186,
-				4A72EAE1C26D19CB47240495,
+				BA477DFE6582F7DB6EAA06D2,
 				0ECF095E595A3F61003AB096,
 				2516937FF938F9180ECB5554,
 				08A348691882E4DAE152691E,

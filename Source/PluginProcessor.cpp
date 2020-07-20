@@ -1,5 +1,5 @@
 /*
- *  Resonant Amp tube amplifier simulation
+ *  Swanky Amp tube amplifier simulation
  *  Copyright (C) 2020  Garrin McGoldrick
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -32,7 +32,7 @@
 // assign a VTS parameter to an object member of the same name
 #define ASSIGN_PARAMETER(n) par##n = parameters.getRawParameterValue("id"#n);
 
-ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
+SwankyAmpAudioProcessor::SwankyAmpAudioProcessor() :
 #ifndef JucePlugin_PreferredChannelConfigurations
 	 AudioProcessor(BusesProperties()
 #if ! JucePlugin_IsMidiEffect
@@ -46,7 +46,7 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 	parameters(
 		*this,
 		nullptr,
-		Identifier("APVTSResonantAmp"), {
+		Identifier("APVTSSwankyAmp"), {
 			MAKE_PARAMETER_UNIT(InputLevel),
 			MAKE_PARAMETER_UNIT(OutputLevel),
 
@@ -111,7 +111,7 @@ ResonantAmpAudioProcessor::ResonantAmpAudioProcessor() :
 #undef MAKE_PARAMETER
 #undef ASSIGN_PARAMETER
 
-ResonantAmpAudioProcessor::~ResonantAmpAudioProcessor()
+SwankyAmpAudioProcessor::~SwankyAmpAudioProcessor()
 {
 }
 
@@ -154,7 +154,7 @@ float remap_log(float x, float slope1, float slope2)
 }
 
 // set the amp object user parameters from the VTS values
-void ResonantAmpAudioProcessor::setAmpParameters() {
+void SwankyAmpAudioProcessor::setAmpParameters() {
 	for (int i = 0; i < 2; i++) {
 		amp_channel[i].set_input_level(*parInputLevel);
 		amp_channel[i].set_output_level(*parOutputLevel);
@@ -210,12 +210,12 @@ void ResonantAmpAudioProcessor::setAmpParameters() {
 	}
 }
 
-const String ResonantAmpAudioProcessor::getName() const
+const String SwankyAmpAudioProcessor::getName() const
 {
 	return JucePlugin_Name;
 }
 
-bool ResonantAmpAudioProcessor::acceptsMidi() const
+bool SwankyAmpAudioProcessor::acceptsMidi() const
 {
 #if JucePlugin_WantsMidiInput
 	return true;
@@ -224,7 +224,7 @@ bool ResonantAmpAudioProcessor::acceptsMidi() const
 #endif
 }
 
-bool ResonantAmpAudioProcessor::producesMidi() const
+bool SwankyAmpAudioProcessor::producesMidi() const
 {
 #if JucePlugin_ProducesMidiOutput
 	return true;
@@ -233,7 +233,7 @@ bool ResonantAmpAudioProcessor::producesMidi() const
 #endif
 }
 
-bool ResonantAmpAudioProcessor::isMidiEffect() const
+bool SwankyAmpAudioProcessor::isMidiEffect() const
 {
 #if JucePlugin_IsMidiEffect
 	return true;
@@ -242,38 +242,38 @@ bool ResonantAmpAudioProcessor::isMidiEffect() const
 #endif
 }
 
-double ResonantAmpAudioProcessor::getTailLengthSeconds() const
+double SwankyAmpAudioProcessor::getTailLengthSeconds() const
 {
 	return 0.0;
 }
 
-int ResonantAmpAudioProcessor::getNumPrograms()
+int SwankyAmpAudioProcessor::getNumPrograms()
 {
 	return 1;
 }
 
-int ResonantAmpAudioProcessor::getCurrentProgram()
+int SwankyAmpAudioProcessor::getCurrentProgram()
 {
 	return 0;
 }
 
-void ResonantAmpAudioProcessor::setCurrentProgram(int index)
+void SwankyAmpAudioProcessor::setCurrentProgram(int index)
 {
 	ignoreUnused(index);
 }
 
-const String ResonantAmpAudioProcessor::getProgramName(int index)
+const String SwankyAmpAudioProcessor::getProgramName(int index)
 {
 	ignoreUnused(index);
 	return {};
 }
 
-void ResonantAmpAudioProcessor::changeProgramName(int index, const String& newName)
+void SwankyAmpAudioProcessor::changeProgramName(int index, const String& newName)
 {
 	ignoreUnused(index, newName);
 }
 
-void ResonantAmpAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
+void SwankyAmpAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
 	ignoreUnused(samplesPerBlock);
 
@@ -283,7 +283,7 @@ void ResonantAmpAudioProcessor::prepareToPlay(double sampleRate, int samplesPerB
 	setAmpParameters();
 }
 
-void ResonantAmpAudioProcessor::releaseResources()
+void SwankyAmpAudioProcessor::releaseResources()
 {
 	// When playback stops, you can use this as an opportunity to free up any
 	// spare memory, etc.
@@ -291,7 +291,7 @@ void ResonantAmpAudioProcessor::releaseResources()
 }
 
 #ifndef JucePlugin_PreferredChannelConfigurations
-bool ResonantAmpAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
+bool SwankyAmpAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) const
 {
 #if JucePlugin_IsMidiEffect
 	ignoreUnused(layouts);
@@ -322,7 +322,7 @@ bool ResonantAmpAudioProcessor::isBusesLayoutSupported(const BusesLayout& layout
 }
 #endif
 
-void ResonantAmpAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMessages)
+void SwankyAmpAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuffer& midiMessages)
 {
 	ignoreUnused(midiMessages);
 	
@@ -389,24 +389,24 @@ void ResonantAmpAudioProcessor::processBlock(AudioBuffer<float>& buffer, MidiBuf
 	}
 }
 
-bool ResonantAmpAudioProcessor::hasEditor() const
+bool SwankyAmpAudioProcessor::hasEditor() const
 {
 	return true; // (change this to false if you choose to not supply an editor)
 }
 
-AudioProcessorEditor* ResonantAmpAudioProcessor::createEditor()
+AudioProcessorEditor* SwankyAmpAudioProcessor::createEditor()
 {
-	return new ResonantAmpAudioProcessorEditor(*this, parameters);
+	return new SwankyAmpAudioProcessorEditor(*this, parameters);
 }
 
-void ResonantAmpAudioProcessor::getStateInformation(MemoryBlock& destData)
+void SwankyAmpAudioProcessor::getStateInformation(MemoryBlock& destData)
 {
 	auto state = parameters.copyState();
 	std::unique_ptr<XmlElement> xml(state.createXml());
 	copyXmlToBinary(*xml, destData);
 }
 
-void ResonantAmpAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
+void SwankyAmpAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
 	std::unique_ptr<XmlElement> xmlState(getXmlFromBinary(data, sizeInBytes));
 	if (xmlState.get() != nullptr)
@@ -451,7 +451,7 @@ double transformUnitScale(double value, double lower, double upper, double lower
 	return jmin(1.0, jmax(-1.0, post));
 }
 
-void ResonantAmpAudioProcessor::setStateInformation(const std::unique_ptr<XmlElement>& state, bool useLevels)
+void SwankyAmpAudioProcessor::setStateInformation(const std::unique_ptr<XmlElement>& state, bool useLevels)
 {
 	std::unordered_map<String, double> values;
 	if (state != nullptr)
@@ -506,5 +506,5 @@ void ResonantAmpAudioProcessor::setStateInformation(const std::unique_ptr<XmlEle
 
 AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
-	return new ResonantAmpAudioProcessor();
+	return new SwankyAmpAudioProcessor();
 }

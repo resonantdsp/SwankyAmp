@@ -1,5 +1,5 @@
 /*
- *  Resonant Amp tube amplifier simulation
+ *  Swanky Amp tube amplifier simulation
  *  Copyright (C) 2020  Garrin McGoldrick
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -23,11 +23,11 @@
 #include "AmpMono.h"
 #include "Components/LevelMeter.h"
 
-class ResonantAmpAudioProcessor : public AudioProcessor
+class SwankyAmpAudioProcessor : public AudioProcessor
 {
 public:
-	ResonantAmpAudioProcessor();
-	~ResonantAmpAudioProcessor();
+	SwankyAmpAudioProcessor();
+	~SwankyAmpAudioProcessor();
 
 	// The amplifier DSP objects (contains DSP state and the process function)
 	// one for each possible channel (even if unused)
@@ -125,5 +125,5 @@ public:
 private:
 	CriticalSection setStateMutex;
 
-	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ResonantAmpAudioProcessor)
+	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SwankyAmpAudioProcessor)
 };

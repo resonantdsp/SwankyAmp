@@ -1,5 +1,5 @@
 /*
- *  Resonant Amp tube amplifier simulation
+ *  Swanky Amp tube amplifier simulation
  *  Copyright (C) 2020  Garrin McGoldrick
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -44,7 +44,7 @@ class PresetManager : public AudioProcessorValueTreeState::Listener
 {
 public:
     PresetManager(
-		ResonantAmpAudioProcessor& processor,
+		SwankyAmpAudioProcessor& processor,
 		AudioProcessorValueTreeState& vts,
 		ComboBox& comboBox,
 		Button& bntSave,
@@ -79,7 +79,7 @@ private:
 	void removeStateEntry(const String& name);
 	void moveStateEntry(size_t idx, size_t newIdx);
 
-	ResonantAmpAudioProcessor& processor;
+	SwankyAmpAudioProcessor& processor;
     AudioProcessorValueTreeState& vts;
 	ComboBox& comboBox;
 	Button& buttonSave;

@@ -1,5 +1,5 @@
 /*
- *  Resonant Amp tube amplifier simulation
+ *  Swanky Amp tube amplifier simulation
  *  Copyright (C) 2020  Garrin McGoldrick
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -20,10 +20,10 @@
 
 #include <JuceHeader.h>
 
-class ResonantAmpLAF : public LookAndFeel_V4
+class SwankyAmpLAF : public LookAndFeel_V4
 {
 public:
-	ResonantAmpLAF();
+	SwankyAmpLAF();
 
 	// Font size conversions (for 96 dpi):
 	// 12pt/16px

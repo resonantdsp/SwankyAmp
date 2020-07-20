@@ -1,5 +1,5 @@
 /*
- *  Resonant Amp tube amplifier simulation
+ *  Swanky Amp tube amplifier simulation
  *  Copyright (C) 2020  Garrin McGoldrick
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -21,8 +21,8 @@
 
 #include "PluginEditor.h"
 
-ResonantAmpAudioProcessorEditor::ResonantAmpAudioProcessorEditor(
-	ResonantAmpAudioProcessor& p,
+SwankyAmpAudioProcessorEditor::SwankyAmpAudioProcessorEditor(
+	SwankyAmpAudioProcessor& p,
 	AudioProcessorValueTreeState& vts) :
 	AudioProcessorEditor(&p),
 	processor(p),
@@ -41,10 +41,10 @@ ResonantAmpAudioProcessorEditor::ResonantAmpAudioProcessorEditor(
 	tooltipWindow(this)
 {
 	LookAndFeel::getDefaultLookAndFeel().setDefaultSansSerifTypeface(
-		resonantAmpLAF.getDefaultFont().getTypeface()
+		laf.getDefaultFont().getTypeface()
 	);
-	setLookAndFeel(&resonantAmpLAF);
-	tooltipWindow.setLookAndFeel(&resonantAmpLAF);
+	setLookAndFeel(&laf);
+	tooltipWindow.setLookAndFeel(&laf);
 	tooltipWindow.setOpaque(false);
 
 	processor.meterListenersIn[0] = ampGroup.levelsGroup.getLevelMeterListenerInL();
@@ -64,7 +64,7 @@ ResonantAmpAudioProcessorEditor::ResonantAmpAudioProcessorEditor(
 	logoSvg = Drawable::createFromSVG(*XmlDocument::parse(BinaryData::logo_svg));
 
 	versionLabel.setText("v" JucePlugin_VersionString, dontSendNotification);
-	versionLabel.setColour(Label::textColourId, ResonantAmpLAF::colourDark);
+	versionLabel.setColour(Label::textColourId, SwankyAmpLAF::colourDark);
 	versionLabel.setFont(16.0f);
 	versionLabel.setJustificationType(Justification::centredRight);
 
@@ -77,7 +77,7 @@ ResonantAmpAudioProcessorEditor::ResonantAmpAudioProcessorEditor(
 
 #undef ATTACH_SLIDER
 
-ResonantAmpAudioProcessorEditor::~ResonantAmpAudioProcessorEditor()
+SwankyAmpAudioProcessorEditor::~SwankyAmpAudioProcessorEditor()
 {
 	// the LAF can be called from ... who knows where, after the Editor goes out
 	// of scope
@@ -95,7 +95,7 @@ ResonantAmpAudioProcessorEditor::~ResonantAmpAudioProcessorEditor()
 		valueTreeState.removeParameterListener(parameterId, &presetManager);
 }
 
-void ResonantAmpAudioProcessorEditor::paint(Graphics& g)
+void SwankyAmpAudioProcessorEditor::paint(Graphics& g)
 {
 	g.fillAll(getLookAndFeel().findColour(ResizableWindow::backgroundColourId));
 
@@ -117,7 +117,7 @@ void ResonantAmpAudioProcessorEditor::paint(Graphics& g)
 
 #undef GROUP_DROP_SHADOW
 
-void ResonantAmpAudioProcessorEditor::buildBgPattern()
+void SwankyAmpAudioProcessorEditor::buildBgPattern()
 {
 	bgPattern.clear();
 
@@ -174,7 +174,7 @@ void ResonantAmpAudioProcessorEditor::buildBgPattern()
 	bgPattern.closeSubPath();
 }
 
-void ResonantAmpAudioProcessorEditor::resized()
+void SwankyAmpAudioProcessorEditor::resized()
 {
 	// build noise to texture background
 	rng.setSeed(1234);
