@@ -96,6 +96,14 @@ However this might not work for versions of FAUST other than `2.14.4` in which c
 
 ## Change log
 
+Version 0.8.0:
+
+* add variance to pre amp stages
+* change preset management to directory sort order
+* add button to open preset directory
+* new presets are discovered on start
+* no need to save preset to preserve order
+
 Version 0.7.3:
 
 * renamed to swanky amp
