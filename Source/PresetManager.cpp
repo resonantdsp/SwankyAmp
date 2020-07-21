@@ -251,6 +251,10 @@ bool PresetManager::loadPresetsFromDir()
 
 		SerializedState stateXml = XmlDocument::parse(presetFile);
 
+		// allow using preseets from version before name change
+		if (stateXml->hasTagName("APVTSResonantAmp"))
+			stateXml->setTagName("APVTSSwankyAmp");
+
 		if (stateXml->hasTagName(stateType) && stateXml->hasAttribute("presetName"))
 		{
 			const String& presetName = stateXml->getStringAttribute("presetName");
