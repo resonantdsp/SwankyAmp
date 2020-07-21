@@ -96,6 +96,13 @@ However this might not work for versions of FAUST other than `2.14.4` in which c
 
 ## Change log
 
+Version 0.7.3:
+
+* renamed to swanky amp
+* allow reordering presets using preset names
+* fixed possible issue with preset chaning causing bad state
+* fixed issue with saving presets
+
 Version 0.7.2:
 
 * improved preset management: can now re-order, rename and remove presets from a single file `presetMaster.xml`
