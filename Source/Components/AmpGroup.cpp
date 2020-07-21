@@ -1,5 +1,5 @@
 /*
- *  Resonant Amp tube amplifier simulation
+ *  Swanky Amp tube amplifier simulation
  *  Copyright (C) 2020  Garrin McGoldrick
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -18,7 +18,7 @@
 
 #include <JuceHeader.h>
 
-#include "../ResonantAmpLAF.h"
+#include "../SwankyAmpLAF.h"
 
 #include "AmpGroup.h"
 
@@ -32,7 +32,7 @@ n##ShadowPath.applyTransform(AffineTransform::translation( \
 	(float)n##Group.getBounds().getTopLeft().getX(), \
 	(float)n##Group.getBounds().getTopLeft().getY() \
 )); \
-auto n##Shadow = ResonantAmpLAF::getDropShadow(); \
+auto n##Shadow = SwankyAmpLAF::getDropShadow(); \
 n##Shadow.drawForPath(g, n##ShadowPath); 
 
 AmpGroup::AmpGroup()

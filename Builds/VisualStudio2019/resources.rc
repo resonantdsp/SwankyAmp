@@ -9,17 +9,17 @@
 #include <windows.h>
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION  0,7,2,0
+FILEVERSION  0,7,3,0
 BEGIN
   BLOCK "StringFileInfo"
   BEGIN
     BLOCK "040904E4"
     BEGIN
       VALUE "CompanyName",  "Resonant DSP\0"
-      VALUE "FileDescription",  "ResonantAmp\0"
-      VALUE "FileVersion",  "0.7.2\0"
-      VALUE "ProductName",  "ResonantAmp\0"
-      VALUE "ProductVersion",  "0.7.2\0"
+      VALUE "FileDescription",  "SwankyAmp\0"
+      VALUE "FileVersion",  "0.7.3\0"
+      VALUE "ProductName",  "SwankyAmp\0"
+      VALUE "ProductVersion",  "0.7.3\0"
     END
   END
 

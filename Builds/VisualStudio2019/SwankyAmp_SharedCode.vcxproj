@@ -45,11 +45,11 @@
     <TargetExt>.lib</TargetExt>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)$(Platform)\$(Configuration)\Shared Code\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Platform)\$(Configuration)\Shared Code\</IntDir>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ResonantAmp</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">SwankyAmp</TargetName>
     <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</GenerateManifest>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)$(Platform)\$(Configuration)\Shared Code\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(Platform)\$(Configuration)\Shared Code\</IntDir>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ResonantAmp</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">SwankyAmp</TargetName>
     <GenerateManifest Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</GenerateManifest>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -80,17 +80,17 @@
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
     <Link>
-      <OutputFile>$(OutDir)\ResonantAmp.lib</OutputFile>
+      <OutputFile>$(OutDir)\SwankyAmp.lib</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <IgnoreSpecificDefaultLibraries>libcmt.lib; msvcrt.lib;;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <ProgramDatabaseFile>$(IntDir)\ResonantAmp.pdb</ProgramDatabaseFile>
+      <ProgramDatabaseFile>$(IntDir)\SwankyAmp.pdb</ProgramDatabaseFile>
       <SubSystem>Windows</SubSystem>
       <LargeAddressAware>true</LargeAddressAware>
     </Link>
     <Bscmake>
       <SuppressStartupBanner>true</SuppressStartupBanner>
-      <OutputFile>$(IntDir)\ResonantAmp.bsc</OutputFile>
+      <OutputFile>$(IntDir)\SwankyAmp.bsc</OutputFile>
     </Bscmake>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -120,11 +120,11 @@
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
     <Link>
-      <OutputFile>$(OutDir)\ResonantAmp.lib</OutputFile>
+      <OutputFile>$(OutDir)\SwankyAmp.lib</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <GenerateDebugInformation>false</GenerateDebugInformation>
-      <ProgramDatabaseFile>$(IntDir)\ResonantAmp.pdb</ProgramDatabaseFile>
+      <ProgramDatabaseFile>$(IntDir)\SwankyAmp.pdb</ProgramDatabaseFile>
       <SubSystem>Windows</SubSystem>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -132,7 +132,7 @@
     </Link>
     <Bscmake>
       <SuppressStartupBanner>true</SuppressStartupBanner>
-      <OutputFile>$(IntDir)\ResonantAmp.bsc</OutputFile>
+      <OutputFile>$(IntDir)\SwankyAmp.bsc</OutputFile>
     </Bscmake>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -150,7 +150,7 @@
     <ClCompile Include="..\..\Source\Components\StagingGroup.cpp"/>
     <ClCompile Include="..\..\Source\Components\ToneStackGroup.cpp"/>
     <ClCompile Include="..\..\Source\Utils.cpp"/>
-    <ClCompile Include="..\..\Source\ResonantAmpLAF.cpp"/>
+    <ClCompile Include="..\..\Source\SwankyAmpLAF.cpp"/>
     <ClCompile Include="..\..\Source\PluginProcessor.cpp"/>
     <ClCompile Include="..\..\Source\PluginEditor.cpp"/>
     <ClCompile Include="..\..\Source\PresetManager.cpp"/>
@@ -2109,7 +2109,7 @@
     <ClInclude Include="..\..\Source\Components\StagingGroup.h"/>
     <ClInclude Include="..\..\Source\Components\ToneStackGroup.h"/>
     <ClInclude Include="..\..\Source\Utils.h"/>
-    <ClInclude Include="..\..\Source\ResonantAmpLAF.h"/>
+    <ClInclude Include="..\..\Source\SwankyAmpLAF.h"/>
     <ClInclude Include="..\..\Source\AmpMono.h"/>
     <ClInclude Include="..\..\Source\PluginProcessor.h"/>
     <ClInclude Include="..\..\Source\PluginEditor.h"/>

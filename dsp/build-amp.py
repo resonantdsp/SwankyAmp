@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-#  Resonant Amp tube amplifier simulation
+#  Swanky Amp tube amplifier simulation
 #  Copyright (C) 2020  Garrin McGoldrick
 #
 #  This program is free software: you can redistribute it and/or modify

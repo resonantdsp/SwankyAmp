@@ -137,9 +137,9 @@
 			isa = PBXBuildFile;
 			fileRef = 326C59FB6919910FA25E1B21;
 		};
-		4A72EAE1C26D19CB47240495 = {
+		BA477DFE6582F7DB6EAA06D2 = {
 			isa = PBXBuildFile;
-			fileRef = 42727C086331B38DF243E9F3;
+			fileRef = F2C34EDA4715EA9D7F3FD676;
 		};
 		0ECF095E595A3F61003AB096 = {
 			isa = PBXBuildFile;
@@ -273,6 +273,13 @@
 			path = "../../JuceLibraryCode/include_juce_audio_plugin_client_utils.cpp";
 			sourceTree = "SOURCE_ROOT";
 		};
+		08B1F82EAEC82C474E0B266D = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = SwankyAmpLAF.h;
+			path = ../../Source/SwankyAmpLAF.h;
+			sourceTree = "SOURCE_ROOT";
+		};
 		0A400B6F77043875D7BBEF90 = {
 			isa = PBXFileReference;
 			lastKnownFileType = file.nib;
@@ -375,7 +382,7 @@
 			isa = PBXFileReference;
 			explicitFileType = wrapper.cfbundle;
 			includeInIndex = 0;
-			path = ResonantAmp.vst3;
+			path = SwankyAmp.vst3;
 			sourceTree = "BUILT_PRODUCTS_DIR";
 		};
 		529A38DC6B0E839FF2B1756E = {
@@ -396,14 +403,14 @@
 			isa = PBXFileReference;
 			explicitFileType = wrapper.cfbundle;
 			includeInIndex = 0;
-			path = ResonantAmp.aaxplugin;
+			path = SwankyAmp.aaxplugin;
 			sourceTree = "BUILT_PRODUCTS_DIR";
 		};
 		23784367939770DD260DB77C = {
 			isa = PBXFileReference;
 			explicitFileType = wrapper.cfbundle;
 			includeInIndex = 0;
-			path = ResonantAmp.component;
+			path = SwankyAmp.component;
 			sourceTree = "BUILT_PRODUCTS_DIR";
 		};
 		2CFFE32D339DB4701C8A2DF8 = {
@@ -467,13 +474,6 @@
 			lastKnownFileType = sourcecode.cpp.objcpp;
 			name = "include_juce_audio_plugin_client_AAX.mm";
 			path = "../../JuceLibraryCode/include_juce_audio_plugin_client_AAX.mm";
-			sourceTree = "SOURCE_ROOT";
-		};
-		42727C086331B38DF243E9F3 = {
-			isa = PBXFileReference;
-			lastKnownFileType = sourcecode.cpp.cpp;
-			name = ResonantAmpLAF.cpp;
-			path = ../../Source/ResonantAmpLAF.cpp;
 			sourceTree = "SOURCE_ROOT";
 		};
 		4414DAC183F81C8A3F77E466 = {
@@ -578,7 +578,7 @@
 			isa = PBXFileReference;
 			explicitFileType = wrapper.application;
 			includeInIndex = 0;
-			path = ResonantAmp.app;
+			path = SwankyAmp.app;
 			sourceTree = "BUILT_PRODUCTS_DIR";
 		};
 		69AF89A7673821C66CFD0D88 = {
@@ -726,13 +726,6 @@
 			lastKnownFileType = sourcecode.cpp.cpp;
 			name = LevelMeter.cpp;
 			path = ../../Source/Components/LevelMeter.cpp;
-			sourceTree = "SOURCE_ROOT";
-		};
-		A07B94944A44C5F1FBB1468A = {
-			isa = PBXFileReference;
-			lastKnownFileType = sourcecode.c.h;
-			name = ResonantAmpLAF.h;
-			path = ../../Source/ResonantAmpLAF.h;
 			sourceTree = "SOURCE_ROOT";
 		};
 		A1718CD5B181B95CD59D5605 = {
@@ -949,7 +942,7 @@
 			isa = PBXFileReference;
 			explicitFileType = archive.ar;
 			includeInIndex = 0;
-			path = libResonantAmp.a;
+			path = libSwankyAmp.a;
 			sourceTree = "BUILT_PRODUCTS_DIR";
 		};
 		EEE7DE2B6E6589529A59378E = {
@@ -971,6 +964,13 @@
 			lastKnownFileType = sourcecode.c.h;
 			name = LevelsGroup.h;
 			path = ../../Source/Components/LevelsGroup.h;
+			sourceTree = "SOURCE_ROOT";
+		};
+		F2C34EDA4715EA9D7F3FD676 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.cpp.cpp;
+			name = SwankyAmpLAF.cpp;
+			path = ../../Source/SwankyAmpLAF.cpp;
 			sourceTree = "SOURCE_ROOT";
 		};
 		F3ACB6EB51A49238B20A01E0 = {
@@ -1053,8 +1053,8 @@
 				C8C0970D85E7EA313CFE656A,
 				326C59FB6919910FA25E1B21,
 				7C3774B124CCED85E17DAD78,
-				42727C086331B38DF243E9F3,
-				A07B94944A44C5F1FBB1468A,
+				F2C34EDA4715EA9D7F3FD676,
+				08B1F82EAEC82C474E0B266D,
 				B38F5D260E42B2637835E14E,
 				638CA5035ACEADC1AF340E2F,
 				073DFBC834356E1C6F4482F1,
@@ -1074,7 +1074,7 @@
 				010566B99270B51F5DB8DAA1,
 				F5315AF4A8D5885BCD9E80F4,
 			);
-			name = ResonantAmp;
+			name = SwankyAmp;
 			sourceTree = "<group>";
 		};
 		F501CB95EF43E33DC63F7CFC = {
@@ -1286,9 +1286,9 @@
 				INSTALL_PATH = "$(HOME)/Library/Audio/Plug-Ins/VST3/";
 				LIBRARY_STYLE = Bundle;
 				MACOSX_DEPLOYMENT_TARGET = 10.11;
-				OTHER_LDFLAGS = "-bundle -lResonantAmp";
-				PRODUCT_BUNDLE_IDENTIFIER = com.ResonantDSP.ResonantAmp;
-				PRODUCT_NAME = "ResonantAmp";
+				OTHER_LDFLAGS = "-bundle -lSwankyAmp";
+				PRODUCT_BUNDLE_IDENTIFIER = com.ResonantDSP.SwankyAmp;
+				PRODUCT_NAME = "SwankyAmp";
 				USE_HEADERMAP = NO;
 				WRAPPER_EXTENSION = vst3;
 			};
@@ -1341,9 +1341,9 @@
 				LIBRARY_STYLE = Bundle;
 				LLVM_LTO = YES;
 				MACOSX_DEPLOYMENT_TARGET = 10.11;
-				OTHER_LDFLAGS = "-bundle -lResonantAmp";
-				PRODUCT_BUNDLE_IDENTIFIER = com.ResonantDSP.ResonantAmp;
-				PRODUCT_NAME = "ResonantAmp";
+				OTHER_LDFLAGS = "-bundle -lSwankyAmp";
+				PRODUCT_BUNDLE_IDENTIFIER = com.ResonantDSP.SwankyAmp;
+				PRODUCT_NAME = "SwankyAmp";
 				USE_HEADERMAP = NO;
 				WRAPPER_EXTENSION = vst3;
 			};
@@ -1399,9 +1399,9 @@
 				);
 				LIBRARY_STYLE = Bundle;
 				MACOSX_DEPLOYMENT_TARGET = 10.11;
-				OTHER_LDFLAGS = "-bundle -lAAXLibrary_libcpp -lResonantAmp";
-				PRODUCT_BUNDLE_IDENTIFIER = com.ResonantDSP.ResonantAmp;
-				PRODUCT_NAME = "ResonantAmp";
+				OTHER_LDFLAGS = "-bundle -lAAXLibrary_libcpp -lSwankyAmp";
+				PRODUCT_BUNDLE_IDENTIFIER = com.ResonantDSP.SwankyAmp;
+				PRODUCT_NAME = "SwankyAmp";
 				USE_HEADERMAP = NO;
 				WRAPPER_EXTENSION = aaxplugin;
 			};
@@ -1458,9 +1458,9 @@
 				LIBRARY_STYLE = Bundle;
 				LLVM_LTO = YES;
 				MACOSX_DEPLOYMENT_TARGET = 10.11;
-				OTHER_LDFLAGS = "-bundle -lAAXLibrary_libcpp -lResonantAmp";
-				PRODUCT_BUNDLE_IDENTIFIER = com.ResonantDSP.ResonantAmp;
-				PRODUCT_NAME = "ResonantAmp";
+				OTHER_LDFLAGS = "-bundle -lAAXLibrary_libcpp -lSwankyAmp";
+				PRODUCT_BUNDLE_IDENTIFIER = com.ResonantDSP.SwankyAmp;
+				PRODUCT_NAME = "SwankyAmp";
 				USE_HEADERMAP = NO;
 				WRAPPER_EXTENSION = aaxplugin;
 			};
@@ -1512,10 +1512,10 @@
 				INSTALL_PATH = "$(HOME)/Library/Audio/Plug-Ins/Components/";
 				LIBRARY_STYLE = Bundle;
 				MACOSX_DEPLOYMENT_TARGET = 10.11;
-				OTHER_LDFLAGS = "-bundle -lResonantAmp";
+				OTHER_LDFLAGS = "-bundle -lSwankyAmp";
 				OTHER_REZFLAGS = "-d ppc_$ppc -d i386_$i386 -d ppc64_$ppc64 -d x86_64_$x86_64 -I /System/Library/Frameworks/CoreServices.framework/Frameworks/CarbonCore.framework/Versions/A/Headers -I \"$(DEVELOPER_DIR)/Extras/CoreAudio/AudioUnits/AUPublic/AUBase\" -I \"$(DEVELOPER_DIR)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/AudioUnit.framework/Headers\"";
-				PRODUCT_BUNDLE_IDENTIFIER = com.ResonantDSP.ResonantAmp;
-				PRODUCT_NAME = "ResonantAmp";
+				PRODUCT_BUNDLE_IDENTIFIER = com.ResonantDSP.SwankyAmp;
+				PRODUCT_NAME = "SwankyAmp";
 				USE_HEADERMAP = NO;
 				WRAPPER_EXTENSION = component;
 			};
@@ -1568,10 +1568,10 @@
 				LIBRARY_STYLE = Bundle;
 				LLVM_LTO = YES;
 				MACOSX_DEPLOYMENT_TARGET = 10.11;
-				OTHER_LDFLAGS = "-bundle -lResonantAmp";
+				OTHER_LDFLAGS = "-bundle -lSwankyAmp";
 				OTHER_REZFLAGS = "-d ppc_$ppc -d i386_$i386 -d ppc64_$ppc64 -d x86_64_$x86_64 -I /System/Library/Frameworks/CoreServices.framework/Frameworks/CarbonCore.framework/Versions/A/Headers -I \"$(DEVELOPER_DIR)/Extras/CoreAudio/AudioUnits/AUPublic/AUBase\" -I \"$(DEVELOPER_DIR)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/AudioUnit.framework/Headers\"";
-				PRODUCT_BUNDLE_IDENTIFIER = com.ResonantDSP.ResonantAmp;
-				PRODUCT_NAME = "ResonantAmp";
+				PRODUCT_BUNDLE_IDENTIFIER = com.ResonantDSP.SwankyAmp;
+				PRODUCT_NAME = "SwankyAmp";
 				USE_HEADERMAP = NO;
 				WRAPPER_EXTENSION = component;
 			};
@@ -1618,9 +1618,9 @@
 				INFOPLIST_FILE = Info-Standalone_Plugin.plist;
 				INFOPLIST_PREPROCESS = NO;
 				MACOSX_DEPLOYMENT_TARGET = 10.11;
-				OTHER_LDFLAGS = "-lResonantAmp";
-				PRODUCT_BUNDLE_IDENTIFIER = com.ResonantDSP.ResonantAmp;
-				PRODUCT_NAME = "ResonantAmp";
+				OTHER_LDFLAGS = "-lSwankyAmp";
+				PRODUCT_BUNDLE_IDENTIFIER = com.ResonantDSP.SwankyAmp;
+				PRODUCT_NAME = "SwankyAmp";
 				USE_HEADERMAP = NO;
 			};
 			name = Debug;
@@ -1667,9 +1667,9 @@
 				INFOPLIST_PREPROCESS = NO;
 				LLVM_LTO = YES;
 				MACOSX_DEPLOYMENT_TARGET = 10.11;
-				OTHER_LDFLAGS = "-lResonantAmp";
-				PRODUCT_BUNDLE_IDENTIFIER = com.ResonantDSP.ResonantAmp;
-				PRODUCT_NAME = "ResonantAmp";
+				OTHER_LDFLAGS = "-lSwankyAmp";
+				PRODUCT_BUNDLE_IDENTIFIER = com.ResonantDSP.SwankyAmp;
+				PRODUCT_NAME = "SwankyAmp";
 				USE_HEADERMAP = NO;
 			};
 			name = Release;
@@ -1715,8 +1715,8 @@
 				);
 				INSTALL_PATH = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 10.11;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ResonantDSP.ResonantAmp;
-				PRODUCT_NAME = "ResonantAmp";
+				PRODUCT_BUNDLE_IDENTIFIER = com.ResonantDSP.SwankyAmp;
+				PRODUCT_NAME = "SwankyAmp";
 				SKIP_INSTALL = YES;
 				USE_HEADERMAP = NO;
 			};
@@ -1764,8 +1764,8 @@
 				INSTALL_PATH = "@executable_path/../Frameworks";
 				LLVM_LTO = YES;
 				MACOSX_DEPLOYMENT_TARGET = 10.11;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ResonantDSP.ResonantAmp;
-				PRODUCT_NAME = "ResonantAmp";
+				PRODUCT_BUNDLE_IDENTIFIER = com.ResonantDSP.SwankyAmp;
+				PRODUCT_NAME = "SwankyAmp";
 				SKIP_INSTALL = YES;
 				USE_HEADERMAP = NO;
 			};
@@ -1813,7 +1813,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_NAME = "ResonantAmp";
+				PRODUCT_NAME = "SwankyAmp";
 				SDKROOT = macosx;
 				WARNING_CFLAGS = "-Wreorder";
 				ZERO_LINK = NO;
@@ -1861,7 +1861,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				PRODUCT_NAME = "ResonantAmp";
+				PRODUCT_NAME = "SwankyAmp";
 				SDKROOT = macosx;
 				WARNING_CFLAGS = "-Wreorder";
 				ZERO_LINK = NO;
@@ -1898,8 +1898,8 @@
 				B5BF0664BB6A654412DD95F9,
 				1C6F48D9104386236BB43DA7,
 			);
-			name = "ResonantAmp - All";
-			productName = ResonantAmp;
+			name = "SwankyAmp - All";
+			productName = SwankyAmp;
 		};
 		53164C4619DB4BD59D4E66BD = {
 			isa = XCConfigurationList;
@@ -1957,8 +1957,8 @@
 			dependencies = (
 				12CF363CD25182FDA41CBCC6,
 			);
-			name = "ResonantAmp - VST3";
-			productName = ResonantAmp;
+			name = "SwankyAmp - VST3";
+			productName = SwankyAmp;
 			productReference = 3A3B8185815BB6FF153325AD;
 			productType = "com.apple.product-type.bundle";
 		};
@@ -2018,8 +2018,8 @@
 			dependencies = (
 				F1C57F1FDCB70E8894DB32DE,
 			);
-			name = "ResonantAmp - AAX";
-			productName = ResonantAmp;
+			name = "SwankyAmp - AAX";
+			productName = SwankyAmp;
 			productReference = B6D598D8AEA1FF5BC3D4BD92;
 			productType = "com.apple.product-type.bundle";
 		};
@@ -2090,8 +2090,8 @@
 			dependencies = (
 				830AE709543FF88EC5D99441,
 			);
-			name = "ResonantAmp - AU";
-			productName = ResonantAmp;
+			name = "SwankyAmp - AU";
+			productName = SwankyAmp;
 			productReference = 23784367939770DD260DB77C;
 			productType = "com.apple.product-type.bundle";
 		};
@@ -2151,8 +2151,8 @@
 			dependencies = (
 				FD2775F26F2714EA8B1C8695,
 			);
-			name = "ResonantAmp - Standalone Plugin";
-			productName = ResonantAmp;
+			name = "SwankyAmp - Standalone Plugin";
+			productName = SwankyAmp;
 			productReference = 67DDA139F83D9E5F7486E101;
 			productType = "com.apple.product-type.application";
 		};
@@ -2183,7 +2183,7 @@
 				A7B76C7EDF4B4DFF31480049,
 				107F585F3EEA213368CC16C5,
 				23003AA9386C538CCEC5C186,
-				4A72EAE1C26D19CB47240495,
+				BA477DFE6582F7DB6EAA06D2,
 				0ECF095E595A3F61003AB096,
 				2516937FF938F9180ECB5554,
 				08A348691882E4DAE152691E,
@@ -2215,8 +2215,8 @@
 			);
 			buildRules = ( );
 			dependencies = ( );
-			name = "ResonantAmp - Shared Code";
-			productName = ResonantAmp;
+			name = "SwankyAmp - Shared Code";
+			productName = SwankyAmp;
 			productReference = EC3CADD2B091D25512B978DD;
 			productType = "com.apple.product-type.library.static";
 		};

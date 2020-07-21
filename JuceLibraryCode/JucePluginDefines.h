@@ -38,7 +38,7 @@
  #define JucePlugin_Enable_IAA             0
 #endif
 #ifndef  JucePlugin_Name
- #define JucePlugin_Name                   "Resonant Amp"
+ #define JucePlugin_Name                   "Swanky Amp"
 #endif
 #ifndef  JucePlugin_Desc
  #define JucePlugin_Desc                   "Tube amplifiers simulation"
@@ -74,13 +74,13 @@
  #define JucePlugin_EditorRequiresKeyboardFocus  0
 #endif
 #ifndef  JucePlugin_Version
- #define JucePlugin_Version                0.7.2
+ #define JucePlugin_Version                0.7.3
 #endif
 #ifndef  JucePlugin_VersionCode
- #define JucePlugin_VersionCode            0x702
+ #define JucePlugin_VersionCode            0x703
 #endif
 #ifndef  JucePlugin_VersionString
- #define JucePlugin_VersionString          "0.7.2"
+ #define JucePlugin_VersionString          "0.7.3"
 #endif
 #ifndef  JucePlugin_VSTUniqueID
  #define JucePlugin_VSTUniqueID            JucePlugin_PluginCode
@@ -98,16 +98,16 @@
  #define JucePlugin_AUSubType              JucePlugin_PluginCode
 #endif
 #ifndef  JucePlugin_AUExportPrefix
- #define JucePlugin_AUExportPrefix         ResonantAmpAU
+ #define JucePlugin_AUExportPrefix         SwankyAmpAU
 #endif
 #ifndef  JucePlugin_AUExportPrefixQuoted
- #define JucePlugin_AUExportPrefixQuoted   "ResonantAmpAU"
+ #define JucePlugin_AUExportPrefixQuoted   "SwankyAmpAU"
 #endif
 #ifndef  JucePlugin_AUManufacturerCode
  #define JucePlugin_AUManufacturerCode     JucePlugin_ManufacturerCode
 #endif
 #ifndef  JucePlugin_CFBundleIdentifier
- #define JucePlugin_CFBundleIdentifier     com.ResonantDSP.ResonantAmp
+ #define JucePlugin_CFBundleIdentifier     com.ResonantDSP.SwankyAmp
 #endif
 #ifndef  JucePlugin_RTASCategory
  #define JucePlugin_RTASCategory           8192
@@ -125,7 +125,7 @@
  #define JucePlugin_RTASDisableMultiMono   0
 #endif
 #ifndef  JucePlugin_AAXIdentifier
- #define JucePlugin_AAXIdentifier          com.ResonantDSP.ResonantAmp
+ #define JucePlugin_AAXIdentifier          com.ResonantDSP.SwankyAmp
 #endif
 #ifndef  JucePlugin_AAXManufacturerCode
  #define JucePlugin_AAXManufacturerCode    JucePlugin_ManufacturerCode
@@ -149,7 +149,7 @@
  #define JucePlugin_IAASubType             JucePlugin_PluginCode
 #endif
 #ifndef  JucePlugin_IAAName
- #define JucePlugin_IAAName                "Resonant DSP: Resonant Amp"
+ #define JucePlugin_IAAName                "Resonant DSP: Swanky Amp"
 #endif
 #ifndef  JucePlugin_VSTNumMidiInputs
  #define JucePlugin_VSTNumMidiInputs       16

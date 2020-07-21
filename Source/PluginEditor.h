@@ -1,5 +1,5 @@
 /*
- *  Resonant Amp tube amplifier simulation
+ *  Swanky Amp tube amplifier simulation
  *  Copyright (C) 2020  Garrin McGoldrick
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -21,7 +21,7 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 
-#include "ResonantAmpLAF.h"
+#include "SwankyAmpLAF.h"
 #include "PresetManager.h"
 #include "TooltipsData.h"
 #include "Components/AmpGroup.h"
@@ -30,11 +30,11 @@
 typedef AudioProcessorValueTreeState::SliderAttachment SliderAttachment;
 typedef AudioProcessorValueTreeState::ButtonAttachment ButtonAttachment;
 
-class ResonantAmpAudioProcessorEditor : public AudioProcessorEditor
+class SwankyAmpAudioProcessorEditor : public AudioProcessorEditor
 {
 public:
-	ResonantAmpAudioProcessorEditor(ResonantAmpAudioProcessor&, AudioProcessorValueTreeState&);
-	~ResonantAmpAudioProcessorEditor();
+	SwankyAmpAudioProcessorEditor(SwankyAmpAudioProcessor&, AudioProcessorValueTreeState&);
+	~SwankyAmpAudioProcessorEditor();
 
 	void paint(Graphics&) override;
 	void resized() override;
@@ -47,11 +47,11 @@ private:
 	const int headerHeight = 24;
 	const int headerPadding = 16;
 
-	ResonantAmpLAF resonantAmpLAF;
+	SwankyAmpLAF laf;
 
 	// This reference is provided as a quick way for your editor to
 	// access the processor object that created it.
-	ResonantAmpAudioProcessor& processor;
+	SwankyAmpAudioProcessor& processor;
 	AudioProcessorValueTreeState& valueTreeState;
 
 	std::vector<String> managerListenIds;
@@ -74,7 +74,7 @@ private:
 
 	void buildBgPattern();
 
-	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ResonantAmpAudioProcessorEditor)
+	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SwankyAmpAudioProcessorEditor)
 };
 
 #undef INSERT_PARAMETER

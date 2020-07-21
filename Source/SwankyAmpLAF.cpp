@@ -1,5 +1,5 @@
 /*
- *  Resonant Amp tube amplifier simulation
+ *  Swanky Amp tube amplifier simulation
  *  Copyright (C) 2020  Garrin McGoldrick
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -22,69 +22,69 @@
 #include "Components/LevelMeter.h"
 #include "Components/RButton.h"
 
-#include "ResonantAmpLAF.h"
+#include "SwankyAmpLAF.h"
 
-const Colour ResonantAmpLAF::colourDark = Colour::fromHSV(0.0f, 0.0f, 0.25f, 1.0f);
-const Colour ResonantAmpLAF::colourGrey = Colour::fromHSV(0.0f, 0.0f, 0.75f, 1.0f);
-const Colour ResonantAmpLAF::colourBackground = Colour::fromHSV(0.0f, 0.0f, 1.0f, 1.0f);
-const Colour ResonantAmpLAF::colourHighlight = Colour::fromHSV(0.98f, 0.6f, 0.75f, 1.0f);
-const Colour ResonantAmpLAF::colourSteel = Colour::fromHSV(0.0f, 0.0f, 0.96f, 1.0f);
+const Colour SwankyAmpLAF::colourDark = Colour::fromHSV(0.0f, 0.0f, 0.25f, 1.0f);
+const Colour SwankyAmpLAF::colourGrey = Colour::fromHSV(0.0f, 0.0f, 0.75f, 1.0f);
+const Colour SwankyAmpLAF::colourBackground = Colour::fromHSV(0.0f, 0.0f, 1.0f, 1.0f);
+const Colour SwankyAmpLAF::colourHighlight = Colour::fromHSV(0.98f, 0.6f, 0.75f, 1.0f);
+const Colour SwankyAmpLAF::colourSteel = Colour::fromHSV(0.0f, 0.0f, 0.96f, 1.0f);
 
-ResonantAmpLAF::ResonantAmpLAF()
+SwankyAmpLAF::SwankyAmpLAF()
 {
-	setColour(ResizableWindow::backgroundColourId, ResonantAmpLAF::colourBackground);
-	setColour(Slider::textBoxTextColourId, ResonantAmpLAF::colourDark);
+	setColour(ResizableWindow::backgroundColourId, SwankyAmpLAF::colourBackground);
+	setColour(Slider::textBoxTextColourId, SwankyAmpLAF::colourDark);
 
-	setColour(ParameterGroup::borderColourId, ResonantAmpLAF::colourDark);
-	setColour(ParameterGroup::steelColourId, ResonantAmpLAF::colourSteel);
+	setColour(ParameterGroup::borderColourId, SwankyAmpLAF::colourDark);
+	setColour(ParameterGroup::steelColourId, SwankyAmpLAF::colourSteel);
 
-	setColour(RSlider::dialColourId, ResonantAmpLAF::colourDark);
-	setColour(RSlider::dialOutlineColourId, ResonantAmpLAF::colourGrey);
-	setColour(RSlider::dialTextColourId, ResonantAmpLAF::colourGrey);
-	setColour(RSlider::dialDotColourId, ResonantAmpLAF::colourHighlight);
+	setColour(RSlider::dialColourId, SwankyAmpLAF::colourDark);
+	setColour(RSlider::dialOutlineColourId, SwankyAmpLAF::colourGrey);
+	setColour(RSlider::dialTextColourId, SwankyAmpLAF::colourGrey);
+	setColour(RSlider::dialDotColourId, SwankyAmpLAF::colourHighlight);
 
-	setColour(LevelMeter::outlineColourId, ResonantAmpLAF::colourDark);
-	setColour(LevelMeter::backgroundColourId, ResonantAmpLAF::colourBackground);
-	setColour(LevelMeter::meterColourId, ResonantAmpLAF::colourGrey);
-	setColour(LevelMeter::textColourId, ResonantAmpLAF::colourDark);
+	setColour(LevelMeter::outlineColourId, SwankyAmpLAF::colourDark);
+	setColour(LevelMeter::backgroundColourId, SwankyAmpLAF::colourBackground);
+	setColour(LevelMeter::meterColourId, SwankyAmpLAF::colourGrey);
+	setColour(LevelMeter::textColourId, SwankyAmpLAF::colourDark);
 
-	setColour(RButton::buttonColourId, ResonantAmpLAF::colourDark);
-	setColour(RButton::textColourId, ResonantAmpLAF::colourGrey);
+	setColour(RButton::buttonColourId, SwankyAmpLAF::colourDark);
+	setColour(RButton::textColourId, SwankyAmpLAF::colourGrey);
 
-	setColour(ComboBox::backgroundColourId, ResonantAmpLAF::colourBackground);
-	setColour(ComboBox::textColourId, ResonantAmpLAF::colourDark);
-	setColour(ComboBox::outlineColourId, ResonantAmpLAF::colourDark);
-	setColour(ComboBox::buttonColourId, ResonantAmpLAF::colourDark);
-	setColour(ComboBox::arrowColourId, ResonantAmpLAF::colourDark);
-	setColour(ComboBox::focusedOutlineColourId, ResonantAmpLAF::colourHighlight);
+	setColour(ComboBox::backgroundColourId, SwankyAmpLAF::colourBackground);
+	setColour(ComboBox::textColourId, SwankyAmpLAF::colourDark);
+	setColour(ComboBox::outlineColourId, SwankyAmpLAF::colourDark);
+	setColour(ComboBox::buttonColourId, SwankyAmpLAF::colourDark);
+	setColour(ComboBox::arrowColourId, SwankyAmpLAF::colourDark);
+	setColour(ComboBox::focusedOutlineColourId, SwankyAmpLAF::colourHighlight);
 
-	setColour(PopupMenu::backgroundColourId, ResonantAmpLAF::colourBackground);
-	setColour(PopupMenu::textColourId, ResonantAmpLAF::colourDark);
-	setColour(PopupMenu::headerTextColourId, ResonantAmpLAF::colourDark);
-	setColour(PopupMenu::highlightedBackgroundColourId, ResonantAmpLAF::colourDark);
-	setColour(PopupMenu::highlightedTextColourId, ResonantAmpLAF::colourBackground);
+	setColour(PopupMenu::backgroundColourId, SwankyAmpLAF::colourBackground);
+	setColour(PopupMenu::textColourId, SwankyAmpLAF::colourDark);
+	setColour(PopupMenu::headerTextColourId, SwankyAmpLAF::colourDark);
+	setColour(PopupMenu::highlightedBackgroundColourId, SwankyAmpLAF::colourDark);
+	setColour(PopupMenu::highlightedTextColourId, SwankyAmpLAF::colourBackground);
 
-	setColour(TextEditor::backgroundColourId, ResonantAmpLAF::colourBackground);
-	setColour(TextEditor::textColourId, ResonantAmpLAF::colourDark);
-	setColour(TextEditor::highlightColourId, ResonantAmpLAF::colourGrey);
-	setColour(TextEditor::highlightedTextColourId, ResonantAmpLAF::colourDark);
+	setColour(TextEditor::backgroundColourId, SwankyAmpLAF::colourBackground);
+	setColour(TextEditor::textColourId, SwankyAmpLAF::colourDark);
+	setColour(TextEditor::highlightColourId, SwankyAmpLAF::colourGrey);
+	setColour(TextEditor::highlightedTextColourId, SwankyAmpLAF::colourDark);
 	setColour(TextEditor::outlineColourId, Colours::transparentBlack);
 	setColour(TextEditor::focusedOutlineColourId, Colours::transparentBlack);
 	setColour(TextEditor::shadowColourId, Colours::transparentBlack);
 
-	setColour(Label::textColourId, ResonantAmpLAF::colourDark);
+	setColour(Label::textColourId, SwankyAmpLAF::colourDark);
 	setColour(Label::backgroundColourId, Colours::transparentBlack);
 	setColour(Label::outlineColourId, Colours::transparentBlack);
 	setColour(Label::backgroundWhenEditingColourId, Colours::transparentBlack);
-	setColour(Label::textWhenEditingColourId, ResonantAmpLAF::colourDark);
+	setColour(Label::textWhenEditingColourId, SwankyAmpLAF::colourDark);
 	setColour(Label::outlineWhenEditingColourId, Colours::transparentBlack);
 
-	setColour(TooltipWindow::backgroundColourId, ResonantAmpLAF::colourBackground);
-	setColour(TooltipWindow::textColourId, ResonantAmpLAF::colourDark);
-	setColour(TooltipWindow::outlineColourId, ResonantAmpLAF::colourDark);
+	setColour(TooltipWindow::backgroundColourId, SwankyAmpLAF::colourBackground);
+	setColour(TooltipWindow::textColourId, SwankyAmpLAF::colourDark);
+	setColour(TooltipWindow::outlineColourId, SwankyAmpLAF::colourDark);
 }
 
-const Font& ResonantAmpLAF::getDefaultFont()
+const Font& SwankyAmpLAF::getDefaultFont()
 {
 	const static Font font = Font(
 		Typeface::createSystemTypefaceFor(
@@ -96,7 +96,7 @@ const Font& ResonantAmpLAF::getDefaultFont()
 	return font;
 }
 
-const Font& ResonantAmpLAF::getDefaultFontNarrow()
+const Font& SwankyAmpLAF::getDefaultFontNarrow()
 {
 	const static Font font = Font(
 		Typeface::createSystemTypefaceFor(
@@ -108,7 +108,7 @@ const Font& ResonantAmpLAF::getDefaultFontNarrow()
 	return font;
 }
 
-const Font& ResonantAmpLAF::getDefaultFontBold()
+const Font& SwankyAmpLAF::getDefaultFontBold()
 {
 	const static Font font = Font(
 		Typeface::createSystemTypefaceFor(
@@ -121,7 +121,7 @@ const Font& ResonantAmpLAF::getDefaultFontBold()
 }
 
 
-const DropShadow& ResonantAmpLAF::getDropShadow()
+const DropShadow& SwankyAmpLAF::getDropShadow()
 {
 	const static DropShadow dropShadow(
 		Colour::fromHSV(0.0f, 0.0f, 0.0f, 0.5),
@@ -131,7 +131,7 @@ const DropShadow& ResonantAmpLAF::getDropShadow()
 	return dropShadow;
 }
 
-Path ResonantAmpLAF::getSaveIconPath(float d)
+Path SwankyAmpLAF::getSaveIconPath(float d)
 {
 	Path path;
 
@@ -158,7 +158,7 @@ Path ResonantAmpLAF::getSaveIconPath(float d)
 	return path;
 }
 
-Path ResonantAmpLAF::getRemoveIconPath(float d)
+Path SwankyAmpLAF::getRemoveIconPath(float d)
 {
 	Path path;
 
@@ -173,7 +173,7 @@ Path ResonantAmpLAF::getRemoveIconPath(float d)
 	return path;
 }
 
-Path ResonantAmpLAF::getNextIconPath(float d)
+Path SwankyAmpLAF::getNextIconPath(float d)
 {
 	Path path;
 
@@ -187,7 +187,7 @@ Path ResonantAmpLAF::getNextIconPath(float d)
 	return path;
 }
 
-Path ResonantAmpLAF::getPrevIconPath(float d)
+Path SwankyAmpLAF::getPrevIconPath(float d)
 {
 	Path path;
 
@@ -201,7 +201,7 @@ Path ResonantAmpLAF::getPrevIconPath(float d)
 	return path;
 }
 
-Path ResonantAmpLAF::getTickShape(float height)
+Path SwankyAmpLAF::getTickShape(float height)
 {
 	const float padding = height / 5.0f;
 
@@ -220,7 +220,7 @@ Path ResonantAmpLAF::getTickShape(float height)
     return path;
 }
 
-Slider::SliderLayout ResonantAmpLAF::getSliderLayout(Slider& slider)
+Slider::SliderLayout SwankyAmpLAF::getSliderLayout(Slider& slider)
 {
 	if (!slider.isRotary() && slider.getTextBoxPosition() != Slider::TextBoxBelow)
 		return LookAndFeel_V4::getSliderLayout(slider);
@@ -234,7 +234,7 @@ Slider::SliderLayout ResonantAmpLAF::getSliderLayout(Slider& slider)
 	return layout;
 }
 
-void ResonantAmpLAF::drawRotarySlider(
+void SwankyAmpLAF::drawRotarySlider(
 	Graphics& g,
 	int x,
 	int y,
@@ -288,7 +288,7 @@ void ResonantAmpLAF::drawRotarySlider(
 	);
 	dialPath.closeSubPath();
 
-	ResonantAmpLAF::getDropShadow().drawForPath(g, dialPath);
+	SwankyAmpLAF::getDropShadow().drawForPath(g, dialPath);
 
 	g.setColour(findColour(RSlider::dialColourId));
 	g.fillPath(dialPath);
@@ -330,7 +330,7 @@ void ResonantAmpLAF::drawRotarySlider(
 	// label text
 
 	const String labelText = rslider->fmtSliderPos(sliderPos);
-	g.setFont(ResonantAmpLAF::getDefaultFontNarrow().withHeight(dims.radius / 1.5f));
+	g.setFont(SwankyAmpLAF::getDefaultFontNarrow().withHeight(dims.radius / 1.5f));
 	g.setColour(findColour(RSlider::dialTextColourId));
 	g.drawText(labelText, dialBounds, Justification::centred, true);
 
@@ -402,7 +402,7 @@ void ResonantAmpLAF::drawRotarySlider(
 	g.restoreState();
 }
 
-void ResonantAmpLAF::drawToggleButton(
+void SwankyAmpLAF::drawToggleButton(
 	Graphics& g,
 	ToggleButton& button,
 	bool shouldDrawButtonAsHighlighted,
@@ -467,7 +467,7 @@ void ResonantAmpLAF::drawToggleButton(
 	// draw the text
 
 	g.setColour(findColour(RButton::textColourId));
-	g.setFont(ResonantAmpLAF::getDefaultFontNarrow().withHeight(radius));
+	g.setFont(SwankyAmpLAF::getDefaultFontNarrow().withHeight(radius));
 	g.drawText(
 		button.getToggleState() ? "ON" : "OFF",
 		circleBounds,
@@ -480,7 +480,7 @@ void ResonantAmpLAF::drawToggleButton(
 }
 
 
-void ResonantAmpLAF::drawComboBox(
+void SwankyAmpLAF::drawComboBox(
 	Graphics& g,
 	int width,
 	int height,
@@ -513,7 +513,7 @@ void ResonantAmpLAF::drawComboBox(
     g.strokePath(path, PathStrokeType(2.0f));
 }
 
-Rectangle<int> ResonantAmpLAF::getTooltipBounds(const String&, Point<int>, Rectangle<int> parentArea)
+Rectangle<int> SwankyAmpLAF::getTooltipBounds(const String&, Point<int>, Rectangle<int> parentArea)
 {
 	const int lineHeight = 16;
 	const int margin = lineHeight;
@@ -529,7 +529,7 @@ Rectangle<int> ResonantAmpLAF::getTooltipBounds(const String&, Point<int>, Recta
 	return area;
 }
 
-void ResonantAmpLAF::drawTooltip(Graphics& g, const String& text, int width, int height)
+void SwankyAmpLAF::drawTooltip(Graphics& g, const String& text, int width, int height)
 {
 	const float lineHeight = 16.0f;
 	const float lineThickness = 1.0f;

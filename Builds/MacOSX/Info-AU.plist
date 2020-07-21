@@ -8,19 +8,19 @@
     <key>CFBundleIconFile</key>
     <string></string>
     <key>CFBundleIdentifier</key>
-    <string>com.ResonantDSP.ResonantAmp</string>
+    <string>com.ResonantDSP.SwankyAmp</string>
     <key>CFBundleName</key>
-    <string>ResonantAmp</string>
+    <string>SwankyAmp</string>
     <key>CFBundleDisplayName</key>
-    <string>ResonantAmp</string>
+    <string>SwankyAmp</string>
     <key>CFBundlePackageType</key>
     <string>BNDL</string>
     <key>CFBundleSignature</key>
     <string>????</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.7.2</string>
+    <string>0.7.3</string>
     <key>CFBundleVersion</key>
-    <string>0.7.2</string>
+    <string>0.7.3</string>
     <key>NSHumanReadableCopyright</key>
     <string></string>
     <key>NSHighResolutionCapable</key>
@@ -29,11 +29,11 @@
     <array>
       <dict>
         <key>name</key>
-        <string>Resonant DSP: Resonant Amp</string>
+        <string>Resonant DSP: Swanky Amp</string>
         <key>description</key>
         <string>Tube amplifiers simulation</string>
         <key>factoryFunction</key>
-        <string>ResonantAmpAUFactory</string>
+        <string>SwankyAmpAUFactory</string>
         <key>manufacturer</key>
         <string>Manu</string>
         <key>type</key>
@@ -41,7 +41,7 @@
         <key>subtype</key>
         <string>Sjgm</string>
         <key>version</key>
-        <integer>1794</integer>
+        <integer>1795</integer>
         <key>resourceUsage</key>
         <dict>
           <key>network.client</key>

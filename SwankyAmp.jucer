@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<JUCERPROJECT id="sJgmJL" name="ResonantAmp" projectType="audioplug" version="0.7.2"
+<JUCERPROJECT id="sJgmJL" name="SwankyAmp" projectType="audioplug" version="0.7.3"
               projectLineFeed="&#10;" companyName="Resonant DSP" companyWebsite="https://www.resonantdsp.com/"
               companyEmail="info@resonantdsp.com" pluginFormats="buildAAX,buildAU,buildStandalone,buildVST3"
-              pluginName="Resonant Amp" pluginDesc="Tube amplifiers simulation"
+              pluginName="Swanky Amp" pluginDesc="Tube amplifiers simulation"
               pluginManufacturer="Resonant DSP" pluginAAXCategory="8192" pluginRTASCategory="8192"
               splashScreenColour="Light" cppLanguageStandard="17" displaySplashScreen="1"
               jucerFormatVersion="1">
-  <MAINGROUP id="qolZJU" name="ResonantAmp">
+  <MAINGROUP id="qolZJU" name="SwankyAmp">
     <GROUP id="{DE71F08C-9BB3-E05B-B09D-49D3564FD2D1}" name="Resources">
       <FILE id="A3p67q" name="logo.svg" compile="0" resource="1" file="Resources/logo.svg"/>
       <FILE id="HEJpbx" name="presets.xml" compile="0" resource="1" file="Resources/presets.xml"/>
@@ -56,10 +56,9 @@
       </GROUP>
       <FILE id="cyaozc" name="Utils.cpp" compile="1" resource="0" file="Source/Utils.cpp"/>
       <FILE id="BkB5cF" name="Utils.h" compile="0" resource="0" file="Source/Utils.h"/>
-      <FILE id="BF767l" name="ResonantAmpLAF.cpp" compile="1" resource="0"
-            file="Source/ResonantAmpLAF.cpp"/>
-      <FILE id="TBMLgx" name="ResonantAmpLAF.h" compile="0" resource="0"
-            file="Source/ResonantAmpLAF.h"/>
+      <FILE id="BF767l" name="SwankyAmpLAF.cpp" compile="1" resource="0"
+            file="Source/SwankyAmpLAF.cpp"/>
+      <FILE id="TBMLgx" name="SwankyAmpLAF.h" compile="0" resource="0" file="Source/SwankyAmpLAF.h"/>
       <FILE id="CNVd3V" name="AmpMono.h" compile="0" resource="0" file="Source/AmpMono.h"/>
       <FILE id="m1Xtuh" name="PluginProcessor.cpp" compile="1" resource="0"
             file="Source/PluginProcessor.cpp"/>
