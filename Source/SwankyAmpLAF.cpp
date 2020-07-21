@@ -131,7 +131,7 @@ const DropShadow& SwankyAmpLAF::getDropShadow()
 	return dropShadow;
 }
 
-Path SwankyAmpLAF::getSaveIconPath(float d)
+Path SwankyAmpLAF::getSaveIconPath(float d, float stroke)
 {
 	Path path;
 
@@ -154,11 +154,12 @@ Path SwankyAmpLAF::getSaveIconPath(float d)
 	path.startNewSubPath(0.75f - 1.0f / 6.0f, 2.0f / 5.0f);
 	path.lineTo(0.75f - 1.0f / 6.0f, 0.0f);
 
-	path.scaleToFit(0, 0, d, d, true);
+	const float pad = stroke / 2.0f;
+	path.scaleToFit(0.0f + pad, 0.0f + pad, d - stroke, d - stroke, true);
 	return path;
 }
 
-Path SwankyAmpLAF::getRemoveIconPath(float d)
+Path SwankyAmpLAF::getRemoveIconPath(float d, float stroke)
 {
 	Path path;
 
@@ -169,11 +170,12 @@ Path SwankyAmpLAF::getRemoveIconPath(float d)
 	path.startNewSubPath(0.25f, 0.75f);
 	path.lineTo(0.75f, 0.25f);
 
-	path.scaleToFit(0, 0, d, d, true);
+	const float pad = stroke / 2.0f;
+	path.scaleToFit(0.0f + pad, 0.0f + pad, d - stroke, d - stroke, true);
 	return path;
 }
 
-Path SwankyAmpLAF::getNextIconPath(float d)
+Path SwankyAmpLAF::getNextIconPath(float d, float stroke)
 {
 	Path path;
 
@@ -183,11 +185,12 @@ Path SwankyAmpLAF::getNextIconPath(float d)
 	path.lineTo(0.667f, 0.5f);
 	path.lineTo(0.333f, 0.75f);
 
-	path.scaleToFit(0, 0, d, d, true);
+	const float pad = stroke / 2.0f;
+	path.scaleToFit(0.0f + pad, 0.0f + pad, d - stroke, d - stroke, true);
 	return path;
 }
 
-Path SwankyAmpLAF::getPrevIconPath(float d)
+Path SwankyAmpLAF::getPrevIconPath(float d, float stroke)
 {
 	Path path;
 
@@ -197,7 +200,33 @@ Path SwankyAmpLAF::getPrevIconPath(float d)
 	path.lineTo(0.333f, 0.5f);
 	path.lineTo(0.667f, 0.75f);
 
-	path.scaleToFit(0, 0, d, d, true);
+	const float pad = stroke / 2.0f;
+	path.scaleToFit(0.0f + pad, 0.0f + pad, d - stroke, d - stroke, true);
+	return path;
+}
+
+Path SwankyAmpLAF::getOpenIconPath(float d, float stroke)
+{
+	Path path;
+
+	path.startNewSubPath(1.0f, 0.5f);
+	path.lineTo(1.0f, 0.875f);
+	path.addCentredArc(0.875f, 0.875f, 0.125f, 0.125f, 0.0f, MathConstants<float>::halfPi, 2.0f * MathConstants<float>::halfPi);
+	path.lineTo(0.125f, 1.0f);
+	path.addCentredArc(0.125f, 0.875f, 0.125f, 0.125f, 0.0f, 2.0f * MathConstants<float>::halfPi, 3.0f * MathConstants<float>::halfPi);
+	path.lineTo(0.0f, 0.125f);
+	path.addCentredArc(0.125f, 0.125f, 0.125f, 0.125f, 0.0f, 3.0f * MathConstants<float>::halfPi, 4.0f * MathConstants<float>::halfPi);
+	path.lineTo(0.5f, 0.0f);
+
+	path.startNewSubPath(0.5f, 0.5f);
+	path.lineTo(1.0f, 0.0f);
+
+	path.startNewSubPath(0.75f, 0.0f);
+	path.lineTo(1.0f, 0.0f);
+	path.lineTo(1.0f, 0.25f);
+
+	const float pad = stroke / 2.0f;
+	path.scaleToFit(0.0f + pad, 0.0f + pad, d - stroke, d - stroke, true);
 	return path;
 }
 

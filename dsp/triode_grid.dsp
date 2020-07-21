@@ -26,8 +26,7 @@ import("common.dsp");
 // Assume the parameters will be given in the range (-1, +1), and scale them
 // here to the appropriate value.
 
-triode_grid = triode_grid
-with {
+triode_grid = environment {
     // High pass frequency for the signal coming into the tridoe, this is the 
     // result of the capacitor after the input signal and also means we don't
     // have to worry about signal biases. This has an audible impact on the
@@ -50,7 +49,7 @@ with {
     grid_tau2 = grid_tau * grid_ratio : 1.0 / (ba.sec2samp(_) + 1);
     grid_tau3 = grid_tau * grid_smooth : 1.0 / (ba.sec2samp(_) + 1);
 
-    triode_grid = _ 
+    full = _ 
         : fi.highpass(1, hp_freq) 
 
         <: _, max(0, _ - grid_level)

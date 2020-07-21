@@ -51,7 +51,7 @@ namespace ProjectInfo
 {
     const char* const  projectName    = "SwankyAmp";
     const char* const  companyName    = "Resonant DSP";
-    const char* const  versionString  = "0.7.3";
-    const int          versionNumber  = 0x703;
+    const char* const  versionString  = "0.8.0";
+    const int          versionNumber  = 0x800;
 }
 #endif

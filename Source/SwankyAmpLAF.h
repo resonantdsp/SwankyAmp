@@ -45,10 +45,11 @@ public:
 
 	static const DropShadow& getDropShadow();
 
-	static Path getSaveIconPath(float d);
-	static Path getRemoveIconPath(float d);
-	static Path getNextIconPath(float d);
-	static Path getPrevIconPath(float d);
+	static Path getSaveIconPath(float d, float stroke = 0.0f);
+	static Path getRemoveIconPath(float d, float stroke = 0.0f);
+	static Path getNextIconPath(float d, float stroke = 0.0f);
+	static Path getPrevIconPath(float d, float stroke = 0.0f);
+	static Path getOpenIconPath(float d, float stroke = 0.0f);
 
 	Path getTickShape(float height) override;
 	Slider::SliderLayout getSliderLayout(Slider& slider) override;

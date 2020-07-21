@@ -24,10 +24,11 @@
 #include "PresetGroup.h"
 
 PresetGroup::PresetGroup() :
-	buttonSave("presetGroupButtonSave", DrawableButton::ButtonStyle::ImageFitted),
-	buttonRemove("presetGroupButtonRemove", DrawableButton::ButtonStyle::ImageFitted),
-	buttonNext("presetGroupButtonNext", DrawableButton::ButtonStyle::ImageFitted),
-	buttonPrev("presetGroupButtonPrev", DrawableButton::ButtonStyle::ImageFitted)
+	buttonSave("presetGroupButtonSave", DrawableButton::ButtonStyle::ImageRaw),
+	buttonRemove("presetGroupButtonRemove", DrawableButton::ButtonStyle::ImageRaw),
+	buttonNext("presetGroupButtonNext", DrawableButton::ButtonStyle::ImageRaw),
+	buttonPrev("presetGroupButtonPrev", DrawableButton::ButtonStyle::ImageRaw),
+	buttonOpen("presetGroupButtonOpen", DrawableButton::ButtonStyle::ImageRaw)
 {
 	presetSelector.setEditableText(true);
 	addAndMakeVisible(presetSelector);
@@ -55,6 +56,12 @@ PresetGroup::PresetGroup() :
 	prevIconHighlight.setFill(Colours::transparentBlack);
 	prevIconHighlight.setStrokeFill(SwankyAmpLAF::colourHighlight);
 	addAndMakeVisible(buttonPrev);
+
+	openIcon.setFill(Colours::transparentBlack);
+	openIcon.setStrokeFill(SwankyAmpLAF::colourDark);
+	openIconHighlight.setFill(Colours::transparentBlack);
+	openIconHighlight.setStrokeFill(SwankyAmpLAF::colourHighlight);
+	addAndMakeVisible(buttonOpen);
 }
 
 void PresetGroup::paint(Graphics& g)
@@ -69,42 +76,54 @@ void PresetGroup::resized()
 	presetSelector.setTopLeftPosition(0, 0);
 	presetSelector.setSize(getHeight() * 8, getHeight());
 
-	saveIcon.setPath(SwankyAmpLAF::getSaveIconPath((float)getHeight()));
-	saveIcon.setStrokeType(PathStrokeType(3.0f));
-	saveIconHighlight.setStrokeType(PathStrokeType(3.0f));
-	saveIconHighlight.setPath(SwankyAmpLAF::getSaveIconPath((float)getHeight()));
-	buttonSave.setImages(&saveIcon, &saveIconHighlight);
+	const float stroke = 2.0f;
+	const float pad = 8.0f;
 
-	buttonSave.setSize(getHeight(), getHeight());
-	buttonSave.setTopLeftPosition(presetSelector.getBounds().getTopRight() + Point<int>(spacing, 0));
-
-	removeIcon.setPath(SwankyAmpLAF::getRemoveIconPath((float)getHeight()));
-	removeIcon.setStrokeType(PathStrokeType(3.0f));
-	removeIconHighlight.setStrokeType(PathStrokeType(3.0f));
-	removeIconHighlight.setPath(SwankyAmpLAF::getRemoveIconPath((float)getHeight()));
-	buttonRemove.setImages(&removeIcon, &removeIconHighlight);
-
-	buttonRemove.setSize(getHeight(), getHeight());
-	buttonRemove.setTopLeftPosition(buttonSave.getBounds().getTopRight() + Point<int>(jmax(1, spacing / 2), 0));
-
-	prevIcon.setPath(SwankyAmpLAF::getPrevIconPath((float)getHeight()));
-	prevIcon.setStrokeType(PathStrokeType(3.0f));
-	prevIconHighlight.setStrokeType(PathStrokeType(3.0f));
-	prevIconHighlight.setPath(SwankyAmpLAF::getPrevIconPath((float)getHeight()));
+	prevIcon.setPath(SwankyAmpLAF::getPrevIconPath((float)getHeight(), pad));
+	prevIcon.setStrokeType(PathStrokeType(stroke));
+	prevIconHighlight.setStrokeType(PathStrokeType(stroke));
+	prevIconHighlight.setPath(SwankyAmpLAF::getPrevIconPath((float)getHeight(), pad));
 	buttonPrev.setImages(&prevIcon, &prevIconHighlight);
 
 	buttonPrev.setSize(getHeight(), getHeight());
-	buttonPrev.setTopLeftPosition(buttonRemove.getBounds().getTopRight() + Point<int>(jmax(1, spacing / 2), 0));
+	buttonPrev.setTopLeftPosition(presetSelector.getBounds().getTopRight() + Point<int>(spacing, 0));
 
-	nextIcon.setPath(SwankyAmpLAF::getNextIconPath((float)getHeight()));
-	nextIcon.setStrokeType(PathStrokeType(3.0f));
-	nextIconHighlight.setStrokeType(PathStrokeType(3.0f));
-	nextIconHighlight.setPath(SwankyAmpLAF::getNextIconPath((float)getHeight()));
+	nextIcon.setPath(SwankyAmpLAF::getNextIconPath((float)getHeight(), pad));
+	nextIcon.setStrokeType(PathStrokeType(stroke));
+	nextIconHighlight.setStrokeType(PathStrokeType(stroke));
+	nextIconHighlight.setPath(SwankyAmpLAF::getNextIconPath((float)getHeight(), pad));
 	buttonNext.setImages(&nextIcon, &nextIconHighlight);
 
 	buttonNext.setSize(getHeight(), getHeight());
-	buttonNext.setTopLeftPosition(buttonPrev.getBounds().getTopRight() + Point<int>(jmax(1, spacing / 2), 0));
+	buttonNext.setTopLeftPosition(buttonPrev.getBounds().getTopRight());
 
-	setSize(buttonNext.getRight(), getHeight());
+	saveIcon.setPath(SwankyAmpLAF::getSaveIconPath((float)getHeight(), pad));
+	saveIcon.setStrokeType(PathStrokeType(stroke));
+	saveIconHighlight.setStrokeType(PathStrokeType(stroke));
+	saveIconHighlight.setPath(SwankyAmpLAF::getSaveIconPath((float)getHeight(), pad));
+	buttonSave.setImages(&saveIcon, &saveIconHighlight);
+
+	buttonSave.setSize(getHeight(), getHeight());
+	buttonSave.setTopLeftPosition(buttonNext.getBounds().getTopRight());
+
+	removeIcon.setPath(SwankyAmpLAF::getRemoveIconPath((float)getHeight(), pad));
+	removeIcon.setStrokeType(PathStrokeType(stroke));
+	removeIconHighlight.setStrokeType(PathStrokeType(stroke));
+	removeIconHighlight.setPath(SwankyAmpLAF::getRemoveIconPath((float)getHeight(), pad));
+	buttonRemove.setImages(&removeIcon, &removeIconHighlight);
+
+	buttonRemove.setSize(getHeight(), getHeight());
+	buttonRemove.setTopLeftPosition(buttonSave.getBounds().getTopRight());
+
+	openIcon.setPath(SwankyAmpLAF::getOpenIconPath((float)getHeight(), pad));
+	openIcon.setStrokeType(PathStrokeType(stroke));
+	openIconHighlight.setStrokeType(PathStrokeType(stroke));
+	openIconHighlight.setPath(SwankyAmpLAF::getOpenIconPath((float)getHeight(), pad));
+	buttonOpen.setImages(&openIcon, &openIconHighlight);
+
+	buttonOpen.setSize(getHeight(), getHeight());
+	buttonOpen.setTopLeftPosition(buttonRemove.getBounds().getTopRight());
+
+	setSize(buttonOpen.getRight(), getHeight());
 }
 

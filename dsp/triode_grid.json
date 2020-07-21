@@ -1,9 +1,9 @@
 {
-	"triode_hp_freq": 0.45277057064703274,
-	"triode_grid_tau": -1.358083282692157,
-	"triode_grid_ratio": 1.2083932713196748,
-	"triode_grid_smooth": 1.49925797770241,
-	"triode_grid_level": 0.3350094125413018,
+	"triode_hp_freq": 0.45277057068066107,
+	"triode_grid_tau": -1.3580832826630866,
+	"triode_grid_ratio": 1.2083854832946317,
+	"triode_grid_smooth": 1.49925797772884,
+	"triode_grid_level": 0.3350094125694183,
 	"triode_grid_clip": 0.6033135807847192,
-	"triode_grid_corner": 0.20983607019321562
+	"triode_grid_corner": 0.2098359451370384
 }

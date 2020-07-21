@@ -50,7 +50,8 @@ public:
 		Button& bntSave,
 		Button& bntRemove,
 		Button& bntNext,
-		Button& bntPrev
+		Button& bntPrev,
+		Button& btnOpen
 	);
     ~PresetManager();
 
@@ -59,6 +60,7 @@ public:
 	void buttonRemoveClicked();
 	void buttonNextClicked();
 	void buttonPrevClicked();
+	void buttonOpenClicked();
 	void parameterChanged(const String& id, float newValue);
 
 	const std::vector<String>& getParameterIds() const { return parameterIds; }
@@ -68,12 +70,11 @@ public:
 private:
 	void loadPreset(SerializedState state, File file, const String& name);
 	void loadFactoryPresets();
-	void loadPresetsFromDir();
-	void loadPresetsFromMaster();
+	bool loadPresetsFromDir();
 
 	void clearUI();
 	void updateComboBox();
-	void updatePresetMaster();
+	void updatePresetDir();
 
 	void addStateEntry(const String& name, const File& file, SerializedState state);
 	void removeStateEntry(const String& name);
@@ -86,8 +87,8 @@ private:
 	Button& buttonRemove;
 	Button& buttonNext;
 	Button& buttonPrev;
+	Button& buttonOpen;
 	File presetDir;
-	File presetMaster;
 
 	std::vector<String> parameterIds;
 
