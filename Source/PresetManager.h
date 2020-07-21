@@ -68,12 +68,11 @@ public:
 private:
 	void loadPreset(SerializedState state, File file, const String& name);
 	void loadFactoryPresets();
-	void loadPresetsFromDir();
-	void loadPresetsFromMaster();
+	bool loadPresetsFromDir();
 
 	void clearUI();
 	void updateComboBox();
-	void updatePresetMaster();
+	void updatePresetDir();
 
 	void addStateEntry(const String& name, const File& file, SerializedState state);
 	void removeStateEntry(const String& name);
@@ -87,7 +86,6 @@ private:
 	Button& buttonNext;
 	Button& buttonPrev;
 	File presetDir;
-	File presetMaster;
 
 	std::vector<String> parameterIds;
 
