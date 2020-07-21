@@ -27,7 +27,8 @@ PresetGroup::PresetGroup() :
 	buttonSave("presetGroupButtonSave", DrawableButton::ButtonStyle::ImageFitted),
 	buttonRemove("presetGroupButtonRemove", DrawableButton::ButtonStyle::ImageFitted),
 	buttonNext("presetGroupButtonNext", DrawableButton::ButtonStyle::ImageFitted),
-	buttonPrev("presetGroupButtonPrev", DrawableButton::ButtonStyle::ImageFitted)
+	buttonPrev("presetGroupButtonPrev", DrawableButton::ButtonStyle::ImageFitted),
+	buttonOpen("presetGroupButtonOpen", DrawableButton::ButtonStyle::ImageFitted)
 {
 	presetSelector.setEditableText(true);
 	addAndMakeVisible(presetSelector);
@@ -55,6 +56,12 @@ PresetGroup::PresetGroup() :
 	prevIconHighlight.setFill(Colours::transparentBlack);
 	prevIconHighlight.setStrokeFill(SwankyAmpLAF::colourHighlight);
 	addAndMakeVisible(buttonPrev);
+
+	openIcon.setFill(Colours::transparentBlack);
+	openIcon.setStrokeFill(SwankyAmpLAF::colourDark);
+	openIconHighlight.setFill(Colours::transparentBlack);
+	openIconHighlight.setStrokeFill(SwankyAmpLAF::colourHighlight);
+	addAndMakeVisible(buttonOpen);
 }
 
 void PresetGroup::paint(Graphics& g)
@@ -105,6 +112,15 @@ void PresetGroup::resized()
 	buttonNext.setSize(getHeight(), getHeight());
 	buttonNext.setTopLeftPosition(buttonPrev.getBounds().getTopRight() + Point<int>(jmax(1, spacing / 2), 0));
 
-	setSize(buttonNext.getRight(), getHeight());
+	openIcon.setPath(SwankyAmpLAF::getOpenIconPath((float)getHeight()));
+	openIcon.setStrokeType(PathStrokeType(3.0f));
+	openIconHighlight.setStrokeType(PathStrokeType(3.0f));
+	openIconHighlight.setPath(SwankyAmpLAF::getOpenIconPath((float)getHeight()));
+	buttonOpen.setImages(&openIcon, &openIconHighlight);
+
+	buttonOpen.setSize(getHeight(), getHeight());
+	buttonOpen.setTopLeftPosition(buttonNext.getBounds().getTopRight() + Point<int>(jmax(1, spacing / 2), 0));
+
+	setSize(buttonOpen.getRight(), getHeight());
 }
 

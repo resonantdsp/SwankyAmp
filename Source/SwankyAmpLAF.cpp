@@ -201,6 +201,30 @@ Path SwankyAmpLAF::getPrevIconPath(float d)
 	return path;
 }
 
+Path SwankyAmpLAF::getOpenIconPath(float d)
+{
+	Path path;
+
+	path.startNewSubPath(1.0f, 0.5f);
+	path.lineTo(1.0f, 0.875f);
+	path.addCentredArc(0.875f, 0.875f, 0.125f, 0.125f, 0.0f, MathConstants<float>::halfPi, 2.0f * MathConstants<float>::halfPi);
+	path.lineTo(0.125f, 1.0f);
+	path.addCentredArc(0.125f, 0.875f, 0.125f, 0.125f, 0.0f, 2.0f * MathConstants<float>::halfPi, 3.0f * MathConstants<float>::halfPi);
+	path.lineTo(0.0f, 0.125f);
+	path.addCentredArc(0.125f, 0.125f, 0.125f, 0.125f, 0.0f, 3.0f * MathConstants<float>::halfPi, 4.0f * MathConstants<float>::halfPi);
+	path.lineTo(0.5f, 0.0f);
+
+	path.startNewSubPath(0.5f, 0.5f);
+	path.lineTo(1.0f, 0.0f);
+
+	path.startNewSubPath(0.75f, 0.0f);
+	path.lineTo(1.0f, 0.0f);
+	path.lineTo(1.0f, 0.25f);
+
+	path.scaleToFit(0, 0, d, d, true);
+	return path;
+}
+
 Path SwankyAmpLAF::getTickShape(float height)
 {
 	const float padding = height / 5.0f;

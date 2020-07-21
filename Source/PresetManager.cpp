@@ -67,14 +67,16 @@ PresetManager::PresetManager(
 	Button& buttonSave,
 	Button& buttonRemove,
 	Button& buttonNext,
-	Button& buttonPrev) :
+	Button& buttonPrev,
+	Button& buttonOpen) :
 	processor(processor),
 	vts(vts),
 	comboBox(comboBox),
 	buttonSave(buttonSave),
 	buttonRemove(buttonRemove),
 	buttonNext(buttonNext),
-	buttonPrev(buttonPrev)
+	buttonPrev(buttonPrev),
+	buttonOpen(buttonOpen)
 {
 	presetDir = File::getSpecialLocation(File::SpecialLocationType::userApplicationDataDirectory);
 	#ifdef JUCE_MAC
@@ -105,6 +107,7 @@ PresetManager::PresetManager(
 	buttonRemove.onClick = [&]() { buttonRemoveClicked(); };
 	buttonNext.onClick = [&]() { buttonNextClicked(); };
 	buttonPrev.onClick = [&]() { buttonPrevClicked(); };
+	buttonOpen.onClick = [&]() { buttonOpenClicked(); };
 }
 
 PresetManager::~PresetManager()
@@ -115,6 +118,7 @@ PresetManager::~PresetManager()
 	buttonRemove.onClick = [](){};
 	buttonNext.onClick = [](){};
 	buttonPrev.onClick = [](){};
+	buttonOpen.onClick = [](){};
 }
 
 void PresetManager::addStateEntry(const String& name, const File& file, SerializedState state)
@@ -515,6 +519,11 @@ void PresetManager::buttonPrevClicked()
 		const int id = (int)(currentIdx + 1);
 		comboBox.setSelectedId(id);
 	}
+}
+
+void PresetManager::buttonOpenClicked()
+{
+	presetDir.startAsProcess();
 }
 
 void PresetManager::parameterChanged(const String& id, float)

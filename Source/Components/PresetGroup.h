@@ -48,6 +48,7 @@ public:
 	DrawableButton buttonRemove;
 	DrawableButton buttonNext;
 	DrawableButton buttonPrev;
+	DrawableButton buttonOpen;
 
 private:
 	DrawablePath saveIcon;
@@ -58,6 +59,8 @@ private:
 	DrawablePath nextIconHighlight;
 	DrawablePath prevIcon;
 	DrawablePath prevIconHighlight;
+	DrawablePath openIcon;
+	DrawablePath openIconHighlight;
 
 	DISABLE_COMPONENT_RESIZE()
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PresetGroup)

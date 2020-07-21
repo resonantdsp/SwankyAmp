@@ -34,7 +34,8 @@ SwankyAmpAudioProcessorEditor::SwankyAmpAudioProcessorEditor(
 		presetGroup.buttonSave,
 		presetGroup.buttonRemove,
 		presetGroup.buttonNext,
-		presetGroup.buttonPrev
+		presetGroup.buttonPrev,
+		presetGroup.buttonOpen
 	),
 	// TODO: how to handle localization?
 	tooltipsData(XmlDocument::parse(BinaryData::tooltips_xml)),

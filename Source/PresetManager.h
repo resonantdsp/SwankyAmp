@@ -50,7 +50,8 @@ public:
 		Button& bntSave,
 		Button& bntRemove,
 		Button& bntNext,
-		Button& bntPrev
+		Button& bntPrev,
+		Button& btnOpen
 	);
     ~PresetManager();
 
@@ -59,6 +60,7 @@ public:
 	void buttonRemoveClicked();
 	void buttonNextClicked();
 	void buttonPrevClicked();
+	void buttonOpenClicked();
 	void parameterChanged(const String& id, float newValue);
 
 	const std::vector<String>& getParameterIds() const { return parameterIds; }
@@ -85,6 +87,7 @@ private:
 	Button& buttonRemove;
 	Button& buttonNext;
 	Button& buttonPrev;
+	Button& buttonOpen;
 	File presetDir;
 
 	std::vector<String> parameterIds;
