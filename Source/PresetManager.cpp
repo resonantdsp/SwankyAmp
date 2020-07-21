@@ -271,7 +271,10 @@ void PresetManager::updateComboBox()
 	{
 		const auto& entry = stateEntries[i];
 		const int id = (int)(i + 1);
-		comboBox.addItem(String(id) + ": " + entry.name, id);
+		if (i > 0)
+			comboBox.addItem(String(i) + ": " + entry.name, id);
+		else
+			comboBox.addItem(entry.name, id);
 	}
 }
 
@@ -280,7 +283,7 @@ void PresetManager::updatePresetDir()
 	const size_t width = (size_t)(log10f((float)stateEntries.size())) + 1;
 
 	size_t idx = 0;
-	for (const auto& entry : stateEntries)
+	for (auto& entry : stateEntries)
 	{
 		if (!entry.file.existsAsFile())
 			continue;
@@ -296,9 +299,15 @@ void PresetManager::updatePresetDir()
 			continue;
 
 		if (entry.file.getParentDirectory() == presetDir)
-			entry.file.moveFileTo(targetPath);
+		{
+			if (entry.file.moveFileTo(targetPath))
+				entry.file = File(targetPath);
+		}
 		else
-			entry.file.copyFileTo(targetPath);
+		{
+			if (entry.file.copyFileTo(targetPath))
+				entry.file = File(targetPath);
+		}
 	}
 }
 
@@ -353,8 +362,8 @@ void PresetManager::comboBoxChanged()
 		// new entry
 		addStateEntry(name, File(), std::move(SerializedState(vts.state.createXml())));
 
-		if (id > 0 && id != stateEntryIdx[name] + 1)
-			moveStateEntry(stateEntryIdx[name], (size_t)id - 1);
+		if (id > 0 && id != stateEntryIdx[name])
+			moveStateEntry(stateEntryIdx[name], (size_t)id);
 		updateComboBox();
 		// note: don't yet update preset dir as it is not yet saved so it won't have
 		// an impact
@@ -382,9 +391,9 @@ void PresetManager::comboBoxChanged()
 			// can't save until modified
 			buttonSave.setEnabled(false);
 
-			if (id > 0 && id != (int)(stateEntryIdx[name] + 1))
+			if (id > 0 && id != (int)(stateEntryIdx[name]))
 			{
-				moveStateEntry(stateEntryIdx[name], (size_t)id - 1);
+				moveStateEntry(stateEntryIdx[name], (size_t)id);
 				updatePresetDir();
 				updateComboBox();
 			}
