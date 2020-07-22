@@ -112,14 +112,7 @@ float RSlider::calcWidthForHeight(float height) const
 
 float RSlider::calcHeightForWidth(float width) const
 {
-	const RotaryParameters rotPars = getRotaryParameters();
-	const float theta = jmax(
-		fabsf(angleModulo(rotPars.startAngleRadians)),
-		fabsf(angleModulo(rotPars.endAngleRadians))
-	);
-
 	const float radiusForWidth = width / 2.0f - margin;
-
 	return (radiusForWidth + margin) * 2.0f;
 }
 

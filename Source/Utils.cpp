@@ -43,7 +43,7 @@ void fillImageNoise(Image& image, Random& rng, float alpha)
 
 Image buildImageNoise(int width, int height, Random& rng, float alpha)
 {
-	Image noise(Image::PixelFormat::ARGB, width, height, false);
+	Image noise(Image::PixelFormat::ARGB, jmax(1, width), jmax(1, height), false);
 	fillImageNoise(noise, rng, alpha);
 	return noise;
 }

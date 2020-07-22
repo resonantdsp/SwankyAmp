@@ -288,7 +288,7 @@ void PresetManager::updateComboBox()
 
 void PresetManager::updatePresetDir()
 {
-	const size_t width = (size_t)(log10f((float)stateEntries.size())) + 1;
+	const int width = (int)(log10f((float)stateEntries.size())) + 1;
 
 	size_t idx = 0;
 	for (auto& entry : stateEntries)
@@ -368,7 +368,7 @@ void PresetManager::comboBoxChanged()
 	if (stateEntryIdx.find(name) == stateEntryIdx.end())
 	{
 		// new entry
-		addStateEntry(name, File(), std::move(SerializedState(vts.state.createXml())));
+		addStateEntry(name, File(), SerializedState(vts.state.createXml()));
 
 		if (id > 0 && id != stateEntryIdx[name])
 			moveStateEntry(stateEntryIdx[name], (size_t)id);
@@ -392,7 +392,7 @@ void PresetManager::comboBoxChanged()
 		if (currentEntry.stateIdx != std::nullopt)
 		{
 			// load the state for this entry
-			setState(states[currentEntry.stateIdx.value()]);
+			setState(states[*currentEntry.stateIdx]);
 
 			// this is a custom state, can be removed
 			buttonRemove.setEnabled(true);

@@ -39,8 +39,9 @@ TooltipsData::TooltipsData(const std::unique_ptr<XmlElement>& xml)
 
 const String& TooltipsData::getForParam(const String& name) const
 {
+	const static String empty = "";
 	if (paramStrings.find(name) == paramStrings.end())
-		return "";
+		return empty;
 	else
 		return paramStrings.at(name);
 }

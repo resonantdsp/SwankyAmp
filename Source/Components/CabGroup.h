@@ -31,7 +31,7 @@ public:
 	CabGroup();
 	~CabGroup() {}
 
-	void attachVTS(AudioProcessorValueTreeState& vts);
+	void attachVTS(AudioProcessorValueTreeState& vts) override;
 	void attachTooltips(const TooltipsData& tooltips) override;
 
 	void setHeight(int height) { setSize(0, height); }

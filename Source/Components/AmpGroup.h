@@ -38,7 +38,7 @@ public:
 	void resized() override;
 	void paint(Graphics& g) override;
 
-	void attachVTS(AudioProcessorValueTreeState& vts);
+	void attachVTS(AudioProcessorValueTreeState& vts) override;
 	void attachTooltips(const TooltipsData& tooltips) override;
 
 	void setGroupsHeight(int height);

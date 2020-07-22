@@ -29,7 +29,7 @@ public:
 	PresetGroup();
 	~PresetGroup() {}
 
-	void attachVTS(AudioProcessorValueTreeState&) {}
+	void attachVTS(AudioProcessorValueTreeState&) override {}
 	void addPresetListener(ComboBox::Listener* listener) { presetSelector.addListener(listener); }
 
 	void setHeight(int height) { setSize(0, height); }
