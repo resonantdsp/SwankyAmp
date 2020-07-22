@@ -96,6 +96,10 @@ However this might not work for versions of FAUST other than `2.14.4` in which c
 
 ## Change log
 
+Version 0.8.1:
+
+* add mac support
+
 Version 0.8.0:
 
 * add variance to pre amp stages
