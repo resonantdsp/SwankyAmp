@@ -289,8 +289,6 @@ void SwankyAmpLAF::drawRotarySlider(
 			slider
 		);
 
-	const auto bounds = g.getClipBounds();
-
 	const RSliderDims dims = rslider->calcDims();
 
 	const auto sliderAngle = angleModulo(
