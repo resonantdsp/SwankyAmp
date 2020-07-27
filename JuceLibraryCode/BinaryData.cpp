@@ -9762,7 +9762,7 @@ static const unsigned char temp_binary_data_5[] =
 "\t\tAffects the microphone distance which will remove some lows and upper mids. This can have the effect of creating a clearer sound.\r\n"
 "\t</param>\r\n"
 "\t<param id=\"idCabOnOff\">\r\n"
-"\t\tDisables the cabinet enumation. Turn off if you want to run a separate cabinet emulation after the plugin.\r\n"
+"\t\tDisables the cabinet emulation. Turn off if you want to run a separate cabinet emulation after the plugin.\r\n"
 "\t</param>\r\n"
 "\t<param id=\"idGainSlope\">\r\n"
 "\t\tAffects how much the signal grows as it enters successive gain stages. Adjust to get different harshness to the distortion.\r\n"
