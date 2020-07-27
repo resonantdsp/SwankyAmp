@@ -41,6 +41,8 @@ triode_grid = environment {
     grid_smooth = nentry("triode_grid_smooth", 0, -1, +1, .1) : uscale(log(1e-5), log(1e+1)) : exp;
     grid_level = nentry("triode_grid_level", 0, -1, +1, .1) : uscale(-5, +5);
 
+    grid_cap = nentry("triode_grid_cap", 0, -1, +1, .1) : uscale(log(1e-1), log(1e1)) : exp;
+
     grid_clip = nentry("triode_grid_clip", 0, -1, +1, .1) : uscale(0, +5);
     grid_corner = nentry("triode_grid_corner", 0, -1, +1, .1) : uscale(0, +5);
     
@@ -53,7 +55,7 @@ triode_grid = environment {
         : fi.highpass(1, hp_freq) 
 
         <: _, max(0, _ - grid_level)
-        : _, calc_charge(grid_tau1, grid_tau2)
+        : _, calc_charge_cap(grid_tau1, grid_tau2, grid_cap)
         : _, si.smooth(1 - grid_tau3)
         : -
         

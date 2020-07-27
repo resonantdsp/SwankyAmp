@@ -29,11 +29,11 @@ with {
     pre_drive = pre_drive_unit : uscale(log(1e0), log(2e3)) : exp;
     // Measured the loudness change as a function of the pre drive, this looks
     // up the correction for any drive
-    unscale_pre = ba.listInterp((+1.37e+01,+7.11e+00,+5.36e-01,-6.01e+00,-1.26e+01,-1.76e+01,-2.04e+01,-2.17e+01,-2.21e+01,-2.24e+01,-2.28e+01), (pre_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
+    unscale_pre = ba.listInterp((+1.37e+01,+7.11e+00,+5.33e-01,-6.03e+00,-1.26e+01,-1.78e+01,-2.06e+01,-2.20e+01,-2.31e+01,-2.53e+01,-2.70e+01), (pre_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
 
     power_drive_unit = nentry("power_drive", 0, -1, +1, .1);
     power_drive = power_drive_unit : uscale(log(5e-1), log(5e2)) : exp;
-    unscale_power = ba.listInterp((+5.27e+00,-3.19e-01,-5.60e+00,-1.10e+01,-1.64e+01,-1.96e+01,-2.07e+01,-2.09e+01,-2.08e+01,-2.08e+01,-2.07e+01), (power_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
+    unscale_power = ba.listInterp((+5.28e+00,-3.08e-01,-5.59e+00,-1.10e+01,-1.64e+01,-1.96e+01,-2.06e+01,-2.09e+01,-2.11e+01,-2.14e+01,-2.15e+01), (power_drive_unit + 1.0) / 2.0 * 10) : ba.db2linear;
 
     gain_stages = nentry("gain_stages", 0, -1, +1, .1);
     gain_slope = nentry("gain_slope", 0, -1, +1, .1) : uscale(0.5, 1.5);
@@ -46,13 +46,12 @@ with {
     // likewise for the range 5 to 7
     stage_4_mix = max(0, min(7, gain_stages) - 5) / 2.0;
 
-    rvalues = (1.08, 0.81, 0.99, 1.08, 0.86, 0.89, 0.89, 0.96, 1.28, 1.02, 0.86, 0.92, 0.99, 0.94, 0.89, 0.96, 0.98, 0.94, 1.09, 0.95, 1.11, 0.96, 0.97, 1.00, 0.89, 0.95, 1.13, 1.17, 0.88, 0.88, 1.18, 0.91);
+    rvalues = (1.08, 0.81, 0.99, 1.08, 0.86, 0.89, 0.89, 0.96, 1.20, 1.02, 0.86, 0.92, 0.99, 0.94, 0.89, 0.96, 0.98, 0.94, 1.09, 0.95, 1.11, 0.96, 0.97, 1.00, 0.89, 0.95, 1.13, 1.17, 0.88, 0.88, 1.18, 0.91);
     rvalue(i) = rvalues : ba.selectn(32, i % 32);
 
     triode_grid_1 = triode_grid[
         hp_freq = triode_grid.hp_freq * rvalue(0);
         grid_tau = triode_grid.grid_tau * rvalue(1);
-        grid_ratio = triode_grid.grid_ratio * rvalue(2);
         grid_smooth = triode_grid.grid_smooth * rvalue(3);
         grid_level = triode_grid.grid_level * rvalue(4);
         grid_clip = triode_grid.grid_clip * rvalue(5);
@@ -61,7 +60,6 @@ with {
     triode_grid_2 = triode_grid[
         hp_freq = triode_grid.hp_freq * rvalue(10);
         grid_tau = triode_grid.grid_tau * rvalue(11);
-        grid_ratio = triode_grid.grid_ratio * rvalue(12);
         grid_smooth = triode_grid.grid_smooth * rvalue(13);
         grid_level = triode_grid.grid_level * rvalue(14);
         grid_clip = triode_grid.grid_clip * rvalue(15);
@@ -70,7 +68,6 @@ with {
     triode_grid_3 = triode_grid[
         hp_freq = triode_grid.hp_freq * rvalue(20);
         grid_tau = triode_grid.grid_tau * rvalue(21);
-        grid_ratio = triode_grid.grid_ratio * rvalue(22);
         grid_smooth = triode_grid.grid_smooth * rvalue(23);
         grid_level = triode_grid.grid_level * rvalue(24);
         grid_clip = triode_grid.grid_clip * rvalue(25);
@@ -84,7 +81,6 @@ with {
         drift_tau = triode_plate.drift_tau * rvalue(4);
         comp_level = triode_plate.comp_level * rvalue(5);
         comp_tau = triode_plate.comp_tau * rvalue(6);
-        comp_ratio = triode_plate.comp_ratio * rvalue(7);
     ].full;
 
     triode_plate_2 = triode_plate[
@@ -95,7 +91,6 @@ with {
         drift_tau = triode_plate.drift_tau * rvalue(14);
         comp_level = triode_plate.comp_level * rvalue(15);
         comp_tau = triode_plate.comp_tau * rvalue(16);
-        comp_ratio = triode_plate.comp_ratio * rvalue(17);
     ].full;
 
     triode_plate_3 = triode_plate[
@@ -106,7 +101,6 @@ with {
         drift_tau = triode_plate.drift_tau * rvalue(24);
         comp_level = triode_plate.comp_level * rvalue(25);
         comp_tau = triode_plate.comp_tau * rvalue(26);
-        comp_ratio = triode_plate.comp_ratio * rvalue(27);
     ].full;
     
     gain_stage_1 = _

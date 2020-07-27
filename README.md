@@ -96,6 +96,16 @@ However this might not work for versions of FAUST other than `2.14.4` in which c
 
 ## Change log
 
+Version 0.9.0:
+
+* fix bug that would cause audio level to decrease and vanish over time
+* preset management can now be done fully from the directory
+* preset names are now picked up from file names
+* preset numbers for re-ordering are handled in a more intuitive way
+* changing the preset name will now prompt for making a new preset or renaming
+* small improvements to pre amp model and filtering
+* small stability improvements to pre amp
+
 Version 0.8.1:
 
 * add mac support

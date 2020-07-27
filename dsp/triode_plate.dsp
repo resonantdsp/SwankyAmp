@@ -43,6 +43,7 @@ triode_plate = environment {
     comp_tau = nentry("triode_plate_comp_tau", 0, -1, +1, .1) : uscale(log(1e-3), log(1e+0)) : exp;
     comp_ratio = nentry("triode_plate_comp_ratio", 0, -1, +1, .1) : uscale(log(1e0), log(1e+1)) : exp;
     comp_depth = nentry("triode_plate_comp_depth", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+1)) : exp;
+    comp_cap = nentry("triode_plate_comp_cap", 0, -1, +1, .1) : uscale(log(1e-1), log(1e+1)) : exp;
     
     comp_tau1 = comp_tau : 1.0 / (ba.sec2samp(_) + 1);
     comp_tau2 = comp_tau * comp_ratio : 1.0 / (ba.sec2samp(_) + 1);
@@ -51,7 +52,7 @@ triode_plate = environment {
     comp_offset = nentry("triode_plate_comp_offset", 0, -1, +1, .1) : uscale(-100, +100);
 
     nyquist = 1.0 / (2.0 * ba.samp2sec(1));
-    lp_freq = nentry("triode_lp_freq", 0, -1, +1, .1) : uscale(log(5e3), log(15e3)) : exp : min(nyquist);
+    lp_freq = nyquist * 0.93;
 
     full = _ 
         // found the fit works better with just a scale and a clip instead of
@@ -69,7 +70,7 @@ triode_plate = environment {
         : -
 
         <: max(comp_level) - comp_level, _
-        : calc_charge(comp_tau1, comp_tau2) * comp_depth + comp_offset, _
+        : calc_charge_cap(comp_tau1, comp_tau2, comp_cap) * comp_depth + comp_offset, _
         // NOTE: the clip level is relative to zero
         : soft_clip_up(comp_corner)
 

@@ -120,7 +120,7 @@ public:
 
 	void getStateInformation(MemoryBlock& destData) override;
 	void setStateInformation(const void* data, int sizeInBytes) override;
-	void setStateInformation(const std::unique_ptr<XmlElement>& state, bool useLevels = true);
+	void setStateInformation(const std::unique_ptr<XmlElement>& state, bool useAll = true);
 
 private:
 	CriticalSection setStateMutex;

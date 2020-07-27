@@ -451,7 +451,7 @@ double transformUnitScale(double value, double lower, double upper, double lower
 	return jmin(1.0, jmax(-1.0, post));
 }
 
-void SwankyAmpAudioProcessor::setStateInformation(const std::unique_ptr<XmlElement>& state, bool useLevels)
+void SwankyAmpAudioProcessor::setStateInformation(const std::unique_ptr<XmlElement>& state, bool useAll)
 {
 	std::unordered_map<String, double> values;
 	if (state != nullptr)
@@ -484,7 +484,7 @@ void SwankyAmpAudioProcessor::setStateInformation(const std::unique_ptr<XmlEleme
 
 	for (const auto& id : parameterIds)
 	{
-		if (!useLevels && (id == "idInputLevel" || id == "idOutputLevel"))
+		if (!useAll && (id == "idInputLevel" || id == "idCabOnOff"))
 			continue;
 
 		auto parameter = parameters.getParameter(id);

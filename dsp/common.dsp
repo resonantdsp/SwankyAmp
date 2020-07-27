@@ -37,6 +37,11 @@ letrec {
     'c = c + tau1 * max(0, s - c) - tau2 * c;
 };
 
+calc_charge_cap(tau1, tau2, cap, s) = c
+letrec {
+    'c = c + tau1 * max(0, cap - c) / cap * max(0, s - c) - tau2 * c;
+};
+
 // Apply soft clipping (tanh) to the portion of a signal between `scale` and
 // `level`. The signal won't exceed `level`.
 soft_clip_up(scale, level) = _ 

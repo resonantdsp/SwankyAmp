@@ -14,7 +14,7 @@
 		Affects the microphone distance which will remove some lows and upper mids. This can have the effect of creating a clearer sound.
 	</param>
 	<param id="idCabOnOff">
-		Disables the cabinet enumation. Turn off if you want to run a separate cabinet emulation after the plugin.
+		Disables the cabinet emulation. Turn off if you want to run a separate cabinet emulation after the plugin.
 	</param>
 	<param id="idGainSlope">
 		Affects how much the signal grows as it enters successive gain stages. Adjust to get different harshness to the distortion.
