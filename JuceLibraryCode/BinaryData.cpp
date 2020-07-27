@@ -126,7 +126,7 @@ static const unsigned char temp_binary_data_1[] =
 "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n"
 "\r\n"
 "<presets>\r\n"
-"  <APVTSSwankyAmp pluginVersion=\"0.7.0\" presetName=\"clean\">\r\n"
+"  <APVTSSwankyAmp presetName=\"clean\">\r\n"
 "    <PARAM id=\"idCabBrightness\" value=\"0.2999999523162842\"/>\r\n"
 "    <PARAM id=\"idCabDistance\" value=\"0.2999999821186066\"/>\r\n"
 "    <PARAM id=\"idCabOnOff\" value=\"1.0\"/>\r\n"
@@ -150,7 +150,7 @@ static const unsigned char temp_binary_data_1[] =
 "    <PARAM id=\"idTsPresence\" value=\"0.25\"/>\r\n"
 "  </APVTSSwankyAmp>\r\n"
 "\r\n"
-"  <APVTSSwankyAmp pluginVersion=\"0.7.0\" presetName=\"edge scoop\">\r\n"
+"  <APVTSSwankyAmp presetName=\"edge scoop\">\r\n"
 "    <PARAM id=\"idCabBrightness\" value=\"0.0\"/>\r\n"
 "    <PARAM id=\"idCabDistance\" value=\"0.0\"/>\r\n"
 "    <PARAM id=\"idCabOnOff\" value=\"1.0\"/>\r\n"
@@ -174,7 +174,7 @@ static const unsigned char temp_binary_data_1[] =
 "    <PARAM id=\"idTsPresence\" value=\"0.25\"/>\r\n"
 "  </APVTSSwankyAmp>\r\n"
 "\r\n"
-"  <APVTSSwankyAmp pluginVersion=\"0.7.0\" presetName=\"edge mids\">\r\n"
+"  <APVTSSwankyAmp presetName=\"edge mids\">\r\n"
 "    <PARAM id=\"idCabBrightness\" value=\"0.0\"/>\r\n"
 "    <PARAM id=\"idCabDistance\" value=\"0.2999999821186066\"/>\r\n"
 "    <PARAM id=\"idCabOnOff\" value=\"1.0\"/>\r\n"
@@ -198,7 +198,7 @@ static const unsigned char temp_binary_data_1[] =
 "    <PARAM id=\"idTsPresence\" value=\"0.4499999284744263\"/>\r\n"
 "  </APVTSSwankyAmp>\r\n"
 "\r\n"
-"  <APVTSSwankyAmp pluginVersion=\"0.7.0\" presetName=\"distort\">\r\n"
+"  <APVTSSwankyAmp presetName=\"distort\">\r\n"
 "    <PARAM id=\"idCabBrightness\" value=\"0.0\"/>\r\n"
 "    <PARAM id=\"idCabDistance\" value=\"0.6499999761581421\"/>\r\n"
 "    <PARAM id=\"idCabOnOff\" value=\"1.0\"/>\r\n"
@@ -222,7 +222,7 @@ static const unsigned char temp_binary_data_1[] =
 "    <PARAM id=\"idTsPresence\" value=\"0.3999999761581421\"/>\r\n"
 "  </APVTSSwankyAmp>\r\n"
 "\r\n"
-"  <APVTSSwankyAmp pluginVersion=\"0.7.0\" presetName=\"dirty distort\">\r\n"
+"  <APVTSSwankyAmp presetName=\"dirty distort\">\r\n"
 "    <PARAM id=\"idCabBrightness\" value=\"-0.1700000166893005\"/>\r\n"
 "    <PARAM id=\"idCabDistance\" value=\"0.2999999821186066\"/>\r\n"
 "    <PARAM id=\"idCabOnOff\" value=\"1.0\"/>\r\n"
@@ -246,7 +246,7 @@ static const unsigned char temp_binary_data_1[] =
 "    <PARAM id=\"idTsPresence\" value=\"0.1999999284744263\"/>\r\n"
 "  </APVTSSwankyAmp>\r\n"
 "\r\n"
-"  <APVTSSwankyAmp pluginVersion=\"0.7.0\" presetName=\"pre drive\">\r\n"
+"  <APVTSSwankyAmp presetName=\"pre drive\">\r\n"
 "    <PARAM id=\"idCabBrightness\" value=\"-0.2000000476837158\"/>\r\n"
 "    <PARAM id=\"idCabDistance\" value=\"0.5999999642372131\"/>\r\n"
 "    <PARAM id=\"idCabOnOff\" value=\"1.0\"/>\r\n"
@@ -270,7 +270,7 @@ static const unsigned char temp_binary_data_1[] =
 "    <PARAM id=\"idTsPresence\" value=\"0.04999995231628418\"/>\r\n"
 "  </APVTSSwankyAmp>\r\n"
 "\r\n"
-"  <APVTSSwankyAmp pluginVersion=\"0.7.0\" presetName=\"power drive\">\r\n"
+"  <APVTSSwankyAmp presetName=\"power drive\">\r\n"
 "    <PARAM id=\"idCabBrightness\" value=\"0.0\"/>\r\n"
 "    <PARAM id=\"idCabDistance\" value=\"0.699999988079071\"/>\r\n"
 "    <PARAM id=\"idCabOnOff\" value=\"1.0\"/>\r\n"
@@ -294,7 +294,7 @@ static const unsigned char temp_binary_data_1[] =
 "    <PARAM id=\"idTsPresence\" value=\"0.5\"/>\r\n"
 "  </APVTSSwankyAmp>\r\n"
 "\r\n"
-"  <APVTSSwankyAmp pluginVersion=\"0.7.0\" presetName=\"full drive\">\r\n"
+"  <APVTSSwankyAmp presetName=\"full drive\">\r\n"
 "    <PARAM id=\"idCabBrightness\" value=\"-0.300000011920929\"/>\r\n"
 "    <PARAM id=\"idCabDistance\" value=\"0.7999999523162842\"/>\r\n"
 "    <PARAM id=\"idCabOnOff\" value=\"1.0\"/>\r\n"
@@ -318,7 +318,7 @@ static const unsigned char temp_binary_data_1[] =
 "    <PARAM id=\"idTsPresence\" value=\"0.0\"/>\r\n"
 "  </APVTSSwankyAmp>\r\n"
 "\r\n"
-"  <APVTSSwankyAmp pluginVersion=\"0.7.0\" presetName=\"high gain\">\r\n"
+"  <APVTSSwankyAmp presetName=\"high gain\">\r\n"
 "    <PARAM id=\"idCabBrightness\" value=\"-0.2000000476837158\"/>\r\n"
 "    <PARAM id=\"idCabDistance\" value=\"0.75\"/>\r\n"
 "    <PARAM id=\"idCabOnOff\" value=\"1.0\"/>\r\n"
@@ -342,7 +342,7 @@ static const unsigned char temp_binary_data_1[] =
 "    <PARAM id=\"idTsPresence\" value=\"-0.4000000357627869\"/>\r\n"
 "  </APVTSSwankyAmp>\r\n"
 "\r\n"
-"  <APVTSSwankyAmp pluginVersion=\"0.7.0\" presetName=\"level 11\">\r\n"
+"  <APVTSSwankyAmp presetName=\"level 11\">\r\n"
 "    <PARAM id=\"idCabBrightness\" value=\"-0.25\"/>\r\n"
 "    <PARAM id=\"idCabDistance\" value=\"0.7999999523162842\"/>\r\n"
 "    <PARAM id=\"idCabOnOff\" value=\"1.0\"/>\r\n"
@@ -365,7 +365,7 @@ static const unsigned char temp_binary_data_1[] =
 "    <PARAM id=\"idTsMid\" value=\"0.1000000238418579\"/>\r\n"
 "    <PARAM id=\"idTsPresence\" value=\"0.0\"/>\r\n"
 "  </APVTSSwankyAmp>\r\n"
-"</presets>";
+"</presets>\r\n";
 
 const char* presets_xml = (const char*) temp_binary_data_1;
 
@@ -9819,7 +9819,7 @@ const char* getNamedResource (const char* resourceNameUTF8, int& numBytes)
     switch (hash)
     {
         case 0x78dee5d0:  numBytes = 7224; return logo_svg;
-        case 0xc1329ecc:  numBytes = 12047; return presets_xml;
+        case 0xc1329ecc:  numBytes = 11829; return presets_xml;
         case 0xc9b4bb03:  numBytes = 287936; return PTSansBold_ttf;
         case 0x1200a58c:  numBytes = 278168; return PTSansRegular_ttf;
         case 0xadb49371:  numBytes = 234208; return PTSansNarrowRegular_ttf;
