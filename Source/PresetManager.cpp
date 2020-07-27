@@ -538,7 +538,7 @@ void PresetManager::parameterChanged(const String& id, float)
 	if (
 		currentEntry.name != "init"
 		&& id != "idInputLevel"
-		&& id != "idOutputLevel")
+		&& id != "idCabOnOff")
 		buttonSave.setEnabled(true);
 }
 
