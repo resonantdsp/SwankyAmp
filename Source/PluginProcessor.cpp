@@ -451,17 +451,58 @@ double transformUnitScale(double value, double lower, double upper, double lower
 	return jmin(1.0, jmax(-1.0, post));
 }
 
+struct VersionNumber {
+	int major = -1;
+	int minor = -1;
+	int patch = -1;
+
+	VersionNumber() {}
+
+	VersionNumber(int major, int minor, int patch) :
+		major(major), minor(minor), patch(patch) {}
+
+	bool VersionNumber::operator<(const VersionNumber& other) {
+		if (this->major < other.major) return true;
+		if (this->major == other.major && this->minor < other.minor) return true;
+		if (this->major == other.major && this->minor == other.minor && this->patch < other.patch) return true;
+		return false;
+	}
+};
+
+VersionNumber parseVersionString(const String& versionString) {
+	int section = 0;
+	VersionNumber versionNumber;
+	String buff;
+	for (const auto& c : versionString)
+	{
+		if (c == '.') {
+			if (buff.isNotEmpty()) {
+				if (section == 0) versionNumber.major = buff.getIntValue();
+				else if (section == 1) versionNumber.minor = buff.getIntValue();
+				else if (section == 2) versionNumber.patch = buff.getIntValue();
+			}
+			section += 1;
+			buff.clear();
+			continue;
+		}
+		buff += c;
+	}
+	return versionNumber;
+}
+
 void SwankyAmpAudioProcessor::setStateInformation(const std::unique_ptr<XmlElement>& state, bool useAll)
 {
 	std::unordered_map<String, double> values;
 	if (state != nullptr)
 		values = mapParameterValues(state);
 
-	// TODO: proper version string comparison
 	// TODO: move to a function
 
 	// range changes from 0.6 to 0.7
-	if (state != nullptr && state->hasAttribute("pluginVersion") && state->getStringAttribute("pluginVersion") < "0.7.0")
+	if (
+		state != nullptr 
+		&& state->hasAttribute("pluginVersion") 
+		&& parseVersionString(state->getStringAttribute("pluginVersion")) < VersionNumber(0, 7, 0))
 	{
 		if (values.find("idPowerAmpDrive") != values.end())
 		{
