@@ -19,6 +19,8 @@
 #include <algorithm>
 #include <unordered_map>
 
+#include "catch.hpp"
+
 #include <JuceHeader.h>
 
 #include "PluginEditor.h"
@@ -46,7 +48,7 @@ SwankyAmpAudioProcessor::SwankyAmpAudioProcessor()
 #endif
                          .withOutput("Output", AudioChannelSet::stereo(), true)
 #endif
-                     ),
+                         ),
 #endif
       parameters(*this, nullptr, Identifier("APVTSSwankyAmp"),
                  {
@@ -115,6 +117,18 @@ SwankyAmpAudioProcessor::SwankyAmpAudioProcessor()
 
 SwankyAmpAudioProcessor::~SwankyAmpAudioProcessor() {}
 
+/**
+ * @brief Remap a float value to a positive and negative range.
+ *
+ * Remap the range [-1, 0) to [`to_low`, 0) and the range (0, 1] to
+ * (0, `to_high`]. Note that the values below zero can be scaled differently
+ * from those above zero.
+ *
+ * @param unit value to remap, usually in the unit scale [-1, +1]
+ * @param to_low scale values above zero by this amount
+ * @param to_high  scale values below zero by this amount
+ * @return remapped value
+ */
 float remap_sided(float unit, float to_low, float to_high) {
   if (unit >= 0) {
     return unit * to_high;
@@ -123,10 +137,49 @@ float remap_sided(float unit, float to_low, float to_high) {
   }
 }
 
+TEST_CASE("values are remapped to sided ranges") {
+  REQUIRE(remap_sided(0.0f, -2.0f, +10.0f) == Approx(0.0f));
+  REQUIRE(remap_sided(1.0f, -2.0f, +10.0f) == Approx(10.0f));
+  REQUIRE(remap_sided(-1.0f, -2.0f, +10.0f) == Approx(-2.0f));
+  REQUIRE(remap_sided(-0.5f, -2.0f, +10.0f) == Approx(-1.0f));
+}
+
+/**
+ * @brief Remap a float value to a new range.
+ *
+ * Remap the range [-1, +1] to [`to_low`, `to_high`]. Unlike `remap_sided`, the
+ * same scaling is applied to all input values. An input value of `0` will map
+ * to the mean of `to_low` and `to_high`.
+ *
+ * @param unit value to remap, usually in the unit scale [-1, +1]
+ * @param to_low value to reach when `unit` is at `-1`
+ * @param to_high value to reach when `unit` is at `+1`
+ * @return remapped value
+ */
 float remap_range(float unit, float to_low, float to_high) {
   return (unit + 1.0f) / 2.0f * (to_high - to_low) + to_low;
 }
 
+TEST_CASE("values are remapped to a single range") {
+  REQUIRE(remap_range(0.0f, -2.0f, +10.0f) == Approx(4.0f));
+  REQUIRE(remap_range(1.0f, -2.0f, +10.0f) == Approx(10.0f));
+  REQUIRE(remap_range(-1.0f, -2.0f, +10.0f) == Approx(-2.0f));
+  REQUIRE(remap_range(-0.5f, -2.0f, +10.0f) == Approx(1.0f));
+}
+
+/**
+ * @brief Remap a given range of floats to a new range.
+ *
+ * Remap the range [`x1`, `x2`] to the range [`y1`, `y2`]. Clips the input `x`
+ * to the range [`x1`, `x2`].
+ *
+ * @param x value to remap
+ * @param x1 lower value in the range to map from
+ * @param x2 upper value in the range to map from
+ * @param y1 lower value in the range to map to
+ * @param y2 upper value in the range to map to
+ * @return remapped value
+ */
 float remap_xy(float x, float x1, float x2, float y1, float y2) {
   x = jmax(x1, jmin(x2, x));
   x = (x - x1) / (x2 - x1);
@@ -134,18 +187,12 @@ float remap_xy(float x, float x1, float x2, float y1, float y2) {
   return y;
 }
 
-/** Remap a value in the range (-1, +1) to the same range, but apply log
- * scaling to it such that the latter part of the range is more compressed.
- * The output value will change with `slope1` at x = -1, and change with
- * `slope2` at x = +1.
- */
-float remap_log(float x, float slope1, float slope2) {
-  const float x1 = 1.0f / slope1;
-  const float x2 = 1.0f / slope2;
-  const float y1 = logf(x1);
-  const float y2 = logf(x2);
-  const float y = logf(remap_range(x, x1, x2));
-  return remap_xy(y, y1, y2, -1.0f, +1.0f);
+TEST_CASE("values are remapped from one range to another") {
+  REQUIRE(remap_xy(-3.0f, -3.0f, +1.0f, -2.0f, 10.0f) == Approx(-2.0f));
+  REQUIRE(remap_xy(-4.0f, -3.0f, +1.0f, -2.0f, 10.0f) == Approx(-2.0f));
+  REQUIRE(remap_xy(+1.0f, -3.0f, +1.0f, -2.0f, 10.0f) == Approx(10.0f));
+  REQUIRE(remap_xy(+2.0f, -3.0f, +1.0f, -2.0f, 10.0f) == Approx(10.0f));
+  REQUIRE(remap_xy(0.0f, -3.0f, +1.0f, -2.0f, 10.0f) == Approx(7.0f));
 }
 
 // set the amp object user parameters from the VTS values
@@ -406,6 +453,11 @@ void SwankyAmpAudioProcessor::setStateInformation(const void *data,
       setStateInformation(xmlState, true);
 }
 
+/**
+ * @brief Build map of serialized state parameter names to values.
+ * @param state serialized state
+ * @return map of parameter names to values
+ */
 std::unordered_map<String, double>
 mapParameterValues(const SerializedState &state) {
   std::unordered_map<String, double> values;
@@ -424,6 +476,29 @@ mapParameterValues(const SerializedState &state) {
   }
 
   return values;
+}
+
+TEST_CASE("state parameters are mapped to thier values") {
+  XmlElement state = XmlElement("state");
+  XmlElement *param = nullptr;
+
+  param = new XmlElement("PARAM");
+  param->setAttribute("id", "param1");
+  param->setAttribute("value", 0.0);
+  state.addChildElement(param);
+
+  param = new XmlElement("PARAM");
+  param->setAttribute("id", "param2");
+  param->setAttribute("value", 1.0);
+  state.addChildElement(param);
+
+  const auto map = mapParameterValues(std::make_unique<XmlElement>(state));
+
+  REQUIRE(map.size() == 2);
+  REQUIRE(map.find("param1") != map.end());
+  REQUIRE(map.find("param2") != map.end());
+  REQUIRE(map.at("param1") == Approx(0.0f));
+  REQUIRE(map.at("param2") == Approx(1.0f));
 }
 
 double transformUnitScale(double value, double lower, double upper,
@@ -445,7 +520,12 @@ struct VersionNumber {
   VersionNumber(int major, int minor, int patch)
       : major(major), minor(minor), patch(patch) {}
 
-  bool VersionNumber::operator<(const VersionNumber &other) {
+  bool VersionNumber::operator==(const VersionNumber &other) const {
+    return this->major == other.major && this->minor == other.minor &&
+           this->patch == other.patch;
+  }
+
+  bool VersionNumber::operator<(const VersionNumber &other) const {
     if (this->major < other.major)
       return true;
     if (this->major == other.major && this->minor < other.minor)
@@ -455,7 +535,41 @@ struct VersionNumber {
       return true;
     return false;
   }
+
+  bool VersionNumber::operator>(const VersionNumber &other) const {
+    return !(*this == other) && !(*this < other);
+  }
+
+  bool VersionNumber::operator!=(const VersionNumber &other) const {
+    return !(*this == other);
+  }
 };
+
+TEST_CASE("version numbers are initialized") {
+  REQUIRE(VersionNumber(1, 2, 3).major == 1);
+  REQUIRE(VersionNumber(1, 2, 3).minor == 2);
+  REQUIRE(VersionNumber(1, 2, 3).patch == 3);
+
+  REQUIRE(VersionNumber().major == -1);
+  REQUIRE(VersionNumber().minor == -1);
+  REQUIRE(VersionNumber().patch == -1);
+}
+
+TEST_CASE("version numbers are compared") {
+  REQUIRE(VersionNumber(1, 2, 3) == VersionNumber(1, 2, 3));
+
+  REQUIRE(VersionNumber(1, 2, 3) != VersionNumber(0, 2, 3));
+  REQUIRE(VersionNumber(1, 2, 3) != VersionNumber(1, 0, 3));
+  REQUIRE(VersionNumber(1, 2, 3) != VersionNumber(1, 2, 0));
+
+  REQUIRE(VersionNumber(1, 2, 3) < VersionNumber(2, 2, 3));
+  REQUIRE(VersionNumber(1, 2, 3) < VersionNumber(1, 3, 3));
+  REQUIRE(VersionNumber(1, 2, 3) < VersionNumber(1, 2, 4));
+
+  REQUIRE(VersionNumber(1, 2, 3) > VersionNumber(0, 2, 3));
+  REQUIRE(VersionNumber(1, 2, 3) > VersionNumber(1, 1, 3));
+  REQUIRE(VersionNumber(1, 2, 3) > VersionNumber(1, 2, 2));
+}
 
 VersionNumber parseVersionString(const String &versionString) {
   int section = 0;
@@ -477,7 +591,23 @@ VersionNumber parseVersionString(const String &versionString) {
     }
     buff += c;
   }
+
+  if (buff.isNotEmpty()) {
+    if (section == 0)
+      versionNumber.major = buff.getIntValue();
+    else if (section == 1)
+      versionNumber.minor = buff.getIntValue();
+    else if (section == 2)
+      versionNumber.patch = buff.getIntValue();
+  }
+
   return versionNumber;
+}
+
+TEST_CASE("version numbers are parsed") {
+  REQUIRE(parseVersionString("1.2.3") == VersionNumber(1, 2, 3));
+  REQUIRE(parseVersionString("1.2.3.4") == VersionNumber(1, 2, 3));
+  REQUIRE(parseVersionString("1.2.03") == VersionNumber(1, 2, 3));
 }
 
 void SwankyAmpAudioProcessor::setStateInformation(
