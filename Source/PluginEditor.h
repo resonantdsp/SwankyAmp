@@ -18,63 +18,63 @@
 
 #pragma once
 
-#include <JuceHeader.h>
 #include "PluginProcessor.h"
+#include <JuceHeader.h>
 
-#include "SwankyAmpLAF.h"
-#include "PresetManager.h"
-#include "TooltipsData.h"
 #include "Components/AmpGroup.h"
 #include "Components/PresetGroup.h"
+#include "PresetManager.h"
+#include "SwankyAmpLAF.h"
+#include "TooltipsData.h"
 
 typedef AudioProcessorValueTreeState::SliderAttachment SliderAttachment;
 typedef AudioProcessorValueTreeState::ButtonAttachment ButtonAttachment;
 
-class SwankyAmpAudioProcessorEditor : public AudioProcessorEditor
-{
+class SwankyAmpAudioProcessorEditor : public AudioProcessorEditor {
 public:
-	SwankyAmpAudioProcessorEditor(SwankyAmpAudioProcessor&, AudioProcessorValueTreeState&);
-	~SwankyAmpAudioProcessorEditor();
+  SwankyAmpAudioProcessorEditor(SwankyAmpAudioProcessor &,
+                                AudioProcessorValueTreeState &);
+  ~SwankyAmpAudioProcessorEditor();
 
-	void paint(Graphics&) override;
-	void resized() override;
+  void paint(Graphics &) override;
+  void resized() override;
 
 private:
-	// TODO: consdier setting and calling resized, bur for now these are const
-	const int padding = 64;
-	const int spacing = 32;
-	const int groupHeight = 128;
-	const int headerHeight = 24;
-	const int headerPadding = 16;
+  // TODO: consdier setting and calling resized, bur for now these are const
+  const int padding = 64;
+  const int spacing = 32;
+  const int groupHeight = 128;
+  const int headerHeight = 24;
+  const int headerPadding = 16;
 
-	SwankyAmpLAF laf;
+  SwankyAmpLAF laf;
 
-	// This reference is provided as a quick way for your editor to
-	// access the processor object that created it.
-	SwankyAmpAudioProcessor& processor;
-	AudioProcessorValueTreeState& valueTreeState;
+  // This reference is provided as a quick way for your editor to
+  // access the processor object that created it.
+  SwankyAmpAudioProcessor &processor;
+  AudioProcessorValueTreeState &valueTreeState;
 
-	std::vector<String> managerListenIds;
+  std::vector<String> managerListenIds;
 
-	Label versionLabel;
-	AmpGroup ampGroup;
-	PresetGroup presetGroup;
+  Label versionLabel;
+  AmpGroup ampGroup;
+  PresetGroup presetGroup;
 
-	// NOTE: must be declared *AFTER* valueTreeState AND presetGroup
-	PresetManager presetManager;
+  // NOTE: must be declared *AFTER* valueTreeState AND presetGroup
+  PresetManager presetManager;
 
-	TooltipsData tooltipsData;
-	TooltipWindow tooltipWindow;
+  TooltipsData tooltipsData;
+  TooltipWindow tooltipWindow;
 
-	std::unique_ptr<Drawable> logoSvg;
+  std::unique_ptr<Drawable> logoSvg;
 
-	Image bgNoise;
-	Path bgPattern;
-	Random rng;
+  Image bgNoise;
+  Path bgPattern;
+  Random rng;
 
-	void buildBgPattern();
+  void buildBgPattern();
 
-	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SwankyAmpAudioProcessorEditor)
+  JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SwankyAmpAudioProcessorEditor)
 };
 
 #undef INSERT_PARAMETER

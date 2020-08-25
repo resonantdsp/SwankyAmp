@@ -21,38 +21,37 @@
 #include <JuceHeader.h>
 
 #include "../Utils.h"
-#include "ParameterGroup.h"
+#include "CabGroup.h"
 #include "LevelsGroup.h"
-#include "PreAmpGroup.h"
+#include "ParameterGroup.h"
 #include "PowerAmpGroup.h"
+#include "PreAmpGroup.h"
 #include "StagingGroup.h"
 #include "ToneStackGroup.h"
-#include "CabGroup.h"
 
-class AmpGroup : public ParameterGroup
-{
+class AmpGroup : public ParameterGroup {
 public:
-	AmpGroup();
-	~AmpGroup() {}
+  AmpGroup();
+  ~AmpGroup() {}
 
-	void resized() override;
-	void paint(Graphics& g) override;
+  void resized() override;
+  void paint(Graphics &g) override;
 
-	void attachVTS(AudioProcessorValueTreeState& vts) override;
-	void attachTooltips(const TooltipsData& tooltips) override;
+  void attachVTS(AudioProcessorValueTreeState &vts) override;
+  void attachTooltips(const TooltipsData &tooltips) override;
 
-	void setGroupsHeight(int height);
+  void setGroupsHeight(int height);
 
-	// TODO: for the time being keep public as need to access members, but this
-	// should be cleaned up at some point
-	LevelsGroup levelsGroup;
-	PreAmpGroup preAmpGroup;
-	PowerAmpGroup powerAmpGroup;
-	StagingGroup stagingGroup;
-	ToneStackGroup toneStackGroup;
-	CabGroup cabGroup;
+  // TODO: for the time being keep public as need to access members, but this
+  // should be cleaned up at some point
+  LevelsGroup levelsGroup;
+  PreAmpGroup preAmpGroup;
+  PowerAmpGroup powerAmpGroup;
+  StagingGroup stagingGroup;
+  ToneStackGroup toneStackGroup;
+  CabGroup cabGroup;
 
 private:
-	DISABLE_COMPONENT_RESIZE()
-	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AmpGroup)
+  DISABLE_COMPONENT_RESIZE()
+  JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AmpGroup)
 };

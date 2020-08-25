@@ -20,30 +20,25 @@
 
 #include "Utils.h"
 
-float angleModulo(float angle)
-{
-	const float modulo = fmodf(angle, MathConstants<float>::twoPi);
-	if (modulo > MathConstants<float>::pi)
-		return modulo - MathConstants<float>::twoPi;
-	else
-		return modulo;
+float angleModulo(float angle) {
+  const float modulo = fmodf(angle, MathConstants<float>::twoPi);
+  if (modulo > MathConstants<float>::pi)
+    return modulo - MathConstants<float>::twoPi;
+  else
+    return modulo;
 }
 
-void fillImageNoise(Image& image, Random& rng, float alpha)
-{
-	if (image.getFormat() != Image::PixelFormat::ARGB)
-		image.convertedToFormat(Image::PixelFormat::ARGB);
-	for (int i = 0; i < image.getWidth(); i++)
-		for (int j = 0; j < image.getHeight(); j++)
-			image.setPixelAt(
-				i, j,
-				Colour::fromHSV(0.0f, 0.0f, 0.0f, rng.nextFloat() * alpha)
-			);
+void fillImageNoise(Image &image, Random &rng, float alpha) {
+  if (image.getFormat() != Image::PixelFormat::ARGB)
+    image.convertedToFormat(Image::PixelFormat::ARGB);
+  for (int i = 0; i < image.getWidth(); i++)
+    for (int j = 0; j < image.getHeight(); j++)
+      image.setPixelAt(
+          i, j, Colour::fromHSV(0.0f, 0.0f, 0.0f, rng.nextFloat() * alpha));
 }
 
-Image buildImageNoise(int width, int height, Random& rng, float alpha)
-{
-	Image noise(Image::PixelFormat::ARGB, jmax(1, width), jmax(1, height), false);
-	fillImageNoise(noise, rng, alpha);
-	return noise;
+Image buildImageNoise(int width, int height, Random &rng, float alpha) {
+  Image noise(Image::PixelFormat::ARGB, jmax(1, width), jmax(1, height), false);
+  fillImageNoise(noise, rng, alpha);
+  return noise;
 }

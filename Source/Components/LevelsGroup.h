@@ -25,35 +25,34 @@
 #include "ParameterGroup.h"
 #include "RSliderLabel.h"
 
-class LevelsGroup : public ParameterGroup
-{
+class LevelsGroup : public ParameterGroup {
 public:
-	LevelsGroup();
-	~LevelsGroup() {}
+  LevelsGroup();
+  ~LevelsGroup() {}
 
-	void setHeight(int height) { setSize(0, height); }
-	void resized() override;
+  void setHeight(int height) { setSize(0, height); }
+  void resized() override;
 
-	void attachVTS(AudioProcessorValueTreeState& vts) override;
-	void attachTooltips(const TooltipsData& tooltips) override;
+  void attachVTS(AudioProcessorValueTreeState &vts) override;
+  void attachTooltips(const TooltipsData &tooltips) override;
 
-	LevelMeterListener* getLevelMeterListenerInL() { return &meterInL; }
-	LevelMeterListener* getLevelMeterListenerInR() { return &meterInR; }
-	LevelMeterListener* getLevelMeterListenerOutL() { return &meterOutL; }
-	LevelMeterListener* getLevelMeterListenerOutR() { return &meterOutR; }
+  LevelMeterListener *getLevelMeterListenerInL() { return &meterInL; }
+  LevelMeterListener *getLevelMeterListenerInR() { return &meterInR; }
+  LevelMeterListener *getLevelMeterListenerOutL() { return &meterOutL; }
+  LevelMeterListener *getLevelMeterListenerOutR() { return &meterOutR; }
 
 private:
-	LevelMeter meterInL;
-	LevelMeter meterInR;
-	LevelMeter meterOutL;
-	LevelMeter meterOutR;
+  LevelMeter meterInL;
+  LevelMeter meterInR;
+  LevelMeter meterOutL;
+  LevelMeter meterOutR;
 
-	RSliderLabel sliderInputLevel;
-	RSliderLabel sliderOutputLevel;
+  RSliderLabel sliderInputLevel;
+  RSliderLabel sliderOutputLevel;
 
-	std::unique_ptr<SliderAttachment> attInputLevel;
-	std::unique_ptr<SliderAttachment> attOutputLevel;
+  std::unique_ptr<SliderAttachment> attInputLevel;
+  std::unique_ptr<SliderAttachment> attOutputLevel;
 
-	DISABLE_COMPONENT_RESIZE()
-	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (LevelsGroup)
+  DISABLE_COMPONENT_RESIZE()
+  JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LevelsGroup)
 };

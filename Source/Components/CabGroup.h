@@ -25,27 +25,26 @@
 #include "RButton.h"
 #include "RSliderLabel.h"
 
-class CabGroup : public ParameterGroup
-{
+class CabGroup : public ParameterGroup {
 public:
-	CabGroup();
-	~CabGroup() {}
+  CabGroup();
+  ~CabGroup() {}
 
-	void attachVTS(AudioProcessorValueTreeState& vts) override;
-	void attachTooltips(const TooltipsData& tooltips) override;
+  void attachVTS(AudioProcessorValueTreeState &vts) override;
+  void attachTooltips(const TooltipsData &tooltips) override;
 
-	void setHeight(int height) { setSize(0, height); }
-	void resized() override;
+  void setHeight(int height) { setSize(0, height); }
+  void resized() override;
 
 private:
-	RButton buttonCabOnOff;
-	RSliderLabel sliderBright;
-	RSliderLabel sliderDistance;
+  RButton buttonCabOnOff;
+  RSliderLabel sliderBright;
+  RSliderLabel sliderDistance;
 
-	std::unique_ptr<ButtonAttachment> attCabOnOff;
-	std::unique_ptr<SliderAttachment> attCabBrightness;
-	std::unique_ptr<SliderAttachment> attCabDistance;
+  std::unique_ptr<ButtonAttachment> attCabOnOff;
+  std::unique_ptr<SliderAttachment> attCabBrightness;
+  std::unique_ptr<SliderAttachment> attCabDistance;
 
-	DISABLE_COMPONENT_RESIZE()
-	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CabGroup)
+  DISABLE_COMPONENT_RESIZE()
+  JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CabGroup)
 };

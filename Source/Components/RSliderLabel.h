@@ -23,35 +23,31 @@
 #include "../Utils.h"
 #include "RSlider.h"
 
-class RSliderLabel : public Component
-{
+class RSliderLabel : public Component {
 public:
-	RSliderLabel();
-	~RSliderLabel() {}
+  RSliderLabel();
+  ~RSliderLabel() {}
 
-	void resized() override;
+  void resized() override;
 
-	void setLabel(const String& text) { label.setText(text, NotificationType::dontSendNotification); }
+  void setLabel(const String &text) {
+    label.setText(text, NotificationType::dontSendNotification);
+  }
 
-	void setHeight(int size);
-	void setWidth(int size);
-	void setSliderMargin(float size);
+  void setHeight(int size);
+  void setWidth(int size);
+  void setSliderMargin(float size);
 
-	// TODO: publich for parameter attachment, but maybe RSliderLabel should
-	// just inherent from RSlider and not compose the elements?
-	RSlider slider;
+  // TODO: publich for parameter attachment, but maybe RSliderLabel should
+  // just inherent from RSlider and not compose the elements?
+  RSlider slider;
 
 private:
-	Label label;
+  Label label;
 
-	enum class SetDimension
-	{
-		SetFromHeight,
-		SetFromWidth,
-		NoDimension
-	};
-	SetDimension setDimension = SetDimension::NoDimension;
+  enum class SetDimension { SetFromHeight, SetFromWidth, NoDimension };
+  SetDimension setDimension = SetDimension::NoDimension;
 
-	DISABLE_COMPONENT_RESIZE()
-	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (RSliderLabel)
+  DISABLE_COMPONENT_RESIZE()
+  JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(RSliderLabel)
 };

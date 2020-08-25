@@ -18,17 +18,16 @@
 
 #pragma once
 
-#include <unordered_map>
 #include <JuceHeader.h>
+#include <unordered_map>
 
-class TooltipsData
-{
+class TooltipsData {
 public:
-	TooltipsData(const std::unique_ptr<XmlElement>& xml);
-	~TooltipsData() {}
+  TooltipsData(const std::unique_ptr<XmlElement> &xml);
+  ~TooltipsData() {}
 
-	const String& getForParam(const String& name) const;
+  const String &getForParam(const String &name) const;
 
 private:
-	std::unordered_map<String, String> paramStrings;
+  std::unordered_map<String, String> paramStrings;
 };
