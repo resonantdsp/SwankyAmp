@@ -355,6 +355,10 @@ void PresetManager::comboBoxChanged() {
         ord != stateEntryIdx[name])
       moveStateEntry(stateEntryIdx[name], (size_t)ord);
 
+    // although the change has already been saved, this lets the user know
+    // something has changed and they can compulsively re-save
+    buttonSave.setEnabled(true);
+
     updatePresetDir();
     updateComboBox();
   } else {
