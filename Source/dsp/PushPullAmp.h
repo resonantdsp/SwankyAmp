@@ -119,8 +119,8 @@ public:
   }
 
   inline void set_num_stages(int x) { numStages = x; }
-  inline void set_drive(FAUSTFLOAT x) { drive = ULSCALE(x, 1e0f, 2e3f); }
-  inline float get_drive() const { return IULSCALE(drive, 1e0f, 2e3f); }
+  inline void set_drive(FAUSTFLOAT x) { drive = ULSCALE(x, 5e-1f, 1e3f); }
+  inline float get_drive() const { return IULSCALE(drive, 5e-1f, 1e3f); }
   inline void set_overhead(FAUSTFLOAT x) { overhead = ULSCALE(x, 1e-1f, 1e1f); }
   inline float get_overhead() const { return IULSCALE(overhead, 1e-1f, 1e1f); }
 
@@ -190,8 +190,8 @@ public:
     tetrodePlate.set_sag_onset(x);
   }
 
-  inline void set_drive(FAUSTFLOAT x) { drive = ULSCALE(x, 5e-1f, 5e2f); }
-  inline float get_drive() const { return IULSCALE(drive, 5e-1f, 5e2f); }
+  inline void set_drive(FAUSTFLOAT x) { drive = ULSCALE(x, 1e-1f, 2e2f); }
+  inline float get_drive() const { return IULSCALE(drive, 1e-1f, 2e2f); }
 
 private:
   TetrodeGrid tetrodeGrid;
@@ -324,14 +324,14 @@ private:
   bool cabinetOn = true;
 
   const float preAmpDriveScale[NUM_SWEEP_BINS + 1] = {
-      2.132676e-03f, 1.393774e-03f, 1.249533e-03f, 1.266841e-03f,
-      1.324153e-03f, 1.461887e-03f, 1.597716e-03f, 1.623120e-03f,
-      1.625593e-03f, 1.678839e-03f, 1.798028e-03f};
+      1.221823e-02f, 6.250414e-03f, 3.119302e-03f, 1.700751e-03f,
+      1.290108e-03f, 1.260687e-03f, 1.314394e-03f, 1.307585e-03f,
+      1.285719e-03f, 1.328954e-03f, 1.394988e-03f};
 
   const float powerAmpDriveScale[NUM_SWEEP_BINS + 1] = {
-      1.249540e+00f, 9.394168e-01f, 8.825729e-01f, 8.955081e-01f,
-      9.266342e-01f, 9.999998e-01f, 1.175000e+00f, 1.551158e+00f,
-      2.276709e+00f, 3.587572e+00f, 5.770323e+00f};
+      1.016741e+01f, 5.198907e+00f, 2.596404e+00f, 1.405875e+00f,
+      1.045974e+00f, 9.999996e-01f, 1.029028e+00f, 1.080280e+00f,
+      1.210819e+00f, 1.546588e+00f, 2.273256e+00f};
 
   void resetParameters() {
     set_input_level(0.0f);

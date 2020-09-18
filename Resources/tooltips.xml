@@ -41,7 +41,7 @@
 		Affects the time scale and depth of the power amp dynamics. Has large effect on the sag compression attack and release.
 	</param>
 	<param id="idPowerAmpSag">
-		Affects how much the amplified level drop in response to a large signal. Increase for a more compressed sound.
+		Affects how much the amplified level drop in response to a large signal. Increase for a more compressed sound. Most pronounced at high power amp drive levels.
 	</param>
 	<param id="idTsHigh">
 		The amount of high end going into the power amp. Increase for a brighter tone. Decrase to reduce harsh distortion noise.

@@ -32,7 +32,7 @@
 // add parameter to the VTS with custom range
 #define MAKE_PARAMETER(n, l, h, d)                                             \
   std::make_unique<AudioParameterFloat>(                                       \
-      "id" #n, #n, NormalisableRange<float>(l, h, fabs(h - l) / 1e3f), 0.0f)
+      "id" #n, #n, NormalisableRange<float>(l, h, fabs(h - l) / 1e3f), d)
 // assign a VTS parameter to an object member of the same name
 #define ASSIGN_PARAMETER(n) par##n = parameters.getRawParameterValue("id" #n);
 
@@ -68,17 +68,17 @@ SwankyAmpAudioProcessor::SwankyAmpAudioProcessor()
                      MAKE_PARAMETER_UNIT(CabBrightness),
                      MAKE_PARAMETER(CabDistance, 0.0f, 1.0f, 0.0f),
 
-                     MAKE_PARAMETER_UNIT(PreAmpDrive),
+                     MAKE_PARAMETER(PreAmpDrive, -1.0f, 1.0f, -0.5f),
                      MAKE_PARAMETER_UNIT(PreAmpTight),
                      MAKE_PARAMETER_UNIT(PreAmpGrit),
 
-                     MAKE_PARAMETER_UNIT(PowerAmpDrive),
+                     MAKE_PARAMETER(PowerAmpDrive, -1.0f, 1.0f, -0.5f),
                      MAKE_PARAMETER_UNIT(PowerAmpTight),
                      MAKE_PARAMETER_UNIT(PowerAmpGrit),
 
-                     MAKE_PARAMETER(PowerAmpSag, -1.0f, 1.0f, -0.6f),
+                     MAKE_PARAMETER_UNIT(PowerAmpSag),
                      MAKE_PARAMETER_UNIT(PowerAmpSagRatio),
-                     MAKE_PARAMETER(PowerAmpSagSlope, -1.0f, 1.0f, -0.25f),
+                     MAKE_PARAMETER_UNIT(PowerAmpSagSlope),
                  }) {
   ASSIGN_PARAMETER(InputLevel)
   ASSIGN_PARAMETER(OutputLevel)
@@ -232,11 +232,7 @@ void SwankyAmpAudioProcessor::setAmpParameters() {
                             0.5f * jmax(0.0f, (float)*parPreAmpDrive);
     const float sagRange = 1.0f / (1.0f + sagOffset * 1.0f);
 
-    amp_channel[i].set_tetrode_plate_sag_toggle(
-        *parPowerAmpSag > -0.999f ? 1.0f : 0.0f);
-    amp_channel[i].set_tetrode_plate_sag_depth(
-        remap_xy(*parPowerAmpSag, -1.0f, 1.0f, -1.0f - sagOffset,
-                 -1.0f - sagOffset + 1.0f * sagRange));
+    amp_channel[i].set_tetrode_plate_sag_depth(*parPowerAmpSag);
     amp_channel[i].set_tetrode_plate_sag_ratio(*parPowerAmpSagRatio);
     amp_channel[i].set_tetrode_plate_sag_onset(*parPowerAmpSagSlope);
   }
