@@ -16,8 +16,8 @@
 	<param id="idCabOnOff">
 		Disables the cabinet emulation. Turn off if you want to run a separate cabinet emulation after the plugin.
 	</param>
-	<param id="idGainSlope">
-		Affects how much the signal grows as it enters successive gain stages. Adjust to get different harshness to the distortion.
+	<param id="idGainOverhead">
+		Affects the amount of distortion in the later gain stages. Decrease for a high-gain sound.
 	</param>
 	<param id="idGainStages">
 		The number of gain stages through the signal passes prior to reaching the power amp. Increase for a high-gain sound.

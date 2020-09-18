@@ -58,8 +58,9 @@ SwankyAmpAudioProcessor::SwankyAmpAudioProcessor()
                      MAKE_PARAMETER_UNIT(TsHigh),
                      MAKE_PARAMETER_UNIT(TsPresence),
 
-                     MAKE_PARAMETER(GainStages, 1.0f, 7.0f, 2.0f),
-                     MAKE_PARAMETER_UNIT(GainSlope),
+                     std::make_unique<AudioParameterInt>("idGainStages",
+                                                         "GainStages", 1, 5, 3),
+                     MAKE_PARAMETER_UNIT(GainOverhead),
                      MAKE_PARAMETER(LowCut, -1.0f, 1.0f, 0.4f),
 
                      std::make_unique<AudioParameterBool>("idCabOnOff",
@@ -88,7 +89,7 @@ SwankyAmpAudioProcessor::SwankyAmpAudioProcessor()
   ASSIGN_PARAMETER(TsPresence)
 
   ASSIGN_PARAMETER(GainStages)
-  ASSIGN_PARAMETER(GainSlope)
+  ASSIGN_PARAMETER(GainOverhead)
   ASSIGN_PARAMETER(LowCut)
 
   ASSIGN_PARAMETER(CabOnOff)
@@ -176,21 +177,21 @@ void SwankyAmpAudioProcessor::setAmpParameters() {
   for (int i = 0; i < 2; i++) {
     amp_channel[i].set_input_level(*parInputLevel);
     amp_channel[i].set_output_level(*parOutputLevel);
-    amp_channel[i].set_pre_drive(*parPreAmpDrive);
-    amp_channel[i].set_power_drive(*parPowerAmpDrive);
+    amp_channel[i].set_triode_drive(*parPreAmpDrive);
+    amp_channel[i].set_tetrode_drive(*parPowerAmpDrive);
 
-    amp_channel[i].set_ts_low(*parTsLow);
-    amp_channel[i].set_ts_mid(*parTsMid);
-    amp_channel[i].set_ts_high(*parTsHigh);
-    amp_channel[i].set_ts_presence(*parTsPresence);
+    amp_channel[i].set_tonestack_bass(*parTsLow);
+    amp_channel[i].set_tonestack_mids(*parTsMid);
+    amp_channel[i].set_tonestack_treble(*parTsHigh);
+    amp_channel[i].set_tonestack_presence(*parTsPresence);
 
-    amp_channel[i].set_gain_stages(*parGainStages);
-    amp_channel[i].set_gain_slope(*parGainSlope);
+    amp_channel[i].set_triode_num_stages((int)(*parGainStages));
+    amp_channel[i].set_triode_overhead(*parGainOverhead);
 
-    amp_channel[i].set_cab_on_off((*parCabOnOff > 0.5f) ? +1.0f : -1.0f);
-    amp_channel[i].set_cab_brightness(
+    amp_channel[i].set_cabinet_on((*parCabOnOff > 0.5f) ? true : false);
+    amp_channel[i].set_cabinet_brightness(
         remap_sided(*parCabBrightness, -0.6f, +0.6f));
-    amp_channel[i].set_cab_distance(*parCabDistance);
+    amp_channel[i].set_cabinet_distance(*parCabDistance);
 
     amp_channel[i].set_triode_hp_freq(remap_sided(*parLowCut, -1.0f, +0.75f));
     amp_channel[i].set_tetrode_hp_freq(remap_sided(*parLowCut, -1.0f, +0.75f));
@@ -296,7 +297,7 @@ void SwankyAmpAudioProcessor::prepareToPlay(double sampleRate,
   // Use this method as the place to do any pre-playback
   // initialisation that you need..
   for (int i = 0; i < 2; i++)
-    amp_channel[i].init(jmax(1, (int)sampleRate));
+    amp_channel[i].prepare(jmax(1, (int)sampleRate));
   setAmpParameters();
 }
 
@@ -304,7 +305,7 @@ void SwankyAmpAudioProcessor::releaseResources() {
   // When playback stops, you can use this as an opportunity to free up any
   // spare memory, etc.
   for (int i = 0; i < 2; i++)
-    amp_channel[i].instanceClear();
+    amp_channel[i].reset();
 }
 
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -376,12 +377,12 @@ void SwankyAmpAudioProcessor::processBlock(AudioBuffer<float> &buffer,
   // mono to mono: run the amp once
   if (totalNumInputChannels == 1 && totalNumOutputChannels == 1) {
     float *amp_buffer = buffer.getWritePointer(0);
-    amp_channel[0].compute(buffer.getNumSamples(), &amp_buffer, &amp_buffer);
+    amp_channel[0].process(buffer.getNumSamples(), &amp_buffer);
   }
   // mono to stereo: run the amp once, copy the result
   else if (totalNumInputChannels == 1 && totalNumOutputChannels == 2) {
     float *amp_buffer = buffer.getWritePointer(0);
-    amp_channel[0].compute(buffer.getNumSamples(), &amp_buffer, &amp_buffer);
+    amp_channel[0].process(buffer.getNumSamples(), &amp_buffer);
     float *amp_buffer_other = buffer.getWritePointer(1);
     std::memcpy((void *)amp_buffer_other, (void *)amp_buffer,
                 numSamples * sizeof(float));
@@ -390,7 +391,7 @@ void SwankyAmpAudioProcessor::processBlock(AudioBuffer<float> &buffer,
   else if (totalNumInputChannels == 2 && totalNumOutputChannels == 2) {
     for (int i = 0; i < 2; i++) {
       float *amp_buffer = buffer.getWritePointer(i);
-      amp_channel[i].compute(buffer.getNumSamples(), &amp_buffer, &amp_buffer);
+      amp_channel[i].process(buffer.getNumSamples(), &amp_buffer);
     }
   }
 
@@ -579,7 +580,7 @@ void SwankyAmpAudioProcessor::setStateInformation(
   // clear the amp state so that buffered values don't decay too slowly with new
   // parameters
   for (int i = 0; i < 2; i++)
-    amp_channel[i].instanceClear();
+    amp_channel[i].reset();
 
   setStateMutex.exit();
 }

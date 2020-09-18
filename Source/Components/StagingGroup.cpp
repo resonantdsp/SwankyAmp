@@ -25,23 +25,24 @@ StagingGroup::StagingGroup() : ParameterGroup("STAGING") {
   addAndMakeVisible(sliderStages);
   sliderStages.setLabel("STAGES");
   sliderStages.slider.setPosMapLow(1.0f);
-  sliderStages.slider.setPosMapHigh(7.0f);
+  sliderStages.slider.setPosMapHigh(5.0f);
   sliderStages.slider.setPosMapDownFmt("%4.1f");
 
-  addAndMakeVisible(sliderSlope);
-  sliderSlope.setLabel("SLOPE");
-  sliderSlope.slider.setPosMapDownFmt("%4.1f");
+  addAndMakeVisible(sliderOverhead);
+  sliderOverhead.setLabel("OVERHEAD");
+  sliderOverhead.slider.setPosMapDownFmt("%4.1f");
 }
 
 void StagingGroup::attachVTS(AudioProcessorValueTreeState &vts) {
   attStages.reset(
       new SliderAttachment(vts, "idGainStages", sliderStages.slider));
-  attSlope.reset(new SliderAttachment(vts, "idGainSlope", sliderSlope.slider));
+  attOverhead.reset(
+      new SliderAttachment(vts, "idGainOverhead", sliderOverhead.slider));
 }
 
 void StagingGroup::attachTooltips(const TooltipsData &tooltips) {
   sliderStages.slider.setTooltip(tooltips.getForParam("idGainStages"));
-  sliderSlope.slider.setTooltip(tooltips.getForParam("idGainSlope"));
+  sliderOverhead.slider.setTooltip(tooltips.getForParam("idGainOverhead"));
 }
 
 void StagingGroup::resized() {
@@ -65,11 +66,11 @@ void StagingGroup::resized() {
 
   corner = sliderStages.getBounds().getTopRight() + Point<int>(spacing, 0);
 
-  sliderSlope.setTopLeftPosition(corner);
-  sliderSlope.slider.setMargin(0.15f * (float)innerHeight);
-  sliderSlope.setHeight(innerHeight);
+  sliderOverhead.setTopLeftPosition(corner);
+  sliderOverhead.slider.setMargin(0.15f * (float)innerHeight);
+  sliderOverhead.setHeight(innerHeight);
 
-  corner = sliderSlope.getBounds().getTopRight() + Point<int>(spacing, 0);
+  corner = sliderOverhead.getBounds().getTopRight() + Point<int>(spacing, 0);
 
   // can now determine the width and set it, this will re-call `resized` but
   // since the height is the same it won't re-do the calculation

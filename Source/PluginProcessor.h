@@ -20,8 +20,8 @@
 
 #include <JuceHeader.h>
 
-#include "AmpMono.h"
 #include "Components/LevelMeter.h"
+#include "dsp/PushPullAmp.h"
 
 class SwankyAmpAudioProcessor : public AudioProcessor {
 public:
@@ -30,7 +30,7 @@ public:
 
   // The amplifier DSP objects (contains DSP state and the process function)
   // one for each possible channel (even if unused)
-  AmpMono amp_channel[2];
+  PushPullAmp amp_channel[2];
 
   // Objects with an `update` method for updating the value of input meters.
   LevelMeterListener *meterListenersIn[2] = {nullptr, nullptr};
@@ -47,7 +47,7 @@ public:
   std::atomic<float> *parTsPresence = nullptr;
 
   std::atomic<float> *parGainStages = nullptr;
-  std::atomic<float> *parGainSlope = nullptr;
+  std::atomic<float> *parGainOverhead = nullptr;
 
   std::atomic<float> *parCabOnOff = nullptr;
   std::atomic<float> *parCabBrightness = nullptr;
@@ -69,7 +69,7 @@ public:
   const std::vector<String> parameterIds = {
       "idInputLevel",    "idOutputLevel",      "idTsLow",
       "idTsMid",         "idTsHigh",           "idTsPresence",
-      "idGainStages",    "idGainSlope",        "idCabOnOff",
+      "idGainStages",    "idGainOverhead",     "idCabOnOff",
       "idCabBrightness", "idCabDistance",      "idPreAmpDrive",
       "idPreAmpTight",   "idPreAmpGrit",       "idLowCut",
       "idPowerAmpDrive", "idPowerAmpTight",    "idPowerAmpGrit",

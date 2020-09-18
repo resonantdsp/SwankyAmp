@@ -5,6 +5,9 @@
     <Filter Include="SwankyAmp\Resources">
       <UniqueIdentifier>{95EE411F-1B87-F062-C49A-766F772DE046}</UniqueIdentifier>
     </Filter>
+    <Filter Include="SwankyAmp\Source\dsp">
+      <UniqueIdentifier>{DEDF9A7E-3079-F42B-8649-1FC57152A285}</UniqueIdentifier>
+    </Filter>
     <Filter Include="SwankyAmp\Source\Components">
       <UniqueIdentifier>{6544B3F9-C156-C5B7-87C3-1175E560E903}</UniqueIdentifier>
     </Filter>
@@ -2604,6 +2607,54 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Source\dsp\Cabinet.h">
+      <Filter>SwankyAmp\Source\dsp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\dsp\CabinetFaust.h">
+      <Filter>SwankyAmp\Source\dsp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\dsp\FaustImpl.h">
+      <Filter>SwankyAmp\Source\dsp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\dsp\Meta.h">
+      <Filter>SwankyAmp\Source\dsp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\dsp\PushPullAmp.h">
+      <Filter>SwankyAmp\Source\dsp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\dsp\TetrodeGrid.h">
+      <Filter>SwankyAmp\Source\dsp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\dsp\TetrodeGridFaust.h">
+      <Filter>SwankyAmp\Source\dsp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\dsp\TetrodePlate.h">
+      <Filter>SwankyAmp\Source\dsp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\dsp\TetrodePlateFaust.h">
+      <Filter>SwankyAmp\Source\dsp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\dsp\ToneStackF.h">
+      <Filter>SwankyAmp\Source\dsp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\dsp\ToneStackFFaust.h">
+      <Filter>SwankyAmp\Source\dsp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\dsp\TriodeGrid.h">
+      <Filter>SwankyAmp\Source\dsp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\dsp\TriodeGridFaust.h">
+      <Filter>SwankyAmp\Source\dsp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\dsp\TriodePlate.h">
+      <Filter>SwankyAmp\Source\dsp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\dsp\TriodePlateFaust.h">
+      <Filter>SwankyAmp\Source\dsp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\dsp\UI.h">
+      <Filter>SwankyAmp\Source\dsp</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\Components\AmpGroup.h">
       <Filter>SwankyAmp\Source\Components</Filter>
     </ClInclude>
@@ -2647,9 +2698,6 @@
       <Filter>SwankyAmp\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\SwankyAmpLAF.h">
-      <Filter>SwankyAmp\Source</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Source\AmpMono.h">
       <Filter>SwankyAmp\Source</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\PluginProcessor.h">
