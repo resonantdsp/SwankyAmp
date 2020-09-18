@@ -2,6 +2,7 @@
 #define __PushPullAmP_H__
 
 #include <cmath>
+#include <random>
 
 #define USCALE(x, l, u) (x + 1.0f) / 2.0f * (u - l) + l
 #define ULSCALE(x, l, u) std::exp(USCALE(x, std::log(l), std::log(u)));
@@ -41,7 +42,7 @@ inline float interp1d(float x, float xl, float xh, const float *edges,
 
 class PreAmp {
 public:
-  PreAmp() = default;
+  PreAmp() : rngDist(-0.2f, 0.2f) {}
   ~PreAmp() = default;
 
   void reset() {
@@ -79,39 +80,63 @@ public:
     scaleBuffer(count, buffer, triodeScale);
   }
 
-  // TDOO: randomized stages
-
   inline void set_hp_freq(FAUSTFLOAT x) {
+    auto rng = std::minstd_rand(rngSeed + 1);
     for (size_t i = 0; i < MAX_STAGES; i++)
-      triodeGrid[i].set_hp_freq(x);
+      triodeGrid[i].set_hp_freq(x + rngDist(rng));
   }
   inline void set_grid_tau(FAUSTFLOAT x) {
+    auto rng = std::minstd_rand(rngSeed + 2);
     for (size_t i = 0; i < MAX_STAGES; i++)
-      triodeGrid[i].set_tau(x);
+      triodeGrid[i].set_tau(x + rngDist(rng));
   }
   inline void set_grid_ratio(FAUSTFLOAT x) {
     for (size_t i = 0; i < MAX_STAGES; i++)
       triodeGrid[i].set_ratio(x);
   }
   inline void set_grid_level(FAUSTFLOAT x) {
+    auto rng = std::minstd_rand(rngSeed + 3);
     for (size_t i = 0; i < MAX_STAGES; i++)
-      triodeGrid[i].set_level(x);
+      triodeGrid[i].set_level(x + rngDist(rng));
   }
   inline void set_grid_clip(FAUSTFLOAT x) {
+    auto rng = std::minstd_rand(rngSeed + 4);
     for (size_t i = 0; i < MAX_STAGES; i++)
-      triodeGrid[i].set_clip(x);
+      triodeGrid[i].set_clip(x + rngDist(rng));
   }
   inline void set_plate_bias(FAUSTFLOAT x) {
+    auto rng = std::minstd_rand(rngSeed + 5);
     for (size_t i = 0; i < MAX_STAGES; i++)
-      triodePlate[i].set_bias(x);
+      triodePlate[i].set_bias(x + rngDist(rng));
+  }
+  inline void set_plate_scale(FAUSTFLOAT x) {
+    auto rng = std::minstd_rand(rngSeed + 6);
+    for (size_t i = 0; i < MAX_STAGES; i++)
+      triodePlate[i].set_scale(x + rngDist(rng));
+  }
+  inline void set_plate_clip(FAUSTFLOAT x) {
+    auto rng = std::minstd_rand(rngSeed + 7);
+    for (size_t i = 0; i < MAX_STAGES; i++)
+      triodePlate[i].set_clip(x + rngDist(rng));
+  }
+  inline void set_plate_drift_level(FAUSTFLOAT x) {
+    auto rng = std::minstd_rand(rngSeed + 8);
+    for (size_t i = 0; i < MAX_STAGES; i++)
+      triodePlate[i].set_drift_level(x + rngDist(rng));
+  }
+  inline void set_plate_drift_tau(FAUSTFLOAT x) {
+    auto rng = std::minstd_rand(rngSeed + 9);
+    for (size_t i = 0; i < MAX_STAGES; i++)
+      triodePlate[i].set_drift_tau(x + rngDist(rng));
   }
   inline void set_plate_comp_ratio(FAUSTFLOAT x) {
     for (size_t i = 0; i < MAX_STAGES; i++)
       triodePlate[i].set_comp_ratio(x);
   }
   inline void set_plate_comp_level(FAUSTFLOAT x) {
+    auto rng = std::minstd_rand(rngSeed + 10);
     for (size_t i = 0; i < MAX_STAGES; i++)
-      triodePlate[i].set_comp_level(x);
+      triodePlate[i].set_comp_level(x + rngDist(rng));
   }
   inline void set_plate_comp_offset(FAUSTFLOAT x) {
     for (size_t i = 0; i < MAX_STAGES; i++)
@@ -134,6 +159,9 @@ private:
   TriodeGrid triodeGrid[MAX_STAGES];
   TriodePlate triodePlate[MAX_STAGES];
 
+  std::uniform_real_distribution<float> rngDist;
+  unsigned int rngSeed = 123;
+
   inline size_t numStagesActive() const {
     size_t num = numStages > MAX_STAGES ? MAX_STAGES : numStages;
     num = num < 1 ? 1 : num;
@@ -144,6 +172,21 @@ private:
     set_num_stages(3);
     set_drive(0.0f);
     set_overhead(0.0f);
+
+    // must manually set to get the randomization
+    set_hp_freq(0.0f);
+    set_grid_tau(0.0f);
+    set_grid_ratio(0.0f);
+    set_grid_level(0.0f);
+    set_grid_clip(0.0f);
+    set_plate_bias(0.0f);
+    set_plate_scale(0.0f);
+    set_plate_clip(0.0f);
+    set_plate_drift_level(0.0f);
+    set_plate_drift_tau(0.0f);
+    set_plate_comp_ratio(0.0f);
+    set_plate_comp_level(0.0f);
+    set_plate_comp_offset(0.0f);
   }
 };
 
@@ -324,14 +367,14 @@ private:
   bool cabinetOn = true;
 
   const float preAmpDriveScale[NUM_SWEEP_BINS + 1] = {
-      1.221823e-02f, 6.250414e-03f, 3.119302e-03f, 1.700751e-03f,
-      1.290108e-03f, 1.260687e-03f, 1.314394e-03f, 1.307585e-03f,
-      1.285719e-03f, 1.328954e-03f, 1.394988e-03f};
+      1.410724e-02f, 7.175739e-03f, 3.618223e-03f, 1.888108e-03f,
+      1.359137e-03f, 1.306723e-03f, 1.342434e-03f, 1.365788e-03f,
+      1.319258e-03f, 1.308935e-03f, 1.345319e-03f};
 
   const float powerAmpDriveScale[NUM_SWEEP_BINS + 1] = {
-      1.016741e+01f, 5.198907e+00f, 2.596404e+00f, 1.405875e+00f,
-      1.045974e+00f, 9.999996e-01f, 1.029028e+00f, 1.080280e+00f,
-      1.210819e+00f, 1.546588e+00f, 2.273256e+00f};
+      1.081612e+01f, 5.521476e+00f, 2.770926e+00f, 1.463769e+00f,
+      1.057923e+00f, 9.999996e-01f, 1.021575e+00f, 1.067748e+00f,
+      1.188773e+00f, 1.503025e+00f, 2.179469e+00f};
 
   void resetParameters() {
     set_input_level(0.0f);
