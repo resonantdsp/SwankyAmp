@@ -195,7 +195,8 @@ void SwankyAmpAudioProcessor::setAmpParameters() {
         remap_sided(*parCabBrightness, -0.6f, +0.6f));
     amp_channel[i].set_cabinet_distance(*parCabDistance);
     // full dynamic when knob is at 0.0
-    amp_channel[i].set_cabinet_dynamic(remap_xy(*parCabDynamic, -1.0f, 0.0f, -1.0f, +1.0f));
+    amp_channel[i].set_cabinet_dynamic(
+        remap_xy(*parCabDynamic, -1.0f, 0.0f, -1.0f, +1.0f));
     // move the dynamic level down over the dynamic knob range
     amp_channel[i].set_cabinet_dynamic_level(-1.0f * *parCabDynamic);
 
@@ -476,12 +477,12 @@ struct VersionNumber {
   VersionNumber(int major, int minor, int patch)
       : major(major), minor(minor), patch(patch) {}
 
-  bool VersionNumber::operator==(const VersionNumber &other) const {
+  bool operator==(const VersionNumber &other) const {
     return this->major == other.major && this->minor == other.minor &&
            this->patch == other.patch;
   }
 
-  bool VersionNumber::operator<(const VersionNumber &other) const {
+  bool operator<(const VersionNumber &other) const {
     if (this->major < other.major)
       return true;
     if (this->major == other.major && this->minor < other.minor)
@@ -492,11 +493,11 @@ struct VersionNumber {
     return false;
   }
 
-  bool VersionNumber::operator>(const VersionNumber &other) const {
+  bool operator>(const VersionNumber &other) const {
     return !(*this == other) && !(*this < other);
   }
 
-  bool VersionNumber::operator!=(const VersionNumber &other) const {
+  bool operator!=(const VersionNumber &other) const {
     return !(*this == other);
   }
 };
@@ -505,7 +506,7 @@ VersionNumber parseVersionString(const String &versionString) {
   int section = 0;
   VersionNumber versionNumber;
   String buff;
-  for (const auto &c : versionString) {
+  for (const auto c : versionString) {
     if (c == '.') {
       if (buff.isNotEmpty()) {
         if (section == 0)
