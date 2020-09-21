@@ -19,6 +19,8 @@
 #include <algorithm>
 #include <unordered_map>
 
+#include "catch.hpp"
+
 #include <JuceHeader.h>
 
 #include "PluginEditor.h"
@@ -138,6 +140,13 @@ float remap_sided(float unit, float to_low, float to_high) {
   }
 }
 
+TEST_CASE("values are remapped to sided ranges") {
+  REQUIRE(remap_sided(0.0f, -2.0f, +10.0f) == Approx(0.0f));
+  REQUIRE(remap_sided(1.0f, -2.0f, +10.0f) == Approx(10.0f));
+  REQUIRE(remap_sided(-1.0f, -2.0f, +10.0f) == Approx(-2.0f));
+  REQUIRE(remap_sided(-0.5f, -2.0f, +10.0f) == Approx(-1.0f));
+}
+
 /**
  * @brief Remap a float value to a new range.
  *
@@ -152,6 +161,13 @@ float remap_sided(float unit, float to_low, float to_high) {
  */
 float remap_range(float unit, float to_low, float to_high) {
   return (unit + 1.0f) / 2.0f * (to_high - to_low) + to_low;
+}
+
+TEST_CASE("values are remapped to a single range") {
+  REQUIRE(remap_range(0.0f, -2.0f, +10.0f) == Approx(4.0f));
+  REQUIRE(remap_range(1.0f, -2.0f, +10.0f) == Approx(10.0f));
+  REQUIRE(remap_range(-1.0f, -2.0f, +10.0f) == Approx(-2.0f));
+  REQUIRE(remap_range(-0.5f, -2.0f, +10.0f) == Approx(1.0f));
 }
 
 /**
@@ -172,6 +188,14 @@ float remap_xy(float x, float x1, float x2, float y1, float y2) {
   x = (x - x1) / (x2 - x1);
   float y = x * (y2 - y1) + y1;
   return y;
+}
+
+TEST_CASE("values are remapped from one range to another") {
+  REQUIRE(remap_xy(-3.0f, -3.0f, +1.0f, -2.0f, 10.0f) == Approx(-2.0f));
+  REQUIRE(remap_xy(-4.0f, -3.0f, +1.0f, -2.0f, 10.0f) == Approx(-2.0f));
+  REQUIRE(remap_xy(+1.0f, -3.0f, +1.0f, -2.0f, 10.0f) == Approx(10.0f));
+  REQUIRE(remap_xy(+2.0f, -3.0f, +1.0f, -2.0f, 10.0f) == Approx(10.0f));
+  REQUIRE(remap_xy(0.0f, -3.0f, +1.0f, -2.0f, 10.0f) == Approx(7.0f));
 }
 
 // set the amp object user parameters from the VTS values
@@ -458,6 +482,29 @@ mapParameterValues(const SerializedState &state) {
   return values;
 }
 
+TEST_CASE("state parameters are mapped to thier values") {
+  XmlElement state = XmlElement("state");
+  XmlElement *param = nullptr;
+
+  param = new XmlElement("PARAM");
+  param->setAttribute("id", "param1");
+  param->setAttribute("value", 0.0);
+  state.addChildElement(param);
+
+  param = new XmlElement("PARAM");
+  param->setAttribute("id", "param2");
+  param->setAttribute("value", 1.0);
+  state.addChildElement(param);
+
+  const auto map = mapParameterValues(std::make_unique<XmlElement>(state));
+
+  REQUIRE(map.size() == 2);
+  REQUIRE(map.find("param1") != map.end());
+  REQUIRE(map.find("param2") != map.end());
+  REQUIRE(map.at("param1") == Approx(0.0f));
+  REQUIRE(map.at("param2") == Approx(1.0f));
+}
+
 double transformUnitScale(double value, double lower, double upper,
                           double lowerPost, double upperPost) {
   const double post =
@@ -502,6 +549,32 @@ struct VersionNumber {
   }
 };
 
+TEST_CASE("version numbers are initialized") {
+  REQUIRE(VersionNumber(1, 2, 3).major == 1);
+  REQUIRE(VersionNumber(1, 2, 3).minor == 2);
+  REQUIRE(VersionNumber(1, 2, 3).patch == 3);
+
+  REQUIRE(VersionNumber().major == -1);
+  REQUIRE(VersionNumber().minor == -1);
+  REQUIRE(VersionNumber().patch == -1);
+}
+
+TEST_CASE("version numbers are compared") {
+  REQUIRE(VersionNumber(1, 2, 3) == VersionNumber(1, 2, 3));
+
+  REQUIRE(VersionNumber(1, 2, 3) != VersionNumber(0, 2, 3));
+  REQUIRE(VersionNumber(1, 2, 3) != VersionNumber(1, 0, 3));
+  REQUIRE(VersionNumber(1, 2, 3) != VersionNumber(1, 2, 0));
+
+  REQUIRE(VersionNumber(1, 2, 3) < VersionNumber(2, 2, 3));
+  REQUIRE(VersionNumber(1, 2, 3) < VersionNumber(1, 3, 3));
+  REQUIRE(VersionNumber(1, 2, 3) < VersionNumber(1, 2, 4));
+
+  REQUIRE(VersionNumber(1, 2, 3) > VersionNumber(0, 2, 3));
+  REQUIRE(VersionNumber(1, 2, 3) > VersionNumber(1, 1, 3));
+  REQUIRE(VersionNumber(1, 2, 3) > VersionNumber(1, 2, 2));
+}
+
 VersionNumber parseVersionString(const String &versionString) {
   int section = 0;
   VersionNumber versionNumber;
@@ -533,6 +606,12 @@ VersionNumber parseVersionString(const String &versionString) {
   }
 
   return versionNumber;
+}
+
+TEST_CASE("version numbers are parsed") {
+  REQUIRE(parseVersionString("1.2.3") == VersionNumber(1, 2, 3));
+  REQUIRE(parseVersionString("1.2.3.4") == VersionNumber(1, 2, 3));
+  REQUIRE(parseVersionString("1.2.03") == VersionNumber(1, 2, 3));
 }
 
 void SwankyAmpAudioProcessor::setStateInformation(
