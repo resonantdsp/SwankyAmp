@@ -52,6 +52,7 @@ public:
   std::atomic<float> *parCabOnOff = nullptr;
   std::atomic<float> *parCabBrightness = nullptr;
   std::atomic<float> *parCabDistance = nullptr;
+  std::atomic<float> *parCabDynamic = nullptr;
 
   std::atomic<float> *parPreAmpDrive = nullptr;
   std::atomic<float> *parPreAmpTight = nullptr;
@@ -70,7 +71,7 @@ public:
       "idInputLevel",    "idOutputLevel",      "idTsLow",
       "idTsMid",         "idTsHigh",           "idTsPresence",
       "idGainStages",    "idGainOverhead",     "idCabOnOff",
-      "idCabBrightness", "idCabDistance",      "idPreAmpDrive",
+      "idCabBrightness", "idCabDistance", "idCabDynamic",      "idPreAmpDrive",
       "idPreAmpTight",   "idPreAmpGrit",       "idLowCut",
       "idPowerAmpDrive", "idPowerAmpTight",    "idPowerAmpGrit",
       "idPowerAmpSag",   "idPowerAmpSagRatio", "idPowerAmpSagSlope",

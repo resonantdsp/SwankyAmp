@@ -32,6 +32,10 @@ CabGroup::CabGroup() : ParameterGroup("CABINET") {
   addAndMakeVisible(sliderDistance);
   sliderDistance.setLabel("DISTANCE");
   sliderDistance.slider.setPosMapDownFmt("%4.1f");
+
+  addAndMakeVisible(sliderDynamic);
+  sliderDynamic.setLabel("DYNAMIC");
+  sliderDynamic.slider.setPosMapDownFmt("%4.1f");
 }
 
 void CabGroup::attachVTS(AudioProcessorValueTreeState &vts) {
@@ -40,12 +44,15 @@ void CabGroup::attachVTS(AudioProcessorValueTreeState &vts) {
       new SliderAttachment(vts, "idCabBrightness", sliderBright.slider));
   attCabDistance.reset(
       new SliderAttachment(vts, "idCabDistance", sliderDistance.slider));
+  attCabDynamic.reset(
+      new SliderAttachment(vts, "idCabDynamic", sliderDynamic.slider));
 }
 
 void CabGroup::attachTooltips(const TooltipsData &tooltips) {
   buttonCabOnOff.setTooltip(tooltips.getForParam("idCabOnOff"));
   sliderBright.slider.setTooltip(tooltips.getForParam("idCabBrightness"));
   sliderDistance.slider.setTooltip(tooltips.getForParam("idCabDistance"));
+  sliderDynamic.slider.setTooltip(tooltips.getForParam("idCabDynamic"));
 }
 
 void CabGroup::resized() {
@@ -81,6 +88,12 @@ void CabGroup::resized() {
   sliderDistance.setHeight(innerHeight);
 
   corner = sliderDistance.getBounds().getTopRight() + Point<int>(spacing, 0);
+
+  sliderDynamic.setTopLeftPosition(corner);
+  sliderDynamic.slider.setMargin(0.15f * (float)innerHeight);
+  sliderDynamic.setHeight(innerHeight);
+
+  corner = sliderDynamic.getBounds().getTopRight() + Point<int>(spacing, 0);
 
   // can now determine the width and set it, this will re-call `resized` but
   // since the height is the same it won't re-do the calculation

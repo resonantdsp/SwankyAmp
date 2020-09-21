@@ -15,7 +15,8 @@ public:
     faustDsp.buildUserInterface(&faustDsp);
     par_brightness = faustDsp.getParameter("brightness");
     par_distance = faustDsp.getParameter("distance");
-    par_gain = faustDsp.getParameter("gain");
+    par_dynamic = faustDsp.getParameter("dynamic");
+    par_dynamic_level = faustDsp.getParameter("dynamic_level");
     par_hp_f = faustDsp.getParameter("hp_f");
     par_lp_f = faustDsp.getParameter("lp_f");
     par_offset = faustDsp.getParameter("offset");
@@ -80,9 +81,13 @@ public:
     x += 0.000000e+00f;
     *par_distance = x;
   }
-  inline void set_gain(FAUSTFLOAT x) {
+  inline void set_dynamic(FAUSTFLOAT x) {
     x += 0.000000e+00f;
-    *par_gain = x;
+    *par_dynamic = uscale(x, 0.0f, 1.0f);
+  }
+  inline void set_dynamic_level(FAUSTFLOAT x) {
+    x += 0.000000e+00f;
+    *par_dynamic_level = uscale(x, 10.0f, 30.0f);
   }
   inline void set_hp_f(FAUSTFLOAT x) {
     x += 1.110027e+02f;
@@ -242,7 +247,8 @@ private:
 
   FAUSTFLOAT *par_brightness = nullptr;
   FAUSTFLOAT *par_distance = nullptr;
-  FAUSTFLOAT *par_gain = nullptr;
+  FAUSTFLOAT *par_dynamic = nullptr;
+  FAUSTFLOAT *par_dynamic_level = nullptr;
   FAUSTFLOAT *par_hp_f = nullptr;
   FAUSTFLOAT *par_lp_f = nullptr;
   FAUSTFLOAT *par_offset = nullptr;
@@ -285,7 +291,8 @@ private:
   void zeroParameters() {
     set_brightness(0.0f);
     set_distance(0.0f);
-    set_gain(0.0f);
+    set_dynamic(0.0f);
+    set_dynamic_level(0.0f);
     set_hp_f(0.0f);
     set_lp_f(0.0f);
     set_offset(0.0f);

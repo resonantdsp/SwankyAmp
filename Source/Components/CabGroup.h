@@ -40,10 +40,12 @@ private:
   RButton buttonCabOnOff;
   RSliderLabel sliderBright;
   RSliderLabel sliderDistance;
+  RSliderLabel sliderDynamic;
 
   std::unique_ptr<ButtonAttachment> attCabOnOff;
   std::unique_ptr<SliderAttachment> attCabBrightness;
   std::unique_ptr<SliderAttachment> attCabDistance;
+  std::unique_ptr<SliderAttachment> attCabDynamic;
 
   DISABLE_COMPONENT_RESIZE()
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CabGroup)

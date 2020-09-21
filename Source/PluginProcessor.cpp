@@ -67,6 +67,7 @@ SwankyAmpAudioProcessor::SwankyAmpAudioProcessor()
                                                           "CabOnOff", true),
                      MAKE_PARAMETER_UNIT(CabBrightness),
                      MAKE_PARAMETER(CabDistance, 0.0f, 1.0f, 0.0f),
+                     MAKE_PARAMETER_UNIT(CabDynamic),
 
                      MAKE_PARAMETER(PreAmpDrive, -1.0f, 1.0f, -0.5f),
                      MAKE_PARAMETER_UNIT(PreAmpTight),
@@ -95,6 +96,7 @@ SwankyAmpAudioProcessor::SwankyAmpAudioProcessor()
   ASSIGN_PARAMETER(CabOnOff)
   ASSIGN_PARAMETER(CabBrightness)
   ASSIGN_PARAMETER(CabDistance)
+  ASSIGN_PARAMETER(CabDynamic)
 
   ASSIGN_PARAMETER(PreAmpDrive)
   ASSIGN_PARAMETER(PreAmpTight)
@@ -192,6 +194,10 @@ void SwankyAmpAudioProcessor::setAmpParameters() {
     amp_channel[i].set_cabinet_brightness(
         remap_sided(*parCabBrightness, -0.6f, +0.6f));
     amp_channel[i].set_cabinet_distance(*parCabDistance);
+    // full dynamic when knob is at 0.0
+    amp_channel[i].set_cabinet_dynamic(remap_xy(*parCabDynamic, -1.0f, 0.0f, -1.0f, +1.0f));
+    // move the dynamic level down over the dynamic knob range
+    amp_channel[i].set_cabinet_dynamic_level(-1.0f * *parCabDynamic);
 
     amp_channel[i].set_triode_hp_freq(remap_sided(*parLowCut, -1.0f, +0.75f));
     amp_channel[i].set_tetrode_hp_freq(remap_sided(*parLowCut, -1.0f, +0.75f));

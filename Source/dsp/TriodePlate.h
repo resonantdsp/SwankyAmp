@@ -47,31 +47,31 @@ public:
   }
 
   inline void set_bias(FAUSTFLOAT x) {
-    x += 2.367939e+00f;
+    x += 2.368065e+00f;
     *par_bias = uscale(x, -100.0f, +100.0f);
   }
   inline void set_bias_corner(FAUSTFLOAT x) {
-    x += 4.893280e-01f;
+    x += 4.893826e-01f;
     *par_bias_corner = ulscale(x, 1e-1f, 1e+3f);
   }
   inline void set_clip(FAUSTFLOAT x) {
-    x += -1.075737e+00f;
+    x += -1.075748e+00f;
     *par_clip = uscale(x, -100.0f, +100.0f);
   }
   inline void set_comp_cap(FAUSTFLOAT x) {
-    x += 2.536857e+00f;
+    x += 2.536844e+00f;
     *par_comp_cap = ulscale(x, 1e-1f, 1e+1f);
   }
   inline void set_comp_corner(FAUSTFLOAT x) {
-    x += 1.574300e-02f;
+    x += 1.632996e-02f;
     *par_comp_corner = ulscale(x, 1e-1f, 1e+2f);
   }
   inline void set_comp_depth(FAUSTFLOAT x) {
-    x += -1.602213e-01f;
+    x += -1.602381e-01f;
     *par_comp_depth = ulscale(x, 1e-1f, 1e+1f);
   }
   inline void set_comp_level(FAUSTFLOAT x) {
-    x += -1.020013e+00f;
+    x += -1.020004e+00f;
     *par_comp_level = uscale(x, -100.0f, +100.0f);
   }
   inline void set_comp_offset(FAUSTFLOAT x) {
@@ -79,31 +79,31 @@ public:
     *par_comp_offset = uscale(x, -100.0f, +100.0f);
   }
   inline void set_comp_ratio(FAUSTFLOAT x) {
-    x += 3.137935e+00f;
+    x += 3.138577e+00f;
     *par_comp_ratio = ulscale(x, 1e0f, 1e+1f);
   }
   inline void set_comp_tau(FAUSTFLOAT x) {
-    x += -1.100187e+00f;
+    x += -1.100162e+00f;
     *par_comp_tau = ulscale(x, 1e-3f, 1e0f);
   }
   inline void set_corner(FAUSTFLOAT x) {
-    x += 1.179033e-02f;
+    x += -2.015572e-02f;
     *par_corner = ulscale(x, 1e-2f, 1e+2f);
   }
   inline void set_drift_depth(FAUSTFLOAT x) {
-    x += -8.250187e-01f;
+    x += -8.250171e-01f;
     *par_drift_depth = ulscale(x, 1e-1f, 1e+1f);
   }
   inline void set_drift_level(FAUSTFLOAT x) {
-    x += 1.016883e-01f;
+    x += 1.017836e-01f;
     *par_drift_level = uscale(x, -100.0f, +100.0f);
   }
   inline void set_drift_tau(FAUSTFLOAT x) {
-    x += -1.087854e+00f;
+    x += -1.088165e+00f;
     *par_drift_tau = ulscale(x, 1e-3f, 1e0f);
   }
   inline void set_scale(FAUSTFLOAT x) {
-    x += 1.524173e+00f;
+    x += 1.524164e+00f;
     *par_scale = ulscale(x, 1e-1f, 1e+1f);
   }
 

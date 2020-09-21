@@ -13,6 +13,9 @@
 	<param id="idCabDistance">
 		Affects the microphone distance which will remove some lows and upper mids. This can have the effect of creating a clearer sound.
 	</param>
+	<param id="idCabDynamic">
+		Affects how much the cabinet frequencies respond to the loudness of the signal. Increase for darker distortion.
+	</param>
 	<param id="idCabOnOff">
 		Disables the cabinet emulation. Turn off if you want to run a separate cabinet emulation after the plugin.
 	</param>

@@ -10,7 +10,7 @@
 #define IULSCALE(x, l, u) IUSCALE(std::log(x), std::log(l), std::log(u))
 
 #define LINEAR2DB(x) 20.0f * std::log10(x)
-#define DB2LINEAR(x) std::pow(10.0f, x / 20.0f)
+#define DB2LINEAR(x) std::pow(10.0f, (x) / 20.0f)
 
 #define NUM_SWEEP_BINS 10
 
@@ -287,7 +287,7 @@ public:
                                  preAmpDriveScale, (size_t)NUM_SWEEP_BINS) *
                         interp1d(powerAmp.get_drive(), -1.0f, 1.0f,
                                  powerAmpDriveScale, (size_t)NUM_SWEEP_BINS) *
-                        DB2LINEAR(outputLevel);
+                        DB2LINEAR(outputLevel + 10.0f);
     scaleBuffer(count, buffer, scale);
   }
 
@@ -347,6 +347,10 @@ public:
     cabinet.set_brightness(x);
   }
   inline void set_cabinet_distance(FAUSTFLOAT x) { cabinet.set_distance(x); }
+  inline void set_cabinet_dynamic(FAUSTFLOAT x) { cabinet.set_dynamic(x); }
+  inline void set_cabinet_dynamic_level(FAUSTFLOAT x) {
+    cabinet.set_dynamic_level(x);
+  }
 
   inline void set_input_level(FAUSTFLOAT x) {
     inputLevel = USCALE(x, -35.0f, 35.0f);
@@ -367,14 +371,14 @@ private:
   bool cabinetOn = true;
 
   const float preAmpDriveScale[NUM_SWEEP_BINS + 1] = {
-      1.410724e-02f, 7.175739e-03f, 3.618223e-03f, 1.888108e-03f,
-      1.359137e-03f, 1.306723e-03f, 1.342434e-03f, 1.365788e-03f,
-      1.319258e-03f, 1.308935e-03f, 1.345319e-03f};
+      1.351344e-02f, 6.804656e-03f, 3.342829e-03f, 1.622306e-03f,
+      1.093645e-03f, 1.041891e-03f, 1.082537e-03f, 1.113424e-03f,
+      1.076906e-03f, 1.084495e-03f, 1.141992e-03f};
 
   const float powerAmpDriveScale[NUM_SWEEP_BINS + 1] = {
-      1.081612e+01f, 5.521476e+00f, 2.770926e+00f, 1.463769e+00f,
-      1.057923e+00f, 9.999996e-01f, 1.021575e+00f, 1.067748e+00f,
-      1.188773e+00f, 1.503025e+00f, 2.179469e+00f};
+      1.298777e+01f, 6.555208e+00f, 3.190968e+00f, 1.555421e+00f,
+      1.061636e+00f, 9.999997e-01f, 1.036814e+00f, 1.101064e+00f,
+      1.254362e+00f, 1.658022e+00f, 2.511448e+00f};
 
   void resetParameters() {
     set_input_level(0.0f);
