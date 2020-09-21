@@ -20,8 +20,8 @@
 
 #include <JuceHeader.h>
 
-#include "../Utils.h"
 #include "../TooltipsData.h"
+#include "../Utils.h"
 
 typedef AudioProcessorValueTreeState::SliderAttachment SliderAttachment;
 typedef AudioProcessorValueTreeState::ButtonAttachment ButtonAttachment;
@@ -29,48 +29,48 @@ typedef AudioProcessorValueTreeState::ButtonAttachment ButtonAttachment;
 /*
  * A group of parameters drawn in a box, with a label sitting atop the box.
  */
-class ParameterGroup : public Component
-{
+class ParameterGroup : public Component {
 public:
-	ParameterGroup(const String& label);
-	ParameterGroup() : ParameterGroup("") {}
-	virtual ~ParameterGroup() {}
+  ParameterGroup(const String &label);
+  ParameterGroup() : ParameterGroup("") {}
+  virtual ~ParameterGroup() {}
 
-	virtual void paint(Graphics&) override;
-	virtual void resized() override;
+  virtual void paint(Graphics &) override;
+  virtual void resized() override;
 
-	virtual void attachVTS(AudioProcessorValueTreeState& vts) = 0;
-	virtual void attachTooltips(const TooltipsData&) {}
+  virtual void attachVTS(AudioProcessorValueTreeState &vts) = 0;
+  virtual void attachTooltips(const TooltipsData &) {}
 
-	const Rectangle<int>& getBorderBounds() const { return borderBounds; }
+  const Rectangle<int> &getBorderBounds() const { return borderBounds; }
 
-	void setLabel(const String& pLabel) { label.setText(pLabel, dontSendNotification); }
-	void setFont(const Font& font);
-	void setFont(float height);
-	void setLineThickness(float thickness);
-	void setSpacing(int spacing);
-	void setBgNoiseAlpha(float alpha) { bgNoiseAlpha = alpha; }
+  void setLabel(const String &pLabel) {
+    label.setText(pLabel, dontSendNotification);
+  }
+  void setFont(const Font &font);
+  void setFont(float height);
+  void setLineThickness(float thickness);
+  void setSpacing(int spacing);
+  void setBgNoiseAlpha(float alpha) { bgNoiseAlpha = alpha; }
 
-	float getLineThickness() const { return lineThickness; }
-	int getSpacing() const  { return spacing; }
+  float getLineThickness() const { return lineThickness; }
+  int getSpacing() const { return spacing; }
 
-	enum ColourIds
-	{
-		borderColourId = 0x2000101, // the colour of the border
-		steelColourId = 0x2000102,  // the component background brushed steel colour
-	};
+  enum ColourIds {
+    borderColourId = 0x2000101, // the colour of the border
+    steelColourId = 0x2000102,  // the component background brushed steel colour
+  };
 
 protected:
-	Label label;
-	float lineThickness = 2.0f;
-	int spacing = 12;
-	Rectangle<int> borderBounds;
-	float bgNoiseAlpha =  0.04f;
+  Label label;
+  float lineThickness = 2.0f;
+  int spacing = 12;
+  Rectangle<int> borderBounds;
+  float bgNoiseAlpha = 0.04f;
 
-	ColourGradient gradient;
-	Image bgNoise;
-	Random rng;
+  ColourGradient gradient;
+  Image bgNoise;
+  Random rng;
 
 private:
-	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ParameterGroup)
+  JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ParameterGroup)
 };

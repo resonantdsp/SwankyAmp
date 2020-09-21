@@ -19,81 +19,71 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include <unordered_map>
 #include <optional>
+#include <unordered_map>
 
 #include "PluginProcessor.h"
 
 using SerializedState = std::unique_ptr<XmlElement>;
 
-struct StateEntry
-{
-	StateEntry(
-		const String& name,
-		File file,
-		std::optional<size_t> stateIdx);
-	StateEntry() {}
+struct StateEntry {
+  StateEntry(const String &name, File file, std::optional<size_t> stateIdx);
+  StateEntry() {}
 
-	String name;
-	File file;
-	std::optional<size_t> stateIdx = std::nullopt;
+  String name;
+  File file;
+  std::optional<size_t> stateIdx = std::nullopt;
 };
 
 /** Connects a value tree state to a combo box and preset directory. */
-class PresetManager : public AudioProcessorValueTreeState::Listener
-{
+class PresetManager : public AudioProcessorValueTreeState::Listener {
 public:
-    PresetManager(
-		SwankyAmpAudioProcessor& processor,
-		AudioProcessorValueTreeState& vts,
-		ComboBox& comboBox,
-		Button& bntSave,
-		Button& bntRemove,
-		Button& bntNext,
-		Button& bntPrev,
-		Button& btnOpen
-	);
-    ~PresetManager();
+  PresetManager(SwankyAmpAudioProcessor &processor,
+                AudioProcessorValueTreeState &vts, ComboBox &comboBox,
+                Button &bntSave, Button &bntRemove, Button &bntNext,
+                Button &bntPrev, Button &btnOpen);
+  ~PresetManager();
 
-	void comboBoxChanged();
-	void buttonSaveClicked();
-	void buttonRemoveClicked();
-	void buttonNextClicked();
-	void buttonPrevClicked();
-	void buttonOpenClicked();
-	void parameterChanged(const String& id, float newValue);
+  void comboBoxChanged();
+  void buttonSaveClicked();
+  void buttonRemoveClicked();
+  void buttonNextClicked();
+  void buttonPrevClicked();
+  void buttonOpenClicked();
+  void parameterChanged(const String &id, float newValue);
 
-	const std::vector<String>& getParameterIds() const { return parameterIds; }
+  const std::vector<String> &getParameterIds() const { return parameterIds; }
 
-	void setState(const SerializedState& state);
+  void setState(const SerializedState &state);
 
 private:
-	void loadPreset(SerializedState state, File file, const String& name);
-	void loadFactoryPresets();
-	bool loadPresetsFromDir();
+  void loadPreset(SerializedState state, File file, const String &name);
+  void loadFactoryPresets();
+  bool loadPresetsFromDir();
 
-	void clearUI();
-	void updateComboBox();
-	void updatePresetDir();
+  void clearUI();
+  void updateComboBox();
+  void updatePresetDir();
 
-	void addStateEntry(const String& name, const File& file, SerializedState state);
-	void removeStateEntry(const String& name);
-	void moveStateEntry(size_t idx, size_t newIdx);
+  void addStateEntry(const String &name, const File &file,
+                     SerializedState state);
+  void removeStateEntry(const String &name);
+  void moveStateEntry(size_t idx, size_t newIdx);
 
-	SwankyAmpAudioProcessor& processor;
-    AudioProcessorValueTreeState& vts;
-	ComboBox& comboBox;
-	Button& buttonSave;
-	Button& buttonRemove;
-	Button& buttonNext;
-	Button& buttonPrev;
-	Button& buttonOpen;
-	File presetDir;
+  SwankyAmpAudioProcessor &processor;
+  AudioProcessorValueTreeState &vts;
+  ComboBox &comboBox;
+  Button &buttonSave;
+  Button &buttonRemove;
+  Button &buttonNext;
+  Button &buttonPrev;
+  Button &buttonOpen;
+  File presetDir;
 
-	std::vector<String> parameterIds;
+  std::vector<String> parameterIds;
 
-	std::optional<String> currentName = std::nullopt;
-	std::vector<StateEntry> stateEntries;
-	std::unordered_map<String, size_t> stateEntryIdx;
-	std::vector<SerializedState> states;
+  std::optional<String> currentName = std::nullopt;
+  std::vector<StateEntry> stateEntries;
+  std::unordered_map<String, size_t> stateEntryIdx;
+  std::vector<SerializedState> states;
 };

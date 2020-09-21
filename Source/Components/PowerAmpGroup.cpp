@@ -20,68 +20,68 @@
 
 #include "PowerAmpGroup.h"
 
-PowerAmpGroup::PowerAmpGroup() :
-	ParameterGroup("POWER AMP")
-{
-	addAndMakeVisible(sliderDrive);
-	sliderDrive.setLabel("DRIVE");
-	sliderDrive.slider.setPosMapDownFmt("%4.1f");
+PowerAmpGroup::PowerAmpGroup() : ParameterGroup("POWER AMP") {
+  addAndMakeVisible(sliderDrive);
+  sliderDrive.setLabel("DRIVE");
+  sliderDrive.slider.setPosMapDownFmt("%4.1f");
 
-	addAndMakeVisible(sliderTight);
-	sliderTight.setLabel("TIGHT");
-	sliderTight.slider.setPosMapDownFmt("%4.1f");
+  addAndMakeVisible(sliderTight);
+  sliderTight.setLabel("TIGHT");
+  sliderTight.slider.setPosMapDownFmt("%4.1f");
 
-	addAndMakeVisible(sliderSag);
-	sliderSag.setLabel("SAG");
-	sliderSag.slider.setPosMapDownFmt("%4.1f");
+  addAndMakeVisible(sliderSag);
+  sliderSag.setLabel("SAG");
+  sliderSag.slider.setPosMapDownFmt("%4.1f");
 }
 
-void PowerAmpGroup::attachVTS(AudioProcessorValueTreeState& vts)
-{
-	attDrive.reset(new SliderAttachment(vts, "idPowerAmpDrive", sliderDrive.slider));
-	attTight.reset(new SliderAttachment(vts, "idPowerAmpTight", sliderTight.slider));
-	attSag.reset(new SliderAttachment(vts, "idPowerAmpSag", sliderSag.slider));
+void PowerAmpGroup::attachVTS(AudioProcessorValueTreeState &vts) {
+  attDrive.reset(
+      new SliderAttachment(vts, "idPowerAmpDrive", sliderDrive.slider));
+  attTight.reset(
+      new SliderAttachment(vts, "idPowerAmpTight", sliderTight.slider));
+  attSag.reset(new SliderAttachment(vts, "idPowerAmpSag", sliderSag.slider));
 }
 
-void PowerAmpGroup::attachTooltips(const TooltipsData& tooltips)
-{
-	sliderDrive.slider.setTooltip(tooltips.getForParam("idPowerAmpDrive"));
-	sliderTight.slider.setTooltip(tooltips.getForParam("idPowerAmpTight"));
-	sliderSag.slider.setTooltip(tooltips.getForParam("idPowerAmpSag"));
+void PowerAmpGroup::attachTooltips(const TooltipsData &tooltips) {
+  sliderDrive.slider.setTooltip(tooltips.getForParam("idPowerAmpDrive"));
+  sliderTight.slider.setTooltip(tooltips.getForParam("idPowerAmpTight"));
+  sliderSag.slider.setTooltip(tooltips.getForParam("idPowerAmpSag"));
 }
 
-void PowerAmpGroup::resized()
-{
-	const int prevInnerHeight = getBorderBounds().getHeight() - 2 * spacing;
-	const Point<int> prevCorner = getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
+void PowerAmpGroup::resized() {
+  const int prevInnerHeight = getBorderBounds().getHeight() - 2 * spacing;
+  const Point<int> prevCorner =
+      getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
 
-	ParameterGroup::resized();
+  ParameterGroup::resized();
 
-	const int innerHeight = getBorderBounds().getHeight() - 2 * spacing;
-	Point<int> corner = getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
+  const int innerHeight = getBorderBounds().getHeight() - 2 * spacing;
+  Point<int> corner =
+      getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
 
-	// only re-set the positions when the height or position changes
-	if (prevInnerHeight == innerHeight && prevCorner == corner) return;
+  // only re-set the positions when the height or position changes
+  if (prevInnerHeight == innerHeight && prevCorner == corner)
+    return;
 
-	sliderDrive.setTopLeftPosition(corner);
-	sliderDrive.slider.setMargin(0.15f * (float)innerHeight);
-	sliderDrive.setHeight(innerHeight);
+  sliderDrive.setTopLeftPosition(corner);
+  sliderDrive.slider.setMargin(0.15f * (float)innerHeight);
+  sliderDrive.setHeight(innerHeight);
 
-	corner = sliderDrive.getBounds().getTopRight() + Point<int>(spacing, 0);
+  corner = sliderDrive.getBounds().getTopRight() + Point<int>(spacing, 0);
 
-	sliderTight.setTopLeftPosition(corner);
-	sliderTight.slider.setMargin(0.15f * (float)innerHeight);
-	sliderTight.setHeight(innerHeight);
+  sliderTight.setTopLeftPosition(corner);
+  sliderTight.slider.setMargin(0.15f * (float)innerHeight);
+  sliderTight.setHeight(innerHeight);
 
-	corner = sliderTight.getBounds().getTopRight() + Point<int>(spacing, 0);
+  corner = sliderTight.getBounds().getTopRight() + Point<int>(spacing, 0);
 
-	sliderSag.setTopLeftPosition(corner);
-	sliderSag.slider.setMargin(0.15f * (float)innerHeight);
-	sliderSag.setHeight(innerHeight);
+  sliderSag.setTopLeftPosition(corner);
+  sliderSag.slider.setMargin(0.15f * (float)innerHeight);
+  sliderSag.setHeight(innerHeight);
 
-	corner = sliderSag.getBounds().getTopRight() + Point<int>(spacing, 0);
+  corner = sliderSag.getBounds().getTopRight() + Point<int>(spacing, 0);
 
-	// can now determine the width and set it, this will re-call `resized` but
-	// since the height is the same it won't re-do the calculation
-	setSize(corner.getX() - getBounds().getX(), getHeight());
+  // can now determine the width and set it, this will re-call `resized` but
+  // since the height is the same it won't re-do the calculation
+  setSize(corner.getX() - getBounds().getX(), getHeight());
 }

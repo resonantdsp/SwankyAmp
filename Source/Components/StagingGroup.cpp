@@ -20,61 +20,59 @@
 
 #include "StagingGroup.h"
 
-StagingGroup::StagingGroup() :
-	ParameterGroup("STAGING")
-{
+StagingGroup::StagingGroup() : ParameterGroup("STAGING") {
 
-	addAndMakeVisible(sliderStages);
-	sliderStages.setLabel("STAGES");
-	sliderStages.slider.setPosMapLow(1.0f);
-	sliderStages.slider.setPosMapHigh(7.0f);
-	sliderStages.slider.setPosMapDownFmt("%4.1f");
+  addAndMakeVisible(sliderStages);
+  sliderStages.setLabel("STAGES");
+  sliderStages.slider.setPosMapLow(1.0f);
+  sliderStages.slider.setPosMapHigh(5.0f);
+  sliderStages.slider.setPosMapDownFmt("%4.1f");
 
-	addAndMakeVisible(sliderSlope);
-	sliderSlope.setLabel("SLOPE");
-	sliderSlope.slider.setPosMapDownFmt("%4.1f");
+  addAndMakeVisible(sliderOverhead);
+  sliderOverhead.setLabel("OVERHEAD");
+  sliderOverhead.slider.setPosMapDownFmt("%4.1f");
 }
 
-
-void StagingGroup::attachVTS(AudioProcessorValueTreeState& vts)
-{
-	attStages.reset(new SliderAttachment(vts, "idGainStages", sliderStages.slider));
-	attSlope.reset(new SliderAttachment(vts, "idGainSlope", sliderSlope.slider));
+void StagingGroup::attachVTS(AudioProcessorValueTreeState &vts) {
+  attStages.reset(
+      new SliderAttachment(vts, "idGainStages", sliderStages.slider));
+  attOverhead.reset(
+      new SliderAttachment(vts, "idGainOverhead", sliderOverhead.slider));
 }
 
-void StagingGroup::attachTooltips(const TooltipsData& tooltips)
-{
-	sliderStages.slider.setTooltip(tooltips.getForParam("idGainStages"));
-	sliderSlope.slider.setTooltip(tooltips.getForParam("idGainSlope"));
+void StagingGroup::attachTooltips(const TooltipsData &tooltips) {
+  sliderStages.slider.setTooltip(tooltips.getForParam("idGainStages"));
+  sliderOverhead.slider.setTooltip(tooltips.getForParam("idGainOverhead"));
 }
 
-void StagingGroup::resized()
-{
-	const int prevInnerHeight = getBorderBounds().getHeight() - 2 * spacing;
-	const Point<int> prevCorner = getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
+void StagingGroup::resized() {
+  const int prevInnerHeight = getBorderBounds().getHeight() - 2 * spacing;
+  const Point<int> prevCorner =
+      getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
 
-	ParameterGroup::resized();
+  ParameterGroup::resized();
 
-	const int innerHeight = getBorderBounds().getHeight() - 2 * spacing;
-	Point<int> corner = getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
+  const int innerHeight = getBorderBounds().getHeight() - 2 * spacing;
+  Point<int> corner =
+      getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
 
-	// only re-set the positions when the height or position changes
-	if (prevInnerHeight == innerHeight && prevCorner == corner) return;
+  // only re-set the positions when the height or position changes
+  if (prevInnerHeight == innerHeight && prevCorner == corner)
+    return;
 
-	sliderStages.setTopLeftPosition(corner);
-	sliderStages.slider.setMargin(0.15f * (float)innerHeight);
-	sliderStages.setHeight(innerHeight);
+  sliderStages.setTopLeftPosition(corner);
+  sliderStages.slider.setMargin(0.15f * (float)innerHeight);
+  sliderStages.setHeight(innerHeight);
 
-	corner = sliderStages.getBounds().getTopRight() + Point<int>(spacing, 0);
+  corner = sliderStages.getBounds().getTopRight() + Point<int>(spacing, 0);
 
-	sliderSlope.setTopLeftPosition(corner);
-	sliderSlope.slider.setMargin(0.15f * (float)innerHeight);
-	sliderSlope.setHeight(innerHeight);
+  sliderOverhead.setTopLeftPosition(corner);
+  sliderOverhead.slider.setMargin(0.15f * (float)innerHeight);
+  sliderOverhead.setHeight(innerHeight);
 
-	corner = sliderSlope.getBounds().getTopRight() + Point<int>(spacing, 0);
+  corner = sliderOverhead.getBounds().getTopRight() + Point<int>(spacing, 0);
 
-	// can now determine the width and set it, this will re-call `resized` but
-	// since the height is the same it won't re-do the calculation
-	setSize(corner.getX() - getBounds().getX(), getHeight());
+  // can now determine the width and set it, this will re-call `resized` but
+  // since the height is the same it won't re-do the calculation
+  setSize(corner.getX() - getBounds().getX(), getHeight());
 }
-

@@ -23,45 +23,45 @@
 #include "../Utils.h"
 #include "ParameterGroup.h"
 
-class PresetGroup : public ParameterGroup
-{
+class PresetGroup : public ParameterGroup {
 public:
-	PresetGroup();
-	~PresetGroup() {}
+  PresetGroup();
+  ~PresetGroup() {}
 
-	void attachVTS(AudioProcessorValueTreeState&) override {}
-	void addPresetListener(ComboBox::Listener* listener) { presetSelector.addListener(listener); }
+  void attachVTS(AudioProcessorValueTreeState &) override {}
+  void addPresetListener(ComboBox::Listener *listener) {
+    presetSelector.addListener(listener);
+  }
 
-	void setHeight(int height) { setSize(0, height); }
-	void paint(Graphics& g) override;
-	void resized() override;
+  void setHeight(int height) { setSize(0, height); }
+  void paint(Graphics &g) override;
+  void resized() override;
 
-	enum ComboIds
-	{
-		PresetInit = 1,
-		PresetOther = 2,
-	};
+  enum ComboIds {
+    PresetInit = 1,
+    PresetOther = 2,
+  };
 
-	// public so the preset manager can modify it
-	ComboBox presetSelector;
-	DrawableButton buttonSave;
-	DrawableButton buttonRemove;
-	DrawableButton buttonNext;
-	DrawableButton buttonPrev;
-	DrawableButton buttonOpen;
+  // public so the preset manager can modify it
+  ComboBox presetSelector;
+  DrawableButton buttonSave;
+  DrawableButton buttonRemove;
+  DrawableButton buttonNext;
+  DrawableButton buttonPrev;
+  DrawableButton buttonOpen;
 
 private:
-	DrawablePath saveIcon;
-	DrawablePath saveIconHighlight;
-	DrawablePath removeIcon;
-	DrawablePath removeIconHighlight;
-	DrawablePath nextIcon;
-	DrawablePath nextIconHighlight;
-	DrawablePath prevIcon;
-	DrawablePath prevIconHighlight;
-	DrawablePath openIcon;
-	DrawablePath openIconHighlight;
+  DrawablePath saveIcon;
+  DrawablePath saveIconHighlight;
+  DrawablePath removeIcon;
+  DrawablePath removeIconHighlight;
+  DrawablePath nextIcon;
+  DrawablePath nextIconHighlight;
+  DrawablePath prevIcon;
+  DrawablePath prevIconHighlight;
+  DrawablePath openIcon;
+  DrawablePath openIconHighlight;
 
-	DISABLE_COMPONENT_RESIZE()
-	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PresetGroup)
+  DISABLE_COMPONENT_RESIZE()
+  JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PresetGroup)
 };

@@ -24,29 +24,28 @@
 #include "ParameterGroup.h"
 #include "RSliderLabel.h"
 
-class ToneStackGroup : public ParameterGroup
-{
+class ToneStackGroup : public ParameterGroup {
 public:
-	ToneStackGroup();
-	~ToneStackGroup() {}
+  ToneStackGroup();
+  ~ToneStackGroup() {}
 
-	void attachVTS(AudioProcessorValueTreeState& vts) override;
-	void attachTooltips(const TooltipsData& tooltips) override;
+  void attachVTS(AudioProcessorValueTreeState &vts) override;
+  void attachTooltips(const TooltipsData &tooltips) override;
 
-	void setHeight(int height) { setSize(0, height); }
-	void resized() override;
+  void setHeight(int height) { setSize(0, height); }
+  void resized() override;
 
 private:
-	RSliderLabel sliderLow;
-	RSliderLabel sliderMid;
-	RSliderLabel sliderHigh;
-	RSliderLabel sliderPresence;
+  RSliderLabel sliderLow;
+  RSliderLabel sliderMid;
+  RSliderLabel sliderHigh;
+  RSliderLabel sliderPresence;
 
-	std::unique_ptr<SliderAttachment> attLow;
-	std::unique_ptr<SliderAttachment> attMid;
-	std::unique_ptr<SliderAttachment> attHigh;
-	std::unique_ptr<SliderAttachment> attPresence;
+  std::unique_ptr<SliderAttachment> attLow;
+  std::unique_ptr<SliderAttachment> attMid;
+  std::unique_ptr<SliderAttachment> attHigh;
+  std::unique_ptr<SliderAttachment> attPresence;
 
-	DISABLE_COMPONENT_RESIZE()
-	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ToneStackGroup)
+  DISABLE_COMPONENT_RESIZE()
+  JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ToneStackGroup)
 };

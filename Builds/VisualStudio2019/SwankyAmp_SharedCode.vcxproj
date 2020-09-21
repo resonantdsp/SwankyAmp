@@ -64,7 +64,7 @@
       <Optimization>Disabled</Optimization>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <AdditionalIncludeDirectories>C:\JUCE\modules\juce_audio_processors\format_types\VST3_SDK;..\..\JuceLibraryCode;C:\SDKs\AAX;C:\SDKs\AAX\Interfaces;C:\SDKs\AAX\Interfaces\ACF;C:\JUCE\modules;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;_WINDOWS;DEBUG;_DEBUG;JUCER_VS2019_78A5026=1;JUCE_APP_VERSION=0.9.0;JUCE_APP_VERSION_HEX=0x900;JucePlugin_Build_VST=0;JucePlugin_Build_VST3=1;JucePlugin_Build_AU=0;JucePlugin_Build_AUv3=0;JucePlugin_Build_RTAS=0;JucePlugin_Build_AAX=1;JucePlugin_Build_Standalone=1;JucePlugin_Build_Unity=0;JUCE_SHARED_CODE=1;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;_WINDOWS;DEBUG;_DEBUG;JUCER_VS2019_78A5026=1;JUCE_APP_VERSION=0.10.0;JUCE_APP_VERSION_HEX=0xa00;JucePlugin_Build_VST=0;JucePlugin_Build_VST3=1;JucePlugin_Build_AU=0;JucePlugin_Build_AUv3=0;JucePlugin_Build_RTAS=0;JucePlugin_Build_AAX=1;JucePlugin_Build_Standalone=1;JucePlugin_Build_Unity=0;JUCE_SHARED_CODE=1;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
       <PrecompiledHeader/>
@@ -104,7 +104,7 @@
     <ClCompile>
       <Optimization>Full</Optimization>
       <AdditionalIncludeDirectories>C:\JUCE\modules\juce_audio_processors\format_types\VST3_SDK;..\..\JuceLibraryCode;C:\SDKs\AAX;C:\SDKs\AAX\Interfaces;C:\SDKs\AAX\Interfaces\ACF;C:\JUCE\modules;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;_WINDOWS;NDEBUG;JUCER_VS2019_78A5026=1;JUCE_APP_VERSION=0.9.0;JUCE_APP_VERSION_HEX=0x900;JucePlugin_Build_VST=0;JucePlugin_Build_VST3=1;JucePlugin_Build_AU=0;JucePlugin_Build_AUv3=0;JucePlugin_Build_RTAS=0;JucePlugin_Build_AAX=1;JucePlugin_Build_Standalone=1;JucePlugin_Build_Unity=0;JUCE_SHARED_CODE=1;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;WIN32;_WINDOWS;NDEBUG;JUCER_VS2019_78A5026=1;JUCE_APP_VERSION=0.10.0;JUCE_APP_VERSION_HEX=0xa00;JucePlugin_Build_VST=0;JucePlugin_Build_VST3=1;JucePlugin_Build_AU=0;JucePlugin_Build_AUv3=0;JucePlugin_Build_RTAS=0;JucePlugin_Build_AAX=1;JucePlugin_Build_Standalone=1;JucePlugin_Build_Unity=0;JUCE_SHARED_CODE=1;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
       <PrecompiledHeader/>
@@ -2095,6 +2095,22 @@
     <ClCompile Include="..\..\JuceLibraryCode\include_juce_opengl.cpp"/>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Source\dsp\Cabinet.h"/>
+    <ClInclude Include="..\..\Source\dsp\CabinetFaust.h"/>
+    <ClInclude Include="..\..\Source\dsp\FaustImpl.h"/>
+    <ClInclude Include="..\..\Source\dsp\Meta.h"/>
+    <ClInclude Include="..\..\Source\dsp\PushPullAmp.h"/>
+    <ClInclude Include="..\..\Source\dsp\TetrodeGrid.h"/>
+    <ClInclude Include="..\..\Source\dsp\TetrodeGridFaust.h"/>
+    <ClInclude Include="..\..\Source\dsp\TetrodePlate.h"/>
+    <ClInclude Include="..\..\Source\dsp\TetrodePlateFaust.h"/>
+    <ClInclude Include="..\..\Source\dsp\ToneStackF.h"/>
+    <ClInclude Include="..\..\Source\dsp\ToneStackFFaust.h"/>
+    <ClInclude Include="..\..\Source\dsp\TriodeGrid.h"/>
+    <ClInclude Include="..\..\Source\dsp\TriodeGridFaust.h"/>
+    <ClInclude Include="..\..\Source\dsp\TriodePlate.h"/>
+    <ClInclude Include="..\..\Source\dsp\TriodePlateFaust.h"/>
+    <ClInclude Include="..\..\Source\dsp\UI.h"/>
     <ClInclude Include="..\..\Source\Components\AmpGroup.h"/>
     <ClInclude Include="..\..\Source\Components\CabGroup.h"/>
     <ClInclude Include="..\..\Source\Components\LevelMeter.h"/>
@@ -2110,7 +2126,6 @@
     <ClInclude Include="..\..\Source\Components\ToneStackGroup.h"/>
     <ClInclude Include="..\..\Source\Utils.h"/>
     <ClInclude Include="..\..\Source\SwankyAmpLAF.h"/>
-    <ClInclude Include="..\..\Source\AmpMono.h"/>
     <ClInclude Include="..\..\Source\PluginProcessor.h"/>
     <ClInclude Include="..\..\Source\PluginEditor.h"/>
     <ClInclude Include="..\..\Source\PresetManager.h"/>

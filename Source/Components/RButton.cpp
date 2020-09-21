@@ -22,8 +22,7 @@
 
 #include "RButton.h"
 
-void RButton::resized()
-{
-	ToggleButton::resized();
-	bgNoise = buildImageNoise(getWidth(), getHeight(), rng, 0.1f);
+void RButton::resized() {
+  ToggleButton::resized();
+  bgNoise = buildImageNoise(getWidth(), getHeight(), rng, 0.1f);
 }

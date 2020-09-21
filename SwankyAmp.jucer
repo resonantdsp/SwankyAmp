@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<JUCERPROJECT id="sJgmJL" name="SwankyAmp" projectType="audioplug" version="0.9.0"
+<JUCERPROJECT id="sJgmJL" name="SwankyAmp" projectType="audioplug" version="0.10.0"
               projectLineFeed="&#10;" companyName="Resonant DSP" companyWebsite="https://www.resonantdsp.com/"
               companyEmail="info@resonantdsp.com" pluginFormats="buildAAX,buildAU,buildStandalone,buildVST3"
               pluginName="Swanky Amp" pluginDesc="Tube amplifiers simulation"
@@ -19,6 +19,29 @@
       <FILE id="Mk7N22" name="tooltips.xml" compile="0" resource="1" file="Resources/tooltips.xml"/>
     </GROUP>
     <GROUP id="{1D5987B1-0BA7-E171-9516-427783CB7E4A}" name="Source">
+      <GROUP id="{A3D2DF63-6C9D-EEB5-26A5-637558A00D17}" name="dsp">
+        <FILE id="vuRhJg" name="Cabinet.h" compile="0" resource="0" file="Source/dsp/Cabinet.h"/>
+        <FILE id="xPOAYL" name="CabinetFaust.h" compile="0" resource="0" file="Source/dsp/CabinetFaust.h"/>
+        <FILE id="o1fsQZ" name="FaustImpl.h" compile="0" resource="0" file="Source/dsp/FaustImpl.h"/>
+        <FILE id="j4heg7" name="Meta.h" compile="0" resource="0" file="Source/dsp/Meta.h"/>
+        <FILE id="SYbjpY" name="PushPullAmp.h" compile="0" resource="0" file="Source/dsp/PushPullAmp.h"/>
+        <FILE id="FQVObv" name="TetrodeGrid.h" compile="0" resource="0" file="Source/dsp/TetrodeGrid.h"/>
+        <FILE id="R7OZwW" name="TetrodeGridFaust.h" compile="0" resource="0"
+              file="Source/dsp/TetrodeGridFaust.h"/>
+        <FILE id="fGdcOZ" name="TetrodePlate.h" compile="0" resource="0" file="Source/dsp/TetrodePlate.h"/>
+        <FILE id="V55zPF" name="TetrodePlateFaust.h" compile="0" resource="0"
+              file="Source/dsp/TetrodePlateFaust.h"/>
+        <FILE id="uOduFQ" name="ToneStackF.h" compile="0" resource="0" file="Source/dsp/ToneStackF.h"/>
+        <FILE id="ea1PJL" name="ToneStackFFaust.h" compile="0" resource="0"
+              file="Source/dsp/ToneStackFFaust.h"/>
+        <FILE id="U8dfxs" name="TriodeGrid.h" compile="0" resource="0" file="Source/dsp/TriodeGrid.h"/>
+        <FILE id="ltVYoy" name="TriodeGridFaust.h" compile="0" resource="0"
+              file="Source/dsp/TriodeGridFaust.h"/>
+        <FILE id="n2kjcw" name="TriodePlate.h" compile="0" resource="0" file="Source/dsp/TriodePlate.h"/>
+        <FILE id="ZYEa0v" name="TriodePlateFaust.h" compile="0" resource="0"
+              file="Source/dsp/TriodePlateFaust.h"/>
+        <FILE id="Dtj0gw" name="UI.h" compile="0" resource="0" file="Source/dsp/UI.h"/>
+      </GROUP>
       <GROUP id="{2BC335E6-8421-3F7B-5FF8-345C44B52666}" name="Components">
         <FILE id="nUfnGB" name="AmpGroup.cpp" compile="1" resource="0" file="Source/Components/AmpGroup.cpp"/>
         <FILE id="tOcGrQ" name="AmpGroup.h" compile="0" resource="0" file="Source/Components/AmpGroup.h"/>
@@ -59,7 +82,6 @@
       <FILE id="BF767l" name="SwankyAmpLAF.cpp" compile="1" resource="0"
             file="Source/SwankyAmpLAF.cpp"/>
       <FILE id="TBMLgx" name="SwankyAmpLAF.h" compile="0" resource="0" file="Source/SwankyAmpLAF.h"/>
-      <FILE id="CNVd3V" name="AmpMono.h" compile="0" resource="0" file="Source/AmpMono.h"/>
       <FILE id="m1Xtuh" name="PluginProcessor.cpp" compile="1" resource="0"
             file="Source/PluginProcessor.cpp"/>
       <FILE id="gzx8za" name="PluginProcessor.h" compile="0" resource="0"

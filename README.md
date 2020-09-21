@@ -23,8 +23,8 @@ Load the plugin into your favorite VST host or DAW (into a mono or stereo track)
   * Note: the plugin will attempt to maintain an even perceived loudness when modyfing the drive. This way you can use the drive to set the desired distortion, and then use the output level to adjust... well the output level.
 
 * Set the staging:
-  * Set the `stages` control to determine the number of pre amp tubes the signal is routed to. Increase this for a more even high gain distortion.
-  * Tune the `slope` control to determine how much harder each successive tube is pushed (smaller values can help even out the distortion).
+  * Set the `stages` control to determine the number of pre amp tubes the signal is routed to. Increase this for high gain distortion.
+  * Tune the `overhead` control to determine how the additional stages distort the signal. Increaes this for high gain distortion.
 
 * Set the tone stack:
   * The `low` control affects the amount of bass in your sound. Increase it for a fatter sound. Too much and the sound can become more washed out, muddy, and lose precision.
@@ -42,6 +42,7 @@ Load the plugin into your favorite VST host or DAW (into a mono or stereo track)
   * Leave the cabinet on unless you are using a dedicated cabinet emulator downstream of this plugin.
   * The `bright` control affects the microphone position in a way which relates to the overall brightness of the sound.
   * The `distance` control affects the distance of the microphone to the cabinet. Increase it to scoop out some lows as well as some high mids.
+  * The `dynamic` control affects how much the cabinet's frequencies respond to the loudness of the signal. Increasing will lead to a darker distortion but maintains clarity prior to breakup.
 
 ## The model
 
@@ -95,6 +96,16 @@ This process generates `Source/AmpMono.h` artifact. However this file is tracked
 However this might not work for versions of FAUST other than `2.14.4` in which case you will need to dig around `dsp/builddsp.py` and fix any issues arising from that script.
 
 ## Change log
+
+Version 0.10.0:
+
+* dynamic cabinet
+* cabinet rework
+* using a new tone stack provided by Dave Clark
+* rework of dsp functionality: each part of the amp is now its own class, compiled in a separate project to the header files
+* possibly fixed issue with rumble building up over time
+* preset save icon now un-greys when creating a new preset or renaming a preset
+* improved version string parsing
 
 Version 0.9.0:
 
