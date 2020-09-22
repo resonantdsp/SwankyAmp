@@ -41,7 +41,7 @@ public:
   virtual void attachVTS(AudioProcessorValueTreeState &vts) = 0;
   virtual void attachTooltips(const TooltipsData &) {}
 
-  const Rectangle<int> &getBorderBounds() const { return borderBounds; }
+  const juce::Rectangle<int> &getBorderBounds() const { return borderBounds; }
 
   void setLabel(const String &pLabel) {
     label.setText(pLabel, dontSendNotification);
@@ -64,7 +64,7 @@ protected:
   Label label;
   float lineThickness = 2.0f;
   int spacing = 12;
-  Rectangle<int> borderBounds;
+  juce::Rectangle<int> borderBounds;
   float bgNoiseAlpha = 0.04f;
 
   ColourGradient gradient;

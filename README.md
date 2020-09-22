@@ -95,6 +95,16 @@ This process generates `Source/AmpMono.h` artifact. However this file is tracked
 
 However this might not work for versions of FAUST other than `2.14.4` in which case you will need to dig around `dsp/builddsp.py` and fix any issues arising from that script.
 
+### Testing
+
+Only available with VisualStudio at the moment.
+
+* Open the solution
+* Build the `SwanyAmp_SharedCode` project
+* Open the `SwankyAmp_Tests` project
+* Build the Debug version
+* Run `Builds\VisualStudio\x64\Debug\SwankyAmp.exe`
+
 ## Change log
 
 Version 0.10.0:

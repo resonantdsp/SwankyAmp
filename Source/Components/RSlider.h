@@ -30,7 +30,7 @@ struct RSliderDims {
   // the largest angle of the knob, where it cuts away
   float theta = 0.0f;
   // the bounds of the graphic
-  Rectangle<float> innerBounds;
+  juce::Rectangle<float> innerBounds;
   // the center of the knob
   Point<float> centre;
 };

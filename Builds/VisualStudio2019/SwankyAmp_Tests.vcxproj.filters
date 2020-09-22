@@ -11,9 +11,10 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\Source\Tests.cpp" />
+    <ClCompile Include="..\..\Source\Tests\Tests.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\Source\catch.hpp" />
+    <ClInclude Include="..\..\Source\Tests\catch.hpp" />
+    <ClInclude Include="..\..\Source\Tests\Tests_PluginProcessor.cpp" />
   </ItemGroup>
 </Project>
