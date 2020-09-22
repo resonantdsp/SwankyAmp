@@ -92,6 +92,8 @@ public:
       "idPowerAmpSagSlope",
   };
 
+  String storedPresetName;
+
   void setAmpParameters();
 
   void prepareToPlay(double sampleRate, int samplesPerBlock) override;

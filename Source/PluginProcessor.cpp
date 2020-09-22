@@ -418,6 +418,11 @@ AudioProcessorEditor *SwankyAmpAudioProcessor::createEditor() {
 void SwankyAmpAudioProcessor::getStateInformation(MemoryBlock &destData) {
   auto state = parameters.copyState();
   std::unique_ptr<XmlElement> xml(state.createXml());
+  SwankyAmpAudioProcessorEditor *editor =
+      dynamic_cast<SwankyAmpAudioProcessorEditor *>(getActiveEditor());
+  if (editor != nullptr) {
+    xml->setAttribute("presetName", editor->getPresetName());
+  }
   copyXmlToBinary(*xml, destData);
 }
 
@@ -533,6 +538,12 @@ VersionNumber parseVersionString(const String &versionString) {
 
 void SwankyAmpAudioProcessor::setStateInformation(
     const std::unique_ptr<XmlElement> &state, bool useAll) {
+  if (state != nullptr && state->hasAttribute("presetName")) {
+    storedPresetName = state->getStringAttribute("presetName");
+  } else {
+    storedPresetName = "";
+  }
+
   std::unordered_map<String, double> values;
   if (state != nullptr)
     values = mapParameterValues(state);
