@@ -833,7 +833,8 @@ public:
     float fSlow159 = float(fEntry30);
     float fSlow160 = float(fEntry31);
     float fSlow161 = (250.0f * fSlow160);
-    float fSlow162 = (1.0f / (std::max<float>(2.0f, float(fEntry32)) + -1.0f));
+    float fSlow162 = (1.0f / (std::max<float>(0.0199999996f, float(fEntry32)) +
+                              -0.00999999978f));
     float fSlow163 = float(fEntry33);
     float fSlow164 = (2.5f * fSlow160);
     float fSlow165 = float(fEntry34);
@@ -1067,8 +1068,9 @@ public:
                                                                 : 0.0f);
       float fTemp11 = std::max<float>(
           -1.0f,
-          std::min<float>(1.0f, (0.588235319f *
-                                 ((fSlow162 * (fRec31[0] + -1.0f)) + -0.5f))));
+          std::min<float>(
+              1.0f, (0.588235319f *
+                     ((fSlow162 * (fRec31[0] + -0.00999999978f)) + -0.5f))));
       float fTemp12 = (fTemp11 * (std::fabs(fTemp11) + -2.0f));
       float fTemp13 = ((fTemp12 * (std::fabs(fTemp12) + -2.0f)) + 1.0f);
       float fTemp14 = (fSlow159 - (fSlow161 * fTemp13));

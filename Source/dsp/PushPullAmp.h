@@ -95,9 +95,8 @@ public:
       triodeGrid[i].set_ratio(x);
   }
   inline void set_grid_level(FAUSTFLOAT x) {
-    auto rng = std::minstd_rand(rngSeed + 3);
     for (size_t i = 0; i < MAX_STAGES; i++)
-      triodeGrid[i].set_level(x + rngDist(rng));
+      triodeGrid[i].set_level(x);
   }
   inline void set_grid_clip(FAUSTFLOAT x) {
     auto rng = std::minstd_rand(rngSeed + 4);
@@ -110,9 +109,8 @@ public:
       triodePlate[i].set_bias(x + rngDist(rng));
   }
   inline void set_plate_scale(FAUSTFLOAT x) {
-    auto rng = std::minstd_rand(rngSeed + 6);
     for (size_t i = 0; i < MAX_STAGES; i++)
-      triodePlate[i].set_scale(x + rngDist(rng));
+      triodePlate[i].set_scale(x);
   }
   inline void set_plate_clip(FAUSTFLOAT x) {
     auto rng = std::minstd_rand(rngSeed + 7);
@@ -177,10 +175,8 @@ private:
     set_hp_freq(0.0f);
     set_grid_tau(0.0f);
     set_grid_ratio(0.0f);
-    set_grid_level(0.0f);
     set_grid_clip(0.0f);
     set_plate_bias(0.0f);
-    set_plate_scale(0.0f);
     set_plate_clip(0.0f);
     set_plate_drift_level(0.0f);
     set_plate_drift_tau(0.0f);
@@ -233,8 +229,8 @@ public:
     tetrodePlate.set_sag_onset(x);
   }
 
-  inline void set_drive(FAUSTFLOAT x) { drive = ULSCALE(x, 1e-1f, 2e2f); }
-  inline float get_drive() const { return IULSCALE(drive, 1e-1f, 2e2f); }
+  inline void set_drive(FAUSTFLOAT x) { drive = ULSCALE(x, 5e-1f, 5e2f); }
+  inline float get_drive() const { return IULSCALE(drive, 5e-1f, 5e2f); }
 
 private:
   TetrodeGrid tetrodeGrid;
@@ -271,24 +267,29 @@ public:
 
     preAmp.process(count, buffer);
 
-    const float tonestackFactor = 5.302220e-01f;
+    const float preAmpScale =
+        interp1d(preAmp.get_drive(), -1.0f, 1.0f, preAmpSweepScales,
+                 (size_t)NUM_SWEEP_BINS);
+    const float preAmpTarget = 3.228806e+01f;
+
+    const float toneStackScale = 1.0f / 5.302220e-01f;
     toneStackF.process(count, buffer);
-    scaleBuffer(count, buffer, 1.0f / tonestackFactor);
+    scaleBuffer(count, buffer, toneStackScale * preAmpScale * preAmpTarget);
 
     powerAmp.process(count, buffer);
 
-    if (cabinetOn) {
-      const float cabinetFactor = 2.723280e+00f;
-      cabinet.process(count, buffer);
-      scaleBuffer(count, buffer, 1.0f / cabinetFactor);
-    }
+    scaleBuffer(count, buffer, 1.0 / preAmpTarget);
 
-    const float scale = interp1d(preAmp.get_drive(), -1.0f, 1.0f,
-                                 preAmpDriveScale, (size_t)NUM_SWEEP_BINS) *
-                        interp1d(powerAmp.get_drive(), -1.0f, 1.0f,
-                                 powerAmpDriveScale, (size_t)NUM_SWEEP_BINS) *
-                        DB2LINEAR(outputLevel + 10.0f);
-    scaleBuffer(count, buffer, scale);
+    const float cabinetScale = cabinetOn ? 1.0f / 2.821151e+00f : 1.0f;
+    if (cabinetOn)
+      cabinet.process(count, buffer);
+
+    const float powerAmpScale =
+        interp1d(powerAmp.get_drive(), -1.0f, 1.0f, powerAmpSweepScales,
+                 (size_t)NUM_SWEEP_BINS);
+
+    const float outputScale = DB2LINEAR(outputLevel + 10.0f);
+    scaleBuffer(count, buffer, powerAmpScale * cabinetScale * outputScale);
   }
 
   inline void set_triode_num_stages(int x) { preAmp.set_num_stages(x); }
@@ -370,15 +371,15 @@ private:
   FAUSTFLOAT outputLevel = 0.0f;
   bool cabinetOn = true;
 
-  const float preAmpDriveScale[NUM_SWEEP_BINS + 1] = {
-      1.351344e-02f, 6.804656e-03f, 3.342829e-03f, 1.622306e-03f,
-      1.093645e-03f, 1.041891e-03f, 1.082537e-03f, 1.113424e-03f,
-      1.076906e-03f, 1.084495e-03f, 1.141992e-03f};
+  const float preAmpSweepScales[NUM_SWEEP_BINS + 1] = {
+      7.938456e-02f, 3.716044e-02f, 1.738048e-02f, 8.038096e-03f,
+      3.618600e-03f, 1.656101e-03f, 8.170880e-04f, 4.936184e-04f,
+      4.046638e-04f, 3.780642e-04f, 3.308160e-04f};
 
-  const float powerAmpDriveScale[NUM_SWEEP_BINS + 1] = {
-      1.298777e+01f, 6.555208e+00f, 3.190968e+00f, 1.555421e+00f,
-      1.061636e+00f, 9.999997e-01f, 1.036814e+00f, 1.101064e+00f,
-      1.254362e+00f, 1.658022e+00f, 2.511448e+00f};
+  const float powerAmpSweepScales[NUM_SWEEP_BINS + 1] = {
+      1.548967e+00f, 7.920586e-01f, 4.118483e-01f, 2.188900e-01f,
+      1.103955e-01f, 5.340211e-02f, 3.514512e-02f, 3.135567e-02f,
+      3.189225e-02f, 3.328768e-02f, 3.539806e-02f};
 
   void resetParameters() {
     set_input_level(0.0f);

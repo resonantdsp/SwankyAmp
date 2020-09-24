@@ -70,11 +70,11 @@ public:
     *par_cross_corner = ulscale(x, 1e-1f, 1e+2f);
   }
   inline void set_drift2_depth(FAUSTFLOAT x) {
-    x += -4.166159e-03f;
+    x += -3.900267e-03f;
     *par_drift2_depth = ulscale(x, 1e-1f, 1e+1f);
   }
   inline void set_drift2_level(FAUSTFLOAT x) {
-    x += 5.644939e-01f;
+    x += 5.645252e-01f;
     *par_drift2_level = uscale(x, -50.0f, +50.0f);
   }
   inline void set_drift_depth(FAUSTFLOAT x) {
