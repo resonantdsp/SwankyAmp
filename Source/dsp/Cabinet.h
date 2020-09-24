@@ -87,7 +87,7 @@ public:
   }
   inline void set_dynamic_level(FAUSTFLOAT x) {
     x += 0.000000e+00f;
-    *par_dynamic_level = uscale(x, 0.2f, 0.5f);
+    *par_dynamic_level = ulscale(x, 0.5f, 2.0f);
   }
   inline void set_hp_f(FAUSTFLOAT x) {
     x += 1.110027e+02f;

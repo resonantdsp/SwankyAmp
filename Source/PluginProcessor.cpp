@@ -66,7 +66,7 @@ SwankyAmpAudioProcessor::SwankyAmpAudioProcessor()
                      std::make_unique<AudioParameterBool>("idCabOnOff",
                                                           "CabOnOff", true),
                      MAKE_PARAMETER_UNIT(CabBrightness),
-                     MAKE_PARAMETER(CabDistance, 0.0f, 1.0f, 0.0f),
+                     MAKE_PARAMETER(CabDistance, 0.0f, 1.0f, 0.5f),
                      MAKE_PARAMETER_UNIT(CabDynamic),
 
                      MAKE_PARAMETER(PreAmpDrive, -1.0f, 1.0f, -0.5f),
@@ -77,9 +77,8 @@ SwankyAmpAudioProcessor::SwankyAmpAudioProcessor()
                      MAKE_PARAMETER_UNIT(PowerAmpTight),
                      MAKE_PARAMETER_UNIT(PowerAmpGrit),
 
-                     MAKE_PARAMETER_UNIT(PowerAmpSag),
+                     MAKE_PARAMETER(PowerAmpSag, -1.0f, 1.0f, -0.6f),
                      MAKE_PARAMETER_UNIT(PowerAmpSagRatio),
-                     MAKE_PARAMETER_UNIT(PowerAmpSagSlope),
                  }) {
   ASSIGN_PARAMETER(InputLevel)
   ASSIGN_PARAMETER(OutputLevel)
@@ -109,7 +108,6 @@ SwankyAmpAudioProcessor::SwankyAmpAudioProcessor()
 
   ASSIGN_PARAMETER(PowerAmpSag)
   ASSIGN_PARAMETER(PowerAmpSagRatio)
-  ASSIGN_PARAMETER(PowerAmpSagSlope)
 }
 
 #undef MAKE_PARAMETER_UNIT
@@ -178,7 +176,11 @@ float remap_xy(float x, float x1, float x2, float y1, float y2) {
 void SwankyAmpAudioProcessor::setAmpParameters() {
   for (int i = 0; i < 2; i++) {
     amp_channel[i].set_input_level(*parInputLevel);
-    amp_channel[i].set_output_level(*parOutputLevel);
+    amp_channel[i].set_output_level(
+        *parOutputLevel +
+        // as the power drive goes too low, there is a significant db increase
+        // not caught by the calibration
+        remap_xy(*parPowerAmpDrive, -1.0f, 0.0f, -5.0f / 35.0f, 0.0f));
     amp_channel[i].set_triode_drive(*parPreAmpDrive);
     amp_channel[i].set_tetrode_drive(*parPowerAmpDrive);
 
@@ -235,9 +237,17 @@ void SwankyAmpAudioProcessor::setAmpParameters() {
     amp_channel[i].set_tetrode_plate_sag_tau(
         remap_sided(*parPowerAmpTight * -1.0f, -1.0f, +1.0f));
 
-    amp_channel[i].set_tetrode_plate_sag_depth(*parPowerAmpSag);
+    amp_channel[i].set_tetrode_plate_sag_depth(
+        *parPowerAmpSag +
+        // shift the depth higher at low drive to get some audible effect when
+        // not much of signal is over clip, and lower at high drive to avoid
+        // just hacking away the signal with a constant db offset
+        remap_xy(*parPowerAmpDrive, -1.0f, 1.0f, 3.0f, -1.0f));
     amp_channel[i].set_tetrode_plate_sag_ratio(*parPowerAmpSagRatio);
-    amp_channel[i].set_tetrode_plate_sag_onset(*parPowerAmpSagSlope);
+    amp_channel[i].set_tetrode_plate_sag_factor(
+        amp_channel[i].get_tetrode_drive());
+    amp_channel[i].set_tetrode_plate_sag_toggle(
+        *parPowerAmpSag < -0.99f ? -1.0f : 1.0f);
   }
 }
 

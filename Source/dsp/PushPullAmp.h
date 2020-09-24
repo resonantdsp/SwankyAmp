@@ -225,8 +225,8 @@ public:
   inline void set_plate_sag_ratio(FAUSTFLOAT x) {
     tetrodePlate.set_sag_ratio(x);
   }
-  inline void set_plate_sag_onset(FAUSTFLOAT x) {
-    tetrodePlate.set_sag_onset(x);
+  inline void set_plate_sag_factor(FAUSTFLOAT x) {
+    tetrodePlate.set_sag_factor(x);
   }
 
   inline void set_drive(FAUSTFLOAT x) { drive = ULSCALE(x, 5e-1f, 5e2f); }
@@ -278,7 +278,7 @@ public:
 
     powerAmp.process(count, buffer);
 
-    scaleBuffer(count, buffer, 1.0 / preAmpTarget);
+    scaleBuffer(count, buffer, 1.0f / preAmpTarget);
 
     const float cabinetScale = cabinetOn ? 1.0f / 2.821151e+00f : 1.0f;
     if (cabinetOn)
@@ -332,8 +332,8 @@ public:
   inline void set_tetrode_plate_sag_ratio(FAUSTFLOAT x) {
     powerAmp.set_plate_sag_ratio(x);
   }
-  inline void set_tetrode_plate_sag_onset(FAUSTFLOAT x) {
-    powerAmp.set_plate_sag_onset(x);
+  inline void set_tetrode_plate_sag_factor(FAUSTFLOAT x) {
+    powerAmp.set_plate_sag_factor(x);
   }
   inline void set_tetrode_drive(FAUSTFLOAT x) { powerAmp.set_drive(x); }
 
@@ -361,6 +361,9 @@ public:
   }
   inline void set_cabinet_on(bool x) { cabinetOn = x; }
 
+  float get_tetrode_drive() const { return powerAmp.get_drive(); }
+  float get_triode_drive() const { return preAmp.get_drive(); }
+
 private:
   PreAmp preAmp;
   ToneStackF toneStackF;
@@ -372,14 +375,14 @@ private:
   bool cabinetOn = true;
 
   const float preAmpSweepScales[NUM_SWEEP_BINS + 1] = {
-      7.938456e-02f, 3.716044e-02f, 1.738048e-02f, 8.038096e-03f,
-      3.618600e-03f, 1.656101e-03f, 8.170880e-04f, 4.936184e-04f,
-      4.046638e-04f, 3.780642e-04f, 3.308160e-04f};
+      7.937135e-02f, 3.715422e-02f, 1.737751e-02f, 8.036362e-03f,
+      3.618314e-03f, 1.656642e-03f, 8.172943e-04f, 4.936273e-04f,
+      4.046660e-04f, 3.780690e-04f, 3.308898e-04f};
 
   const float powerAmpSweepScales[NUM_SWEEP_BINS + 1] = {
-      1.548967e+00f, 7.920586e-01f, 4.118483e-01f, 2.188900e-01f,
-      1.103955e-01f, 5.340211e-02f, 3.514512e-02f, 3.135567e-02f,
-      3.189225e-02f, 3.328768e-02f, 3.539806e-02f};
+      1.568337e+00f, 8.047397e-01f, 4.215028e-01f, 2.276836e-01f,
+      1.204987e-01f, 6.356055e-02f, 4.464232e-02f, 4.385213e-02f,
+      5.264425e-02f, 6.849243e-02f, 9.256473e-02f};
 
   void resetParameters() {
     set_input_level(0.0f);
