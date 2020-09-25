@@ -13,7 +13,7 @@
     <PARAM id="idOutputLevel" value="-0.08799993991851807"/>
     <PARAM id="idPowerAmpDrive" value="-0.6000000238418579"/>
     <PARAM id="idPowerAmpGrit" value="0.0"/>
-    <PARAM id="idPowerAmpSag" value="0.0"/>
+    <PARAM id="idPowerAmpSag" value="-0.6000000238418579"/>
     <PARAM id="idPowerAmpSagRatio" value="0.0"/>
     <PARAM id="idPowerAmpTight" value="0.0"/>
     <PARAM id="idPreAmpDrive" value="-0.6000000238418579"/>
@@ -55,22 +55,22 @@
     <PARAM id="idCabDynamic" value="-0.2099999785423279"/>
     <PARAM id="idCabOnOff" value="1.0"/>
     <PARAM id="idGainOverhead" value="0.0"/>
-    <PARAM id="idGainStages" value="2.0"/>
+    <PARAM id="idGainStages" value="3.0"/>
     <PARAM id="idInputLevel" value="0.3820000886917114"/>
     <PARAM id="idLowCut" value="0.4000000953674316"/>
-    <PARAM id="idOutputLevel" value="0.08600008487701416"/>
+    <PARAM id="idOutputLevel" value="0.05400002002716064"/>
     <PARAM id="idPowerAmpDrive" value="0.190000057220459"/>
     <PARAM id="idPowerAmpGrit" value="0.0"/>
-    <PARAM id="idPowerAmpSag" value="-0.199999988079071"/>
+    <PARAM id="idPowerAmpSag" value="0.3960000276565552"/>
     <PARAM id="idPowerAmpSagRatio" value="0.0"/>
     <PARAM id="idPowerAmpTight" value="0.2000000476837158"/>
-    <PARAM id="idPreAmpDrive" value="-0.009999930858612061"/>
+    <PARAM id="idPreAmpDrive" value="0.1960000991821289"/>
     <PARAM id="idPreAmpGrit" value="0.0"/>
-    <PARAM id="idPreAmpTight" value="-0.3999999761581421"/>
-    <PARAM id="idTsHigh" value="0.190000057220459"/>
-    <PARAM id="idTsLow" value="-0.199999988079071"/>
-    <PARAM id="idTsMid" value="0.5900000333786011"/>
-    <PARAM id="idTsPresence" value="0.0"/>
+    <PARAM id="idPreAmpTight" value="0.1960000991821289"/>
+    <PARAM id="idTsHigh" value="0.4160000085830688"/>
+    <PARAM id="idTsLow" value="0.0"/>
+    <PARAM id="idTsMid" value="0.2960000038146973"/>
+    <PARAM id="idTsPresence" value="0.3940000534057617"/>
   </APVTSSwankyAmp>
 
   <APVTSSwankyAmp presetName="dirty distort">
@@ -82,7 +82,7 @@
     <PARAM id="idGainStages" value="4.0"/>
     <PARAM id="idInputLevel" value="0.3820000886917114"/>
     <PARAM id="idLowCut" value="0.0"/>
-    <PARAM id="idOutputLevel" value="0.0"/>
+    <PARAM id="idOutputLevel" value="-0.05999994277954102"/>
     <PARAM id="idPowerAmpDrive" value="0.4000000953674316"/>
     <PARAM id="idPowerAmpGrit" value="0.0"/>
     <PARAM id="idPowerAmpSag" value="-0.01599997282028198"/>
@@ -102,19 +102,19 @@
     <PARAM id="idCabDistance" value="0.5"/>
     <PARAM id="idCabDynamic" value="0.0"/>
     <PARAM id="idCabOnOff" value="1.0"/>
-    <PARAM id="idGainOverhead" value="0.190000057220459"/>
+    <PARAM id="idGainOverhead" value="0.0"/>
     <PARAM id="idGainStages" value="5.0"/>
     <PARAM id="idInputLevel" value="0.3820000886917114"/>
-    <PARAM id="idLowCut" value="-0.005999982357025146"/>
-    <PARAM id="idOutputLevel" value="-0.05599993467330933"/>
-    <PARAM id="idPowerAmpDrive" value="-0.3999999761581421"/>
+    <PARAM id="idLowCut" value="0.2000000476837158"/>
+    <PARAM id="idOutputLevel" value="-0.0899999737739563"/>
+    <PARAM id="idPowerAmpDrive" value="-0.0899999737739563"/>
     <PARAM id="idPowerAmpGrit" value="0.0"/>
-    <PARAM id="idPowerAmpSag" value="0.0"/>
+    <PARAM id="idPowerAmpSag" value="0.3960000276565552"/>
     <PARAM id="idPowerAmpSagRatio" value="0.0"/>
     <PARAM id="idPowerAmpTight" value="0.0"/>
-    <PARAM id="idPreAmpDrive" value="0.4900001287460327"/>
-    <PARAM id="idPreAmpGrit" value="-0.5979999899864197"/>
-    <PARAM id="idPreAmpTight" value="0.3980001211166382"/>
+    <PARAM id="idPreAmpDrive" value="0.5000001192092896"/>
+    <PARAM id="idPreAmpGrit" value="-0.203999936580658"/>
+    <PARAM id="idPreAmpTight" value="0.2060000896453857"/>
     <PARAM id="idTsHigh" value="0.3900001049041748"/>
     <PARAM id="idTsLow" value="-0.199999988079071"/>
     <PARAM id="idTsMid" value="0.6000000238418579"/>
@@ -122,18 +122,18 @@
   </APVTSSwankyAmp>
 
   <APVTSSwankyAmp presetName="power drive">
-    <PARAM id="idCabBrightness" value="0.2060000896453857"/>
+    <PARAM id="idCabBrightness" value="-0.1979999542236328"/>
     <PARAM id="idCabDistance" value="0.4030000269412994"/>
-    <PARAM id="idCabDynamic" value="-0.2099999785423279"/>
+    <PARAM id="idCabDynamic" value="0.0"/>
     <PARAM id="idCabOnOff" value="1.0"/>
     <PARAM id="idGainOverhead" value="0.0"/>
-    <PARAM id="idGainStages" value="2.0"/>
+    <PARAM id="idGainStages" value="3.0"/>
     <PARAM id="idInputLevel" value="0.3820000886917114"/>
     <PARAM id="idLowCut" value="0.4000000953674316"/>
-    <PARAM id="idOutputLevel" value="0.08600008487701416"/>
+    <PARAM id="idOutputLevel" value="0.0"/>
     <PARAM id="idPowerAmpDrive" value="0.6020001173019409"/>
     <PARAM id="idPowerAmpGrit" value="0.0"/>
-    <PARAM id="idPowerAmpSag" value="-0.5959999561309814"/>
+    <PARAM id="idPowerAmpSag" value="-0.6000000238418579"/>
     <PARAM id="idPowerAmpSagRatio" value="0.0"/>
     <PARAM id="idPowerAmpTight" value="-0.203999936580658"/>
     <PARAM id="idPreAmpDrive" value="-0.5"/>
@@ -142,7 +142,7 @@
     <PARAM id="idTsHigh" value="0.5040000677108765"/>
     <PARAM id="idTsLow" value="-0.2139999866485596"/>
     <PARAM id="idTsMid" value="0.3900001049041748"/>
-    <PARAM id="idTsPresence" value="0.0"/>
+    <PARAM id="idTsPresence" value="0.2000000476837158"/>
   </APVTSSwankyAmp>
 
   <APVTSSwankyAmp presetName="full drive">
@@ -202,7 +202,7 @@
     <PARAM id="idGainStages" value="5.0"/>
     <PARAM id="idInputLevel" value="0.3820000886917114"/>
     <PARAM id="idLowCut" value="-0.01399993896484375"/>
-    <PARAM id="idOutputLevel" value="-0.0899999737739563"/>
+    <PARAM id="idOutputLevel" value="-0.1739999651908875"/>
     <PARAM id="idPowerAmpDrive" value="1.0"/>
     <PARAM id="idPowerAmpGrit" value="0.0"/>
     <PARAM id="idPowerAmpSag" value="0.0"/>
