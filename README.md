@@ -2,7 +2,7 @@
 
 Swanky Amp is a tube amplifier simulation DSP plugin which aims to capture the details in the dynamics of tube amplifiers.
 
-The software is currently in beta and is distributed only as a VST3 for 64-bit Windows systems. You can find the installers on the website:
+The software is currently in beta and is distributed as a VST3 for 64-bit Windows systems, as well as VST3 and AU for Mac OSX systems. You can find the installers on the website:
 
 <http://www.resonantdsp.com/swankyamp/>
 
@@ -10,43 +10,13 @@ The software is currently in beta and is distributed only as a VST3 for 64-bit W
 
 Load the plugin into your favorite VST host or DAW (into a mono or stereo track), and have fun!
 
-* Set the levels (gain staging):
-    * Set the `input` control such that a strummed open chord just reaches the `S` tick mark for a single coil pickeup, or `H` for a hummbucker.
-    * Set the `output` control to get the desired volume. Generally the -15 dB range is typical.
-    * Note: these are suggested values. You can safely increase the input level to mimick the use of a clean boost pedal, or if you know your pickups are hotter than typical.
+Hover over a parameter to get a tooltip giving you information on how to use it.
 
-* Set the pre amp section
-  * Set the `drive` control (a.k.a. gain) to get the desired pre amp distortion.
-  * Increase the `tight` control to get to tighten the tube dynamics. This is especially helpful at high drive. Lower values with less drive lead to more touch sensitivity, higher values lead to a more modern sound.
-  * Tune the `grit` control to get different distortion tones. This effectively changes the overhead available in the pre amp tubes.
-  * Increase `low cut` control to remove low end build up. A lower value can lead to a fuller sound, but it can be less stable.
-  * Note: the plugin will attempt to maintain an even perceived loudness when modyfing the drive. This way you can use the drive to set the desired distortion, and then use the output level to adjust... well the output level.
-
-* Set the staging:
-  * Set the `stages` control to determine the number of pre amp tubes the signal is routed to. Increase this for high gain distortion.
-  * Tune the `overhead` control to determine how the additional stages distort the signal. Increaes this for high gain distortion.
-
-* Set the tone stack:
-  * The `low` control affects the amount of bass in your sound. Increase it for a fatter sound. Too much and the sound can become more washed out, muddy, and lose precision.
-  * The `mid` control affects the amount of mids in your sound. Increase it to thicken out the guitar, add aggression, and also to increase the sustain. Too much and the guitar sounds like its being played through a telephone speaker.
-  * The `high` control affects the amout of high frequencies in your sound. Increase it get a brighter tone with more chime. Too much and the guitar can sound thin. Reduce to help remove hiss and fatiguing distoriton noise.
-  * The `presence` control affects the frequencie around 4 kHz. This helps add clarity and definiton to the sound without making it too brittle. Too much and the sound will become harsher.
-
-* Set the power amp section:
-  * See the notes on the pre amp section
-  * The `drive` control here has the same effect on distortion as the volume knob of an amp, but the plugin maintains an even loudness.
-  * Set the `sag` control affects the compression of the signal due to insufficient power supply. This isn't a transparent compression: the compresion isn't directly related to the loudness of the signal, and it is accompanied by audible distortion.
-  * Note that the `tight` control affects the attack time of the sag, so the two should be used in conjunction to achieve the desried effect.
-
-* Set the cabinet:
-  * Leave the cabinet on unless you are using a dedicated cabinet emulator downstream of this plugin.
-  * The `bright` control affects the microphone position in a way which relates to the overall brightness of the sound.
-  * The `distance` control affects the distance of the microphone to the cabinet. Increase it to scoop out some lows as well as some high mids.
-  * The `dynamic` control affects how much the cabinet's frequencies respond to the loudness of the signal. Increasing will lead to a darker distortion but maintains clarity prior to breakup.
+In general, you will want to first gain stage, then set the drive according to your needs, and then fine tune.
 
 ## The model
 
-The model was developed by running finit-difference simulation methods (spice), storing the outputs, developing empirical models using a mix of python and C++, and then fitting the model paramters to the simulation results. That code is very experimental and outside the scope of this repository.
+The model was developed by running finite-difference simulation methods (spice), storing the outputs, developing empirical models using a mix of python and C++, and then fitting the model paramters to the simulation results. That code is very experimental and outside the scope of this repository.
 
 ## Building
 
@@ -57,7 +27,6 @@ This repository includes code to:
 * Build the VST3 or AAX using Visual Studio 2019
 * Build the AU using Xcode
 * Create the windows installer using [Inno Setup](https://jrsoftware.org/isinfo.php)
-* Compile the FAUST code into a standalone C++ class
 
 ### For Windows
 
@@ -74,26 +43,36 @@ The project is configured assuming the VST3 SDK is found at: `C:\SDKs\VST_SDK\VS
 * Build the VST3 target.
 * Move the VST3 to your VST3 system directory (usually `C:\Program Files\Common Files\VST3`)
 
-### For Mac
-
-This hasn't yet been attempted, but in theory it is possible.
-
-### Installer
+To build the installer:
 
 * Move into the `package` directory
 * Open the Inno Setup script `setup.iss`
 * Compile the installer, it should be created at `package\SwankyAmp-win64.exe`
 
-### FAUST code
+### For Mac
 
-This isn't entirely stable and might require some code tweaking to get it working on your platform. Unfortunately the method chosen to get the FAUST code into a standalone format is very much a hack job which will need to be revisited at some later time.
+To build the installer:
 
-This process generates `Source/AmpMono.h` artifact. However this file is tracked in the repository, so there is no need to re-generate it unless you are modifying the FAUT DSP files.
-
-* Move into the `dsp` directory
-* Run `python buildamp.py`
-
-However this might not work for versions of FAUST other than `2.14.4` in which case you will need to dig around `dsp/builddsp.py` and fix any issues arising from that script.
+* Open the project in Xcode
+* Choose the desired solution (VST3 or AU) in the top menu
+* Re-open the menu and choose "Edit Scheme"
+* Change the build target to "Release"
+* From the project room in a terminal:
+  `cp Builds/MacOSX/build/Release/SwankyAmp.vst3 package/dmg-vst3/` or
+  `cp Builds/MacOSX/build/Release/SwankyAmp.component package/dmg-au/`
+* Copy the dmg installer background
+  `cp Resources/dmg-bg.png package/dmg-vst3/.bg.png`
+* Open "Disk Utility"
+* Choose "File -> New Image"
+* From folder
+* Select the folder `pacakge/dmg-vst3`
+* Set "Image Format" to "read/write"
+* Create then open the DMG
+* Right click in the window, choose "Show View Options"
+* Choose a background image (to show hidden files "cmd + shift + .")
+* Re-size the window and place the icons appropriately
+* In "Disk Utility", choose "Images -> Convert"
+* Set "Image Format" to "read-only"
 
 ### Testing
 
@@ -106,6 +85,14 @@ Only available with VisualStudio at the moment.
 * Run `Builds\VisualStudio\x64\Debug\SwankyAmp.exe`
 
 ## Change log
+
+Version 0.10.1:
+
+* preset name will restore correctly after re-loading the plugin host
+* pre amp drive no longer affects the power amp drive
+* the power amp drive is easier to tune, and has an improved range
+* the sag range has been improved
+* the overall level normalization has been improved
 
 Version 0.10.0:
 
