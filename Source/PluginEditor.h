@@ -39,6 +39,8 @@ public:
   void paint(Graphics &) override;
   void resized() override;
 
+  String getPresetName() const { return presetGroup.presetSelector.getText(); }
+
 private:
   // TODO: consdier setting and calling resized, bur for now these are const
   const int padding = 64;

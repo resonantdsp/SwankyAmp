@@ -305,7 +305,7 @@ public:
     ui_interface->addNumEntry("hp_freq", &fEntry1, 0.0f, 0.0f, 1.0f, 1.0f);
     ui_interface->addNumEntry("lp_freq", &fEntry0, 0.0f, 0.0f, 1.0f, 1.0f);
     ui_interface->addNumEntry("sag_depth", &fEntry3, 0.0f, 0.0f, 1.0f, 1.0f);
-    ui_interface->addNumEntry("sag_onset", &fEntry14, 0.0f, 0.0f, 1.0f, 1.0f);
+    ui_interface->addNumEntry("sag_factor", &fEntry14, 0.0f, 0.0f, 1.0f, 1.0f);
     ui_interface->addNumEntry("sag_ratio", &fEntry15, 0.0f, 0.0f, 1.0f, 1.0f);
     ui_interface->addNumEntry("sag_tau", &fEntry13, 0.0f, 0.0f, 1.0f, 1.0f);
     ui_interface->addNumEntry("sag_toggle", &fEntry2, 0.0f, 0.0f, 1.0f, 1.0f);
@@ -353,7 +353,7 @@ public:
     float fSlow26 = (0.294117659f / fSlow25);
     float fSlow27 = float(fEntry13);
     float fSlow28 = (1.0f / ((fConst0 * fSlow27) + 1.0f));
-    float fSlow29 = float(fEntry14);
+    float fSlow29 = (1.0f / (std::max<float>(0.0f, float(fEntry14)) + 1.0f));
     float fSlow30 = (fSlow16 / fSlow9);
     float fSlow31 =
         (1.0f - (1.0f / ((fConst0 * (fSlow27 * float(fEntry15))) + 1.0f)));
@@ -422,12 +422,12 @@ public:
           -1.0f,
           std::min<float>(1.0f, (fSlow26 * std::min<float>(0.0f, fTemp7))));
       float fTemp17 = (fTemp16 * (std::fabs(fTemp16) + -2.0f));
-      float fTemp18 = std::fabs((fSlow30 * fTemp0));
       float fTempFTZ4 =
           ((fSlow28 *
-            std::max<float>(0.0f, (((fSlow29 * std::min<float>(1.0f, fTemp18)) +
-                                    std::max<float>(1.0f, fTemp18)) +
-                                   (-1.0f - fRec5[1])))) +
+            std::max<float>(
+                0.0f, ((fSlow29 *
+                        std::max<float>(std::fabs((fSlow30 * fTemp0)), 1.0f)) -
+                       fRec5[1]))) +
            (fSlow31 * fRec5[1]));
       fRec5[0] =
           ((*reinterpret_cast<int *>(&fTempFTZ4) & 2139095040) ? fTempFTZ4
@@ -444,15 +444,15 @@ public:
       fRec0[0] =
           ((*reinterpret_cast<int *>(&fTempFTZ5) & 2139095040) ? fTempFTZ5
                                                                : 0.0f);
-      float fTemp19 = ((fSlow6 * fRec0[0]) + (fSlow35 * fRec0[2]));
+      float fTemp18 = ((fSlow6 * fRec0[0]) + (fSlow35 * fRec0[2]));
       float fTempFTZ6 =
           ((fSlow20 * fRec6[1]) +
            (fSlow21 *
-            (std::max<float>(fSlow37, std::fabs(fTemp19)) - fSlow37)));
+            (std::max<float>(fSlow37, std::fabs(fTemp18)) - fSlow37)));
       fRec6[0] =
           ((*reinterpret_cast<int *>(&fTempFTZ6) & 2139095040) ? fTempFTZ6
                                                                : 0.0f);
-      output0[i] = FAUSTFLOAT((fTemp19 + (fSlow36 * fRec6[0])));
+      output0[i] = FAUSTFLOAT((fTemp18 + (fSlow36 * fRec6[0])));
       fRec2[1] = fRec2[0];
       fRec1[1] = fRec1[0];
       fRec4[1] = fRec4[0];

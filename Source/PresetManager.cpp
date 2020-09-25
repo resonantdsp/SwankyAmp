@@ -90,6 +90,16 @@ PresetManager::PresetManager(SwankyAmpAudioProcessor &processor,
   buttonNext.onClick = [&]() { buttonNextClicked(); };
   buttonPrev.onClick = [&]() { buttonPrevClicked(); };
   buttonOpen.onClick = [&]() { buttonOpenClicked(); };
+
+  const String storedName = processor.storedPresetName;
+  if (storedName.isNotEmpty()) {
+    auto state = processor.parameters.copyState();
+    std::unique_ptr<XmlElement> xml(state.createXml());
+    comboBox.setText(storedName, NotificationType::sendNotificationSync);
+    processor.setStateInformation(xml);
+    if (storedName != "init")
+      buttonSave.setEnabled(true);
+  }
 }
 
 PresetManager::~PresetManager() {
@@ -273,7 +283,8 @@ void PresetManager::clearUI() {
 }
 
 void PresetManager::updateComboBox() {
-  comboBox.clear();
+  // don't re-trigger comboBoxChanged
+  comboBox.clear(NotificationType::dontSendNotification);
   const int width = (int)(log10f((float)stateEntries.size())) + 1;
 
   for (size_t idx = 0; idx < stateEntries.size(); idx++) {
@@ -288,7 +299,8 @@ void PresetManager::updateComboBox() {
     comboBox.addItem(text, id);
 
     if (entry.name == currentName)
-      comboBox.setText(text);
+      // don't re-trigger comboBoxChanged
+      comboBox.setText(text, NotificationType::dontSendNotification);
   }
 }
 
@@ -357,6 +369,7 @@ void PresetManager::comboBoxChanged() {
 
     // although the change has already been saved, this lets the user know
     // something has changed and they can compulsively re-save
+
     buttonSave.setEnabled(true);
 
     updatePresetDir();
@@ -391,6 +404,7 @@ void PresetManager::comboBoxChanged() {
 void PresetManager::buttonSaveClicked() {
   if (!currentName.has_value())
     return;
+
   StateEntry &currentEntry = stateEntries[stateEntryIdx[*currentName]];
   if (currentEntry.name == "")
     return;
@@ -401,8 +415,8 @@ void PresetManager::buttonSaveClicked() {
 
   if (currentEntry.file.getFullPathName() != "" &&
       !AlertWindow::showOkCancelBox(AlertWindow::AlertIconType::QuestionIcon,
-                                    "Overwrite",
-                                    "Overwrite preset: " + *currentName + "?"))
+                                    "Confirm save",
+                                    "Save preset: " + *currentName + "?"))
     return;
 
   state->setAttribute("pluginVersion", JucePlugin_VersionString);

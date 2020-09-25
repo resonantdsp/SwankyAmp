@@ -64,8 +64,9 @@ public:
   void drawComboBox(Graphics &g, int width, int height, bool, int, int, int,
                     int, ComboBox &box) override;
 
-  virtual Rectangle<int> getTooltipBounds(const String &, Point<int>,
-                                          Rectangle<int> parentArea) override;
+  virtual juce::Rectangle<int>
+  getTooltipBounds(const String &, Point<int>,
+                   juce::Rectangle<int> parentArea) override;
   virtual void drawTooltip(Graphics &g, const String &text, int width,
                            int height) override;
 };
