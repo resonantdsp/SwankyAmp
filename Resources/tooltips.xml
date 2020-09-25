@@ -14,7 +14,7 @@
 		Affects the microphone distance which will remove some lows and upper mids. This can have the effect of creating a clearer sound.
 	</param>
 	<param id="idCabDynamic">
-		Affects how much the cabinet frequencies respond to the loudness of the signal. Increase for darker distortion.
+		Affects how much the cabinet frequencies respond to the loudness of the signal. Increase to darken the distortion while leaving quiet parts unaffected.
 	</param>
 	<param id="idCabOnOff">
 		Disables the cabinet emulation. Turn off if you want to run a separate cabinet emulation after the plugin.
@@ -44,13 +44,13 @@
 		Affects the time scale and depth of the power amp dynamics. Has large effect on the sag compression attack and release.
 	</param>
 	<param id="idPowerAmpSag">
-		Affects how much the amplified level drop in response to a large signal. Increase for a more compressed sound. Most pronounced at high power amp drive levels.
+		Affects how much the amplified level drop in response to a large signal. Increase for a more compressed sound. Not as effectie with low power amp drive or large pre amp drive.
 	</param>
 	<param id="idTsHigh">
 		The amount of high end going into the power amp. Increase for a brighter tone. Decrase to reduce harsh distortion noise.
 	</param>
 	<param id="idTsMid">
-		The amount of mids going into the power amp. Increase for a more aggressive, punchier tone. Decrease for a cleaner tone
+		The amount of mids going into the power amp. Increase for a more aggressive, punchier tone. Can increase sustain when the power amp drive is high.
 	</param>
 	<param id="idTsLow">
 		The amount of bass going into the power amp. Increase for a fuller sound. Decrease for more definition and more brightness.
