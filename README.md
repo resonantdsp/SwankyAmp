@@ -86,6 +86,10 @@ Only available with VisualStudio at the moment.
 
 ## Change log
 
+Version 0.10.2:
+
+* rework sag onset
+
 Version 0.10.1:
 
 * preset name will restore correctly after re-loading the plugin host

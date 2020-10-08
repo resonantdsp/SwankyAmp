@@ -228,6 +228,9 @@ public:
   inline void set_plate_sag_factor(FAUSTFLOAT x) {
     tetrodePlate.set_sag_factor(x);
   }
+  inline void set_plate_sag_onset(FAUSTFLOAT x) {
+    tetrodePlate.set_sag_onset(x);
+  }
 
   inline void set_drive(FAUSTFLOAT x) { drive = ULSCALE(x, 5e-1f, 5e2f); }
   inline float get_drive() const { return IULSCALE(drive, 5e-1f, 5e2f); }
@@ -335,6 +338,9 @@ public:
   inline void set_tetrode_plate_sag_factor(FAUSTFLOAT x) {
     powerAmp.set_plate_sag_factor(x);
   }
+  inline void set_tetrode_plate_sag_onset(FAUSTFLOAT x) {
+    powerAmp.set_plate_sag_onset(x);
+  }
   inline void set_tetrode_drive(FAUSTFLOAT x) { powerAmp.set_drive(x); }
 
   inline void set_tonestack_bass(FAUSTFLOAT x) { toneStackF.set_bass(x); }
@@ -375,14 +381,14 @@ private:
   bool cabinetOn = true;
 
   const float preAmpSweepScales[NUM_SWEEP_BINS + 1] = {
-      7.937135e-02f, 3.715422e-02f, 1.737751e-02f, 8.036362e-03f,
-      3.618314e-03f, 1.656642e-03f, 8.172943e-04f, 4.936273e-04f,
-      4.046660e-04f, 3.780690e-04f, 3.308898e-04f};
+      7.938998e-02f, 3.716311e-02f, 1.738177e-02f, 8.038360e-03f,
+      3.619326e-03f, 1.657188e-03f, 8.175384e-04f, 4.937290e-04f,
+      4.047297e-04f, 3.781237e-04f, 3.309307e-04f};
 
   const float powerAmpSweepScales[NUM_SWEEP_BINS + 1] = {
-      1.568337e+00f, 8.047397e-01f, 4.215028e-01f, 2.276836e-01f,
-      1.204987e-01f, 6.356055e-02f, 4.464232e-02f, 4.385213e-02f,
-      5.264425e-02f, 6.849243e-02f, 9.256473e-02f};
+      1.574379e+00f, 8.079116e-01f, 4.232488e-01f, 2.287124e-01f,
+      1.209799e-01f, 6.344776e-02f, 4.388500e-02f, 4.185453e-02f,
+      4.794303e-02f, 5.917895e-02f, 7.668519e-02f};
 
   void resetParameters() {
     set_input_level(0.0f);

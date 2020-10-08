@@ -242,8 +242,9 @@ void SwankyAmpAudioProcessor::setAmpParameters() {
         // shift the depth higher at low drive to get some audible effect when
         // not much of signal is over clip, and lower at high drive to avoid
         // just hacking away the signal with a constant db offset
-        remap_xy(*parPowerAmpDrive, -1.0f, 1.0f, 3.0f, -1.0f));
+        remap_xy(*parPowerAmpDrive, -1.0f, 1.0f, 1.0f, 0.0f));
     amp_channel[i].set_tetrode_plate_sag_ratio(*parPowerAmpSagRatio);
+    amp_channel[i].set_tetrode_plate_sag_onset(*parPowerAmpSag);
     amp_channel[i].set_tetrode_plate_sag_factor(
         amp_channel[i].get_tetrode_drive());
     amp_channel[i].set_tetrode_plate_sag_toggle(
