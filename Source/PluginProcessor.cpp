@@ -73,7 +73,7 @@ SwankyAmpAudioProcessor::SwankyAmpAudioProcessor()
                      MAKE_PARAMETER_UNIT(PreAmpTight),
                      MAKE_PARAMETER_UNIT(PreAmpGrit),
 
-                     MAKE_PARAMETER(PowerAmpDrive, -1.0f, 1.0f, 0.0f),
+                     MAKE_PARAMETER(PowerAmpDrive, -1.0f, 1.0f, -0.2f),
                      MAKE_PARAMETER_UNIT(PowerAmpTight),
                      MAKE_PARAMETER_UNIT(PowerAmpGrit),
 
