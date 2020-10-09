@@ -278,14 +278,12 @@ public:
                  (size_t)NUM_SWEEP_BINS);
     const float preAmpTarget = 3.228806e+01f;
 
-    float toneStackScale = 1.0f;
+    const float toneStackScale = 1.0f / 5.302220e-01f;
 
     if (toneStackSelector == 0) {
       toneStackF.process(count, buffer);
-      toneStackScale = 1.0f / 5.302220e-01f;
     } else {
       toneStackM.process(count, buffer);
-      toneStackScale = 1.0f / 8.828859e-01f;
     }
 
     scaleBuffer(count, buffer, toneStackScale * preAmpScale * preAmpTarget);
