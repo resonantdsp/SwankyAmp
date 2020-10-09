@@ -18,6 +18,10 @@ In general, you will want to first gain stage, then set the drive according to y
 
 The model was developed by running finite-difference simulation methods (spice), storing the outputs, developing empirical models using a mix of python and C++, and then fitting the model paramters to the simulation results. That code is very experimental and outside the scope of this repository.
 
+Some more information about the process can be found here:
+
+<http://www.resonantdsp.com/blog/tube-emulation/tube-emulation-4/index.html>
+
 ## Building
 
 The DSP is primarily written in [FAUST](https://faust.grame.fr/), whereas the UI is written in C++ using the [JUCE](https://www.juce.com) toolkit.
@@ -26,7 +30,8 @@ This repository includes code to:
 
 * Build the VST3 or AAX using Visual Studio 2019
 * Build the AU using Xcode
-* Create the windows installer using [Inno Setup](https://jrsoftware.org/isinfo.php)
+* Create the Windows installer using [Inno Setup](https://jrsoftware.org/isinfo.php)
+* Create the Mac installers using a drag-and-drop DMG image.
 
 ### For Windows
 
@@ -58,21 +63,14 @@ To build the installer:
 * Re-open the menu and choose "Edit Scheme"
 * Change the build target to "Release"
 * From the project room in a terminal:
-  `cp Builds/MacOSX/build/Release/SwankyAmp.vst3 package/dmg-vst3/` or
-  `cp Builds/MacOSX/build/Release/SwankyAmp.component package/dmg-au/`
-* Copy the dmg installer background
-  `cp Resources/dmg-bg.png package/dmg-vst3/.bg.png`
-* Open "Disk Utility"
-* Choose "File -> New Image"
-* From folder
-* Select the folder `pacakge/dmg-vst3`
-* Set "Image Format" to "read/write"
-* Create then open the DMG
-* Right click in the window, choose "Show View Options"
-* Choose a background image (to show hidden files "cmd + shift + .")
-* Re-size the window and place the icons appropriately
-* In "Disk Utility", choose "Images -> Convert"
-* Set "Image Format" to "read-only"
+  `bash build-mach.sh`
+* When you are prompted to edit the images:
+  * Mount the images
+  * Open the mounted images
+  * Right click in the window, choose "Show View Options"
+  * Choose the background image (to show hidden files "cmd + shift + .")
+  * Re-size the window and place the icons appropriately
+* Unmount the images and press enter to finish the process
 
 ### Testing
 
@@ -85,6 +83,11 @@ Only available with VisualStudio at the moment.
 * Run `Builds\VisualStudio\x64\Debug\SwankyAmp.exe`
 
 ## Change log
+
+Version 1.0.0:
+
+* add Marshall-like tone stack
+* reduce default power amp drive
 
 Version 0.10.2:
 
