@@ -40,19 +40,19 @@ public:
   }
 
   inline void set_cap(FAUSTFLOAT x) {
-    x += 1.739770e+00f;
+    x += 1.739606e+00f;
     *par_cap = ulscale(x, 1e-1f, 1e+1f);
   }
   inline void set_clip(FAUSTFLOAT x) {
-    x += 4.231519e-01f;
+    x += 4.160800e-01f;
     *par_clip = uscale(x, 0.0f, 5.0f);
   }
   inline void set_corner(FAUSTFLOAT x) {
-    x += 2.750887e-02f;
+    x += 2.000031e-02f;
     *par_corner = uscale(x, 0.0f, 5.0f);
   }
   inline void set_hp_freq(FAUSTFLOAT x) {
-    x += 4.522111e-01f;
+    x += 4.522110e-01f;
     *par_hp_freq = ulscale(x, 1e-1f, 1e+2f);
   }
   inline void set_level(FAUSTFLOAT x) {
@@ -60,15 +60,15 @@ public:
     *par_level = uscale(x, -5.0f, +5.0f);
   }
   inline void set_ratio(FAUSTFLOAT x) {
-    x += 1.209034e+00f;
+    x += 1.209004e+00f;
     *par_ratio = ulscale(x, 1e-1f, 1e+4f);
   }
   inline void set_smooth(FAUSTFLOAT x) {
-    x += 1.527377e+00f;
+    x += 1.528122e+00f;
     *par_smooth = ulscale(x, 1e-5f, 1e+1f);
   }
   inline void set_tau(FAUSTFLOAT x) {
-    x += -1.357754e+00f;
+    x += -1.357749e+00f;
     *par_tau = ulscale(x, 1e-6f, 1e-3f);
   }
 

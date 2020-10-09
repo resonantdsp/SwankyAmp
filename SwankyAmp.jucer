@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<JUCERPROJECT id="sJgmJL" name="SwankyAmp" projectType="audioplug" version="0.10.2"
+<JUCERPROJECT id="sJgmJL" name="SwankyAmp" projectType="audioplug" version="1.0.0"
               projectLineFeed="&#10;" companyName="Resonant DSP" companyWebsite="https://www.resonantdsp.com/"
               companyEmail="info@resonantdsp.com" pluginFormats="buildAAX,buildAU,buildStandalone,buildVST3"
               pluginName="Swanky Amp" pluginDesc="Tube amplifiers simulation"
@@ -34,6 +34,9 @@
         <FILE id="uOduFQ" name="ToneStackF.h" compile="0" resource="0" file="Source/dsp/ToneStackF.h"/>
         <FILE id="ea1PJL" name="ToneStackFFaust.h" compile="0" resource="0"
               file="Source/dsp/ToneStackFFaust.h"/>
+        <FILE id="NQfdn0" name="ToneStackM.h" compile="0" resource="0" file="Source/dsp/ToneStackM.h"/>
+        <FILE id="ZdaTGL" name="ToneStackMFaust.h" compile="0" resource="0"
+              file="Source/dsp/ToneStackMFaust.h"/>
         <FILE id="U8dfxs" name="TriodeGrid.h" compile="0" resource="0" file="Source/dsp/TriodeGrid.h"/>
         <FILE id="ltVYoy" name="TriodeGridFaust.h" compile="0" resource="0"
               file="Source/dsp/TriodeGridFaust.h"/>

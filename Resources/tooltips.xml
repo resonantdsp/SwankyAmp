@@ -56,6 +56,9 @@
 		The amount of bass going into the power amp. Increase for a fuller sound. Decrease for more definition and more brightness.
 	</param>
 	<param id="idTsPresence">
-		The amoutn of signal in the higher mids, lower highs. Increase for more definition, more detail. Decrease to reduce brittle harshness.
+		The amoumt of signal in the higher mids, lower highs. Increase for more definition, more detail. Decrease to reduce brittle harshness.
+	</param>
+	<param id="idTsSelection">
+        Select the tone stack: F will give you a Fender-like tone stack with scooped mids. M will give you a Marshall-like tone stack with lots of mids for heavier distortion.
 	</param>
 </tooltips>

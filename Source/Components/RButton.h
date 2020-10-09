@@ -37,6 +37,9 @@ public:
     textColourId = 0x2000402,
   };
 
+  String textOn = "ON";
+  String textOff = "OFF";
+
 private:
   Random rng;
   Image bgNoise;

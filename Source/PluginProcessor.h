@@ -45,6 +45,7 @@ public:
   std::atomic<float> *parTsMid = nullptr;
   std::atomic<float> *parTsHigh = nullptr;
   std::atomic<float> *parTsPresence = nullptr;
+  std::atomic<float> *parTsSelection = nullptr;
 
   std::atomic<float> *parGainStages = nullptr;
   std::atomic<float> *parGainOverhead = nullptr;
@@ -67,13 +68,17 @@ public:
   std::atomic<float> *parPowerAmpSagRatio = nullptr;
 
   const std::vector<String> parameterIds = {
-      "idInputLevel",    "idOutputLevel",   "idTsLow",
-      "idTsMid",         "idTsHigh",        "idTsPresence",
-      "idGainStages",    "idGainOverhead",  "idCabOnOff",
-      "idCabBrightness", "idCabDistance",   "idCabDynamic",
-      "idPreAmpDrive",   "idPreAmpTight",   "idPreAmpGrit",
-      "idLowCut",        "idPowerAmpDrive", "idPowerAmpTight",
-      "idPowerAmpGrit",  "idPowerAmpSag",   "idPowerAmpSagRatio",
+      "idInputLevel",    "idOutputLevel",
+      "idTsLow",         "idTsMid",
+      "idTsHigh",        "idTsPresence",
+      "idTsSelection",   "idGainStages",
+      "idGainOverhead",  "idCabOnOff",
+      "idCabBrightness", "idCabDistance",
+      "idCabDynamic",    "idPreAmpDrive",
+      "idPreAmpTight",   "idPreAmpGrit",
+      "idLowCut",        "idPowerAmpDrive",
+      "idPowerAmpTight", "idPowerAmpGrit",
+      "idPowerAmpSag",   "idPowerAmpSagRatio",
   };
 
   String storedPresetName;
