@@ -9780,7 +9780,10 @@ static const unsigned char temp_binary_data_5[] =
 "\t\tThe amount of bass going into the power amp. Increase for a fuller sound. Decrease for more definition and more brightness.\r\n"
 "\t</param>\r\n"
 "\t<param id=\"idTsPresence\">\r\n"
-"\t\tThe amoutn of signal in the higher mids, lower highs. Increase for more definition, more detail. Decrease to reduce brittle harshness.\r\n"
+"\t\tThe amoumt of signal in the higher mids, lower highs. Increase for more definition, more detail. Decrease to reduce brittle harshness.\r\n"
+"\t</param>\r\n"
+"\t<param id=\"idTsSelection\">\r\n"
+"        Select the tone stack: F will give you a Fender-like tone stack with scooped mids. M will give you a Marshall-like tone stack with lots of mids for heavier distortion.\r\n"
 "\t</param>\r\n"
 "</tooltips>\r\n";
 
@@ -9802,7 +9805,7 @@ const char* getNamedResource (const char* resourceNameUTF8, int& numBytes)
         case 0xc9b4bb03:  numBytes = 287936; return PTSansBold_ttf;
         case 0x1200a58c:  numBytes = 278168; return PTSansRegular_ttf;
         case 0xadb49371:  numBytes = 234208; return PTSansNarrowRegular_ttf;
-        case 0x0e764828:  numBytes = 3245; return tooltips_xml;
+        case 0x0e764828:  numBytes = 3462; return tooltips_xml;
         default: break;
     }
 

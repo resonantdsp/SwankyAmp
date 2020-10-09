@@ -53,7 +53,7 @@ void ToneStackGroup::attachVTS(AudioProcessorValueTreeState &vts) {
 }
 
 void ToneStackGroup::attachTooltips(const TooltipsData &tooltips) {
-  // TODO
+  buttonSelection.setTooltip(tooltips.getForParam("idTsSelection"));
   sliderLow.slider.setTooltip(tooltips.getForParam("idTsLow"));
   sliderMid.slider.setTooltip(tooltips.getForParam("idTsMid"));
   sliderHigh.slider.setTooltip(tooltips.getForParam("idTsHigh"));
