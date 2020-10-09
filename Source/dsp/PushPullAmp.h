@@ -18,6 +18,7 @@
 #include "TetrodeGrid.h"
 #include "TetrodePlate.h"
 #include "ToneStackF.h"
+#include "ToneStackM.h"
 #include "TriodeGrid.h"
 #include "TriodePlate.h"
 
@@ -252,6 +253,7 @@ public:
   void reset() {
     preAmp.reset();
     toneStackF.reset();
+    toneStackM.reset();
     powerAmp.reset();
     cabinet.reset();
     resetParameters();
@@ -260,6 +262,7 @@ public:
   void prepare(int sampleRate) {
     preAmp.prepare(sampleRate);
     toneStackF.prepare(sampleRate);
+    toneStackM.prepare(sampleRate);
     powerAmp.prepare(sampleRate);
     cabinet.prepare(sampleRate);
     resetParameters();
@@ -275,8 +278,16 @@ public:
                  (size_t)NUM_SWEEP_BINS);
     const float preAmpTarget = 3.228806e+01f;
 
-    const float toneStackScale = 1.0f / 5.302220e-01f;
-    toneStackF.process(count, buffer);
+    float toneStackScale = 1.0f;
+
+    if (toneStackSelector == 0) {
+      toneStackF.process(count, buffer);
+      toneStackScale = 1.0f / 5.302220e-01f;
+    } else {
+      toneStackM.process(count, buffer);
+      toneStackScale = 1.0f / 8.828859e-01f;
+    }
+
     scaleBuffer(count, buffer, toneStackScale * preAmpScale * preAmpTarget);
 
     powerAmp.process(count, buffer);
@@ -343,11 +354,21 @@ public:
   }
   inline void set_tetrode_drive(FAUSTFLOAT x) { powerAmp.set_drive(x); }
 
-  inline void set_tonestack_bass(FAUSTFLOAT x) { toneStackF.set_bass(x); }
-  inline void set_tonestack_mids(FAUSTFLOAT x) { toneStackF.set_mids(x); }
-  inline void set_tonestack_treble(FAUSTFLOAT x) { toneStackF.set_treble(x); }
+  inline void set_tonestack_bass(FAUSTFLOAT x) {
+    toneStackF.set_bass(x);
+    toneStackM.set_bass(x);
+  }
+  inline void set_tonestack_mids(FAUSTFLOAT x) {
+    toneStackF.set_mids(x);
+    toneStackM.set_mids(x);
+  }
+  inline void set_tonestack_treble(FAUSTFLOAT x) {
+    toneStackF.set_treble(x);
+    toneStackM.set_treble(x);
+  }
   inline void set_tonestack_presence(FAUSTFLOAT x) {
     toneStackF.set_presence(x);
+    toneStackM.set_presence(x);
   }
 
   inline void set_cabinet_brightness(FAUSTFLOAT x) {
@@ -367,18 +388,22 @@ public:
   }
   inline void set_cabinet_on(bool x) { cabinetOn = x; }
 
+  inline void set_tonestack_selection(int i) { toneStackSelector = i; }
+
   float get_tetrode_drive() const { return powerAmp.get_drive(); }
   float get_triode_drive() const { return preAmp.get_drive(); }
 
 private:
   PreAmp preAmp;
   ToneStackF toneStackF;
+  ToneStackM toneStackM;
   PowerAmp powerAmp;
   Cabinet cabinet;
 
   FAUSTFLOAT inputLevel = 0.0f;
   FAUSTFLOAT outputLevel = 0.0f;
   bool cabinetOn = true;
+  int toneStackSelector = 0;
 
   const float preAmpSweepScales[NUM_SWEEP_BINS + 1] = {
       7.938998e-02f, 3.716311e-02f, 1.738177e-02f, 8.038360e-03f,

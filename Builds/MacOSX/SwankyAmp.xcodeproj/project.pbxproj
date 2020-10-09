@@ -385,6 +385,13 @@
 			path = ../../Source/Components/RSliderLabel.cpp;
 			sourceTree = "SOURCE_ROOT";
 		};
+		2E10367FDC8EB67CDA056A86 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = ToneStackM.h;
+			path = ../../Source/dsp/ToneStackM.h;
+			sourceTree = "SOURCE_ROOT";
+		};
 		2FED4567AE7701820DE2CDF5 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.c.h;
@@ -411,6 +418,13 @@
 			lastKnownFileType = sourcecode.c.h;
 			name = RSliderLabel.h;
 			path = ../../Source/Components/RSliderLabel.h;
+			sourceTree = "SOURCE_ROOT";
+		};
+		385221ADA0E00B5D8ADBF4BE = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = ToneStackMFaust.h;
+			path = ../../Source/dsp/ToneStackMFaust.h;
 			sourceTree = "SOURCE_ROOT";
 		};
 		388BA9C56D9F003E1C42E655 = {
@@ -476,13 +490,6 @@
 			path = ../../Source/dsp/UI.h;
 			sourceTree = "SOURCE_ROOT";
 		};
-		4F98434E7DD515463E5603CC = {
-			isa = PBXFileReference;
-			lastKnownFileType = file;
-			name = "juce_opengl";
-			path = "~/JUCE/modules/juce_opengl";
-			sourceTree = "<absolute>";
-		};
 		529A38DC6B0E839FF2B1756E = {
 			isa = PBXFileReference;
 			lastKnownFileType = file.ttf;
@@ -495,13 +502,6 @@
 			lastKnownFileType = sourcecode.c.h;
 			name = Meta.h;
 			path = ../../Source/dsp/Meta.h;
-			sourceTree = "SOURCE_ROOT";
-		};
-		58DBF80726DE8E1E93EC463D = {
-			isa = PBXFileReference;
-			lastKnownFileType = sourcecode.c.h;
-			name = JucePluginDefines.h;
-			path = ../../JuceLibraryCode/JucePluginDefines.h;
 			sourceTree = "SOURCE_ROOT";
 		};
 		5D40A7937E0F8E42459A9F9B = {
@@ -560,11 +560,25 @@
 			path = System/Library/Frameworks/CoreMIDI.framework;
 			sourceTree = SDKROOT;
 		};
+		4F98434E7DD515463E5603CC = {
+			isa = PBXFileReference;
+			lastKnownFileType = file;
+			name = "juce_opengl";
+			path = "~/JUCE/modules/juce_opengl";
+			sourceTree = "<absolute>";
+		};
 		58259A1EEEEB2D19003511DF = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.c.h;
 			name = PresetManager.h;
 			path = ../../Source/PresetManager.h;
+			sourceTree = "SOURCE_ROOT";
+		};
+		58DBF80726DE8E1E93EC463D = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = JucePluginDefines.h;
+			path = ../../JuceLibraryCode/JucePluginDefines.h;
 			sourceTree = "SOURCE_ROOT";
 		};
 		5B071824680FCDE93CAB5834 = {
@@ -1133,6 +1147,8 @@
 				EBA0F26915BD45EADD307C1C,
 				7C361BD6DC46E7E32C25C852,
 				08F63A57D0FD52F670B72A05,
+				2E10367FDC8EB67CDA056A86,
+				385221ADA0E00B5D8ADBF4BE,
 				8C162E29A4D362E4D36FF395,
 				B6693397E6A28B904EEB8290,
 				3C7FA2BB55DC9826415CF3D4,

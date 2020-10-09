@@ -57,6 +57,8 @@ SwankyAmpAudioProcessor::SwankyAmpAudioProcessor()
                      MAKE_PARAMETER_UNIT(TsMid),
                      MAKE_PARAMETER_UNIT(TsHigh),
                      MAKE_PARAMETER_UNIT(TsPresence),
+                     std::make_unique<AudioParameterInt>(
+                         "idTsSelection", "TsSelection", 0, 1, 0),
 
                      std::make_unique<AudioParameterInt>("idGainStages",
                                                          "GainStages", 1, 5, 3),
@@ -87,6 +89,7 @@ SwankyAmpAudioProcessor::SwankyAmpAudioProcessor()
   ASSIGN_PARAMETER(TsMid)
   ASSIGN_PARAMETER(TsHigh)
   ASSIGN_PARAMETER(TsPresence)
+  ASSIGN_PARAMETER(TsSelection)
 
   ASSIGN_PARAMETER(GainStages)
   ASSIGN_PARAMETER(GainOverhead)
@@ -188,6 +191,7 @@ void SwankyAmpAudioProcessor::setAmpParameters() {
     amp_channel[i].set_tonestack_mids(*parTsMid);
     amp_channel[i].set_tonestack_treble(*parTsHigh);
     amp_channel[i].set_tonestack_presence(*parTsPresence);
+    amp_channel[i].set_tonestack_selection((int)(*parTsSelection));
 
     amp_channel[i].set_triode_num_stages((int)(*parGainStages));
     amp_channel[i].set_triode_overhead(*parGainOverhead);

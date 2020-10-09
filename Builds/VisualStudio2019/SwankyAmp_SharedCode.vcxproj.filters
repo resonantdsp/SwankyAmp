@@ -2640,6 +2640,12 @@
     <ClInclude Include="..\..\Source\dsp\ToneStackFFaust.h">
       <Filter>SwankyAmp\Source\dsp</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\Source\dsp\ToneStackM.h">
+      <Filter>SwankyAmp\Source\dsp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\dsp\ToneStackMFaust.h">
+      <Filter>SwankyAmp\Source\dsp</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\Source\dsp\TriodeGrid.h">
       <Filter>SwankyAmp\Source\dsp</Filter>
     </ClInclude>
