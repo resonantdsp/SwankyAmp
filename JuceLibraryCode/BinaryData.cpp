@@ -275,7 +275,6 @@ static const unsigned char temp_binary_data_1[] =
 "    <PARAM id=\"idTsPresence\" value=\"0.2000000476837158\"/>\r\n"
 "    <PARAM id=\"idTsSelection\" value=\"0.0\"/>\r\n"
 "  </APVTSSwankyAmp>\r\n"
-"  </APVTSSwankyAmp>\r\n"
 "\r\n"
 "  <APVTSSwankyAmp presetName=\"full drive\">\r\n"
 "    <PARAM id=\"idCabBrightness\" value=\"-0.3059999942779541\"/>\r\n"
@@ -9811,7 +9810,7 @@ const char* getNamedResource (const char* resourceNameUTF8, int& numBytes)
     switch (hash)
     {
         case 0x78dee5d0:  numBytes = 7224; return logo_svg;
-        case 0xc1329ecc:  numBytes = 11061; return presets_xml;
+        case 0xc1329ecc:  numBytes = 11040; return presets_xml;
         case 0xc9b4bb03:  numBytes = 287936; return PTSansBold_ttf;
         case 0x1200a58c:  numBytes = 278168; return PTSansRegular_ttf;
         case 0xadb49371:  numBytes = 234208; return PTSansNarrowRegular_ttf;

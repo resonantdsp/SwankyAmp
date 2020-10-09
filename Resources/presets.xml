@@ -150,7 +150,6 @@
     <PARAM id="idTsPresence" value="0.2000000476837158"/>
     <PARAM id="idTsSelection" value="0.0"/>
   </APVTSSwankyAmp>
-  </APVTSSwankyAmp>
 
   <APVTSSwankyAmp presetName="full drive">
     <PARAM id="idCabBrightness" value="-0.3059999942779541"/>
