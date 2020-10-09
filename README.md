@@ -20,7 +20,7 @@ The model was developed by running finite-difference simulation methods (spice),
 
 Some more information about the process can be found here:
 
-<http://www.resonantdsp.com/blog/tube-emulation/tube-emulation-4/index.html>
+<http://www.resonantdsp.com/blog/tube-emulation/tube-emulation-4.html>
 
 ## Building
 
