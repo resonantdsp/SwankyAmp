@@ -441,8 +441,8 @@ void SwankyAmpLAF::drawToggleButton(Graphics &g, ToggleButton &button,
 
   g.setColour(findColour(RButton::textColourId));
   g.setFont(SwankyAmpLAF::getDefaultFontNarrow().withHeight(radius));
-  g.drawText(button.getToggleState() ? "ON" : "OFF", circleBounds,
-             Justification::centred, true);
+  g.drawText(button.getToggleState() ? rbutton->textOn : rbutton->textOff,
+             circleBounds, Justification::centred, true);
 
   g.setColour(findColour(RButton::buttonColourId));
   g.drawRoundedRectangle(outer, radius, lineWidth);

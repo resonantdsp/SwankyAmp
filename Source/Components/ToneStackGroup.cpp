@@ -21,6 +21,10 @@
 #include "ToneStackGroup.h"
 
 ToneStackGroup::ToneStackGroup() : ParameterGroup("TONE STACK") {
+  buttonSelection.textOn = "M";
+  buttonSelection.textOff = "F";
+  addAndMakeVisible(buttonSelection);
+
   addAndMakeVisible(sliderLow);
   sliderLow.setLabel("LOW");
   sliderLow.slider.setPosMapDownFmt("%4.1f");
@@ -39,6 +43,8 @@ ToneStackGroup::ToneStackGroup() : ParameterGroup("TONE STACK") {
 }
 
 void ToneStackGroup::attachVTS(AudioProcessorValueTreeState &vts) {
+  attSelection.reset(
+      new ButtonAttachment(vts, "idTsSelection", buttonSelection));
   attLow.reset(new SliderAttachment(vts, "idTsLow", sliderLow.slider));
   attMid.reset(new SliderAttachment(vts, "idTsMid", sliderMid.slider));
   attHigh.reset(new SliderAttachment(vts, "idTsHigh", sliderHigh.slider));
@@ -47,6 +53,7 @@ void ToneStackGroup::attachVTS(AudioProcessorValueTreeState &vts) {
 }
 
 void ToneStackGroup::attachTooltips(const TooltipsData &tooltips) {
+  // TODO
   sliderLow.slider.setTooltip(tooltips.getForParam("idTsLow"));
   sliderMid.slider.setTooltip(tooltips.getForParam("idTsMid"));
   sliderHigh.slider.setTooltip(tooltips.getForParam("idTsHigh"));
@@ -67,6 +74,13 @@ void ToneStackGroup::resized() {
   // only re-set the positions when the height or position changes
   if (prevInnerHeight == innerHeight && prevCorner == corner)
     return;
+
+  buttonSelection.setTopLeftPosition(corner + Point<int>(spacing, spacing) / 2);
+  buttonSelection.setSize(
+      (int)(buttonSelection.calcWidthForHeight((float)innerHeight - spacing)),
+      (int)((float)innerHeight - spacing));
+
+  corner = buttonSelection.getBounds().getTopRight() + Point<int>(spacing, 0);
 
   sliderLow.setTopLeftPosition(corner);
   sliderLow.slider.setMargin(0.15f * (float)innerHeight);
