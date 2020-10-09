@@ -148,6 +148,7 @@ static const unsigned char temp_binary_data_1[] =
 "    <PARAM id=\"idTsLow\" value=\"0.0\"/>\r\n"
 "    <PARAM id=\"idTsMid\" value=\"-0.2999999523162842\"/>\r\n"
 "    <PARAM id=\"idTsPresence\" value=\"0.3900001049041748\"/>\r\n"
+"    <PARAM id=\"idTsSelection\" value=\"0.0\"/>\r\n"
 "  </APVTSSwankyAmp>\r\n"
 "\r\n"
 "  <APVTSSwankyAmp presetName=\"edge\">\r\n"
@@ -172,6 +173,7 @@ static const unsigned char temp_binary_data_1[] =
 "    <PARAM id=\"idTsLow\" value=\"0.1960000991821289\"/>\r\n"
 "    <PARAM id=\"idTsMid\" value=\"-0.2099999785423279\"/>\r\n"
 "    <PARAM id=\"idTsPresence\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idTsSelection\" value=\"0.0\"/>\r\n"
 "  </APVTSSwankyAmp>\r\n"
 "\r\n"
 "  <APVTSSwankyAmp presetName=\"distort\">\r\n"
@@ -196,6 +198,7 @@ static const unsigned char temp_binary_data_1[] =
 "    <PARAM id=\"idTsLow\" value=\"0.0\"/>\r\n"
 "    <PARAM id=\"idTsMid\" value=\"0.2960000038146973\"/>\r\n"
 "    <PARAM id=\"idTsPresence\" value=\"0.3940000534057617\"/>\r\n"
+"    <PARAM id=\"idTsSelection\" value=\"0.0\"/>\r\n"
 "  </APVTSSwankyAmp>\r\n"
 "\r\n"
 "  <APVTSSwankyAmp presetName=\"dirty distort\">\r\n"
@@ -220,6 +223,7 @@ static const unsigned char temp_binary_data_1[] =
 "    <PARAM id=\"idTsLow\" value=\"-0.1939999461174011\"/>\r\n"
 "    <PARAM id=\"idTsMid\" value=\"0.6000000238418579\"/>\r\n"
 "    <PARAM id=\"idTsPresence\" value=\"0.2060000896453857\"/>\r\n"
+"    <PARAM id=\"idTsSelection\" value=\"0.0\"/>\r\n"
 "  </APVTSSwankyAmp>\r\n"
 "\r\n"
 "  <APVTSSwankyAmp presetName=\"pre drive\">\r\n"
@@ -244,6 +248,7 @@ static const unsigned char temp_binary_data_1[] =
 "    <PARAM id=\"idTsLow\" value=\"-0.199999988079071\"/>\r\n"
 "    <PARAM id=\"idTsMid\" value=\"0.6000000238418579\"/>\r\n"
 "    <PARAM id=\"idTsPresence\" value=\"0.0\"/>\r\n"
+"    <PARAM id=\"idTsSelection\" value=\"0.0\"/>\r\n"
 "  </APVTSSwankyAmp>\r\n"
 "\r\n"
 "  <APVTSSwankyAmp presetName=\"power drive\">\r\n"
@@ -268,6 +273,8 @@ static const unsigned char temp_binary_data_1[] =
 "    <PARAM id=\"idTsLow\" value=\"-0.2139999866485596\"/>\r\n"
 "    <PARAM id=\"idTsMid\" value=\"0.3900001049041748\"/>\r\n"
 "    <PARAM id=\"idTsPresence\" value=\"0.2000000476837158\"/>\r\n"
+"    <PARAM id=\"idTsSelection\" value=\"0.0\"/>\r\n"
+"  </APVTSSwankyAmp>\r\n"
 "  </APVTSSwankyAmp>\r\n"
 "\r\n"
 "  <APVTSSwankyAmp presetName=\"full drive\">\r\n"
@@ -292,6 +299,7 @@ static const unsigned char temp_binary_data_1[] =
 "    <PARAM id=\"idTsLow\" value=\"0.0\"/>\r\n"
 "    <PARAM id=\"idTsMid\" value=\"0.5060000419616699\"/>\r\n"
 "    <PARAM id=\"idTsPresence\" value=\"-0.1939999461174011\"/>\r\n"
+"    <PARAM id=\"idTsSelection\" value=\"0.0\"/>\r\n"
 "  </APVTSSwankyAmp>\r\n"
 "\r\n"
 "  <APVTSSwankyAmp presetName=\"high gain\">\r\n"
@@ -316,6 +324,7 @@ static const unsigned char temp_binary_data_1[] =
 "    <PARAM id=\"idTsLow\" value=\"0.2000000476837158\"/>\r\n"
 "    <PARAM id=\"idTsMid\" value=\"-0.203999936580658\"/>\r\n"
 "    <PARAM id=\"idTsPresence\" value=\"-0.3999999761581421\"/>\r\n"
+"    <PARAM id=\"idTsSelection\" value=\"0.0\"/>\r\n"
 "  </APVTSSwankyAmp>\r\n"
 "\r\n"
 "  <APVTSSwankyAmp presetName=\"level 11\">\r\n"
@@ -340,6 +349,7 @@ static const unsigned char temp_binary_data_1[] =
 "    <PARAM id=\"idTsLow\" value=\"0.1920000314712524\"/>\r\n"
 "    <PARAM id=\"idTsMid\" value=\"1.0\"/>\r\n"
 "    <PARAM id=\"idTsPresence\" value=\"0.3840000629425049\"/>\r\n"
+"    <PARAM id=\"idTsSelection\" value=\"1.0\"/>\r\n"
 "  </APVTSSwankyAmp>\r\n"
 "</presets>\r\n";
 
@@ -9801,7 +9811,7 @@ const char* getNamedResource (const char* resourceNameUTF8, int& numBytes)
     switch (hash)
     {
         case 0x78dee5d0:  numBytes = 7224; return logo_svg;
-        case 0xc1329ecc:  numBytes = 10635; return presets_xml;
+        case 0xc1329ecc:  numBytes = 11061; return presets_xml;
         case 0xc9b4bb03:  numBytes = 287936; return PTSansBold_ttf;
         case 0x1200a58c:  numBytes = 278168; return PTSansRegular_ttf;
         case 0xadb49371:  numBytes = 234208; return PTSansNarrowRegular_ttf;
