@@ -1,6 +1,6 @@
 [Setup]
 AppName=SwankyAmp
-AppVersion=1.1.0
+AppVersion=1.2.0
 DefaultDirName={commoncf64}\VST3
 DirExistsWarning=no
 DisableDirPage=no
