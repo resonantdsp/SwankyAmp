@@ -34,10 +34,6 @@ PreAmpGroup::PreAmpGroup() : ParameterGroup("PRE AMP")
   addAndMakeVisible(sliderGrit);
   sliderGrit.setLabel("GRIT");
   sliderGrit.slider.setPosMapDownFmt("%4.1f");
-
-  addAndMakeVisible(sliderFilter);
-  sliderFilter.setLabel("LOW CUT");
-  sliderFilter.slider.setPosMapDownFmt("%4.1f");
 }
 
 void PreAmpGroup::attachVTS(AudioProcessorValueTreeState& vts)
@@ -47,7 +43,6 @@ void PreAmpGroup::attachVTS(AudioProcessorValueTreeState& vts)
   attTight.reset(
       new SliderAttachment(vts, "idPreAmpTight", sliderTight.slider));
   attGrit.reset(new SliderAttachment(vts, "idPreAmpGrit", sliderGrit.slider));
-  attFilter.reset(new SliderAttachment(vts, "idLowCut", sliderFilter.slider));
 }
 
 void PreAmpGroup::attachTooltips(const TooltipsData& tooltips)
@@ -55,7 +50,6 @@ void PreAmpGroup::attachTooltips(const TooltipsData& tooltips)
   sliderDrive.slider.setTooltip(tooltips.getForParam("idPreAmpDrive"));
   sliderTight.slider.setTooltip(tooltips.getForParam("idPreAmpTight"));
   sliderGrit.slider.setTooltip(tooltips.getForParam("idPreAmpGrit"));
-  sliderFilter.slider.setTooltip(tooltips.getForParam("idLowCut"));
 }
 
 void PreAmpGroup::resized()
@@ -90,12 +84,6 @@ void PreAmpGroup::resized()
   sliderGrit.setHeight(innerHeight);
 
   corner = sliderGrit.getBounds().getTopRight() + Point<int>(spacing, 0);
-
-  sliderFilter.setTopLeftPosition(corner);
-  sliderFilter.slider.setMargin(0.15f * (float)innerHeight);
-  sliderFilter.setHeight(innerHeight);
-
-  corner = sliderFilter.getBounds().getTopRight() + Point<int>(spacing, 0);
 
   // can now determine the width and set it, this will re-call `resized` but
   // since the height is the same it won't re-do the calculation

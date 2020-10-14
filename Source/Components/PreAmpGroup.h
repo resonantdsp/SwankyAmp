@@ -40,12 +40,10 @@ private:
   RSliderLabel sliderDrive;
   RSliderLabel sliderTight;
   RSliderLabel sliderGrit;
-  RSliderLabel sliderFilter;
 
   std::unique_ptr<SliderAttachment> attDrive;
   std::unique_ptr<SliderAttachment> attTight;
   std::unique_ptr<SliderAttachment> attGrit;
-  std::unique_ptr<SliderAttachment> attFilter;
 
   DISABLE_COMPONENT_RESIZE()
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PreAmpGroup)

@@ -37,13 +37,11 @@ public:
   void resized() override;
 
 private:
-  RSliderLabel sliderSelection;
   RSliderLabel sliderLow;
   RSliderLabel sliderMid;
   RSliderLabel sliderHigh;
   RSliderLabel sliderPresence;
 
-  std::unique_ptr<SliderAttachment> attSelection;
   std::unique_ptr<SliderAttachment> attLow;
   std::unique_ptr<SliderAttachment> attMid;
   std::unique_ptr<SliderAttachment> attHigh;

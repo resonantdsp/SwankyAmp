@@ -31,6 +31,14 @@ StagingGroup::StagingGroup() : ParameterGroup("STAGING")
   addAndMakeVisible(sliderOverhead);
   sliderOverhead.setLabel("OVERHEAD");
   sliderOverhead.slider.setPosMapDownFmt("%4.1f");
+
+  addAndMakeVisible(sliderFilter);
+  sliderFilter.setLabel("LOW CUT");
+  sliderFilter.slider.setPosMapDownFmt("%4.1f");
+
+  addAndMakeVisible(sliderSelection);
+  sliderSelection.setLabel("TONE STACK");
+  sliderSelection.slider.setPosMapDownFmt("%4.1f");
 }
 
 void StagingGroup::attachVTS(AudioProcessorValueTreeState& vts)
@@ -39,12 +47,17 @@ void StagingGroup::attachVTS(AudioProcessorValueTreeState& vts)
       new SliderAttachment(vts, "idGainStages", sliderStages.slider));
   attOverhead.reset(
       new SliderAttachment(vts, "idGainOverhead", sliderOverhead.slider));
+  attFilter.reset(new SliderAttachment(vts, "idLowCut", sliderFilter.slider));
+  attSelection.reset(
+      new SliderAttachment(vts, "idTsSelection", sliderSelection.slider));
 }
 
 void StagingGroup::attachTooltips(const TooltipsData& tooltips)
 {
   sliderStages.slider.setTooltip(tooltips.getForParam("idGainStages"));
   sliderOverhead.slider.setTooltip(tooltips.getForParam("idGainOverhead"));
+  sliderFilter.slider.setTooltip(tooltips.getForParam("idLowCut"));
+  sliderSelection.slider.setTooltip(tooltips.getForParam("idTsSelection"));
 }
 
 void StagingGroup::resized()
@@ -73,6 +86,18 @@ void StagingGroup::resized()
   sliderOverhead.setHeight(innerHeight);
 
   corner = sliderOverhead.getBounds().getTopRight() + Point<int>(spacing, 0);
+
+  sliderFilter.setTopLeftPosition(corner);
+  sliderFilter.slider.setMargin(0.15f * (float)innerHeight);
+  sliderFilter.setHeight(innerHeight);
+
+  corner = sliderFilter.getBounds().getTopRight() + Point<int>(spacing, 0);
+
+  sliderSelection.setTopLeftPosition(corner);
+  sliderSelection.slider.setMargin(0.15f * (float)innerHeight);
+  sliderSelection.setHeight(innerHeight);
+
+  corner = sliderSelection.getBounds().getTopRight() + Point<int>(spacing, 0);
 
   // can now determine the width and set it, this will re-call `resized` but
   // since the height is the same it won't re-do the calculation

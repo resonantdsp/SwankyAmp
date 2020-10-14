@@ -39,9 +39,13 @@ public:
 private:
   RSliderLabel sliderStages;
   RSliderLabel sliderOverhead;
+  RSliderLabel sliderFilter;
+  RSliderLabel sliderSelection;
 
   std::unique_ptr<SliderAttachment> attStages;
   std::unique_ptr<SliderAttachment> attOverhead;
+  std::unique_ptr<SliderAttachment> attFilter;
+  std::unique_ptr<SliderAttachment> attSelection;
 
   DISABLE_COMPONENT_RESIZE()
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(StagingGroup)
