@@ -259,6 +259,8 @@ void SwankyAmpLAF::drawRotarySlider(Graphics &g, int x, int y, int width,
                                     const float rotaryStartAngle,
                                     const float rotaryEndAngle,
                                     Slider &slider) {
+  // should make this rslider specific, then move the cast to the paint call
+  // of the rslider (cast the LAF)
   RSlider *rslider = dynamic_cast<RSlider *>(&slider);
 
   if (!rslider)
@@ -283,6 +285,108 @@ void SwankyAmpLAF::drawRotarySlider(Graphics &g, int x, int y, int width,
                          dims.radius, 0.0f, -dims.theta, dims.theta, true);
   dialPath.closeSubPath();
 
+  // dots outline
+
+  const float dotSize = dims.margin - 2.0f * dims.gap;
+
+  g.setColour(findColour(RSlider::dialOutlineColourId));
+
+  for (int iangle = 1; iangle < 10; iangle++) {
+    const float angle = dims.theta - iangle * dims.theta / 5.0f;
+    const auto dotCenter =
+        dialBounds.getCentre() - (dims.radius + dims.margin / 2.0f) *
+                                     Point<float>(sinf(angle), cosf(angle));
+    auto dotBounds = Rectangle<float>();
+    dotBounds.setCentre(dotCenter);
+    dotBounds.translate(-dotSize / 2.0f, -dotSize / 2.0f);
+    dotBounds.setSize(dotSize, dotSize);
+    g.fillEllipse(dotBounds);
+  }
+
+  const auto overAngle =
+      rslider->getOverValue() >= 0.0f
+          ? angleModulo(rotaryStartAngle +
+                        rslider->getOverValue() *
+                            (rotaryEndAngle - rotaryStartAngle))
+          : MathConstants<float>::pi;
+
+  // show range
+  if (rslider->getOverValue() >= 0) {
+    auto rangePath = Path();
+    rangePath.startNewSubPath(dialBounds.getCentre());
+    rangePath.addCentredArc(dialBounds.getCentreX(), dialBounds.getCentreY(),
+                            dims.radius + dims.margin,
+                            dims.radius + dims.margin, 0.0f, overAngle,
+                            dims.theta);
+    rangePath.addCentredArc(dialBounds.getCentreX(), dialBounds.getCentreY(),
+                            dims.radius, dims.radius, 0.0f, dims.theta,
+                            overAngle);
+    rangePath.closeSubPath();
+
+    g.setColour(
+        findColour(RSlider::dialDotColourId).withMultipliedSaturation(0.33f));
+    g.fillPath(rangePath);
+  }
+
+  // dots filled
+
+  auto dotClipPath = Path();
+  dotClipPath.startNewSubPath(dialBounds.getCentre());
+  dotClipPath.addCentredArc(dialBounds.getCentreX(), dialBounds.getCentreY(),
+                            dims.radius + dims.margin,
+                            dims.radius + dims.margin, 0.0f, -dims.theta,
+                            jmin(overAngle, sliderAngle));
+  dotClipPath.closeSubPath();
+
+  g.setColour(findColour(RSlider::dialDotColourId));
+  g.saveState();
+  g.reduceClipRegion(dotClipPath);
+
+  for (int iangle = 1; iangle < 10; iangle++) {
+    const float angle = dims.theta - iangle * dims.theta / 5.0f;
+    const auto dotCenter =
+        dialBounds.getCentre() - (dims.radius + dims.margin / 2.0f) *
+                                     Point<float>(sinf(angle), cosf(angle));
+    auto dotBounds = Rectangle<float>();
+    dotBounds.setCentre(dotCenter);
+    dotBounds.translate(-dotSize / 2.0f, -dotSize / 2.0f);
+    dotBounds.setSize(dotSize, dotSize);
+    g.fillEllipse(dotBounds);
+  }
+
+  g.restoreState();
+
+  // dots filled range
+
+  if (sliderAngle > overAngle) {
+    auto overClipPath = Path();
+    overClipPath.startNewSubPath(dialBounds.getCentre());
+    overClipPath.addCentredArc(dialBounds.getCentreX(), dialBounds.getCentreY(),
+                               dims.radius + dims.margin,
+                               dims.radius + dims.margin, 0.0f, overAngle,
+                               sliderAngle);
+    overClipPath.closeSubPath();
+
+    g.setColour(findColour(RSlider::dialColourId));
+    g.saveState();
+    g.reduceClipRegion(overClipPath);
+
+    for (int iangle = 1; iangle < 10; iangle++) {
+      const float angle = dims.theta - iangle * dims.theta / 5.0f;
+      const auto dotCenter =
+          dialBounds.getCentre() - (dims.radius + dims.margin / 2.0f) *
+                                       Point<float>(sinf(angle), cosf(angle));
+      auto dotBounds = Rectangle<float>();
+      dotBounds.setCentre(dotCenter);
+      dotBounds.translate(-dotSize / 2.0f, -dotSize / 2.0f);
+      dotBounds.setSize(dotSize, dotSize);
+      g.fillEllipse(dotBounds);
+    }
+
+    g.restoreState();
+  }
+
+  // Shadow
   SwankyAmpLAF::getDropShadow().drawForPath(g, dialPath);
 
   g.setColour(findColour(RSlider::dialColourId));
@@ -308,7 +412,6 @@ void SwankyAmpLAF::drawRotarySlider(Graphics &g, int x, int y, int width,
   g.setColour(findColour(RSlider::dialOutlineColourId));
 
   Path dialOutlinePath;
-  // dialOutlinePath.startNewSubPath(dims.start + Point<float>(1.5f, 0));
   dialOutlinePath.addCentredArc(dims.centre.getX(), dims.centre.getY(),
                                 dims.radius - 1.5f, dims.radius - 1.5f, 0.0f,
                                 -dims.theta, dims.theta, true);
@@ -335,50 +438,6 @@ void SwankyAmpLAF::drawRotarySlider(Graphics &g, int x, int y, int width,
                                  .translated(dialBounds.getCentre()));
   g.setColour(findColour(RSlider::dialOutlineColourId));
   g.fillPath(pointerPath);
-
-  // dots
-
-  const float dotSize = dims.margin - 2.0f * dims.gap;
-
-  auto dotClipPath = Path();
-  dotClipPath.startNewSubPath(dialBounds.getCentre());
-  dotClipPath.addCentredArc(dialBounds.getCentreX(), dialBounds.getCentreY(),
-                            dims.radius + dims.margin,
-                            dims.radius + dims.margin, 0.0f, -dims.theta,
-                            sliderAngle);
-  dotClipPath.closeSubPath();
-
-  g.setColour(findColour(RSlider::dialOutlineColourId));
-
-  for (int iangle = 1; iangle < 10; iangle++) {
-    const float angle = dims.theta - iangle * dims.theta / 5.0f;
-    const auto dotCenter =
-        dialBounds.getCentre() - (dims.radius + dims.margin / 2.0f) *
-                                     Point<float>(sinf(angle), cosf(angle));
-    auto dotBounds = Rectangle<float>();
-    dotBounds.setCentre(dotCenter);
-    dotBounds.translate(-dotSize / 2.0f, -dotSize / 2.0f);
-    dotBounds.setSize(dotSize, dotSize);
-    g.fillEllipse(dotBounds);
-  }
-
-  g.setColour(findColour(RSlider::dialDotColourId));
-  g.saveState();
-  g.reduceClipRegion(dotClipPath);
-
-  for (int iangle = 1; iangle < 10; iangle++) {
-    const float angle = dims.theta - iangle * dims.theta / 5.0f;
-    const auto dotCenter =
-        dialBounds.getCentre() - (dims.radius + dims.margin / 2.0f) *
-                                     Point<float>(sinf(angle), cosf(angle));
-    auto dotBounds = Rectangle<float>();
-    dotBounds.setCentre(dotCenter);
-    dotBounds.translate(-dotSize / 2.0f, -dotSize / 2.0f);
-    dotBounds.setSize(dotSize, dotSize);
-    g.fillEllipse(dotBounds);
-  }
-
-  g.restoreState();
 }
 
 void SwankyAmpLAF::drawToggleButton(Graphics &g, ToggleButton &button,

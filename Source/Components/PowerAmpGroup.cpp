@@ -24,6 +24,7 @@ PowerAmpGroup::PowerAmpGroup() : ParameterGroup("POWER AMP") {
   addAndMakeVisible(sliderDrive);
   sliderDrive.setLabel("DRIVE");
   sliderDrive.slider.setPosMapDownFmt("%4.1f");
+  sliderDrive.slider.setOverValue(0.5f);
 
   addAndMakeVisible(sliderTight);
   sliderTight.setLabel("TIGHT");

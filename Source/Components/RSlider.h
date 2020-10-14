@@ -54,12 +54,14 @@ public:
 
   void setGap(float pGap) { gap = pGap; }
   void setMargin(float pMargin) { margin = pMargin; }
+  void setOverValue(float value) { overValue = value; }
   void setPosMapLow(float value) { posMapLow = value; }
   void setPosMapHigh(float value) { posMapHigh = value; }
   void setPosMapFmt(const String &fmt) { posMapFmt = fmt; }
   void setPosMapDownFmt(const String &fmt) { posMapDownFmt = fmt; }
 
   const Image &getBgNoise() const { return bgNoise; }
+  const float getOverValue() const { return overValue; }
 
   enum ColourIds {
     dialColourId = 0x2000201,
@@ -79,6 +81,7 @@ private:
 
   float gap = 2.0f;
   float margin = 0.0f;
+  float overValue = -1.0f;
 
   Random rng;
   Image bgNoise;

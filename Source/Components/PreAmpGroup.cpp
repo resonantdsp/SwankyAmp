@@ -24,6 +24,7 @@ PreAmpGroup::PreAmpGroup() : ParameterGroup("PRE AMP") {
   addAndMakeVisible(sliderDrive);
   sliderDrive.setLabel("DRIVE");
   sliderDrive.slider.setPosMapDownFmt("%4.1f");
+  sliderDrive.slider.setOverValue(0.6f);
 
   addAndMakeVisible(sliderTight);
   sliderTight.setLabel("TIGHT");
