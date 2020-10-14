@@ -22,7 +22,6 @@
 
 #include "../Utils.h"
 #include "ParameterGroup.h"
-#include "RButton.h"
 #include "RSliderLabel.h"
 
 class ToneStackGroup : public ParameterGroup {
@@ -37,13 +36,13 @@ public:
   void resized() override;
 
 private:
-  RButton buttonSelection;
+  RSliderLabel sliderSelection;
   RSliderLabel sliderLow;
   RSliderLabel sliderMid;
   RSliderLabel sliderHigh;
   RSliderLabel sliderPresence;
 
-  std::unique_ptr<ButtonAttachment> attSelection;
+  std::unique_ptr<SliderAttachment> attSelection;
   std::unique_ptr<SliderAttachment> attLow;
   std::unique_ptr<SliderAttachment> attMid;
   std::unique_ptr<SliderAttachment> attHigh;

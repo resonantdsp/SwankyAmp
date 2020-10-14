@@ -59,6 +59,6 @@
 		The amoumt of signal in the higher mids, lower highs. Increase for more definition, more detail. Decrease to reduce brittle harshness.
 	</param>
 	<param id="idTsSelection">
-        Select the tone stack: F will give you a Fender-like tone stack with scooped mids. M will give you a Marshall-like tone stack with lots of mids for heavier distortion.
+        Tone stack model: 0 will give you a Fender-like tone stack with scooped mids, while 10 will give you a Marshall-like tone stack with lots of mids for heavier distortion.
 	</param>
 </tooltips>

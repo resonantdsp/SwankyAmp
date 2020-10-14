@@ -21,9 +21,9 @@
 #include "ToneStackGroup.h"
 
 ToneStackGroup::ToneStackGroup() : ParameterGroup("TONE STACK") {
-  buttonSelection.textOn = "M";
-  buttonSelection.textOff = "F";
-  addAndMakeVisible(buttonSelection);
+  addAndMakeVisible(sliderSelection);
+  sliderSelection.setLabel("MODEL");
+  sliderSelection.slider.setPosMapDownFmt("%4.1f");
 
   addAndMakeVisible(sliderLow);
   sliderLow.setLabel("LOW");
@@ -44,7 +44,7 @@ ToneStackGroup::ToneStackGroup() : ParameterGroup("TONE STACK") {
 
 void ToneStackGroup::attachVTS(AudioProcessorValueTreeState &vts) {
   attSelection.reset(
-      new ButtonAttachment(vts, "idTsSelection", buttonSelection));
+      new SliderAttachment(vts, "idTsSelection", sliderSelection.slider));
   attLow.reset(new SliderAttachment(vts, "idTsLow", sliderLow.slider));
   attMid.reset(new SliderAttachment(vts, "idTsMid", sliderMid.slider));
   attHigh.reset(new SliderAttachment(vts, "idTsHigh", sliderHigh.slider));
@@ -53,7 +53,7 @@ void ToneStackGroup::attachVTS(AudioProcessorValueTreeState &vts) {
 }
 
 void ToneStackGroup::attachTooltips(const TooltipsData &tooltips) {
-  buttonSelection.setTooltip(tooltips.getForParam("idTsSelection"));
+  sliderSelection.slider.setTooltip(tooltips.getForParam("idTsSelection"));
   sliderLow.slider.setTooltip(tooltips.getForParam("idTsLow"));
   sliderMid.slider.setTooltip(tooltips.getForParam("idTsMid"));
   sliderHigh.slider.setTooltip(tooltips.getForParam("idTsHigh"));
@@ -75,12 +75,11 @@ void ToneStackGroup::resized() {
   if (prevInnerHeight == innerHeight && prevCorner == corner)
     return;
 
-  buttonSelection.setTopLeftPosition(corner + Point<int>(spacing, spacing) / 2);
-  buttonSelection.setSize(
-      (int)(buttonSelection.calcWidthForHeight((float)innerHeight - spacing)),
-      (int)((float)innerHeight - spacing));
+  sliderSelection.setTopLeftPosition(corner);
+  sliderSelection.slider.setMargin(0.15f * (float)innerHeight);
+  sliderSelection.setHeight(innerHeight);
 
-  corner = buttonSelection.getBounds().getTopRight() + Point<int>(spacing, 0);
+  corner = sliderSelection.getBounds().getTopRight() + Point<int>(spacing, 0);
 
   sliderLow.setTopLeftPosition(corner);
   sliderLow.slider.setMargin(0.15f * (float)innerHeight);
