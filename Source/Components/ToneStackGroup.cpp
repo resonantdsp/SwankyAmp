@@ -20,7 +20,8 @@
 
 #include "ToneStackGroup.h"
 
-ToneStackGroup::ToneStackGroup() : ParameterGroup("TONE STACK") {
+ToneStackGroup::ToneStackGroup() : ParameterGroup("TONE STACK")
+{
   addAndMakeVisible(sliderSelection);
   sliderSelection.setLabel("MODEL");
   sliderSelection.slider.setPosMapDownFmt("%4.1f");
@@ -42,7 +43,8 @@ ToneStackGroup::ToneStackGroup() : ParameterGroup("TONE STACK") {
   sliderPresence.slider.setPosMapDownFmt("%4.1f");
 }
 
-void ToneStackGroup::attachVTS(AudioProcessorValueTreeState &vts) {
+void ToneStackGroup::attachVTS(AudioProcessorValueTreeState& vts)
+{
   attSelection.reset(
       new SliderAttachment(vts, "idTsSelection", sliderSelection.slider));
   attLow.reset(new SliderAttachment(vts, "idTsLow", sliderLow.slider));
@@ -52,7 +54,8 @@ void ToneStackGroup::attachVTS(AudioProcessorValueTreeState &vts) {
       new SliderAttachment(vts, "idTsPresence", sliderPresence.slider));
 }
 
-void ToneStackGroup::attachTooltips(const TooltipsData &tooltips) {
+void ToneStackGroup::attachTooltips(const TooltipsData& tooltips)
+{
   sliderSelection.slider.setTooltip(tooltips.getForParam("idTsSelection"));
   sliderLow.slider.setTooltip(tooltips.getForParam("idTsLow"));
   sliderMid.slider.setTooltip(tooltips.getForParam("idTsMid"));
@@ -60,7 +63,8 @@ void ToneStackGroup::attachTooltips(const TooltipsData &tooltips) {
   sliderPresence.slider.setTooltip(tooltips.getForParam("idTsPresence"));
 }
 
-void ToneStackGroup::resized() {
+void ToneStackGroup::resized()
+{
   const int prevInnerHeight = getBorderBounds().getHeight() - 2 * spacing;
   const Point<int> prevCorner =
       getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
@@ -72,8 +76,7 @@ void ToneStackGroup::resized() {
       getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
 
   // only re-set the positions when the height or position changes
-  if (prevInnerHeight == innerHeight && prevCorner == corner)
-    return;
+  if (prevInnerHeight == innerHeight && prevCorner == corner) return;
 
   sliderSelection.setTopLeftPosition(corner);
   sliderSelection.slider.setMargin(0.15f * (float)innerHeight);

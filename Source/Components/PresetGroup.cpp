@@ -23,17 +23,14 @@
 #include "ParameterGroup.h"
 #include "PresetGroup.h"
 
-PresetGroup::PresetGroup()
-    : buttonSave("presetGroupButtonSave",
-                 DrawableButton::ButtonStyle::ImageRaw),
-      buttonRemove("presetGroupButtonRemove",
-                   DrawableButton::ButtonStyle::ImageRaw),
-      buttonNext("presetGroupButtonNext",
-                 DrawableButton::ButtonStyle::ImageRaw),
-      buttonPrev("presetGroupButtonPrev",
-                 DrawableButton::ButtonStyle::ImageRaw),
-      buttonOpen("presetGroupButtonOpen",
-                 DrawableButton::ButtonStyle::ImageRaw) {
+PresetGroup::PresetGroup() :
+    buttonSave("presetGroupButtonSave", DrawableButton::ButtonStyle::ImageRaw),
+    buttonRemove(
+        "presetGroupButtonRemove", DrawableButton::ButtonStyle::ImageRaw),
+    buttonNext("presetGroupButtonNext", DrawableButton::ButtonStyle::ImageRaw),
+    buttonPrev("presetGroupButtonPrev", DrawableButton::ButtonStyle::ImageRaw),
+    buttonOpen("presetGroupButtonOpen", DrawableButton::ButtonStyle::ImageRaw)
+{
   presetSelector.setEditableText(true);
   addAndMakeVisible(presetSelector);
 
@@ -68,12 +65,14 @@ PresetGroup::PresetGroup()
   addAndMakeVisible(buttonOpen);
 }
 
-void PresetGroup::paint(Graphics &g) {
+void PresetGroup::paint(Graphics& g)
+{
   // skip the group paint to avoid drawing border
   Component::paint(g);
 }
 
-void PresetGroup::resized() {
+void PresetGroup::resized()
+{
   ParameterGroup::resized();
   presetSelector.setTopLeftPosition(0, 0);
   presetSelector.setSize(getHeight() * 8, getHeight());
@@ -89,8 +88,8 @@ void PresetGroup::resized() {
   buttonPrev.setImages(&prevIcon, &prevIconHighlight);
 
   buttonPrev.setSize(getHeight(), getHeight());
-  buttonPrev.setTopLeftPosition(presetSelector.getBounds().getTopRight() +
-                                Point<int>(spacing, 0));
+  buttonPrev.setTopLeftPosition(
+      presetSelector.getBounds().getTopRight() + Point<int>(spacing, 0));
 
   nextIcon.setPath(SwankyAmpLAF::getNextIconPath((float)getHeight(), pad));
   nextIcon.setStrokeType(PathStrokeType(stroke));

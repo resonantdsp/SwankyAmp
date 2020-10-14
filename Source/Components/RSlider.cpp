@@ -22,7 +22,8 @@
 
 #include "RSlider.h"
 
-RSlider::RSlider() {
+RSlider::RSlider()
+{
   setSliderStyle(Slider::RotaryHorizontalVerticalDrag);
   setTextBoxStyle(Slider::TextEntryBoxPosition::NoTextBox, true, 0, 0);
 }
@@ -30,19 +31,21 @@ RSlider::RSlider() {
 // from:
 // https://stackoverflow.com/questions/2342162/stdstring-formatting-like-sprintf
 // I don't even recognize C++ anymore, this looks like rust to me
-template <typename... Args>
-std::string stringFormat(const std::string &format, Args... args) {
-  size_t size = snprintf(nullptr, 0, format.c_str(), args...) +
-                (size_t)1; // Extra space for '\0'
-  if (size <= 0)
-    throw std::runtime_error("Error during formatting.");
+template<typename... Args>
+std::string stringFormat(const std::string& format, Args... args)
+{
+  size_t size = snprintf(nullptr, 0, format.c_str(), args...)
+      + (size_t)1;  // Extra space for '\0'
+  if (size <= 0) throw std::runtime_error("Error during formatting.");
   std::unique_ptr<char[]> buf(new char[size]);
   snprintf(buf.get(), size, format.c_str(), args...);
-  return std::string(buf.get(),
-                     buf.get() + size - 1); // We don't want the '\0' inside
+  return std::string(
+      buf.get(),
+      buf.get() + size - 1);  // We don't want the '\0' inside
 }
 
-String RSlider::fmtSliderPos(float sliderPos) const {
+String RSlider::fmtSliderPos(float sliderPos) const
+{
   const float pos = sliderPos * (posMapHigh - posMapLow) + posMapLow;
   if (isMouseButtonDown() && posMapDownFmt.length() > 0)
     return String(stringFormat(posMapDownFmt.toStdString(), pos));
@@ -50,20 +53,22 @@ String RSlider::fmtSliderPos(float sliderPos) const {
     return String(stringFormat(posMapFmt.toStdString(), pos));
 }
 
-RSliderDims RSlider::calcDims() const {
+RSliderDims RSlider::calcDims() const
+{
   RSliderDims dims;
 
   dims.gap = gap;
   dims.margin = margin;
 
   const RotaryParameters rotPars = getRotaryParameters();
-  dims.theta = jmax(fabsf(angleModulo(rotPars.startAngleRadians)),
-                    fabsf(angleModulo(rotPars.endAngleRadians)));
+  dims.theta = jmax(
+      fabsf(angleModulo(rotPars.startAngleRadians)),
+      fabsf(angleModulo(rotPars.endAngleRadians)));
 
   const float radiusForWidth =
       (float)getBounds().getWidth() / 2.0f - dims.margin;
-  const float radiusForHeight = ((float)getBounds().getHeight() - dims.margin) /
-                                (1.0f - cosf(dims.theta));
+  const float radiusForHeight = ((float)getBounds().getHeight() - dims.margin)
+      / (1.0f - cosf(dims.theta));
   dims.radius = jmin(radiusForWidth, radiusForHeight);
 
   // the amount clipped from the bottom due to limited angle
@@ -74,34 +79,40 @@ RSliderDims RSlider::calcDims() const {
       2.0f * dims.radius + dims.margin);
 
   dims.innerBounds = getBounds().toFloat();
-  dims.innerBounds.setSize((dims.radius + dims.margin) * 2.0f,
-                           (dims.radius + dims.margin) * 2.0f - clipped);
+  dims.innerBounds.setSize(
+      (dims.radius + dims.margin) * 2.0f,
+      (dims.radius + dims.margin) * 2.0f - clipped);
   dims.innerBounds.translate(
       (getBounds().getWidth() - dims.innerBounds.getWidth()) / 2.0f,
       (getBounds().getHeight() - dims.innerBounds.getHeight()) / 2.0f);
 
-  dims.centre.setXY(dims.innerBounds.getX() + dims.margin + dims.radius,
-                    dims.innerBounds.getY() + dims.margin + dims.radius);
+  dims.centre.setXY(
+      dims.innerBounds.getX() + dims.margin + dims.radius,
+      dims.innerBounds.getY() + dims.margin + dims.radius);
 
   return dims;
 }
 
-float RSlider::calcWidthForHeight(float height) const {
+float RSlider::calcWidthForHeight(float height) const
+{
   const RotaryParameters rotPars = getRotaryParameters();
-  const float theta = jmax(fabsf(angleModulo(rotPars.startAngleRadians)),
-                           fabsf(angleModulo(rotPars.endAngleRadians)));
+  const float theta = jmax(
+      fabsf(angleModulo(rotPars.startAngleRadians)),
+      fabsf(angleModulo(rotPars.endAngleRadians)));
 
   const float radiusForHeight = (height - margin) / (1.0f - cosf(theta));
 
   return (radiusForHeight + margin) * 2.0f;
 }
 
-float RSlider::calcHeightForWidth(float width) const {
+float RSlider::calcHeightForWidth(float width) const
+{
   const float radiusForWidth = width / 2.0f - margin;
   return (radiusForWidth + margin) * 2.0f;
 }
 
-void RSlider::resized() {
+void RSlider::resized()
+{
   Slider::resized();
   bgNoise = buildImageNoise(getWidth(), getHeight(), rng, 0.1f);
 }

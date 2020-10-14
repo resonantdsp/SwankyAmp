@@ -25,13 +25,14 @@
 #include "RButton.h"
 #include "RSliderLabel.h"
 
-class CabGroup : public ParameterGroup {
+class CabGroup : public ParameterGroup
+{
 public:
   CabGroup();
   ~CabGroup() {}
 
-  void attachVTS(AudioProcessorValueTreeState &vts) override;
-  void attachTooltips(const TooltipsData &tooltips) override;
+  void attachVTS(AudioProcessorValueTreeState& vts) override;
+  void attachTooltips(const TooltipsData& tooltips) override;
 
   void setHeight(int height) { setSize(0, height); }
   void resized() override;

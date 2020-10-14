@@ -30,13 +30,14 @@
 typedef AudioProcessorValueTreeState::SliderAttachment SliderAttachment;
 typedef AudioProcessorValueTreeState::ButtonAttachment ButtonAttachment;
 
-class SwankyAmpAudioProcessorEditor : public AudioProcessorEditor {
+class SwankyAmpAudioProcessorEditor : public AudioProcessorEditor
+{
 public:
-  SwankyAmpAudioProcessorEditor(SwankyAmpAudioProcessor &,
-                                AudioProcessorValueTreeState &);
+  SwankyAmpAudioProcessorEditor(
+      SwankyAmpAudioProcessor&, AudioProcessorValueTreeState&);
   ~SwankyAmpAudioProcessorEditor();
 
-  void paint(Graphics &) override;
+  void paint(Graphics&) override;
   void resized() override;
 
   String getPresetName() const { return presetGroup.presetSelector.getText(); }
@@ -53,8 +54,8 @@ private:
 
   // This reference is provided as a quick way for your editor to
   // access the processor object that created it.
-  SwankyAmpAudioProcessor &processor;
-  AudioProcessorValueTreeState &valueTreeState;
+  SwankyAmpAudioProcessor& processor;
+  AudioProcessorValueTreeState& valueTreeState;
 
   std::vector<String> managerListenIds;
 

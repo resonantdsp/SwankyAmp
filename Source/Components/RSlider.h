@@ -20,7 +20,8 @@
 
 #include <JuceHeader.h>
 
-struct RSliderDims {
+struct RSliderDims
+{
   // the radius of the knob
   float radius = 0.0f;
   // the amount of space between the knob edge and the graphic edge
@@ -35,7 +36,8 @@ struct RSliderDims {
   Point<float> centre;
 };
 
-class RSlider : public Slider {
+class RSlider : public Slider
+{
 public:
   RSlider();
   // NOTE: base class destructor is not virtual, so can't be using pointers to
@@ -57,13 +59,14 @@ public:
   void setOverValue(float value) { overValue = value; }
   void setPosMapLow(float value) { posMapLow = value; }
   void setPosMapHigh(float value) { posMapHigh = value; }
-  void setPosMapFmt(const String &fmt) { posMapFmt = fmt; }
-  void setPosMapDownFmt(const String &fmt) { posMapDownFmt = fmt; }
+  void setPosMapFmt(const String& fmt) { posMapFmt = fmt; }
+  void setPosMapDownFmt(const String& fmt) { posMapDownFmt = fmt; }
 
-  const Image &getBgNoise() const { return bgNoise; }
+  const Image& getBgNoise() const { return bgNoise; }
   const float getOverValue() const { return overValue; }
 
-  enum ColourIds {
+  enum ColourIds
+  {
     dialColourId = 0x2000201,
     dialOutlineColourId = 0x2000202,
     dialTextColourId = 0x2000203,

@@ -23,7 +23,8 @@
 #include "Components/LevelMeter.h"
 #include "dsp/PushPullAmp.h"
 
-class SwankyAmpAudioProcessor : public AudioProcessor {
+class SwankyAmpAudioProcessor : public AudioProcessor
+{
 public:
   SwankyAmpAudioProcessor();
   ~SwankyAmpAudioProcessor();
@@ -33,39 +34,39 @@ public:
   PushPullAmp amp_channel[2];
 
   // Objects with an `update` method for updating the value of input meters.
-  LevelMeterListener *meterListenersIn[2] = {nullptr, nullptr};
-  LevelMeterListener *meterListenersOut[2] = {nullptr, nullptr};
+  LevelMeterListener* meterListenersIn[2] = {nullptr, nullptr};
+  LevelMeterListener* meterListenersOut[2] = {nullptr, nullptr};
 
   AudioProcessorValueTreeState parameters;
 
-  std::atomic<float> *parInputLevel = nullptr;
-  std::atomic<float> *parOutputLevel = nullptr;
+  std::atomic<float>* parInputLevel = nullptr;
+  std::atomic<float>* parOutputLevel = nullptr;
 
-  std::atomic<float> *parTsLow = nullptr;
-  std::atomic<float> *parTsMid = nullptr;
-  std::atomic<float> *parTsHigh = nullptr;
-  std::atomic<float> *parTsPresence = nullptr;
-  std::atomic<float> *parTsSelection = nullptr;
+  std::atomic<float>* parTsLow = nullptr;
+  std::atomic<float>* parTsMid = nullptr;
+  std::atomic<float>* parTsHigh = nullptr;
+  std::atomic<float>* parTsPresence = nullptr;
+  std::atomic<float>* parTsSelection = nullptr;
 
-  std::atomic<float> *parGainStages = nullptr;
-  std::atomic<float> *parGainOverhead = nullptr;
+  std::atomic<float>* parGainStages = nullptr;
+  std::atomic<float>* parGainOverhead = nullptr;
 
-  std::atomic<float> *parCabOnOff = nullptr;
-  std::atomic<float> *parCabBrightness = nullptr;
-  std::atomic<float> *parCabDistance = nullptr;
-  std::atomic<float> *parCabDynamic = nullptr;
+  std::atomic<float>* parCabOnOff = nullptr;
+  std::atomic<float>* parCabBrightness = nullptr;
+  std::atomic<float>* parCabDistance = nullptr;
+  std::atomic<float>* parCabDynamic = nullptr;
 
-  std::atomic<float> *parPreAmpDrive = nullptr;
-  std::atomic<float> *parPreAmpTight = nullptr;
-  std::atomic<float> *parPreAmpGrit = nullptr;
-  std::atomic<float> *parLowCut = nullptr;
+  std::atomic<float>* parPreAmpDrive = nullptr;
+  std::atomic<float>* parPreAmpTight = nullptr;
+  std::atomic<float>* parPreAmpGrit = nullptr;
+  std::atomic<float>* parLowCut = nullptr;
 
-  std::atomic<float> *parPowerAmpDrive = nullptr;
-  std::atomic<float> *parPowerAmpTight = nullptr;
-  std::atomic<float> *parPowerAmpGrit = nullptr;
+  std::atomic<float>* parPowerAmpDrive = nullptr;
+  std::atomic<float>* parPowerAmpTight = nullptr;
+  std::atomic<float>* parPowerAmpGrit = nullptr;
 
-  std::atomic<float> *parPowerAmpSag = nullptr;
-  std::atomic<float> *parPowerAmpSagRatio = nullptr;
+  std::atomic<float>* parPowerAmpSag = nullptr;
+  std::atomic<float>* parPowerAmpSagRatio = nullptr;
 
   const std::vector<String> parameterIds = {
       "idInputLevel",    "idOutputLevel",
@@ -89,12 +90,12 @@ public:
   void releaseResources() override;
 
 #ifndef JucePlugin_PreferredChannelConfigurations
-  bool isBusesLayoutSupported(const BusesLayout &layouts) const override;
+  bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
 #endif
 
-  void processBlock(AudioBuffer<float> &, MidiBuffer &) override;
+  void processBlock(AudioBuffer<float>&, MidiBuffer&) override;
 
-  AudioProcessorEditor *createEditor() override;
+  AudioProcessorEditor* createEditor() override;
   bool hasEditor() const override;
 
   const String getName() const override;
@@ -108,12 +109,12 @@ public:
   int getCurrentProgram() override;
   void setCurrentProgram(int index) override;
   const String getProgramName(int index) override;
-  void changeProgramName(int index, const String &newName) override;
+  void changeProgramName(int index, const String& newName) override;
 
-  void getStateInformation(MemoryBlock &destData) override;
-  void setStateInformation(const void *data, int sizeInBytes) override;
-  void setStateInformation(const std::unique_ptr<XmlElement> &state,
-                           bool useAll = true);
+  void getStateInformation(MemoryBlock& destData) override;
+  void setStateInformation(const void* data, int sizeInBytes) override;
+  void setStateInformation(
+      const std::unique_ptr<XmlElement>& state, bool useAll = true);
 
 private:
   CriticalSection setStateMutex;

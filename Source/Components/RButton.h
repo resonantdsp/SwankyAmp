@@ -20,7 +20,8 @@
 
 #include <JuceHeader.h>
 
-class RButton : public ToggleButton {
+class RButton : public ToggleButton
+{
 public:
   RButton() {}
   ~RButton() {}
@@ -30,9 +31,10 @@ public:
   float calcWidthForHeight(float height) const { return height / 2.0f; }
   float calcHeightForWidth(float width) const { return width * 2.0f; }
 
-  const Image &getBgNoise() const { return bgNoise; }
+  const Image& getBgNoise() const { return bgNoise; }
 
-  enum ColourIds {
+  enum ColourIds
+  {
     buttonColourId = 0x2000401,
     textColourId = 0x2000402,
   };

@@ -24,7 +24,8 @@
 #include "ParameterGroup.h"
 #include "RSliderLabel.h"
 
-class StagingGroup : public ParameterGroup {
+class StagingGroup : public ParameterGroup
+{
 public:
   StagingGroup();
   ~StagingGroup() {}
@@ -32,8 +33,8 @@ public:
   void setHeight(int height) { setSize(0, height); }
   void resized() override;
 
-  void attachVTS(AudioProcessorValueTreeState &vts) override;
-  void attachTooltips(const TooltipsData &tooltips) override;
+  void attachVTS(AudioProcessorValueTreeState& vts) override;
+  void attachTooltips(const TooltipsData& tooltips) override;
 
 private:
   RSliderLabel sliderStages;

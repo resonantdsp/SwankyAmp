@@ -29,24 +29,26 @@ typedef AudioProcessorValueTreeState::ButtonAttachment ButtonAttachment;
 /*
  * A group of parameters drawn in a box, with a label sitting atop the box.
  */
-class ParameterGroup : public Component {
+class ParameterGroup : public Component
+{
 public:
-  ParameterGroup(const String &label);
+  ParameterGroup(const String& label);
   ParameterGroup() : ParameterGroup("") {}
   virtual ~ParameterGroup() {}
 
-  virtual void paint(Graphics &) override;
+  virtual void paint(Graphics&) override;
   virtual void resized() override;
 
-  virtual void attachVTS(AudioProcessorValueTreeState &vts) = 0;
-  virtual void attachTooltips(const TooltipsData &) {}
+  virtual void attachVTS(AudioProcessorValueTreeState& vts) = 0;
+  virtual void attachTooltips(const TooltipsData&) {}
 
-  const juce::Rectangle<int> &getBorderBounds() const { return borderBounds; }
+  const juce::Rectangle<int>& getBorderBounds() const { return borderBounds; }
 
-  void setLabel(const String &pLabel) {
+  void setLabel(const String& pLabel)
+  {
     label.setText(pLabel, dontSendNotification);
   }
-  void setFont(const Font &font);
+  void setFont(const Font& font);
   void setFont(float height);
   void setLineThickness(float thickness);
   void setSpacing(int spacing);
@@ -55,8 +57,9 @@ public:
   float getLineThickness() const { return lineThickness; }
   int getSpacing() const { return spacing; }
 
-  enum ColourIds {
-    borderColourId = 0x2000101, // the colour of the border
+  enum ColourIds
+  {
+    borderColourId = 0x2000101,  // the colour of the border
     steelColourId = 0x2000102,  // the component background brushed steel colour
   };
 

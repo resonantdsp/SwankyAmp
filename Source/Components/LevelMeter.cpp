@@ -22,30 +22,36 @@
 
 #include "LevelMeter.h"
 
-void LevelMeter::setBarWidth(int width) {
+void LevelMeter::setBarWidth(int width)
+{
   barWidth = width;
   setSize(labelWidth + labelGap + barWidth, getHeight());
 }
 
-void LevelMeter::setBarHeight(int height) {
+void LevelMeter::setBarHeight(int height)
+{
   setSize(labelWidth + labelGap + barWidth, height);
 }
 
-void LevelMeter::setLabelWidth(int width) {
+void LevelMeter::setLabelWidth(int width)
+{
   labelWidth = width;
   setSize(labelWidth + labelGap + barWidth, getHeight());
 }
 
-void LevelMeter::setLabelGap(int width) {
+void LevelMeter::setLabelGap(int width)
+{
   labelGap = width;
   setSize(labelWidth + labelGap + barWidth, getHeight());
 }
 
-float LevelMeter::dbToLevel(float db) const {
+float LevelMeter::dbToLevel(float db) const
+{
   return (db - dbLow) / (dbHigh - dbLow);
 }
 
-void LevelMeter::paint(Graphics &g) {
+void LevelMeter::paint(Graphics& g)
+{
   g.fillAll(Colours::transparentBlack);
 
   const auto bounds = g.getClipBounds();
@@ -58,7 +64,7 @@ void LevelMeter::paint(Graphics &g) {
 
   const float lw = 2.0f;
   const float corner = 2.0f;
-  const Font &font =
+  const Font& font =
       SwankyAmpLAF::getDefaultFontNarrow().withHeight(labelHeight);
 
   const auto clippedLevel = jmax(0.0f, jmin(1.0f, level));
@@ -67,8 +73,14 @@ void LevelMeter::paint(Graphics &g) {
   filledBarPath.addRoundedRectangle(
       fullBar.getX(),
       fullBar.getY() + fullBar.getHeight() * (1.0f - clippedLevel),
-      fullBar.getWidth(), fullBar.getHeight() * clippedLevel, corner, corner,
-      false, false, true, true);
+      fullBar.getWidth(),
+      fullBar.getHeight() * clippedLevel,
+      corner,
+      corner,
+      false,
+      false,
+      true,
+      true);
 
   g.setColour(findColour(backgroundColourId));
   g.fillRoundedRectangle(fullBar, corner);
@@ -77,11 +89,13 @@ void LevelMeter::paint(Graphics &g) {
   g.fillPath(filledBarPath);
 
   g.setFont(font);
-  for (const auto &tick : ticks) {
+  for (const auto& tick : ticks)
+  {
     const float y =
         (1.0f - (tick.first - dbLow) / (dbHigh - dbLow)) * fullBar.getHeight();
 
-    if (labelWidth > 0) {
+    if (labelWidth > 0)
+    {
       auto labelBox = Rectangle<float>();
       if (!labelsOnRight)
         labelBox.setX((float)bounds.getX());
@@ -103,17 +117,19 @@ void LevelMeter::paint(Graphics &g) {
   }
 
   g.setColour(findColour(outlineColourId));
-  g.drawRoundedRectangle(BorderSize<float>(lw / 2.0f).subtractedFrom(fullBar),
-                         corner, lw);
+  g.drawRoundedRectangle(
+      BorderSize<float>(lw / 2.0f).subtractedFrom(fullBar), corner, lw);
 }
 
-void LevelMeter::update(float db) {
+void LevelMeter::update(float db)
+{
   // The processor will call this from the audio thread, which simply stores
   // the maximum until the timer paints it to the UI
   maxLevel = jmax(maxLevel.load(), dbToLevel(db));
 }
 
-void LevelMeter::timerCallback() {
+void LevelMeter::timerCallback()
+{
   // The editor owns this component, and some time thread (?) will make calls to
   // this method to repaint the meter.
 

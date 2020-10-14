@@ -25,16 +25,18 @@
 typedef std::pair<float, String> MeterTick;
 typedef std::vector<MeterTick> MeterTicks;
 
-struct LevelMeterListener {
+struct LevelMeterListener
+{
   virtual ~LevelMeterListener() {}
   virtual void update(float) = 0;
 };
 
-class LevelMeter : public Component, public LevelMeterListener, private Timer {
+class LevelMeter : public Component, public LevelMeterListener, private Timer
+{
 public:
   LevelMeter() { setRefreshRate(30); }
 
-  void paint(Graphics &g) override;
+  void paint(Graphics& g) override;
   void update(float db) override;
 
   // NOTE: startTime just adds this to a list of timers a singleton time thread
@@ -43,7 +45,7 @@ public:
   void setDbLow(float db) { dbLow = db; }
   void setDbHigh(float db) { dbHigh = db; }
   void setDecayTau(float tau) { decayTau = tau; }
-  void setTicks(const MeterTicks &pTicks) { ticks = pTicks; }
+  void setTicks(const MeterTicks& pTicks) { ticks = pTicks; }
 
   void setBarWidth(int width);
   void setBarHeight(int height);
@@ -55,7 +57,8 @@ public:
   float getLabelHeight() const { return labelHeight; }
   int getLabelWidth() const { return labelWidth; }
 
-  enum ColourIds {
+  enum ColourIds
+  {
     outlineColourId = 0x2000301,
     backgroundColourId = 0x2000302,
     meterColourId = 0x2000303,

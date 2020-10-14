@@ -20,7 +20,8 @@
 
 #include "RSliderLabel.h"
 
-RSliderLabel::RSliderLabel() {
+RSliderLabel::RSliderLabel()
+{
   addAndMakeVisible(slider);
   addAndMakeVisible(label);
   label.setJustificationType(Justification::centredTop);
@@ -28,24 +29,29 @@ RSliderLabel::RSliderLabel() {
   slider.setMouseDragSensitivity(400);
 }
 
-void RSliderLabel::setWidth(int width) {
+void RSliderLabel::setWidth(int width)
+{
   setDimension = SetDimension::SetFromWidth;
   setSize(width, 0);
 }
 
-void RSliderLabel::setHeight(int height) {
+void RSliderLabel::setHeight(int height)
+{
   setDimension = SetDimension::SetFromHeight;
   setSize(0, height);
 }
 
-void RSliderLabel::setSliderMargin(float margin) {
+void RSliderLabel::setSliderMargin(float margin)
+{
   slider.setMargin(margin);
   // since the slider aspect ratio changes, must re-calculate the sizes
   resized();
 }
 
-void RSliderLabel::resized() {
-  if (setDimension == SetDimension::NoDimension) {
+void RSliderLabel::resized()
+{
+  if (setDimension == SetDimension::NoDimension)
+  {
     slider.setSize(0, 0);
     label.setSize(0, 0);
     return;
@@ -53,14 +59,17 @@ void RSliderLabel::resized() {
 
   const int labelHeight = (int)(label.getFont().getHeight() + 0.5f);
 
-  if (setDimension == SetDimension::SetFromHeight) {
+  if (setDimension == SetDimension::SetFromHeight)
+  {
     const int sliderHeight = jmax(0, getHeight() - labelHeight);
     const int width =
         (int)(slider.calcWidthForHeight((float)sliderHeight) + 0.5f);
     // note: this does re-trigger `resized`, but it won't recurse because it
     // proceeds only if bounds changed
     setSize(width, getHeight());
-  } else if (setDimension == SetDimension::SetFromWidth) {
+  }
+  else if (setDimension == SetDimension::SetFromWidth)
+  {
     const int sliderHeight =
         (int)(slider.calcHeightForWidth((float)getWidth()) + 0.5f);
     setSize(getWidth(), sliderHeight + labelHeight);

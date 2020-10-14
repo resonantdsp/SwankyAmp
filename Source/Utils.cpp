@@ -20,7 +20,8 @@
 
 #include "Utils.h"
 
-float angleModulo(float angle) {
+float angleModulo(float angle)
+{
   const float modulo = fmodf(angle, MathConstants<float>::twoPi);
   if (modulo > MathConstants<float>::pi)
     return modulo - MathConstants<float>::twoPi;
@@ -28,7 +29,8 @@ float angleModulo(float angle) {
     return modulo;
 }
 
-void fillImageNoise(Image &image, Random &rng, float alpha) {
+void fillImageNoise(Image& image, Random& rng, float alpha)
+{
   if (image.getFormat() != Image::PixelFormat::ARGB)
     image.convertedToFormat(Image::PixelFormat::ARGB);
   for (int i = 0; i < image.getWidth(); i++)
@@ -37,7 +39,8 @@ void fillImageNoise(Image &image, Random &rng, float alpha) {
           i, j, Colour::fromHSV(0.0f, 0.0f, 0.0f, rng.nextFloat() * alpha));
 }
 
-Image buildImageNoise(int width, int height, Random &rng, float alpha) {
+Image buildImageNoise(int width, int height, Random& rng, float alpha)
+{
   Image noise(Image::PixelFormat::ARGB, jmax(1, width), jmax(1, height), false);
   fillImageNoise(noise, rng, alpha);
   return noise;

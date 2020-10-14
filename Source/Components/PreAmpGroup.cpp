@@ -20,7 +20,8 @@
 
 #include "PreAmpGroup.h"
 
-PreAmpGroup::PreAmpGroup() : ParameterGroup("PRE AMP") {
+PreAmpGroup::PreAmpGroup() : ParameterGroup("PRE AMP")
+{
   addAndMakeVisible(sliderDrive);
   sliderDrive.setLabel("DRIVE");
   sliderDrive.slider.setPosMapDownFmt("%4.1f");
@@ -39,7 +40,8 @@ PreAmpGroup::PreAmpGroup() : ParameterGroup("PRE AMP") {
   sliderFilter.slider.setPosMapDownFmt("%4.1f");
 }
 
-void PreAmpGroup::attachVTS(AudioProcessorValueTreeState &vts) {
+void PreAmpGroup::attachVTS(AudioProcessorValueTreeState& vts)
+{
   attDrive.reset(
       new SliderAttachment(vts, "idPreAmpDrive", sliderDrive.slider));
   attTight.reset(
@@ -48,14 +50,16 @@ void PreAmpGroup::attachVTS(AudioProcessorValueTreeState &vts) {
   attFilter.reset(new SliderAttachment(vts, "idLowCut", sliderFilter.slider));
 }
 
-void PreAmpGroup::attachTooltips(const TooltipsData &tooltips) {
+void PreAmpGroup::attachTooltips(const TooltipsData& tooltips)
+{
   sliderDrive.slider.setTooltip(tooltips.getForParam("idPreAmpDrive"));
   sliderTight.slider.setTooltip(tooltips.getForParam("idPreAmpTight"));
   sliderGrit.slider.setTooltip(tooltips.getForParam("idPreAmpGrit"));
   sliderFilter.slider.setTooltip(tooltips.getForParam("idLowCut"));
 }
 
-void PreAmpGroup::resized() {
+void PreAmpGroup::resized()
+{
   const int prevInnerHeight = getBorderBounds().getHeight() - 2 * spacing;
   const Point<int> prevCorner =
       getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
@@ -67,8 +71,7 @@ void PreAmpGroup::resized() {
       getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
 
   // only re-set the positions when the height or position changes
-  if (prevInnerHeight == innerHeight && prevCorner == corner)
-    return;
+  if (prevInnerHeight == innerHeight && prevCorner == corner) return;
 
   sliderDrive.setTopLeftPosition(corner);
   sliderDrive.slider.setMargin(0.15f * (float)innerHeight);

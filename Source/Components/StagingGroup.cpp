@@ -20,8 +20,8 @@
 
 #include "StagingGroup.h"
 
-StagingGroup::StagingGroup() : ParameterGroup("STAGING") {
-
+StagingGroup::StagingGroup() : ParameterGroup("STAGING")
+{
   addAndMakeVisible(sliderStages);
   sliderStages.setLabel("STAGES");
   sliderStages.slider.setPosMapLow(1.0f);
@@ -33,19 +33,22 @@ StagingGroup::StagingGroup() : ParameterGroup("STAGING") {
   sliderOverhead.slider.setPosMapDownFmt("%4.1f");
 }
 
-void StagingGroup::attachVTS(AudioProcessorValueTreeState &vts) {
+void StagingGroup::attachVTS(AudioProcessorValueTreeState& vts)
+{
   attStages.reset(
       new SliderAttachment(vts, "idGainStages", sliderStages.slider));
   attOverhead.reset(
       new SliderAttachment(vts, "idGainOverhead", sliderOverhead.slider));
 }
 
-void StagingGroup::attachTooltips(const TooltipsData &tooltips) {
+void StagingGroup::attachTooltips(const TooltipsData& tooltips)
+{
   sliderStages.slider.setTooltip(tooltips.getForParam("idGainStages"));
   sliderOverhead.slider.setTooltip(tooltips.getForParam("idGainOverhead"));
 }
 
-void StagingGroup::resized() {
+void StagingGroup::resized()
+{
   const int prevInnerHeight = getBorderBounds().getHeight() - 2 * spacing;
   const Point<int> prevCorner =
       getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
@@ -57,8 +60,7 @@ void StagingGroup::resized() {
       getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
 
   // only re-set the positions when the height or position changes
-  if (prevInnerHeight == innerHeight && prevCorner == corner)
-    return;
+  if (prevInnerHeight == innerHeight && prevCorner == corner) return;
 
   sliderStages.setTopLeftPosition(corner);
   sliderStages.slider.setMargin(0.15f * (float)innerHeight);

@@ -22,7 +22,8 @@
 
 #include "ParameterGroup.h"
 
-ParameterGroup::ParameterGroup(const String &pLabel) {
+ParameterGroup::ParameterGroup(const String& pLabel)
+{
   setLabel(pLabel);
   label.setJustificationType(Justification::topLeft);
   label.setFont(24.0f);
@@ -34,29 +35,34 @@ ParameterGroup::ParameterGroup(const String &pLabel) {
   addAndMakeVisible(label);
 }
 
-void ParameterGroup::setFont(const Font &font) {
+void ParameterGroup::setFont(const Font& font)
+{
   label.setFont(font);
   // note that if the font size changes, the box will need to change
   resized();
 }
 
-void ParameterGroup::setFont(float height) {
+void ParameterGroup::setFont(float height)
+{
   label.setFont(height);
   resized();
 }
 
-void ParameterGroup::setLineThickness(float thickness) {
+void ParameterGroup::setLineThickness(float thickness)
+{
   lineThickness = thickness;
   // note: border bounds depend on line thickness affects paint
   resized();
 }
 
-void ParameterGroup::setSpacing(int pSpacing) {
+void ParameterGroup::setSpacing(int pSpacing)
+{
   spacing = pSpacing;
   resized();
 }
 
-void ParameterGroup::paint(Graphics &g) {
+void ParameterGroup::paint(Graphics& g)
+{
   gradient.setColour(0, findColour(steelColourId));
   gradient.setColour(1, Colours::white);
   gradient.setColour(2, findColour(steelColourId));
@@ -64,20 +70,23 @@ void ParameterGroup::paint(Graphics &g) {
   g.setGradientFill(gradient);
   g.fillRoundedRectangle(getBorderBounds().toFloat(), 2.0f * lineThickness);
 
-  g.drawImage(bgNoise, getBorderBounds().toFloat(),
-              RectanglePlacement::stretchToFit);
+  g.drawImage(
+      bgNoise, getBorderBounds().toFloat(), RectanglePlacement::stretchToFit);
 
   g.setColour(findColour(borderColourId));
-  g.drawRoundedRectangle(getBorderBounds().toFloat(), 2.0f * lineThickness,
-                         lineThickness);
+  g.drawRoundedRectangle(
+      getBorderBounds().toFloat(), 2.0f * lineThickness, lineThickness);
 
   g.setColour(Colour::fromHSV(0.0f, 0.0f, 1.0f, 0.5f));
-  g.drawRoundedRectangle(getBorderBounds().toFloat().translated(
-                             -lineThickness / 4.0f, -lineThickness / 4.0f),
-                         2.0f * lineThickness, lineThickness / 2.0f);
+  g.drawRoundedRectangle(
+      getBorderBounds().toFloat().translated(
+          -lineThickness / 4.0f, -lineThickness / 4.0f),
+      2.0f * lineThickness,
+      lineThickness / 2.0f);
 }
 
-void ParameterGroup::resized() {
+void ParameterGroup::resized()
+{
   label.setBounds(
       getLocalBounds().withHeight((int)(label.getFont().getHeight() + 0.5f)));
 
@@ -88,8 +97,10 @@ void ParameterGroup::resized() {
 
   bgNoise = buildImageNoise(
       // noise is not as wide, and gets stretched to create brushed metal
-      jmax(1, getBorderBounds().getWidth() / 20), getBorderBounds().getHeight(),
-      rng, bgNoiseAlpha);
+      jmax(1, getBorderBounds().getWidth() / 20),
+      getBorderBounds().getHeight(),
+      rng,
+      bgNoiseAlpha);
 
   gradient.point1 = getBorderBounds().getCentre().toFloat().translated(
       -0.5f * (float)getHeight(), 0.0f);

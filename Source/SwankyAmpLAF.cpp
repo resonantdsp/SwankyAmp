@@ -35,9 +35,10 @@ const Colour SwankyAmpLAF::colourHighlight =
 const Colour SwankyAmpLAF::colourSteel =
     Colour::fromHSV(0.0f, 0.0f, 0.96f, 1.0f);
 
-SwankyAmpLAF::SwankyAmpLAF() {
-  setColour(ResizableWindow::backgroundColourId,
-            SwankyAmpLAF::colourBackground);
+SwankyAmpLAF::SwankyAmpLAF()
+{
+  setColour(
+      ResizableWindow::backgroundColourId, SwankyAmpLAF::colourBackground);
   setColour(Slider::textBoxTextColourId, SwankyAmpLAF::colourDark);
 
   setColour(ParameterGroup::borderColourId, SwankyAmpLAF::colourDark);
@@ -89,14 +90,16 @@ SwankyAmpLAF::SwankyAmpLAF() {
   setColour(TooltipWindow::outlineColourId, SwankyAmpLAF::colourDark);
 }
 
-const Font &SwankyAmpLAF::getDefaultFont() {
+const Font& SwankyAmpLAF::getDefaultFont()
+{
   const static Font font = Font(Typeface::createSystemTypefaceFor(
       BinaryData::PTSansRegular_ttf, BinaryData::PTSansRegular_ttfSize));
 
   return font;
 }
 
-const Font &SwankyAmpLAF::getDefaultFontNarrow() {
+const Font& SwankyAmpLAF::getDefaultFontNarrow()
+{
   const static Font font = Font(Typeface::createSystemTypefaceFor(
       BinaryData::PTSansNarrowRegular_ttf,
       BinaryData::PTSansNarrowRegular_ttfSize));
@@ -104,36 +107,55 @@ const Font &SwankyAmpLAF::getDefaultFontNarrow() {
   return font;
 }
 
-const Font &SwankyAmpLAF::getDefaultFontBold() {
+const Font& SwankyAmpLAF::getDefaultFontBold()
+{
   const static Font font = Font(Typeface::createSystemTypefaceFor(
       BinaryData::PTSansBold_ttf, BinaryData::PTSansBold_ttfSize));
 
   return font;
 }
 
-const DropShadow &SwankyAmpLAF::getDropShadow() {
-  const static DropShadow dropShadow(Colour::fromHSV(0.0f, 0.0f, 0.0f, 0.5), 6,
-                                     Point<int>(1, 1));
+const DropShadow& SwankyAmpLAF::getDropShadow()
+{
+  const static DropShadow dropShadow(
+      Colour::fromHSV(0.0f, 0.0f, 0.0f, 0.5), 6, Point<int>(1, 1));
   return dropShadow;
 }
 
-Path SwankyAmpLAF::getSaveIconPath(float d, float stroke) {
+Path SwankyAmpLAF::getSaveIconPath(float d, float stroke)
+{
   Path path;
 
   path.startNewSubPath(0.5f, 0.0f);
   path.lineTo(0.875f, 0.0f);
   path.lineTo(1.0f, 0.125f);
   path.lineTo(1.0f, 0.875f);
-  path.addCentredArc(0.875f, 0.875f, 0.125f, 0.125f, 0.0f,
-                     MathConstants<float>::halfPi, MathConstants<float>::pi);
+  path.addCentredArc(
+      0.875f,
+      0.875f,
+      0.125f,
+      0.125f,
+      0.0f,
+      MathConstants<float>::halfPi,
+      MathConstants<float>::pi);
   path.lineTo(0.125f, 1.0f);
-  path.addCentredArc(0.125f, 0.875f, 0.125f, 0.125f, 0.0f,
-                     MathConstants<float>::pi,
-                     3.0f * MathConstants<float>::halfPi);
+  path.addCentredArc(
+      0.125f,
+      0.875f,
+      0.125f,
+      0.125f,
+      0.0f,
+      MathConstants<float>::pi,
+      3.0f * MathConstants<float>::halfPi);
   path.lineTo(0.0f, 0.125f);
-  path.addCentredArc(0.125f, 0.125f, 0.125f, 0.125f, 0.0f,
-                     3.0f * MathConstants<float>::halfPi,
-                     2.0f * MathConstants<float>::pi);
+  path.addCentredArc(
+      0.125f,
+      0.125f,
+      0.125f,
+      0.125f,
+      0.0f,
+      3.0f * MathConstants<float>::halfPi,
+      2.0f * MathConstants<float>::pi);
   path.closeSubPath();
 
   path.startNewSubPath(0.25f, 0.0f);
@@ -149,7 +171,8 @@ Path SwankyAmpLAF::getSaveIconPath(float d, float stroke) {
   return path;
 }
 
-Path SwankyAmpLAF::getRemoveIconPath(float d, float stroke) {
+Path SwankyAmpLAF::getRemoveIconPath(float d, float stroke)
+{
   Path path;
 
   path.addRoundedRectangle(0.0f, 0.0f, 1.0f, 1.0f, 0.125f, 0.125f);
@@ -164,7 +187,8 @@ Path SwankyAmpLAF::getRemoveIconPath(float d, float stroke) {
   return path;
 }
 
-Path SwankyAmpLAF::getNextIconPath(float d, float stroke) {
+Path SwankyAmpLAF::getNextIconPath(float d, float stroke)
+{
   Path path;
 
   path.addRoundedRectangle(0.0f, 0.0f, 1.0f, 1.0f, 0.125f, 0.125f);
@@ -178,7 +202,8 @@ Path SwankyAmpLAF::getNextIconPath(float d, float stroke) {
   return path;
 }
 
-Path SwankyAmpLAF::getPrevIconPath(float d, float stroke) {
+Path SwankyAmpLAF::getPrevIconPath(float d, float stroke)
+{
   Path path;
 
   path.addRoundedRectangle(0.0f, 0.0f, 1.0f, 1.0f, 0.125f, 0.125f);
@@ -192,22 +217,38 @@ Path SwankyAmpLAF::getPrevIconPath(float d, float stroke) {
   return path;
 }
 
-Path SwankyAmpLAF::getOpenIconPath(float d, float stroke) {
+Path SwankyAmpLAF::getOpenIconPath(float d, float stroke)
+{
   Path path;
 
   path.startNewSubPath(1.0f, 0.5f);
   path.lineTo(1.0f, 0.875f);
-  path.addCentredArc(0.875f, 0.875f, 0.125f, 0.125f, 0.0f,
-                     MathConstants<float>::halfPi,
-                     2.0f * MathConstants<float>::halfPi);
+  path.addCentredArc(
+      0.875f,
+      0.875f,
+      0.125f,
+      0.125f,
+      0.0f,
+      MathConstants<float>::halfPi,
+      2.0f * MathConstants<float>::halfPi);
   path.lineTo(0.125f, 1.0f);
-  path.addCentredArc(0.125f, 0.875f, 0.125f, 0.125f, 0.0f,
-                     2.0f * MathConstants<float>::halfPi,
-                     3.0f * MathConstants<float>::halfPi);
+  path.addCentredArc(
+      0.125f,
+      0.875f,
+      0.125f,
+      0.125f,
+      0.0f,
+      2.0f * MathConstants<float>::halfPi,
+      3.0f * MathConstants<float>::halfPi);
   path.lineTo(0.0f, 0.125f);
-  path.addCentredArc(0.125f, 0.125f, 0.125f, 0.125f, 0.0f,
-                     3.0f * MathConstants<float>::halfPi,
-                     4.0f * MathConstants<float>::halfPi);
+  path.addCentredArc(
+      0.125f,
+      0.125f,
+      0.125f,
+      0.125f,
+      0.0f,
+      3.0f * MathConstants<float>::halfPi,
+      4.0f * MathConstants<float>::halfPi);
   path.lineTo(0.5f, 0.0f);
 
   path.startNewSubPath(0.5f, 0.5f);
@@ -222,7 +263,8 @@ Path SwankyAmpLAF::getOpenIconPath(float d, float stroke) {
   return path;
 }
 
-Path SwankyAmpLAF::getTickShape(float height) {
+Path SwankyAmpLAF::getTickShape(float height)
+{
   const float padding = height / 5.0f;
 
   Path path;
@@ -235,13 +277,14 @@ Path SwankyAmpLAF::getTickShape(float height) {
   path.startNewSubPath(height, height / 2.0f);
   path.lineTo(height - padding, height / 2.0f);
 
-  path.addEllipse(padding, padding, height - 2.0f * padding,
-                  height - 2.0f * padding);
+  path.addEllipse(
+      padding, padding, height - 2.0f * padding, height - 2.0f * padding);
 
   return path;
 }
 
-Slider::SliderLayout SwankyAmpLAF::getSliderLayout(Slider &slider) {
+Slider::SliderLayout SwankyAmpLAF::getSliderLayout(Slider& slider)
+{
   if (!slider.isRotary() && slider.getTextBoxPosition() != Slider::TextBoxBelow)
     return LookAndFeel_V4::getSliderLayout(slider);
 
@@ -254,19 +297,32 @@ Slider::SliderLayout SwankyAmpLAF::getSliderLayout(Slider &slider) {
   return layout;
 }
 
-void SwankyAmpLAF::drawRotarySlider(Graphics &g, int x, int y, int width,
-                                    int height, float sliderPos,
-                                    const float rotaryStartAngle,
-                                    const float rotaryEndAngle,
-                                    Slider &slider) {
+void SwankyAmpLAF::drawRotarySlider(
+    Graphics& g,
+    int x,
+    int y,
+    int width,
+    int height,
+    float sliderPos,
+    const float rotaryStartAngle,
+    const float rotaryEndAngle,
+    Slider& slider)
+{
   // should make this rslider specific, then move the cast to the paint call
   // of the rslider (cast the LAF)
-  RSlider *rslider = dynamic_cast<RSlider *>(&slider);
+  RSlider* rslider = dynamic_cast<RSlider*>(&slider);
 
   if (!rslider)
-    return LookAndFeel_V4::drawRotarySlider(g, x, y, width, height, sliderPos,
-                                            rotaryStartAngle, rotaryEndAngle,
-                                            slider);
+    return LookAndFeel_V4::drawRotarySlider(
+        g,
+        x,
+        y,
+        width,
+        height,
+        sliderPos,
+        rotaryStartAngle,
+        rotaryEndAngle,
+        slider);
 
   const RSliderDims dims = rslider->calcDims();
 
@@ -281,8 +337,15 @@ void SwankyAmpLAF::drawRotarySlider(Graphics &g, int x, int y, int width,
   dialBounds.setY(dims.centre.getY() - dims.radius);
 
   Path dialPath;
-  dialPath.addCentredArc(dims.centre.getX(), dims.centre.getY(), dims.radius,
-                         dims.radius, 0.0f, -dims.theta, dims.theta, true);
+  dialPath.addCentredArc(
+      dims.centre.getX(),
+      dims.centre.getY(),
+      dims.radius,
+      dims.radius,
+      0.0f,
+      -dims.theta,
+      dims.theta,
+      true);
   dialPath.closeSubPath();
 
   // dots outline
@@ -291,11 +354,12 @@ void SwankyAmpLAF::drawRotarySlider(Graphics &g, int x, int y, int width,
 
   g.setColour(findColour(RSlider::dialOutlineColourId));
 
-  for (int iangle = 1; iangle < 10; iangle++) {
+  for (int iangle = 1; iangle < 10; iangle++)
+  {
     const float angle = dims.theta - iangle * dims.theta / 5.0f;
-    const auto dotCenter =
-        dialBounds.getCentre() - (dims.radius + dims.margin / 2.0f) *
-                                     Point<float>(sinf(angle), cosf(angle));
+    const auto dotCenter = dialBounds.getCentre()
+        - (dims.radius + dims.margin / 2.0f)
+            * Point<float>(sinf(angle), cosf(angle));
     auto dotBounds = Rectangle<float>();
     dotBounds.setCentre(dotCenter);
     dotBounds.translate(-dotSize / 2.0f, -dotSize / 2.0f);
@@ -303,24 +367,33 @@ void SwankyAmpLAF::drawRotarySlider(Graphics &g, int x, int y, int width,
     g.fillEllipse(dotBounds);
   }
 
-  const auto overAngle =
-      rslider->getOverValue() >= 0.0f
-          ? angleModulo(rotaryStartAngle +
-                        rslider->getOverValue() *
-                            (rotaryEndAngle - rotaryStartAngle))
-          : MathConstants<float>::pi;
+  const auto overAngle = rslider->getOverValue() >= 0.0f
+      ? angleModulo(
+          rotaryStartAngle
+          + rslider->getOverValue() * (rotaryEndAngle - rotaryStartAngle))
+      : MathConstants<float>::pi;
 
   // show range
-  if (rslider->getOverValue() >= 0) {
+  if (rslider->getOverValue() >= 0)
+  {
     auto rangePath = Path();
     rangePath.startNewSubPath(dialBounds.getCentre());
-    rangePath.addCentredArc(dialBounds.getCentreX(), dialBounds.getCentreY(),
-                            dims.radius + dims.margin,
-                            dims.radius + dims.margin, 0.0f, overAngle,
-                            dims.theta);
-    rangePath.addCentredArc(dialBounds.getCentreX(), dialBounds.getCentreY(),
-                            dims.radius, dims.radius, 0.0f, dims.theta,
-                            overAngle);
+    rangePath.addCentredArc(
+        dialBounds.getCentreX(),
+        dialBounds.getCentreY(),
+        dims.radius + dims.margin,
+        dims.radius + dims.margin,
+        0.0f,
+        overAngle,
+        dims.theta);
+    rangePath.addCentredArc(
+        dialBounds.getCentreX(),
+        dialBounds.getCentreY(),
+        dims.radius,
+        dims.radius,
+        0.0f,
+        dims.theta,
+        overAngle);
     rangePath.closeSubPath();
 
     g.setColour(
@@ -332,21 +405,26 @@ void SwankyAmpLAF::drawRotarySlider(Graphics &g, int x, int y, int width,
 
   auto dotClipPath = Path();
   dotClipPath.startNewSubPath(dialBounds.getCentre());
-  dotClipPath.addCentredArc(dialBounds.getCentreX(), dialBounds.getCentreY(),
-                            dims.radius + dims.margin,
-                            dims.radius + dims.margin, 0.0f, -dims.theta,
-                            jmin(overAngle, sliderAngle));
+  dotClipPath.addCentredArc(
+      dialBounds.getCentreX(),
+      dialBounds.getCentreY(),
+      dims.radius + dims.margin,
+      dims.radius + dims.margin,
+      0.0f,
+      -dims.theta,
+      jmin(overAngle, sliderAngle));
   dotClipPath.closeSubPath();
 
   g.setColour(findColour(RSlider::dialDotColourId));
   g.saveState();
   g.reduceClipRegion(dotClipPath);
 
-  for (int iangle = 1; iangle < 10; iangle++) {
+  for (int iangle = 1; iangle < 10; iangle++)
+  {
     const float angle = dims.theta - iangle * dims.theta / 5.0f;
-    const auto dotCenter =
-        dialBounds.getCentre() - (dims.radius + dims.margin / 2.0f) *
-                                     Point<float>(sinf(angle), cosf(angle));
+    const auto dotCenter = dialBounds.getCentre()
+        - (dims.radius + dims.margin / 2.0f)
+            * Point<float>(sinf(angle), cosf(angle));
     auto dotBounds = Rectangle<float>();
     dotBounds.setCentre(dotCenter);
     dotBounds.translate(-dotSize / 2.0f, -dotSize / 2.0f);
@@ -358,24 +436,30 @@ void SwankyAmpLAF::drawRotarySlider(Graphics &g, int x, int y, int width,
 
   // dots filled range
 
-  if (sliderAngle > overAngle) {
+  if (sliderAngle > overAngle)
+  {
     auto overClipPath = Path();
     overClipPath.startNewSubPath(dialBounds.getCentre());
-    overClipPath.addCentredArc(dialBounds.getCentreX(), dialBounds.getCentreY(),
-                               dims.radius + dims.margin,
-                               dims.radius + dims.margin, 0.0f, overAngle,
-                               sliderAngle);
+    overClipPath.addCentredArc(
+        dialBounds.getCentreX(),
+        dialBounds.getCentreY(),
+        dims.radius + dims.margin,
+        dims.radius + dims.margin,
+        0.0f,
+        overAngle,
+        sliderAngle);
     overClipPath.closeSubPath();
 
     g.setColour(findColour(RSlider::dialColourId));
     g.saveState();
     g.reduceClipRegion(overClipPath);
 
-    for (int iangle = 1; iangle < 10; iangle++) {
+    for (int iangle = 1; iangle < 10; iangle++)
+    {
       const float angle = dims.theta - iangle * dims.theta / 5.0f;
-      const auto dotCenter =
-          dialBounds.getCentre() - (dims.radius + dims.margin / 2.0f) *
-                                       Point<float>(sinf(angle), cosf(angle));
+      const auto dotCenter = dialBounds.getCentre()
+          - (dims.radius + dims.margin / 2.0f)
+              * Point<float>(sinf(angle), cosf(angle));
       auto dotBounds = Rectangle<float>();
       dotBounds.setCentre(dotCenter);
       dotBounds.translate(-dotSize / 2.0f, -dotSize / 2.0f);
@@ -412,9 +496,15 @@ void SwankyAmpLAF::drawRotarySlider(Graphics &g, int x, int y, int width,
   g.setColour(findColour(RSlider::dialOutlineColourId));
 
   Path dialOutlinePath;
-  dialOutlinePath.addCentredArc(dims.centre.getX(), dims.centre.getY(),
-                                dims.radius - 1.5f, dims.radius - 1.5f, 0.0f,
-                                -dims.theta, dims.theta, true);
+  dialOutlinePath.addCentredArc(
+      dims.centre.getX(),
+      dims.centre.getY(),
+      dims.radius - 1.5f,
+      dims.radius - 1.5f,
+      0.0f,
+      -dims.theta,
+      dims.theta,
+      true);
   dialOutlinePath.closeSubPath();
   g.strokePath(dialOutlinePath, PathStrokeType(1.0f));
 
@@ -431,19 +521,25 @@ void SwankyAmpLAF::drawRotarySlider(Graphics &g, int x, int y, int width,
   Path pointerPath;
   auto pointerLength = dims.radius * 0.33f;
   auto lineThickness = 2.0f;
-  pointerPath.addRoundedRectangle(-lineThickness * 2.0f * 0.5f, -dims.radius,
-                                  lineThickness * 2.0f, pointerLength,
-                                  lineThickness);
+  pointerPath.addRoundedRectangle(
+      -lineThickness * 2.0f * 0.5f,
+      -dims.radius,
+      lineThickness * 2.0f,
+      pointerLength,
+      lineThickness);
   pointerPath.applyTransform(AffineTransform::rotation(sliderAngle)
                                  .translated(dialBounds.getCentre()));
   g.setColour(findColour(RSlider::dialOutlineColourId));
   g.fillPath(pointerPath);
 }
 
-void SwankyAmpLAF::drawToggleButton(Graphics &g, ToggleButton &button,
-                                    bool shouldDrawButtonAsHighlighted,
-                                    bool shouldDrawButtonAsDown) {
-  RButton *rbutton = dynamic_cast<RButton *>(&button);
+void SwankyAmpLAF::drawToggleButton(
+    Graphics& g,
+    ToggleButton& button,
+    bool shouldDrawButtonAsHighlighted,
+    bool shouldDrawButtonAsDown)
+{
+  RButton* rbutton = dynamic_cast<RButton*>(&button);
 
   if (!rbutton)
     return LookAndFeel_V4::drawToggleButton(
@@ -462,8 +558,9 @@ void SwankyAmpLAF::drawToggleButton(Graphics &g, ToggleButton &button,
 
   Rectangle<float> outer;
   outer.setSize(2.0f * radius, 4.0f * radius);
-  outer.setPosition(g.getClipBounds().getCentreX() - radius,
-                    g.getClipBounds().getCentreY() - 2.0f * radius);
+  outer.setPosition(
+      g.getClipBounds().getCentreX() - radius,
+      g.getClipBounds().getCentreY() - 2.0f * radius);
 
   // draw the circle
 
@@ -500,15 +597,19 @@ void SwankyAmpLAF::drawToggleButton(Graphics &g, ToggleButton &button,
 
   g.setColour(findColour(RButton::textColourId));
   g.setFont(SwankyAmpLAF::getDefaultFontNarrow().withHeight(radius));
-  g.drawText(button.getToggleState() ? rbutton->textOn : rbutton->textOff,
-             circleBounds, Justification::centred, true);
+  g.drawText(
+      button.getToggleState() ? rbutton->textOn : rbutton->textOff,
+      circleBounds,
+      Justification::centred,
+      true);
 
   g.setColour(findColour(RButton::buttonColourId));
   g.drawRoundedRectangle(outer, radius, lineWidth);
 }
 
-void SwankyAmpLAF::drawComboBox(Graphics &g, int width, int height, bool, int,
-                                int, int, int, ComboBox &box) {
+void SwankyAmpLAF::drawComboBox(
+    Graphics& g, int width, int height, bool, int, int, int, int, ComboBox& box)
+{
   const float lineThickness = 2.0f;
   const float cornerSize = 2.0f;
   Rectangle<int> boxBounds(0, 0, width, height);
@@ -519,10 +620,11 @@ void SwankyAmpLAF::drawComboBox(Graphics &g, int width, int height, bool, int,
   g.setColour(box.findColour(ComboBox::outlineColourId));
   g.drawRoundedRectangle(
       boxBounds.toFloat().reduced(lineThickness / 2.0f, lineThickness / 2.0f),
-      cornerSize, lineThickness);
+      cornerSize,
+      lineThickness);
 
-  Rectangle<float> arrowZone((float)(width - height), 0.0f, (float)height,
-                             (float)height);
+  Rectangle<float> arrowZone(
+      (float)(width - height), 0.0f, (float)height, (float)height);
   arrowZone.reduce(height / 3.0f, height / 2.5f);
 
   Path path;
@@ -535,8 +637,9 @@ void SwankyAmpLAF::drawComboBox(Graphics &g, int width, int height, bool, int,
   g.strokePath(path, PathStrokeType(2.0f));
 }
 
-Rectangle<int> SwankyAmpLAF::getTooltipBounds(const String &, Point<int>,
-                                              Rectangle<int> parentArea) {
+Rectangle<int> SwankyAmpLAF::getTooltipBounds(
+    const String&, Point<int>, Rectangle<int> parentArea)
+{
   const int lineHeight = 16;
   const int margin = lineHeight;
   const int padding = 4;
@@ -544,21 +647,22 @@ Rectangle<int> SwankyAmpLAF::getTooltipBounds(const String &, Point<int>,
 
   Rectangle<int> area(parentArea.withPosition(0, 0));
   area.setBottom(area.getBottom() - margin);
-  area.setTop(area.getBottom() - 2 * lineHeight - 2 * padding -
-              2 * shadowMargin);
+  area.setTop(
+      area.getBottom() - 2 * lineHeight - 2 * padding - 2 * shadowMargin);
   area.setLeft((int)(area.getWidth() * 0.4f + 0.5f));
   area.setRight(area.getRight() - margin);
 
   return area;
 }
 
-void SwankyAmpLAF::drawTooltip(Graphics &g, const String &text, int width,
-                               int height) {
+void SwankyAmpLAF::drawTooltip(
+    Graphics& g, const String& text, int width, int height)
+{
   const float lineHeight = 16.0f;
   const float lineThickness = 1.0f;
   const float padding = 4.0f;
 
-  const DropShadow &shadow = getDropShadow();
+  const DropShadow& shadow = getDropShadow();
   Rectangle<int> areaShadow(width, height);
   Rectangle<float> area = areaShadow.reduced(shadow.radius).toFloat();
 

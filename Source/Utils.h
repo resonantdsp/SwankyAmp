@@ -22,14 +22,14 @@
 
 float angleModulo(float angle);
 
-Image buildImageNoise(int width, int height, Random &rng, float alpha);
+Image buildImageNoise(int width, int height, Random& rng, float alpha);
 
 // commonly used in parameter groups that need to handle the size (e.g. to
 // maintain an aspect ratio)
-#define DISABLE_COMPONENT_RESIZE()                                             \
-  using Component::setSize;                                                    \
-  using Component::setBounds;                                                  \
-  using Component::setBoundsRelative;                                          \
-  using Component::setBoundsInset;                                             \
-  using Component::setBoundsToFit;                                             \
+#define DISABLE_COMPONENT_RESIZE() \
+  using Component::setSize; \
+  using Component::setBounds; \
+  using Component::setBoundsRelative; \
+  using Component::setBoundsInset; \
+  using Component::setBoundsToFit; \
   using Component::centreWithSize;

@@ -29,16 +29,17 @@
 #include "StagingGroup.h"
 #include "ToneStackGroup.h"
 
-class AmpGroup : public ParameterGroup {
+class AmpGroup : public ParameterGroup
+{
 public:
   AmpGroup();
   ~AmpGroup() {}
 
   void resized() override;
-  void paint(Graphics &g) override;
+  void paint(Graphics& g) override;
 
-  void attachVTS(AudioProcessorValueTreeState &vts) override;
-  void attachTooltips(const TooltipsData &tooltips) override;
+  void attachVTS(AudioProcessorValueTreeState& vts) override;
+  void attachTooltips(const TooltipsData& tooltips) override;
 
   void setGroupsHeight(int height);
 

@@ -26,8 +26,9 @@
 
 using SerializedState = std::unique_ptr<XmlElement>;
 
-struct StateEntry {
-  StateEntry(const String &name, File file, std::optional<size_t> stateIdx);
+struct StateEntry
+{
+  StateEntry(const String& name, File file, std::optional<size_t> stateIdx);
   StateEntry() {}
 
   String name;
@@ -36,12 +37,18 @@ struct StateEntry {
 };
 
 /** Connects a value tree state to a combo box and preset directory. */
-class PresetManager : public AudioProcessorValueTreeState::Listener {
+class PresetManager : public AudioProcessorValueTreeState::Listener
+{
 public:
-  PresetManager(SwankyAmpAudioProcessor &processor,
-                AudioProcessorValueTreeState &vts, ComboBox &comboBox,
-                Button &bntSave, Button &bntRemove, Button &bntNext,
-                Button &bntPrev, Button &btnOpen);
+  PresetManager(
+      SwankyAmpAudioProcessor& processor,
+      AudioProcessorValueTreeState& vts,
+      ComboBox& comboBox,
+      Button& bntSave,
+      Button& bntRemove,
+      Button& bntNext,
+      Button& bntPrev,
+      Button& btnOpen);
   ~PresetManager();
 
   void comboBoxChanged();
@@ -50,14 +57,14 @@ public:
   void buttonNextClicked();
   void buttonPrevClicked();
   void buttonOpenClicked();
-  void parameterChanged(const String &id, float newValue);
+  void parameterChanged(const String& id, float newValue);
 
-  const std::vector<String> &getParameterIds() const { return parameterIds; }
+  const std::vector<String>& getParameterIds() const { return parameterIds; }
 
-  void setState(const SerializedState &state);
+  void setState(const SerializedState& state);
 
 private:
-  void loadPreset(SerializedState state, File file, const String &name);
+  void loadPreset(SerializedState state, File file, const String& name);
   void loadFactoryPresets();
   bool loadPresetsFromDir();
 
@@ -65,19 +72,19 @@ private:
   void updateComboBox();
   void updatePresetDir();
 
-  void addStateEntry(const String &name, const File &file,
-                     SerializedState state);
-  void removeStateEntry(const String &name);
+  void
+  addStateEntry(const String& name, const File& file, SerializedState state);
+  void removeStateEntry(const String& name);
   void moveStateEntry(size_t idx, size_t newIdx);
 
-  SwankyAmpAudioProcessor &processor;
-  AudioProcessorValueTreeState &vts;
-  ComboBox &comboBox;
-  Button &buttonSave;
-  Button &buttonRemove;
-  Button &buttonNext;
-  Button &buttonPrev;
-  Button &buttonOpen;
+  SwankyAmpAudioProcessor& processor;
+  AudioProcessorValueTreeState& vts;
+  ComboBox& comboBox;
+  Button& buttonSave;
+  Button& buttonRemove;
+  Button& buttonNext;
+  Button& buttonPrev;
+  Button& buttonOpen;
   File presetDir;
 
   std::vector<String> parameterIds;

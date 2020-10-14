@@ -24,13 +24,14 @@
 #include "ParameterGroup.h"
 #include "RSliderLabel.h"
 
-class ToneStackGroup : public ParameterGroup {
+class ToneStackGroup : public ParameterGroup
+{
 public:
   ToneStackGroup();
   ~ToneStackGroup() {}
 
-  void attachVTS(AudioProcessorValueTreeState &vts) override;
-  void attachTooltips(const TooltipsData &tooltips) override;
+  void attachVTS(AudioProcessorValueTreeState& vts) override;
+  void attachTooltips(const TooltipsData& tooltips) override;
 
   void setHeight(int height) { setSize(0, height); }
   void resized() override;
