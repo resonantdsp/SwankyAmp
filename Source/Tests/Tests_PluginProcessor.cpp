@@ -85,3 +85,32 @@ TEST_CASE("version numbers are parsed")
   REQUIRE(parseVersionString("1.2.3.4") == VersionNumber(1, 2, 3));
   REQUIRE(parseVersionString("1.2.03") == VersionNumber(1, 2, 3));
 }
+
+TEST_CASE("remap sinh has correct behaviour")
+{
+  SECTION("y=0 at x=0")
+  {
+    REQUIRE(remapSinh(0.0f, 0.5f, 1.0f) == Approx(0.0f));
+    REQUIRE(remapSinh(0.0f, 0.5f, 5.0f) == Approx(0.0f));
+    REQUIRE(remapSinh(0.0f, 0.0f, 5.0f) == Approx(0.0f));
+    REQUIRE(remapSinh(0.0f, 1.0f, 5.0f) == Approx(0.0f));
+  }
+
+  SECTION("y=1 at x=1")
+  {
+    REQUIRE(remapSinh(1.0f, 0.5f, 1.0f) == Approx(1.0f));
+    REQUIRE(remapSinh(1.0f, 0.5f, 5.0f) == Approx(1.0f));
+    REQUIRE(remapSinh(1.0f, 0.0f, 5.0f) == Approx(1.0f));
+    REQUIRE(remapSinh(1.0f, 1.0f, 5.0f) == Approx(1.0f));
+  }
+
+  SECTION("y follows x0 correctly")
+  {
+    // when centered x0, then x=y at x=0.5
+    REQUIRE(remapSinh(0.5f, 0.5f, 5.0f) == Approx(0.5f));
+    // for larger x0, y initially moves faster and is larger at 0.5
+    REQUIRE(remapSinh(0.5f, 0.6f, 5.0f) > 0.5f);
+    // for smaller x0, y initially moves slower and is smaller at 0.5
+    REQUIRE(remapSinh(0.5f, 0.4f, 5.0f) < 0.5f);
+  }
+}

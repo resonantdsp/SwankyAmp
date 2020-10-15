@@ -17,6 +17,7 @@
  */
 
 #include <algorithm>
+#include <cmath>
 #include <unordered_map>
 
 #include <JuceHeader.h>
@@ -178,6 +179,29 @@ float remap_xy(float x, float x1, float x2, float y1, float y2)
   x = (x - x1) / (x2 - x1);
   float y = x * (y2 - y1) + y1;
   return y;
+}
+
+/**
+ * @brief Remap a value from the range (0, 1) to the same range, but with a new
+ * metric such that dy/dx (x) follows a sinh curve.
+ *
+ * In other words, for an input x near the eges 0 or 1, a small change in x
+ * will result in a bigger change in y. For input values near 0.5, a small
+ * change in x will result in a smaller change in y.
+ *
+ * @param x the value to remap
+ * @param x0 the point in the range (0, 1) where y changes most slowly
+ * @param scale larger values will create a bigger difference
+ * @return remaped value
+ */
+float remapSinh(float x, float x0, float scale)
+{
+  // the value mapped by sinh
+  const float mapped = sinh((x - x0) * scale);
+  // y(x) at the bounds 0 and 1
+  const float lower = sinh((0.0f - x0) * scale);
+  const float upper = sinh((1.0f - x0) * scale);
+  return (mapped - lower) / (upper - lower);
 }
 
 // set the amp object user parameters from the VTS values
