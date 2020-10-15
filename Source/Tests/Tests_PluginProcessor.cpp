@@ -88,12 +88,12 @@ TEST_CASE("version numbers are parsed")
 
 TEST_CASE("remap sinh has correct behaviour")
 {
-  SECTION("y=0 at x=0")
+  SECTION("y=-1 at x=-1")
   {
-    REQUIRE(remapSinh(0.0f, 0.5f, 1.0f) == Approx(0.0f));
-    REQUIRE(remapSinh(0.0f, 0.5f, 5.0f) == Approx(0.0f));
-    REQUIRE(remapSinh(0.0f, 0.0f, 5.0f) == Approx(0.0f));
-    REQUIRE(remapSinh(0.0f, 1.0f, 5.0f) == Approx(0.0f));
+    REQUIRE(remapSinh(-1.0f, 0.0f, 1.0f) == Approx(-1.0f));
+    REQUIRE(remapSinh(-1.0f, 0.0f, 5.0f) == Approx(-1.0f));
+    REQUIRE(remapSinh(-1.0f, -1.0f, 5.0f) == Approx(-1.0f));
+    REQUIRE(remapSinh(-1.0f, 1.0f, 5.0f) == Approx(-1.0f));
   }
 
   SECTION("y=1 at x=1")
@@ -106,11 +106,18 @@ TEST_CASE("remap sinh has correct behaviour")
 
   SECTION("y follows x0 correctly")
   {
-    // when centered x0, then x=y at x=0.5
-    REQUIRE(remapSinh(0.5f, 0.5f, 5.0f) == Approx(0.5f));
-    // for larger x0, y initially moves faster and is larger at 0.5
-    REQUIRE(remapSinh(0.5f, 0.6f, 5.0f) > 0.5f);
-    // for smaller x0, y initially moves slower and is smaller at 0.5
-    REQUIRE(remapSinh(0.5f, 0.4f, 5.0f) < 0.5f);
+    // when centered x0, then x=y at x=0.0
+    REQUIRE(remapSinh(0.0f, 0.0f, 5.0f) == Approx(0.0f));
+    // for larger x0, y initially moves faster and is larger at 0
+    REQUIRE(remapSinh(0.0f, 0.1f, 5.0f) > 0.0f);
+    // for smaller x0, y initially moves slower and is smaller at 0
+    REQUIRE(remapSinh(0.0f, -0.1f, 5.0f) < 0.0f);
   }
+}
+
+TEST_CASE("invert remap sinh matches forward operation")
+{
+  REQUIRE(
+      invertRemapSinh(remapSinh(-0.25, 0.5f, 2.0f), 0.5f, 2.0f)
+      == Approx(-0.25f));
 }

@@ -182,18 +182,18 @@ float remap_xy(float x, float x1, float x2, float y1, float y2)
 }
 
 /**
- * @brief Remap a value from the range (0, 1) to the same range, but with a new
- * metric such that dy/dx (x) follows a sinh curve.
+ * @brief Remap a value from the range (-1, +1) to the same range, but with a
+ * new metric such that dy/dx(x) follows a sinh curve.
  *
- * In other words, for an input x near the eges 0 or 1, a small change in x
- * will result in a bigger change in y. For input values near 0.5, a small
+ * In other words, for an input x near the eges -1 or 1, a small change in x
+ * will result in a bigger change in y. For input values near 0, a small
  * change in x will result in a smaller change in y.
  *
  * The calulating uses exponential values in the intermediate steps. This can
  * probably be fixed later, but for now scales should stay below 100.
  *
  * @param x the value to remap
- * @param x0 the point in the range (0, 1) where y changes most slowly
+ * @param x0 the point in the range (-1, 1) where y changes most slowly
  * @param scale larger values will create a bigger difference
  * @return remaped value
  */
@@ -201,10 +201,18 @@ float remapSinh(float x, float x0, float scale)
 {
   // the value mapped by sinh
   const float mapped = sinh((x - x0) * scale);
-  // y(x) at the bounds 0 and 1
-  const float lower = sinh((0.0f - x0) * scale);
-  const float upper = sinh((1.0f - x0) * scale);
-  return (mapped - lower) / (upper - lower);
+  // y(x) at the bounds -1 and 1
+  const float lower = sinh((-1.0f - x0) * scale);
+  const float upper = sinh((+1.0f - x0) * scale);
+  return (mapped - lower) / (upper - lower) * 2.0f - 1.0f;
+}
+
+float invertRemapSinh(float x, float x0, float scale)
+{
+  const float lower = sinh((-1.0f - x0) * scale);
+  const float upper = sinh((+1.0f - x0) * scale);
+  const float unscaled = (x + 1.0f) / 2.0f * (upper - lower) + lower;
+  return asinh(unscaled) / scale + x0;
 }
 
 // set the amp object user parameters from the VTS values
@@ -212,27 +220,9 @@ void SwankyAmpAudioProcessor::setAmpParameters()
 {
   for (int i = 0; i < 2; i++)
   {
-    const float preAmpDriveMap = remap_xy(
-        remapSinh(
-            remap_xy(*parPreAmpDrive, -1.0f, 1.0f, 0.0f, 1.0f), 0.6f, 3.0f),
-        0.0f,
-        1.0f,
-        -1.0f,
-        1.0f);
-    const float powerAmpDriveMap = remap_xy(
-        remapSinh(
-            remap_xy(*parPowerAmpDrive, -1.0f, 1.0f, 0.0f, 1.0f), 0.5f, 5.0f),
-        0.0f,
-        1.0f,
-        -1.0f,
-        1.0f);
-    const float powerAmpSagMap = remap_xy(
-        remapSinh(
-            remap_xy(*parPowerAmpSag, -1.0f, 1.0f, 0.0f, 1.0f), 0.5f, 3.0f),
-        0.0f,
-        1.0f,
-        -1.0f,
-        1.0f);
+    const float preAmpDriveMap = remapSinh(*parPreAmpDrive, 0.6f, 3.0f);
+    const float powerAmpDriveMap = remapSinh(*parPowerAmpDrive, 0.5f, 5.0f);
+    const float powerAmpSagMap = remapSinh(*parPowerAmpSag, 0.5f, 3.0f);
 
     amp_channel[i].set_input_level(*parInputLevel);
     amp_channel[i].set_output_level(
@@ -692,7 +682,7 @@ void SwankyAmpAudioProcessor::setStateInformation(
     }
     if (values.find("idPowerAmpSag") != values.end())
     {
-      const float value = values["idPowerAmpSag"];
+      const double value = values["idPowerAmpSag"];
       values["idPowerAmpSag"] = value;
     }
   }
