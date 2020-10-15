@@ -73,7 +73,7 @@ SwankyAmpAudioProcessor::SwankyAmpAudioProcessor() :
             MAKE_PARAMETER(CabDistance, 0.0f, 1.0f, 0.5f),
             MAKE_PARAMETER_UNIT(CabDynamic),
 
-            MAKE_PARAMETER(PreAmpDrive, -1.0f, 1.0f, -0.5f),
+            MAKE_PARAMETER(PreAmpDrive, -1.0f, 1.0f, -0.4f),
             MAKE_PARAMETER_UNIT(PreAmpTight),
             MAKE_PARAMETER_UNIT(PreAmpGrit),
 
@@ -189,6 +189,9 @@ float remap_xy(float x, float x1, float x2, float y1, float y2)
  * will result in a bigger change in y. For input values near 0.5, a small
  * change in x will result in a smaller change in y.
  *
+ * The calulating uses exponential values in the intermediate steps. This can
+ * probably be fixed later, but for now scales should stay below 100.
+ *
  * @param x the value to remap
  * @param x0 the point in the range (0, 1) where y changes most slowly
  * @param scale larger values will create a bigger difference
@@ -209,14 +212,29 @@ void SwankyAmpAudioProcessor::setAmpParameters()
 {
   for (int i = 0; i < 2; i++)
   {
+    const float preAmpDriveMap = remap_xy(
+        remapSinh(
+            remap_xy(*parPreAmpDrive, -1.0f, 1.0f, 0.0f, 1.0f), 0.6f, 3.5f),
+        0.0f,
+        1.0f,
+        -1.0f,
+        1.0f);
+    const float powerAmpDriveMap = remap_xy(
+        remapSinh(
+            remap_xy(*parPowerAmpDrive, -1.0f, 1.0f, 0.0f, 1.0f), 0.5f, 4.5f),
+        0.0f,
+        1.0f,
+        -1.0f,
+        1.0f);
+
     amp_channel[i].set_input_level(*parInputLevel);
     amp_channel[i].set_output_level(
         *parOutputLevel +
         // as the power drive goes too low, there is a significant db increase
         // not caught by the calibration
         remap_xy(*parPowerAmpDrive, -1.0f, 0.0f, -5.0f / 35.0f, 0.0f));
-    amp_channel[i].set_triode_drive(*parPreAmpDrive);
-    amp_channel[i].set_tetrode_drive(*parPowerAmpDrive);
+    amp_channel[i].set_triode_drive(preAmpDriveMap);
+    amp_channel[i].set_tetrode_drive(powerAmpDriveMap);
 
     amp_channel[i].set_tonestack_bass(*parTsLow);
     amp_channel[i].set_tonestack_mids(*parTsMid);
