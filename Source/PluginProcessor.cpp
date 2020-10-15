@@ -71,7 +71,7 @@ SwankyAmpAudioProcessor::SwankyAmpAudioProcessor() :
                 "idCabOnOff", "CabOnOff", true),
             MAKE_PARAMETER_UNIT(CabBrightness),
             MAKE_PARAMETER(CabDistance, 0.0f, 1.0f, 0.5f),
-            MAKE_PARAMETER_UNIT(CabDynamic),
+            MAKE_PARAMETER(CabDynamic, -1.0f, 1.0f, -2.0f),
 
             MAKE_PARAMETER(PreAmpDrive, -1.0f, 1.0f, -0.4f),
             MAKE_PARAMETER_UNIT(PreAmpTight),
@@ -214,14 +214,21 @@ void SwankyAmpAudioProcessor::setAmpParameters()
   {
     const float preAmpDriveMap = remap_xy(
         remapSinh(
-            remap_xy(*parPreAmpDrive, -1.0f, 1.0f, 0.0f, 1.0f), 0.6f, 3.5f),
+            remap_xy(*parPreAmpDrive, -1.0f, 1.0f, 0.0f, 1.0f), 0.6f, 3.0f),
         0.0f,
         1.0f,
         -1.0f,
         1.0f);
     const float powerAmpDriveMap = remap_xy(
         remapSinh(
-            remap_xy(*parPowerAmpDrive, -1.0f, 1.0f, 0.0f, 1.0f), 0.5f, 4.5f),
+            remap_xy(*parPowerAmpDrive, -1.0f, 1.0f, 0.0f, 1.0f), 0.5f, 5.0f),
+        0.0f,
+        1.0f,
+        -1.0f,
+        1.0f);
+    const float powerAmpSagMap = remap_xy(
+        remapSinh(
+            remap_xy(*parPowerAmpSag, -1.0f, 1.0f, 0.0f, 1.0f), 0.5f, 3.0f),
         0.0f,
         1.0f,
         -1.0f,
@@ -291,11 +298,11 @@ void SwankyAmpAudioProcessor::setAmpParameters()
         remap_sided(*parPowerAmpTight * -1.0f, -1.0f, +1.0f));
 
     amp_channel[i].set_tetrode_plate_sag_depth(
-        *parPowerAmpSag +
+        powerAmpSagMap +
         // shift the depth higher at low drive to get some audible effect when
         // not much of signal is over clip, and lower at high drive to avoid
         // just hacking away the signal with a constant db offset
-        remap_xy(*parPowerAmpDrive, -1.0f, 1.0f, 1.0f, 0.0f));
+        remap_xy(*parPowerAmpDrive, -1.0f, 1.0f, 1.0f, -1.0f));
     amp_channel[i].set_tetrode_plate_sag_ratio(*parPowerAmpSagRatio);
     amp_channel[i].set_tetrode_plate_sag_onset(*parPowerAmpSag);
     amp_channel[i].set_tetrode_plate_sag_factor(
@@ -665,6 +672,28 @@ void SwankyAmpAudioProcessor::setStateInformation(
       const double value = values["idPowerAmpSag"];
       const double post = transformUnitScale(value, 0.0, 1.0, 0.0, 0.5);
       values["idPowerAmpSag"] = post;
+    }
+  }
+
+  // from 1.1 to 1.2
+  if (state != nullptr && state->hasAttribute("pluginVersion")
+      && parseVersionString(state->getStringAttribute("pluginVersion"))
+          < VersionNumber(1, 2, 0))
+  {
+    if (values.find("idPreAmpDrive") != values.end())
+    {
+      const double value = values["idPreAmpDrive"];
+      values["idPreAmpDrive"] = value;
+    }
+    if (values.find("idPowerAmpDrive") != values.end())
+    {
+      const double value = values["idPowerAmpDrive"];
+      values["idPowerAmpDrive"] = value;
+    }
+    if (values.find("idPowerAmpSag") != values.end())
+    {
+      const float value = values["idPowerAmpSag"];
+      values["idPowerAmpSag"] = value;
     }
   }
 
