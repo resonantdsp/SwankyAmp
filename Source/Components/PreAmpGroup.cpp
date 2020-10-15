@@ -34,6 +34,7 @@ PreAmpGroup::PreAmpGroup() : ParameterGroup("PRE AMP")
   addAndMakeVisible(sliderGrit);
   sliderGrit.setLabel("GRIT");
   sliderGrit.slider.setPosMapDownFmt("%4.1f");
+  sliderGrit.slider.setOverValue(0.7f);
 }
 
 void PreAmpGroup::attachVTS(AudioProcessorValueTreeState& vts)
