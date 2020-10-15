@@ -30,7 +30,7 @@ This repository includes code to:
 
 * Build the VST3 or AAX using Visual Studio 2019
 * Build the AU using Xcode
-* Create the Windows installer using [Inno Setup](https://jrsoftware.org/isinfo.php)
+* Create the Windows installer using [WiX](https://wixtoolset.org/)
 * Create the Mac installers using a drag-and-drop DMG image.
 
 ### For Windows
@@ -51,8 +51,7 @@ The project is configured assuming the VST3 SDK is found at: `C:\SDKs\VST_SDK\VS
 To build the installer:
 
 * Move into the `package` directory
-* Open the Inno Setup script `setup.iss`
-* Compile the installer, it should be created at `package\SwankyAmp-win64.exe`
+* Run `bash build-win.sh` (probably want to do that using WSL)
 
 ### For Mac
 
