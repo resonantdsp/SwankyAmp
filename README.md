@@ -8,6 +8,10 @@ You can find the installers on the website:
 
 ![Swanky Amp](https://www.resonantdsp.com/images/swanky-amp.jpg)
 
+## Demo
+
+[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/pz3v87VMQfk/0.jpg)](https://www.youtube.com/watch?v=pz3v87VMQfk)
+
 ## Usage
 
 Load the plugin into your favorite VST host or DAW (into a mono or stereo track), and have fun!
