@@ -156,8 +156,8 @@ public:
   }
 
   inline void set_num_stages(int x) { numStages = x; }
-  inline void set_drive(FAUSTFLOAT x) { drive = ULSCALE(x, 5e-1f, 1e3f); }
-  inline float get_drive() const { return IULSCALE(drive, 5e-1f, 1e3f); }
+  inline void set_drive(FAUSTFLOAT x) { drive = ULSCALE(x, 1e-1f, 2e3f); }
+  inline float get_drive() const { return IULSCALE(drive, 1e-1f, 2e3f); }
   inline void set_overhead(FAUSTFLOAT x) { overhead = ULSCALE(x, 1e-1f, 1e1f); }
   inline float get_overhead() const { return IULSCALE(overhead, 1e-1f, 1e1f); }
 
@@ -258,8 +258,8 @@ public:
     tetrodePlate.set_sag_onset(x);
   }
 
-  inline void set_drive(FAUSTFLOAT x) { drive = ULSCALE(x, 5e-1f, 5e2f); }
-  inline float get_drive() const { return IULSCALE(drive, 5e-1f, 5e2f); }
+  inline void set_drive(FAUSTFLOAT x) { drive = ULSCALE(x, 3e1f, 3e4f); }
+  inline float get_drive() const { return IULSCALE(drive, 3e1f, 3e4f); }
 
 private:
   TetrodeGrid tetrodeGrid;
@@ -328,7 +328,7 @@ public:
         powerAmpSweepScales,
         (size_t)NUM_SWEEP_BINS);
 
-    const float outputScale = DB2LINEAR(outputLevel + 10.0f);
+    const float outputScale = DB2LINEAR(outputLevel);
     scaleBuffer(count, buffer, powerAmpScale * cabinetScale * outputScale);
   }
 
@@ -439,30 +439,30 @@ private:
   float toneStackSelector = 0;
 
   const float preAmpSweepScales[NUM_SWEEP_BINS + 1] = {
-      7.938998e-02f,
-      3.716311e-02f,
-      1.738177e-02f,
-      8.038360e-03f,
-      3.619326e-03f,
-      1.657188e-03f,
-      8.175384e-04f,
-      4.937290e-04f,
-      4.047297e-04f,
-      3.781237e-04f,
-      3.309307e-04f};
+      8.676414e-03f,
+      4.294761e-03f,
+      1.687722e-03f,
+      6.320606e-04f,
+      2.316651e-04f,
+      8.176096e-05f,
+      2.982284e-05f,
+      1.479136e-05f,
+      1.232648e-05f,
+      1.210069e-05f,
+      9.698762e-06f};
 
   const float powerAmpSweepScales[NUM_SWEEP_BINS + 1] = {
-      1.574379e+00f,
-      8.079116e-01f,
-      4.232488e-01f,
-      2.287124e-01f,
-      1.209799e-01f,
-      6.344776e-02f,
-      4.388500e-02f,
-      4.185453e-02f,
-      4.794303e-02f,
-      5.917895e-02f,
-      7.668519e-02f};
+      8.590898e-01f,
+      4.493977e-01f,
+      2.417230e-01f,
+      1.281823e-01f,
+      6.675259e-02f,
+      4.269145e-02f,
+      3.635631e-02f,
+      3.546308e-02f,
+      3.480443e-02f,
+      3.322940e-02f,
+      3.182487e-02f};
 
   void resetParameters()
   {

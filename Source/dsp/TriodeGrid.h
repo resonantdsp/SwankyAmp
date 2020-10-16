@@ -51,22 +51,22 @@ public:
   }
   inline void set_clip(FAUSTFLOAT x)
   {
-    x += 4.160800e-01f;
+    x += 4.146244e-01f;
     *par_clip = uscale(x, 0.0f, 5.0f);
   }
   inline void set_corner(FAUSTFLOAT x)
   {
-    x += 2.000031e-02f;
+    x += 1.847635e-02f;
     *par_corner = uscale(x, 0.0f, 5.0f);
   }
   inline void set_hp_freq(FAUSTFLOAT x)
   {
-    x += 4.522110e-01f;
+    x += 4.522112e-01f;
     *par_hp_freq = ulscale(x, 1e-1f, 1e+2f);
   }
   inline void set_level(FAUSTFLOAT x)
   {
-    x += 3.357217e-01f;
+    x += 3.357345e-01f;
     *par_level = uscale(x, -5.0f, +5.0f);
   }
   inline void set_ratio(FAUSTFLOAT x)
@@ -76,7 +76,7 @@ public:
   }
   inline void set_smooth(FAUSTFLOAT x)
   {
-    x += 1.528122e+00f;
+    x += 1.528339e+00f;
     *par_smooth = ulscale(x, 1e-5f, 1e+1f);
   }
   inline void set_tau(FAUSTFLOAT x)

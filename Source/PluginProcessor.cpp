@@ -71,7 +71,7 @@ SwankyAmpAudioProcessor::SwankyAmpAudioProcessor() :
                 "idCabOnOff", "CabOnOff", true),
             MAKE_PARAMETER_UNIT(CabBrightness),
             MAKE_PARAMETER(CabDistance, 0.0f, 1.0f, 0.5f),
-            MAKE_PARAMETER(CabDynamic, -1.0f, 1.0f, -2.0f),
+            MAKE_PARAMETER(CabDynamic, -1.0f, 1.0f, -0.3f),
 
             MAKE_PARAMETER(PreAmpDrive, -1.0f, 1.0f, -0.4f),
             MAKE_PARAMETER_UNIT(PreAmpTight),
@@ -220,16 +220,14 @@ void SwankyAmpAudioProcessor::setAmpParameters()
 {
   for (int i = 0; i < 2; i++)
   {
-    const float preAmpDriveMap = remapSinh(*parPreAmpDrive, 0.6f, 3.0f);
-    const float powerAmpDriveMap = remapSinh(*parPowerAmpDrive, 0.5f, 5.0f);
-    const float powerAmpSagMap = remapSinh(*parPowerAmpSag, 0.5f, 3.0f);
+    const float preAmpDriveMap = *parPreAmpDrive;
+    const float powerAmpDriveMap = remapSinh(*parPowerAmpDrive, -0.2f, 1.0f);
+    const float powerAmpSagMap = remapSinh(*parPowerAmpSag, 0.0f, 1.0f);
 
     amp_channel[i].set_input_level(*parInputLevel);
     amp_channel[i].set_output_level(
-        *parOutputLevel +
-        // as the power drive goes too low, there is a significant db increase
-        // not caught by the calibration
-        remap_xy(*parPowerAmpDrive, -1.0f, 0.0f, -5.0f / 35.0f, 0.0f));
+        *parOutputLevel
+        + (10.0f + remap_xy(preAmpDriveMap, 0.0f, 1.0f, 0.0f, -3.0f)) / 35.0f);
     amp_channel[i].set_triode_drive(preAmpDriveMap);
     amp_channel[i].set_tetrode_drive(powerAmpDriveMap);
 
@@ -256,7 +254,7 @@ void SwankyAmpAudioProcessor::setAmpParameters()
     amp_channel[i].set_tetrode_hp_freq(remap_sided(*parLowCut, -1.0f, +0.75f));
 
     const float minPreAmpTight =
-        remap_xy(*parPreAmpDrive, -0.5f, +1.0f, -1.0f, 0.0f);
+        remap_xy(preAmpDriveMap, -0.5f, +1.0f, -1.0f, 0.0f);
     const float adjPreAmpTight =
         remap_range(*parPreAmpTight, minPreAmpTight, +1.0f);
 
@@ -292,13 +290,13 @@ void SwankyAmpAudioProcessor::setAmpParameters()
         // shift the depth higher at low drive to get some audible effect when
         // not much of signal is over clip, and lower at high drive to avoid
         // just hacking away the signal with a constant db offset
-        remap_xy(*parPowerAmpDrive, -1.0f, 1.0f, 1.0f, -1.0f));
+        remap_xy(powerAmpDriveMap, -1.0f, 1.0f, 1.0f, -1.0f));
     amp_channel[i].set_tetrode_plate_sag_ratio(*parPowerAmpSagRatio);
-    amp_channel[i].set_tetrode_plate_sag_onset(*parPowerAmpSag);
+    amp_channel[i].set_tetrode_plate_sag_onset(powerAmpSagMap);
     amp_channel[i].set_tetrode_plate_sag_factor(
         amp_channel[i].get_tetrode_drive());
     amp_channel[i].set_tetrode_plate_sag_toggle(
-        *parPowerAmpSag < -0.99f ? -1.0f : 1.0f);
+        powerAmpSagMap < -0.99f ? -1.0f : 1.0f);
   }
 }
 
@@ -673,17 +671,21 @@ void SwankyAmpAudioProcessor::setStateInformation(
     if (values.find("idPreAmpDrive") != values.end())
     {
       const double value = values["idPreAmpDrive"];
-      values["idPreAmpDrive"] = value;
+      const float post = remap_xy((float)value, -1.0f, 1.0f, -0.67f, 0.86f);
+      values["idPreAmpDrive"] = (double)post;
     }
     if (values.find("idPowerAmpDrive") != values.end())
     {
       const double value = values["idPowerAmpDrive"];
-      values["idPowerAmpDrive"] = value;
+      const float post = invertRemapSinh(
+          remap_xy((float)value, -1.0f, 1.0f, -0.85, 1.14), -0.2f, 1.0f);
+      values["idPowerAmpDrive"] = (double)post;
     }
     if (values.find("idPowerAmpSag") != values.end())
     {
       const double value = values["idPowerAmpSag"];
-      values["idPowerAmpSag"] = value;
+      const float post = remapSinh((double)value, 0.0f, 1.0f);
+      values["idPowerAmpSag"] = (float)value;
     }
   }
 

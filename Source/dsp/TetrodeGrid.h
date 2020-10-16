@@ -81,7 +81,7 @@ public:
   }
   inline void set_taus(FAUSTFLOAT x)
   {
-    x += -4.923820e-05f;
+    x += -4.923818e-05f;
     *par_taus = ulscale(x, 1e-4f, 1e0f);
   }
 

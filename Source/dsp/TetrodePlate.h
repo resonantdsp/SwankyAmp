@@ -72,7 +72,7 @@ public:
   }
   inline void set_comp_tau(FAUSTFLOAT x)
   {
-    x += -1.314464e+00f;
+    x += -1.314456e+00f;
     *par_comp_tau = ulscale(x, 1e-3f, 1e0f);
   }
   inline void set_cross_corner(FAUSTFLOAT x)
@@ -82,12 +82,12 @@ public:
   }
   inline void set_drift2_depth(FAUSTFLOAT x)
   {
-    x += 2.950708e-02f;
+    x += 2.965889e-02f;
     *par_drift2_depth = ulscale(x, 1e-1f, 1e+1f);
   }
   inline void set_drift2_level(FAUSTFLOAT x)
   {
-    x += 5.678489e-01f;
+    x += 5.679661e-01f;
     *par_drift2_level = uscale(x, -50.0f, +50.0f);
   }
   inline void set_drift_depth(FAUSTFLOAT x)
@@ -102,7 +102,7 @@ public:
   }
   inline void set_drift_tau(FAUSTFLOAT x)
   {
-    x += -2.449032e-01f;
+    x += -2.449028e-01f;
     *par_drift_tau = ulscale(x, 1e-3f, 1e0f);
   }
   inline void set_hp_freq(FAUSTFLOAT x)
