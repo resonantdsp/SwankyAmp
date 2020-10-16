@@ -25,9 +25,10 @@
 #ifndef __faust2hpp_Meta_H__
 #define __faust2hpp_Meta_H__
 
-struct Meta {
+struct Meta
+{
   virtual ~Meta(){};
-  virtual void declare(const char *key, const char *value) = 0;
+  virtual void declare(const char* key, const char* value) = 0;
 };
 
 #endif

@@ -22,7 +22,8 @@
 #include "LevelMeter.h"
 #include "ParameterGroup.h"
 
-CabGroup::CabGroup() : ParameterGroup("CABINET") {
+CabGroup::CabGroup() : ParameterGroup("CABINET")
+{
   addAndMakeVisible(buttonCabOnOff);
 
   addAndMakeVisible(sliderBright);
@@ -38,7 +39,8 @@ CabGroup::CabGroup() : ParameterGroup("CABINET") {
   sliderDynamic.slider.setPosMapDownFmt("%4.1f");
 }
 
-void CabGroup::attachVTS(AudioProcessorValueTreeState &vts) {
+void CabGroup::attachVTS(AudioProcessorValueTreeState& vts)
+{
   attCabOnOff.reset(new ButtonAttachment(vts, "idCabOnOff", buttonCabOnOff));
   attCabBrightness.reset(
       new SliderAttachment(vts, "idCabBrightness", sliderBright.slider));
@@ -48,14 +50,16 @@ void CabGroup::attachVTS(AudioProcessorValueTreeState &vts) {
       new SliderAttachment(vts, "idCabDynamic", sliderDynamic.slider));
 }
 
-void CabGroup::attachTooltips(const TooltipsData &tooltips) {
+void CabGroup::attachTooltips(const TooltipsData& tooltips)
+{
   buttonCabOnOff.setTooltip(tooltips.getForParam("idCabOnOff"));
   sliderBright.slider.setTooltip(tooltips.getForParam("idCabBrightness"));
   sliderDistance.slider.setTooltip(tooltips.getForParam("idCabDistance"));
   sliderDynamic.slider.setTooltip(tooltips.getForParam("idCabDynamic"));
 }
 
-void CabGroup::resized() {
+void CabGroup::resized()
+{
   const int prevInnerHeight = getBorderBounds().getHeight() - 2 * spacing;
   const Point<int> prevCorner =
       getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
@@ -67,8 +71,7 @@ void CabGroup::resized() {
       getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
 
   // only re-set the positions when the height or position changes
-  if (prevInnerHeight == innerHeight && prevCorner == corner)
-    return;
+  if (prevInnerHeight == innerHeight && prevCorner == corner) return;
 
   buttonCabOnOff.setTopLeftPosition(corner + Point<int>(spacing, spacing) / 2);
   buttonCabOnOff.setSize(

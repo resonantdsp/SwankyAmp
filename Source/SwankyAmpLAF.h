@@ -20,7 +20,8 @@
 
 #include <JuceHeader.h>
 
-class SwankyAmpLAF : public LookAndFeel_V4 {
+class SwankyAmpLAF : public LookAndFeel_V4
+{
 public:
   SwankyAmpLAF();
 
@@ -32,9 +33,9 @@ public:
   // 22/29.333px
   // 24/32px
 
-  static const Font &getDefaultFont();
-  static const Font &getDefaultFontNarrow();
-  static const Font &getDefaultFontBold();
+  static const Font& getDefaultFont();
+  static const Font& getDefaultFontNarrow();
+  static const Font& getDefaultFontBold();
 
   static const Colour colourDark;
   static const Colour colourGrey;
@@ -42,7 +43,7 @@ public:
   static const Colour colourHighlight;
   static const Colour colourSteel;
 
-  static const DropShadow &getDropShadow();
+  static const DropShadow& getDropShadow();
 
   static Path getSaveIconPath(float d, float stroke = 0.0f);
   static Path getRemoveIconPath(float d, float stroke = 0.0f);
@@ -51,22 +52,38 @@ public:
   static Path getOpenIconPath(float d, float stroke = 0.0f);
 
   Path getTickShape(float height) override;
-  Slider::SliderLayout getSliderLayout(Slider &slider) override;
+  Slider::SliderLayout getSliderLayout(Slider& slider) override;
 
-  void drawRotarySlider(Graphics &g, int x, int y, int width, int height,
-                        float sliderPos, const float rotaryStartAngle,
-                        const float rotaryEndAngle, Slider &slider) override;
+  void drawRotarySlider(
+      Graphics& g,
+      int x,
+      int y,
+      int width,
+      int height,
+      float sliderPos,
+      const float rotaryStartAngle,
+      const float rotaryEndAngle,
+      Slider& slider) override;
 
-  void drawToggleButton(Graphics &g, ToggleButton &button,
-                        bool shouldDrawButtonAsHighlighted,
-                        bool shouldDrawButtonAsDown) override;
+  void drawToggleButton(
+      Graphics& g,
+      ToggleButton& button,
+      bool shouldDrawButtonAsHighlighted,
+      bool shouldDrawButtonAsDown) override;
 
-  void drawComboBox(Graphics &g, int width, int height, bool, int, int, int,
-                    int, ComboBox &box) override;
+  void drawComboBox(
+      Graphics& g,
+      int width,
+      int height,
+      bool,
+      int,
+      int,
+      int,
+      int,
+      ComboBox& box) override;
 
-  virtual juce::Rectangle<int>
-  getTooltipBounds(const String &, Point<int>,
-                   juce::Rectangle<int> parentArea) override;
-  virtual void drawTooltip(Graphics &g, const String &text, int width,
-                           int height) override;
+  virtual juce::Rectangle<int> getTooltipBounds(
+      const String&, Point<int>, juce::Rectangle<int> parentArea) override;
+  virtual void
+  drawTooltip(Graphics& g, const String& text, int width, int height) override;
 };

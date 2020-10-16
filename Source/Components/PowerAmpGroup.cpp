@@ -20,10 +20,12 @@
 
 #include "PowerAmpGroup.h"
 
-PowerAmpGroup::PowerAmpGroup() : ParameterGroup("POWER AMP") {
+PowerAmpGroup::PowerAmpGroup() : ParameterGroup("POWER AMP")
+{
   addAndMakeVisible(sliderDrive);
   sliderDrive.setLabel("DRIVE");
   sliderDrive.slider.setPosMapDownFmt("%4.1f");
+  sliderDrive.slider.setOverValue(0.7f);
 
   addAndMakeVisible(sliderTight);
   sliderTight.setLabel("TIGHT");
@@ -34,7 +36,8 @@ PowerAmpGroup::PowerAmpGroup() : ParameterGroup("POWER AMP") {
   sliderSag.slider.setPosMapDownFmt("%4.1f");
 }
 
-void PowerAmpGroup::attachVTS(AudioProcessorValueTreeState &vts) {
+void PowerAmpGroup::attachVTS(AudioProcessorValueTreeState& vts)
+{
   attDrive.reset(
       new SliderAttachment(vts, "idPowerAmpDrive", sliderDrive.slider));
   attTight.reset(
@@ -42,13 +45,15 @@ void PowerAmpGroup::attachVTS(AudioProcessorValueTreeState &vts) {
   attSag.reset(new SliderAttachment(vts, "idPowerAmpSag", sliderSag.slider));
 }
 
-void PowerAmpGroup::attachTooltips(const TooltipsData &tooltips) {
+void PowerAmpGroup::attachTooltips(const TooltipsData& tooltips)
+{
   sliderDrive.slider.setTooltip(tooltips.getForParam("idPowerAmpDrive"));
   sliderTight.slider.setTooltip(tooltips.getForParam("idPowerAmpTight"));
   sliderSag.slider.setTooltip(tooltips.getForParam("idPowerAmpSag"));
 }
 
-void PowerAmpGroup::resized() {
+void PowerAmpGroup::resized()
+{
   const int prevInnerHeight = getBorderBounds().getHeight() - 2 * spacing;
   const Point<int> prevCorner =
       getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
@@ -60,8 +65,7 @@ void PowerAmpGroup::resized() {
       getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
 
   // only re-set the positions when the height or position changes
-  if (prevInnerHeight == innerHeight && prevCorner == corner)
-    return;
+  if (prevInnerHeight == innerHeight && prevCorner == corner) return;
 
   sliderDrive.setTopLeftPosition(corner);
   sliderDrive.slider.setMargin(0.15f * (float)innerHeight);

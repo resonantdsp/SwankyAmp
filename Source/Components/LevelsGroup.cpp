@@ -20,7 +20,8 @@
 
 #include "LevelsGroup.h"
 
-LevelsGroup::LevelsGroup() : ParameterGroup("LEVELS") {
+LevelsGroup::LevelsGroup() : ParameterGroup("LEVELS")
+{
   const auto inputTicks = MeterTicks{{-16.5f, "S"}, {-2.5f, "H"}};
 
   meterInL.setDbLow(-26.0f);
@@ -33,8 +34,11 @@ LevelsGroup::LevelsGroup() : ParameterGroup("LEVELS") {
   meterInR.setLabelWidth(0);
 
   const auto outputTicks = MeterTicks{
-      {-5.0f, "-5"}, {-10.0f, ""},    {-15.0f, "-15"},
-      {-20.0f, ""},  {-25.0f, "-25"},
+      {-5.0f, "-5"},
+      {-10.0f, ""},
+      {-15.0f, "-15"},
+      {-20.0f, ""},
+      {-25.0f, "-25"},
   };
 
   meterOutL.setDbLow(-30.0f);
@@ -68,19 +72,22 @@ LevelsGroup::LevelsGroup() : ParameterGroup("LEVELS") {
   sliderOutputLevel.slider.setPosMapDownFmt("%+.1f");
 }
 
-void LevelsGroup::attachVTS(AudioProcessorValueTreeState &vts) {
+void LevelsGroup::attachVTS(AudioProcessorValueTreeState& vts)
+{
   attInputLevel.reset(
       new SliderAttachment(vts, "idInputLevel", sliderInputLevel.slider));
   attOutputLevel.reset(
       new SliderAttachment(vts, "idOutputLevel", sliderOutputLevel.slider));
 }
 
-void LevelsGroup::attachTooltips(const TooltipsData &tooltips) {
+void LevelsGroup::attachTooltips(const TooltipsData& tooltips)
+{
   sliderInputLevel.slider.setTooltip(tooltips.getForParam("idInputLevel"));
   sliderOutputLevel.slider.setTooltip(tooltips.getForParam("idOutputLevel"));
 }
 
-void LevelsGroup::resized() {
+void LevelsGroup::resized()
+{
   const int prevInnerHeight = getBorderBounds().getHeight() - 2 * spacing;
   const Point<int> prevCorner =
       getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
@@ -92,8 +99,7 @@ void LevelsGroup::resized() {
       getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
 
   // only re-set the positions when the height or position changes
-  if (prevInnerHeight == innerHeight && prevCorner == corner)
-    return;
+  if (prevInnerHeight == innerHeight && prevCorner == corner) return;
 
   meterInL.setTopLeftPosition(corner);
   meterInL.setBarHeight(innerHeight);

@@ -22,17 +22,18 @@
 
 #include "AmpGroup.h"
 
-#define GROUP_DROP_SHADOW(n)                                                   \
-  auto n##ShadowPath = Path();                                                 \
-  n##ShadowPath.addRoundedRectangle(n##Group.getBorderBounds(),                \
-                                    2.0f * n##Group.getLineThickness());       \
-  n##ShadowPath.applyTransform(AffineTransform::translation(                   \
-      (float)n##Group.getBounds().getTopLeft().getX(),                         \
-      (float)n##Group.getBounds().getTopLeft().getY()));                       \
-  auto n##Shadow = SwankyAmpLAF::getDropShadow();                              \
+#define GROUP_DROP_SHADOW(n) \
+  auto n##ShadowPath = Path(); \
+  n##ShadowPath.addRoundedRectangle( \
+      n##Group.getBorderBounds(), 2.0f * n##Group.getLineThickness()); \
+  n##ShadowPath.applyTransform(AffineTransform::translation( \
+      (float)n##Group.getBounds().getTopLeft().getX(), \
+      (float)n##Group.getBounds().getTopLeft().getY())); \
+  auto n##Shadow = SwankyAmpLAF::getDropShadow(); \
   n##Shadow.drawForPath(g, n##ShadowPath);
 
-AmpGroup::AmpGroup() {
+AmpGroup::AmpGroup()
+{
   spacing = 32;
   lineThickness = 0;
   label.setFont(0.0f);
@@ -46,7 +47,8 @@ AmpGroup::AmpGroup() {
   addAndMakeVisible(cabGroup);
 }
 
-void AmpGroup::setGroupsHeight(int height) {
+void AmpGroup::setGroupsHeight(int height)
+{
   levelsGroup.setHeight(height);
   preAmpGroup.setHeight(height);
   powerAmpGroup.setHeight(height);
@@ -56,7 +58,8 @@ void AmpGroup::setGroupsHeight(int height) {
   resized();
 }
 
-void AmpGroup::attachVTS(AudioProcessorValueTreeState &vts) {
+void AmpGroup::attachVTS(AudioProcessorValueTreeState& vts)
+{
   levelsGroup.attachVTS(vts);
   preAmpGroup.attachVTS(vts);
   powerAmpGroup.attachVTS(vts);
@@ -65,7 +68,8 @@ void AmpGroup::attachVTS(AudioProcessorValueTreeState &vts) {
   cabGroup.attachVTS(vts);
 }
 
-void AmpGroup::attachTooltips(const TooltipsData &tooltips) {
+void AmpGroup::attachTooltips(const TooltipsData& tooltips)
+{
   levelsGroup.attachTooltips(tooltips);
   preAmpGroup.attachTooltips(tooltips);
   powerAmpGroup.attachTooltips(tooltips);
@@ -74,7 +78,8 @@ void AmpGroup::attachTooltips(const TooltipsData &tooltips) {
   cabGroup.attachTooltips(tooltips);
 }
 
-void AmpGroup::paint(Graphics &g) {
+void AmpGroup::paint(Graphics& g)
+{
   // skip  painting the group background and borders
   Component::paint(g);
   GROUP_DROP_SHADOW(levels)
@@ -85,18 +90,20 @@ void AmpGroup::paint(Graphics &g) {
   GROUP_DROP_SHADOW(cab)
 }
 
-void AmpGroup::resized() {
+void AmpGroup::resized()
+{
   ParameterGroup::resized();
 
   levelsGroup.setTopLeftPosition(spacing, spacing);
   preAmpGroup.setTopLeftPosition(spacing, spacing + levelsGroup.getBottom());
   powerAmpGroup.setTopLeftPosition(spacing, spacing + preAmpGroup.getBottom());
-  stagingGroup.setTopLeftPosition(spacing + preAmpGroup.getRight(),
-                                  spacing + levelsGroup.getBottom());
-  toneStackGroup.setTopLeftPosition(spacing + powerAmpGroup.getRight(),
-                                    spacing + preAmpGroup.getBottom());
+  stagingGroup.setTopLeftPosition(
+      spacing + preAmpGroup.getRight(), spacing + levelsGroup.getBottom());
+  toneStackGroup.setTopLeftPosition(
+      spacing + powerAmpGroup.getRight(), spacing + preAmpGroup.getBottom());
   cabGroup.setTopLeftPosition(spacing + levelsGroup.getRight(), spacing);
 
-  setSize(toneStackGroup.getRight() + spacing,
-          toneStackGroup.getBottom() + spacing);
+  setSize(
+      toneStackGroup.getRight() + spacing,
+      toneStackGroup.getBottom() + spacing);
 }

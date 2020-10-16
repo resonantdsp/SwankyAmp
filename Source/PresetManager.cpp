@@ -26,17 +26,19 @@
 #include "PresetManager.h"
 
 // TODO: could be useful for building parameter list in processor?
-std::vector<String> buildParameterIds(const SerializedState &state) {
-  if (state == nullptr)
-    return {};
+std::vector<String> buildParameterIds(const SerializedState& state)
+{
+  if (state == nullptr) return {};
 
   std::vector<String> parameterIds;
 
-  XmlElement *element = state->getFirstChildElement();
+  XmlElement* element = state->getFirstChildElement();
 
-  while (element != nullptr) {
-    if (element->getTagName() == "PARAM" && element->hasAttribute("id")) {
-      const String &id = element->getStringAttribute("id");
+  while (element != nullptr)
+  {
+    if (element->getTagName() == "PARAM" && element->hasAttribute("id"))
+    {
+      const String& id = element->getStringAttribute("id");
       parameterIds.push_back(id);
     }
 
@@ -46,18 +48,30 @@ std::vector<String> buildParameterIds(const SerializedState &state) {
   return parameterIds;
 }
 
-StateEntry::StateEntry(const String &name, File file,
-                       std::optional<size_t> stateIdx)
-    : name(name), file(file), stateIdx(stateIdx) {}
+StateEntry::StateEntry(
+    const String& name, File file, std::optional<size_t> stateIdx) :
+    name(name), file(file), stateIdx(stateIdx)
+{
+}
 
-PresetManager::PresetManager(SwankyAmpAudioProcessor &processor,
-                             AudioProcessorValueTreeState &vts,
-                             ComboBox &comboBox, Button &buttonSave,
-                             Button &buttonRemove, Button &buttonNext,
-                             Button &buttonPrev, Button &buttonOpen)
-    : processor(processor), vts(vts), comboBox(comboBox),
-      buttonSave(buttonSave), buttonRemove(buttonRemove),
-      buttonNext(buttonNext), buttonPrev(buttonPrev), buttonOpen(buttonOpen) {
+PresetManager::PresetManager(
+    SwankyAmpAudioProcessor& processor,
+    AudioProcessorValueTreeState& vts,
+    ComboBox& comboBox,
+    Button& buttonSave,
+    Button& buttonRemove,
+    Button& buttonNext,
+    Button& buttonPrev,
+    Button& buttonOpen) :
+    processor(processor),
+    vts(vts),
+    comboBox(comboBox),
+    buttonSave(buttonSave),
+    buttonRemove(buttonRemove),
+    buttonNext(buttonNext),
+    buttonPrev(buttonPrev),
+    buttonOpen(buttonOpen)
+{
   presetDir = File::getSpecialLocation(
       File::SpecialLocationType::userApplicationDataDirectory);
 #ifdef JUCE_MAC
@@ -77,8 +91,7 @@ PresetManager::PresetManager(SwankyAmpAudioProcessor &processor,
   // any without correct tag are removed
   // any with resonantamp tag are converted to swankyamp
 
-  if (!loadPresetsFromDir())
-    loadFactoryPresets();
+  if (!loadPresetsFromDir()) loadFactoryPresets();
 
   updatePresetDir();
   updateComboBox();
@@ -92,17 +105,18 @@ PresetManager::PresetManager(SwankyAmpAudioProcessor &processor,
   buttonOpen.onClick = [&]() { buttonOpenClicked(); };
 
   const String storedName = processor.storedPresetName;
-  if (storedName.isNotEmpty()) {
+  if (storedName.isNotEmpty())
+  {
     auto state = processor.parameters.copyState();
     std::unique_ptr<XmlElement> xml(state.createXml());
     comboBox.setText(storedName, NotificationType::sendNotificationSync);
     processor.setStateInformation(xml);
-    if (storedName != "init")
-      buttonSave.setEnabled(true);
+    if (storedName != "init") buttonSave.setEnabled(true);
   }
 }
 
-PresetManager::~PresetManager() {
+PresetManager::~PresetManager()
+{
   // UI elements can outlive the manager, ensure they don't try to use callbacks
   comboBox.onChange = []() {};
   buttonSave.onClick = []() {};
@@ -112,23 +126,27 @@ PresetManager::~PresetManager() {
   buttonOpen.onClick = []() {};
 }
 
-void PresetManager::addStateEntry(const String &name, const File &file,
-                                  SerializedState state) {
+void PresetManager::addStateEntry(
+    const String& name, const File& file, SerializedState state)
+{
   removeStateEntry(name);
 
-  if (state != nullptr) {
+  if (state != nullptr)
+  {
     stateEntryIdx[name] = stateEntries.size();
     stateEntries.push_back(StateEntry(name, file, states.size()));
     states.push_back(std::move(state));
-  } else {
+  }
+  else
+  {
     stateEntryIdx[name] = stateEntries.size();
     stateEntries.push_back(StateEntry(name, file, std::nullopt));
   }
 }
 
-void PresetManager::removeStateEntry(const String &name) {
-  if (stateEntryIdx.find(name) == stateEntryIdx.end())
-    return;
+void PresetManager::removeStateEntry(const String& name)
+{
+  if (stateEntryIdx.find(name) == stateEntryIdx.end()) return;
 
   const size_t idx = stateEntryIdx[name];
   stateEntries.erase(stateEntries.begin() + idx);
@@ -138,29 +156,25 @@ void PresetManager::removeStateEntry(const String &name) {
     stateEntryIdx[stateEntries[i].name] = i;
 }
 
-void PresetManager::moveStateEntry(size_t idx, size_t newIdx) {
+void PresetManager::moveStateEntry(size_t idx, size_t newIdx)
+{
   std::vector<StateEntry> moved;
   moved.reserve(stateEntries.size());
 
-  if (newIdx < 1)
-    newIdx = 1;
+  if (newIdx < 1) newIdx = 1;
 
-  if (newIdx == idx)
-    return;
+  if (newIdx == idx) return;
 
-  if (newIdx > idx)
-    newIdx += 1;
+  if (newIdx > idx) newIdx += 1;
 
-  for (size_t i = 0; i < stateEntries.size(); i++) {
-    if (i == idx)
-      continue;
-    if (i == newIdx)
-      moved.push_back(stateEntries[idx]);
+  for (size_t i = 0; i < stateEntries.size(); i++)
+  {
+    if (i == idx) continue;
+    if (i == newIdx) moved.push_back(stateEntries[idx]);
     moved.push_back(stateEntries[i]);
   }
 
-  if (newIdx >= stateEntries.size())
-    moved.push_back(stateEntries[idx]);
+  if (newIdx >= stateEntries.size()) moved.push_back(stateEntries[idx]);
 
   stateEntries = moved;
 
@@ -169,92 +183,99 @@ void PresetManager::moveStateEntry(size_t idx, size_t newIdx) {
     stateEntryIdx[stateEntries[i].name] = i;
 }
 
-void PresetManager::loadPreset(SerializedState state, File file,
-                               const String &name) {
-  if (state == nullptr)
-    return;
+void PresetManager::loadPreset(
+    SerializedState state, File file, const String& name)
+{
+  if (state == nullptr) return;
   addStateEntry(name, file, std::move(state));
 }
 
-void PresetManager::loadFactoryPresets() {
+void PresetManager::loadFactoryPresets()
+{
   const std::unique_ptr<XmlElement> xml =
       XmlDocument::parse(BinaryData::presets_xml);
-  if (xml == nullptr)
-    return;
+  if (xml == nullptr) return;
 
   bool writingSuccess = true;
-  const Identifier &stateType = vts.state.getType();
+  const Identifier& stateType = vts.state.getType();
 
-  XmlElement *stateXml = xml->getFirstChildElement();
-  while (stateXml != nullptr) {
-    if (stateXml->hasTagName(stateType) &&
-        stateXml->hasAttribute("presetName")) {
+  XmlElement* stateXml = xml->getFirstChildElement();
+  while (stateXml != nullptr)
+  {
+    if (stateXml->hasTagName(stateType) && stateXml->hasAttribute("presetName"))
+    {
       const String presetName = stateXml->getStringAttribute("presetName");
       stateXml->removeAttribute("presetName");
       stateXml->setAttribute("pluginVersion", JucePlugin_VersionString);
 
       File presetFile = presetDir.getChildFile(presetName + ".xml");
-      loadPreset(std::make_unique<XmlElement>(*stateXml), presetFile,
-                 presetName);
+      loadPreset(
+          std::make_unique<XmlElement>(*stateXml), presetFile, presetName);
       writingSuccess &= stateXml->writeTo(presetFile);
     }
     stateXml = stateXml->getNextElement();
   }
 
-  if (!writingSuccess) {
-    AlertWindow::showMessageBox(AlertWindow::AlertIconType::WarningIcon,
-                                "Factory preset failure",
-                                "Unalble to write factory presets to disk");
+  if (!writingSuccess)
+  {
+    AlertWindow::showMessageBox(
+        AlertWindow::AlertIconType::WarningIcon,
+        "Factory preset failure",
+        "Unalble to write factory presets to disk");
   }
 }
 
-std::pair<int, String> extractNumAndName(const String &name) {
+std::pair<int, String> extractNumAndName(const String& name)
+{
   static const String digits = "09";
   static const String div = " ";
 
   int startIdx = -1;
 
-  for (int i = 0; i < name.length(); i++) {
+  for (int i = 0; i < name.length(); i++)
+  {
     const juce_wchar c = name[i];
 
-    if (c >= digits[0] && c <= digits[1])
-      continue;
+    if (c >= digits[0] && c <= digits[1]) continue;
 
     const bool hasNumber = i > 0;
-    const bool hasDivider = i + div.length() <= name.length() &&
-                            name.substring(i, i + div.length()) == div;
+    const bool hasDivider = i + div.length() <= name.length()
+        && name.substring(i, i + div.length()) == div;
 
-    if (hasNumber && hasDivider)
-      startIdx = i + div.length();
+    if (hasNumber && hasDivider) startIdx = i + div.length();
 
     break;
   }
 
-  if (startIdx > 1) {
+  if (startIdx > 1)
+  {
     int num = std::atoi(name.substring(0, startIdx - div.length()).toRawUTF8());
     String nameStripped = name.substring(startIdx);
     return std::pair<int, String>(num, nameStripped);
-  } else {
+  }
+  else
+  {
     return std::pair<int, String>(-1, name);
   }
 }
 
-bool PresetManager::loadPresetsFromDir() {
+bool PresetManager::loadPresetsFromDir()
+{
   std::vector<String> filePaths;
   auto files =
       presetDir.findChildFiles(File::TypesOfFileToFind::findFiles, false);
 
-  if (files.isEmpty())
-    return false;
+  if (files.isEmpty()) return false;
 
   std::sort(files.begin(), files.end());
 
-  const Identifier &stateType = vts.state.getType();
+  const Identifier& stateType = vts.state.getType();
 
-  for (int i = 0; i < files.size(); i++) {
-    const File &presetFile = files[i];
-    if (presetFile.getFileExtension() != ".xml" &&
-        presetFile.getFileExtension() != ".XML")
+  for (int i = 0; i < files.size(); i++)
+  {
+    const File& presetFile = files[i];
+    if (presetFile.getFileExtension() != ".xml"
+        && presetFile.getFileExtension() != ".XML")
       continue;
 
     const auto numAndName =
@@ -266,29 +287,33 @@ bool PresetManager::loadPresetsFromDir() {
     if (stateXml->hasTagName("APVTSResonantAmp"))
       stateXml->setTagName("APVTSSwankyAmp");
 
-    if (stateXml->hasTagName(stateType)) {
-      const String &presetName = numAndName.second;
-      loadPreset(std::make_unique<XmlElement>(*stateXml), presetFile,
-                 presetName);
+    if (stateXml->hasTagName(stateType))
+    {
+      const String& presetName = numAndName.second;
+      loadPreset(
+          std::make_unique<XmlElement>(*stateXml), presetFile, presetName);
     }
   }
 
   return true;
 }
 
-void PresetManager::clearUI() {
+void PresetManager::clearUI()
+{
   comboBox.setSelectedId(0);
   buttonSave.setEnabled(false);
   buttonRemove.setEnabled(false);
 }
 
-void PresetManager::updateComboBox() {
+void PresetManager::updateComboBox()
+{
   // don't re-trigger comboBoxChanged
   comboBox.clear(NotificationType::dontSendNotification);
   const int width = (int)(log10f((float)stateEntries.size())) + 1;
 
-  for (size_t idx = 0; idx < stateEntries.size(); idx++) {
-    const auto &entry = stateEntries[idx];
+  for (size_t idx = 0; idx < stateEntries.size(); idx++)
+  {
+    const auto& entry = stateEntries[idx];
     const int id = (int)(idx + 1);
 
     std::ostringstream ss;
@@ -304,13 +329,14 @@ void PresetManager::updateComboBox() {
   }
 }
 
-void PresetManager::updatePresetDir() {
+void PresetManager::updatePresetDir()
+{
   const int width = (int)(log10f((float)stateEntries.size())) + 1;
 
   size_t idx = 0;
-  for (auto &entry : stateEntries) {
-    if (!entry.file.existsAsFile())
-      continue;
+  for (auto& entry : stateEntries)
+  {
+    if (!entry.file.existsAsFile()) continue;
 
     idx++;
 
@@ -320,42 +346,48 @@ void PresetManager::updatePresetDir() {
 
     const String targetPath =
         presetDir.getChildFile(ss.str()).getFullPathName();
-    if (entry.file == targetPath)
-      continue;
+    if (entry.file == targetPath) continue;
 
-    if (entry.file.getParentDirectory() == presetDir) {
-      if (entry.file.moveFileTo(targetPath))
-        entry.file = File(targetPath);
-    } else {
-      if (entry.file.copyFileTo(targetPath))
-        entry.file = File(targetPath);
+    if (entry.file.getParentDirectory() == presetDir)
+    {
+      if (entry.file.moveFileTo(targetPath)) entry.file = File(targetPath);
+    }
+    else
+    {
+      if (entry.file.copyFileTo(targetPath)) entry.file = File(targetPath);
     }
   }
 }
 
-void PresetManager::comboBoxChanged() {
+void PresetManager::comboBoxChanged()
+{
   const auto numAndName = extractNumAndName(comboBox.getText());
-  const String &name = numAndName.second;
+  const String& name = numAndName.second;
   const int ord = numAndName.first;
 
-  if (name == "")
-    return;
+  if (name == "") return;
 
-  if (stateEntryIdx.find(name) == stateEntryIdx.end()) {
-    const bool makeNew =
-        !currentName.has_value() ||
-        AlertWindow::showOkCancelBox(
-            AlertWindow::AlertIconType::QuestionIcon, "New preset name",
-            "Create new preset or rename existing?", "new", "rename");
+  if (stateEntryIdx.find(name) == stateEntryIdx.end())
+  {
+    const bool makeNew = !currentName.has_value()
+        || AlertWindow::showOkCancelBox(
+            AlertWindow::AlertIconType::QuestionIcon,
+            "New preset name",
+            "Create new preset or rename existing?",
+            "new",
+            "rename");
 
-    if (makeNew) {
+    if (makeNew)
+    {
       // new entry
       addStateEntry(name, File(), SerializedState(vts.state.createXml()));
       currentName = name;
       buttonSaveClicked();
-    } else if (stateEntryIdx.find(*currentName) != stateEntryIdx.end()) {
+    }
+    else if (stateEntryIdx.find(*currentName) != stateEntryIdx.end())
+    {
       const size_t idx = stateEntryIdx[*currentName];
-      StateEntry &currentEntry = stateEntries[idx];
+      StateEntry& currentEntry = stateEntries[idx];
       currentEntry.name = name;
       stateEntryIdx[name] = idx;
       stateEntryIdx.erase(*currentName);
@@ -363,8 +395,8 @@ void PresetManager::comboBoxChanged() {
     }
 
     // possible a new order was defined, update if so
-    if (ord > 0 && stateEntryIdx.find(name) != stateEntryIdx.end() &&
-        ord != stateEntryIdx[name])
+    if (ord > 0 && stateEntryIdx.find(name) != stateEntryIdx.end()
+        && ord != stateEntryIdx[name])
       moveStateEntry(stateEntryIdx[name], (size_t)ord);
 
     // although the change has already been saved, this lets the user know
@@ -374,11 +406,14 @@ void PresetManager::comboBoxChanged() {
 
     updatePresetDir();
     updateComboBox();
-  } else {
+  }
+  else
+  {
     currentName = name;
-    const StateEntry &currentEntry = stateEntries[stateEntryIdx[name]];
+    const StateEntry& currentEntry = stateEntries[stateEntryIdx[name]];
 
-    if (currentEntry.stateIdx != std::nullopt) {
+    if (currentEntry.stateIdx != std::nullopt)
+    {
       // load the state for this entry
       setState(states[*currentEntry.stateIdx]);
 
@@ -387,12 +422,15 @@ void PresetManager::comboBoxChanged() {
       // can't save until modified
       buttonSave.setEnabled(false);
 
-      if (ord > 0 && ord != (int)(stateEntryIdx[name])) {
+      if (ord > 0 && ord != (int)(stateEntryIdx[name]))
+      {
         moveStateEntry(stateEntryIdx[name], (size_t)ord);
         updatePresetDir();
         updateComboBox();
       }
-    } else {
+    }
+    else
+    {
       // the init preset
       setState(nullptr);
       buttonRemove.setEnabled(false);
@@ -401,22 +439,21 @@ void PresetManager::comboBoxChanged() {
   }
 }
 
-void PresetManager::buttonSaveClicked() {
-  if (!currentName.has_value())
-    return;
+void PresetManager::buttonSaveClicked()
+{
+  if (!currentName.has_value()) return;
 
-  StateEntry &currentEntry = stateEntries[stateEntryIdx[*currentName]];
-  if (currentEntry.name == "")
-    return;
+  StateEntry& currentEntry = stateEntries[stateEntryIdx[*currentName]];
+  if (currentEntry.name == "") return;
 
   SerializedState state = vts.state.createXml();
-  if (state == nullptr)
-    return;
+  if (state == nullptr) return;
 
-  if (currentEntry.file.getFullPathName() != "" &&
-      !AlertWindow::showOkCancelBox(AlertWindow::AlertIconType::QuestionIcon,
-                                    "Confirm save",
-                                    "Save preset: " + *currentName + "?"))
+  if (currentEntry.file.getFullPathName() != ""
+      && !AlertWindow::showOkCancelBox(
+          AlertWindow::AlertIconType::QuestionIcon,
+          "Confirm save",
+          "Save preset: " + *currentName + "?"))
     return;
 
   state->setAttribute("pluginVersion", JucePlugin_VersionString);
@@ -426,10 +463,12 @@ void PresetManager::buttonSaveClicked() {
   if (currentEntry.file.getFullPathName() == "")
     currentEntry.file = presetDir.getChildFile(currentEntry.name + ".xml");
 
-  if (!state->writeTo(currentEntry.file)) {
-    AlertWindow::showMessageBox(AlertWindow::AlertIconType::WarningIcon,
-                                "Failed to save",
-                                "Failed to save preset file.");
+  if (!state->writeTo(currentEntry.file))
+  {
+    AlertWindow::showMessageBox(
+        AlertWindow::AlertIconType::WarningIcon,
+        "Failed to save",
+        "Failed to save preset file.");
     return;
   }
 
@@ -441,12 +480,13 @@ void PresetManager::buttonSaveClicked() {
   buttonRemove.setEnabled(true);
 }
 
-void PresetManager::buttonRemoveClicked() {
-  if (!currentName.has_value())
-    return;
-  StateEntry &currentEntry = stateEntries[stateEntryIdx[*currentName]];
+void PresetManager::buttonRemoveClicked()
+{
+  if (!currentName.has_value()) return;
+  StateEntry& currentEntry = stateEntries[stateEntryIdx[*currentName]];
 
-  if (currentEntry.file.getFullPathName() != "") {
+  if (currentEntry.file.getFullPathName() != "")
+  {
     currentEntry.file.deleteFile();
     currentEntry.file = File();
   }
@@ -459,15 +499,18 @@ void PresetManager::buttonRemoveClicked() {
   clearUI();
 }
 
-void PresetManager::buttonNextClicked() {
-  if (currentName == std::nullopt) {
+void PresetManager::buttonNextClicked()
+{
+  if (currentName == std::nullopt)
+  {
     comboBox.setSelectedId(1);
     return;
   }
 
   size_t currentIdx = stateEntryIdx[*currentName];
 
-  if (currentIdx < stateEntries.size() - 1) {
+  if (currentIdx < stateEntries.size() - 1)
+  {
     currentIdx += 1;
     currentName = stateEntries[currentIdx].name;
     const int id = (int)(currentIdx + 1);
@@ -475,15 +518,18 @@ void PresetManager::buttonNextClicked() {
   }
 }
 
-void PresetManager::buttonPrevClicked() {
-  if (currentName == std::nullopt) {
+void PresetManager::buttonPrevClicked()
+{
+  if (currentName == std::nullopt)
+  {
     comboBox.setSelectedId(1);
     return;
   }
 
   size_t currentIdx = stateEntryIdx[*currentName];
 
-  if (currentIdx > 1) {
+  if (currentIdx > 1)
+  {
     currentIdx -= 1;
     currentName = stateEntries[currentIdx].name;
     const int id = (int)(currentIdx + 1);
@@ -493,14 +539,15 @@ void PresetManager::buttonPrevClicked() {
 
 void PresetManager::buttonOpenClicked() { presetDir.startAsProcess(); }
 
-void PresetManager::parameterChanged(const String &id, float) {
-  if (!currentName.has_value())
-    return;
-  StateEntry &currentEntry = stateEntries[stateEntryIdx[*currentName]];
+void PresetManager::parameterChanged(const String& id, float)
+{
+  if (!currentName.has_value()) return;
+  StateEntry& currentEntry = stateEntries[stateEntryIdx[*currentName]];
   if (currentEntry.name != "init" && id != "idInputLevel" && id != "idCabOnOff")
     buttonSave.setEnabled(true);
 }
 
-void PresetManager::setState(const SerializedState &state) {
+void PresetManager::setState(const SerializedState& state)
+{
   processor.setStateInformation(state, false);
 }

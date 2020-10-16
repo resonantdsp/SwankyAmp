@@ -46,7 +46,7 @@
 
 #define JUCE_USE_DARK_SPLASH_SCREEN 0
 
-#define JUCE_PROJUCER_VERSION 0x60001
+#define JUCE_PROJUCER_VERSION 0x60004
 
 //==============================================================================
 #define JUCE_MODULE_AVAILABLE_juce_audio_basics             1
@@ -79,10 +79,6 @@
 
 #ifndef    JUCE_WASAPI
  //#define JUCE_WASAPI 1
-#endif
-
-#ifndef    JUCE_WASAPI_EXCLUSIVE
- //#define JUCE_WASAPI_EXCLUSIVE 0
 #endif
 
 #ifndef    JUCE_DIRECTSOUND

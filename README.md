@@ -2,9 +2,11 @@
 
 Swanky Amp is a tube amplifier simulation DSP plugin which aims to capture the details in the dynamics of tube amplifiers.
 
-The software is currently in beta and is distributed as a VST3 for 64-bit Windows systems, as well as VST3 and AU for Mac OSX systems. You can find the installers on the website:
+You can find the installers on the website:
 
-<http://www.resonantdsp.com/swankyamp/>
+<https://www.resonantdsp.com/swankyamp/>
+
+![Swanky Amp](https://www.resonantdsp.com/images/swanky-amp.jpg)
 
 ## Usage
 
@@ -20,7 +22,7 @@ The model was developed by running finite-difference simulation methods (spice),
 
 Some more information about the process can be found here:
 
-<http://www.resonantdsp.com/blog/tube-emulation/tube-emulation-4.html>
+<https://www.resonantdsp.com/blog/tube-emulation/tube-emulation-4.html>
 
 ## Building
 
@@ -30,7 +32,7 @@ This repository includes code to:
 
 * Build the VST3 or AAX using Visual Studio 2019
 * Build the AU using Xcode
-* Create the Windows installer using [Inno Setup](https://jrsoftware.org/isinfo.php)
+* Create the Windows installer using [WiX](https://wixtoolset.org/)
 * Create the Mac installers using a drag-and-drop DMG image.
 
 ### For Windows
@@ -51,8 +53,7 @@ The project is configured assuming the VST3 SDK is found at: `C:\SDKs\VST_SDK\VS
 To build the installer:
 
 * Move into the `package` directory
-* Open the Inno Setup script `setup.iss`
-* Compile the installer, it should be created at `package\SwankyAmp-win64.exe`
+* Run `bash build-win.sh` (probably want to do that using WSL)
 
 ### For Mac
 
@@ -83,6 +84,18 @@ Only available with VisualStudio at the moment.
 * Run `Builds\VisualStudio\x64\Debug\SwankyAmp.exe`
 
 ## Change log
+
+Version 1.2.0:
+
+* re-wokred drive ranges
+* re-worked sag slightly
+* use sinh transformation to make central range more sensitive
+* changed windows installer to MSI
+* changes to the layout
+
+Version 1.1.0:
+
+* Added ability to blend the tone stacks
 
 Version 1.0.0:
 

@@ -25,7 +25,8 @@
 #include "ParameterGroup.h"
 #include "RSliderLabel.h"
 
-class LevelsGroup : public ParameterGroup {
+class LevelsGroup : public ParameterGroup
+{
 public:
   LevelsGroup();
   ~LevelsGroup() {}
@@ -33,13 +34,13 @@ public:
   void setHeight(int height) { setSize(0, height); }
   void resized() override;
 
-  void attachVTS(AudioProcessorValueTreeState &vts) override;
-  void attachTooltips(const TooltipsData &tooltips) override;
+  void attachVTS(AudioProcessorValueTreeState& vts) override;
+  void attachTooltips(const TooltipsData& tooltips) override;
 
-  LevelMeterListener *getLevelMeterListenerInL() { return &meterInL; }
-  LevelMeterListener *getLevelMeterListenerInR() { return &meterInR; }
-  LevelMeterListener *getLevelMeterListenerOutL() { return &meterOutL; }
-  LevelMeterListener *getLevelMeterListenerOutR() { return &meterOutR; }
+  LevelMeterListener* getLevelMeterListenerInL() { return &meterInL; }
+  LevelMeterListener* getLevelMeterListenerInR() { return &meterInR; }
+  LevelMeterListener* getLevelMeterListenerOutL() { return &meterOutL; }
+  LevelMeterListener* getLevelMeterListenerOutR() { return &meterOutR; }
 
 private:
   LevelMeter meterInL;

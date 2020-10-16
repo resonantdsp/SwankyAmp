@@ -4,14 +4,16 @@
 #include <cmath>
 
 #define uscale(x, l, u) (x + 1.0f) / 2.0f * (u - l) + l;
-#define ulscale(x, l, u)                                                       \
+#define ulscale(x, l, u) \
   std::exp((x + 1.0f) / 2.0f * (std::log(u) - std::log(l)) + std::log(l));
 
 #include "TetrodePlateFaust.h"
 
-class TetrodePlate {
+class TetrodePlate
+{
 public:
-  TetrodePlate() {
+  TetrodePlate()
+  {
     faustDsp.buildUserInterface(&faustDsp);
     par_clip = faustDsp.getParameter("clip");
     par_clip_corner = faustDsp.getParameter("clip_corner");
@@ -36,93 +38,115 @@ public:
 
   ~TetrodePlate() = default;
 
-  void reset() {
+  void reset()
+  {
     faustDsp.instanceClear();
     zeroParameters();
   }
 
-  void prepare(int sampleRate) {
+  void prepare(int sampleRate)
+  {
     faustDsp.init(sampleRate);
     zeroParameters();
   }
 
-  void process(int count, FAUSTFLOAT **buffer) {
+  void process(int count, FAUSTFLOAT** buffer)
+  {
     faustDsp.compute(count, buffer, buffer);
   }
 
-  inline void set_clip(FAUSTFLOAT x) {
+  inline void set_clip(FAUSTFLOAT x)
+  {
     x += 5.126636e-01f;
     *par_clip = uscale(x, 10.0f, 50.0f);
   }
-  inline void set_clip_corner(FAUSTFLOAT x) {
+  inline void set_clip_corner(FAUSTFLOAT x)
+  {
     x += 1.071061e+00f;
     *par_clip_corner = ulscale(x, 1e-1f, 1e+2f);
   }
-  inline void set_comp_depth(FAUSTFLOAT x) {
+  inline void set_comp_depth(FAUSTFLOAT x)
+  {
     x += -5.413460e-01f;
     *par_comp_depth = ulscale(x, 1e-1f, 1e+1f);
   }
-  inline void set_comp_tau(FAUSTFLOAT x) {
-    x += -1.314464e+00f;
+  inline void set_comp_tau(FAUSTFLOAT x)
+  {
+    x += -1.314456e+00f;
     *par_comp_tau = ulscale(x, 1e-3f, 1e0f);
   }
-  inline void set_cross_corner(FAUSTFLOAT x) {
+  inline void set_cross_corner(FAUSTFLOAT x)
+  {
     x += 5.975771e-01f;
     *par_cross_corner = ulscale(x, 1e-1f, 1e+2f);
   }
-  inline void set_drift2_depth(FAUSTFLOAT x) {
-    x += 2.950708e-02f;
+  inline void set_drift2_depth(FAUSTFLOAT x)
+  {
+    x += 2.965889e-02f;
     *par_drift2_depth = ulscale(x, 1e-1f, 1e+1f);
   }
-  inline void set_drift2_level(FAUSTFLOAT x) {
-    x += 5.678489e-01f;
+  inline void set_drift2_level(FAUSTFLOAT x)
+  {
+    x += 5.679661e-01f;
     *par_drift2_level = uscale(x, -50.0f, +50.0f);
   }
-  inline void set_drift_depth(FAUSTFLOAT x) {
+  inline void set_drift_depth(FAUSTFLOAT x)
+  {
     x += 1.725648e-01f;
     *par_drift_depth = ulscale(x, 1e-1f, 1e+1f);
   }
-  inline void set_drift_level(FAUSTFLOAT x) {
+  inline void set_drift_level(FAUSTFLOAT x)
+  {
     x += 1.145700e+00f;
     *par_drift_level = uscale(x, -100.0f, +100.0f);
   }
-  inline void set_drift_tau(FAUSTFLOAT x) {
-    x += -2.449032e-01f;
+  inline void set_drift_tau(FAUSTFLOAT x)
+  {
+    x += -2.449028e-01f;
     *par_drift_tau = ulscale(x, 1e-3f, 1e0f);
   }
-  inline void set_hp_freq(FAUSTFLOAT x) {
+  inline void set_hp_freq(FAUSTFLOAT x)
+  {
     x += -2.867797e+00f;
     *par_hp_freq = ulscale(x, 1e1f, 1e2f);
   }
-  inline void set_lp_freq(FAUSTFLOAT x) {
+  inline void set_lp_freq(FAUSTFLOAT x)
+  {
     x += 4.804993e-01f;
     *par_lp_freq = ulscale(x, 5e3f, 15e3f);
   }
-  inline void set_sag_depth(FAUSTFLOAT x) {
+  inline void set_sag_depth(FAUSTFLOAT x)
+  {
     x += 0.000000e+00f;
     *par_sag_depth = ulscale(x, 1e-2f, 1e-1f);
   }
-  inline void set_sag_factor(FAUSTFLOAT x) {
+  inline void set_sag_factor(FAUSTFLOAT x)
+  {
     x += 0.000000e+00f;
     *par_sag_factor = x;
   }
-  inline void set_sag_onset(FAUSTFLOAT x) {
+  inline void set_sag_onset(FAUSTFLOAT x)
+  {
     x += 0.000000e+00f;
     *par_sag_onset = ulscale(x, 1e-2f, 1e0f);
   }
-  inline void set_sag_ratio(FAUSTFLOAT x) {
+  inline void set_sag_ratio(FAUSTFLOAT x)
+  {
     x += 0.000000e+00f;
     *par_sag_ratio = ulscale(x, 1e0f, 1e+1f);
   }
-  inline void set_sag_tau(FAUSTFLOAT x) {
+  inline void set_sag_tau(FAUSTFLOAT x)
+  {
     x += 0.000000e+00f;
     *par_sag_tau = ulscale(x, 1e-2f, 5e-1f);
   }
-  inline void set_sag_toggle(FAUSTFLOAT x) {
+  inline void set_sag_toggle(FAUSTFLOAT x)
+  {
     x += 0.000000e+00f;
     *par_sag_toggle = uscale(x, 0.0f, 1.0f);
   }
-  inline void set_scale(FAUSTFLOAT x) {
+  inline void set_scale(FAUSTFLOAT x)
+  {
     x += 3.354131e-01f;
     *par_scale = ulscale(x, 1e-2f, 1e+2f);
   }
@@ -130,27 +154,28 @@ public:
 private:
   TetrodePlateFaust faustDsp;
 
-  FAUSTFLOAT *par_clip = nullptr;
-  FAUSTFLOAT *par_clip_corner = nullptr;
-  FAUSTFLOAT *par_comp_depth = nullptr;
-  FAUSTFLOAT *par_comp_tau = nullptr;
-  FAUSTFLOAT *par_cross_corner = nullptr;
-  FAUSTFLOAT *par_drift2_depth = nullptr;
-  FAUSTFLOAT *par_drift2_level = nullptr;
-  FAUSTFLOAT *par_drift_depth = nullptr;
-  FAUSTFLOAT *par_drift_level = nullptr;
-  FAUSTFLOAT *par_drift_tau = nullptr;
-  FAUSTFLOAT *par_hp_freq = nullptr;
-  FAUSTFLOAT *par_lp_freq = nullptr;
-  FAUSTFLOAT *par_sag_depth = nullptr;
-  FAUSTFLOAT *par_sag_factor = nullptr;
-  FAUSTFLOAT *par_sag_onset = nullptr;
-  FAUSTFLOAT *par_sag_ratio = nullptr;
-  FAUSTFLOAT *par_sag_tau = nullptr;
-  FAUSTFLOAT *par_sag_toggle = nullptr;
-  FAUSTFLOAT *par_scale = nullptr;
+  FAUSTFLOAT* par_clip = nullptr;
+  FAUSTFLOAT* par_clip_corner = nullptr;
+  FAUSTFLOAT* par_comp_depth = nullptr;
+  FAUSTFLOAT* par_comp_tau = nullptr;
+  FAUSTFLOAT* par_cross_corner = nullptr;
+  FAUSTFLOAT* par_drift2_depth = nullptr;
+  FAUSTFLOAT* par_drift2_level = nullptr;
+  FAUSTFLOAT* par_drift_depth = nullptr;
+  FAUSTFLOAT* par_drift_level = nullptr;
+  FAUSTFLOAT* par_drift_tau = nullptr;
+  FAUSTFLOAT* par_hp_freq = nullptr;
+  FAUSTFLOAT* par_lp_freq = nullptr;
+  FAUSTFLOAT* par_sag_depth = nullptr;
+  FAUSTFLOAT* par_sag_factor = nullptr;
+  FAUSTFLOAT* par_sag_onset = nullptr;
+  FAUSTFLOAT* par_sag_ratio = nullptr;
+  FAUSTFLOAT* par_sag_tau = nullptr;
+  FAUSTFLOAT* par_sag_toggle = nullptr;
+  FAUSTFLOAT* par_scale = nullptr;
 
-  void zeroParameters() {
+  void zeroParameters()
+  {
     set_clip(0.0f);
     set_clip_corner(0.0f);
     set_comp_depth(0.0f);

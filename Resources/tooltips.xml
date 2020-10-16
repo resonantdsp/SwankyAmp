@@ -23,7 +23,7 @@
 		Affects the amount of distortion in the later gain stages. Decrease for a high-gain sound.
 	</param>
 	<param id="idGainStages">
-		The number of gain stages through the signal passes prior to reaching the power amp. Increase for a high-gain sound.
+		The number of gain stages (tubes) the signal goes through. Each stage is voiced differently and can bring out more low end or tighter distortion.
 	</param>
 	<param id="idLowCut">
 		How much of the lows are cut out from the pre amp stage. Increase to remove bass. Decrease to get fuller distortion.
@@ -59,6 +59,6 @@
 		The amoumt of signal in the higher mids, lower highs. Increase for more definition, more detail. Decrease to reduce brittle harshness.
 	</param>
 	<param id="idTsSelection">
-        Tone stack model: 0 will give you a Fender-like tone stack with scooped mids, while 10 will give you a Marshall-like tone stack with lots of mids for heavier distortion.
+        Tone stack model: 0 will give you a Fender-like tone stack with scooped mids, while 10 will give you a Marshall-like tone stack with lots of mids.
 	</param>
 </tooltips>

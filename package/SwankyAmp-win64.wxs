@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+    <Product
+        Id="924803a1-7ca5-48e5-b7d4-070bcdf7e79a"
+        UpgradeCode="4fe41a17-a81f-4e8f-8ae0-55cb71eb28f2"
+        Version="1.2.0"
+        Language="1033"
+        Name="Swanky Amp"
+        Manufacturer="Resonant DSP">
+        <Package InstallerVersion="300" Compressed="yes" />
+        <Media Id="1" Cabinet="swankyamp.cab" EmbedCab="yes" />
+
+        <MajorUpgrade
+            DowngradeErrorMessage=
+                "A later version of [ProductName] is already installed. Setup will now exit." />
+
+        <Directory Id="TARGETDIR" Name="SourceDir">
+            <Directory Id="CommonFiles64Folder">
+                <Directory Id="INSTALLDIR" Name="VST3"/>
+            </Directory>
+        </Directory>
+
+        <DirectoryRef Id="INSTALLDIR">
+            <Component Id="SwankyAmp.vst3" Guid="1801fdea-31fb-4724-b9ca-6819af83f512">
+                <File
+                    Id="SwamluAmp.vst3"
+                    Source="..\Builds\VisualStudio2019\x64\Release\VST3\SwankyAmp.vst3"
+                    KeyPath="yes"
+                    Checksum="yes" />
+            </Component>
+        </DirectoryRef>
+
+        <Feature
+            Id="Complete"
+            Title="Swanky Amp"
+            ConfigurableDirectory="INSTALLDIR"
+            Level="1">
+            <ComponentRef Id="SwankyAmp.vst3" />
+        </Feature>
+
+        <UIRef Id="WixUI_FeatureTree" />
+        <UIRef Id="WixUI_ErrorProgressText" />
+        <!--
+        <WixVariable Id="WixUIBannerBmp" Value=" " />
+        <WixVariable Id="WixUIDialogBmp" Value=" " />
+        -->
+
+    </Product>
+</Wix>

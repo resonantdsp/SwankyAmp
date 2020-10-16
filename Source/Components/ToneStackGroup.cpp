@@ -20,11 +20,8 @@
 
 #include "ToneStackGroup.h"
 
-ToneStackGroup::ToneStackGroup() : ParameterGroup("TONE STACK") {
-  addAndMakeVisible(sliderSelection);
-  sliderSelection.setLabel("MODEL");
-  sliderSelection.slider.setPosMapDownFmt("%4.1f");
-
+ToneStackGroup::ToneStackGroup() : ParameterGroup("TONE")
+{
   addAndMakeVisible(sliderLow);
   sliderLow.setLabel("LOW");
   sliderLow.slider.setPosMapDownFmt("%4.1f");
@@ -42,9 +39,8 @@ ToneStackGroup::ToneStackGroup() : ParameterGroup("TONE STACK") {
   sliderPresence.slider.setPosMapDownFmt("%4.1f");
 }
 
-void ToneStackGroup::attachVTS(AudioProcessorValueTreeState &vts) {
-  attSelection.reset(
-      new SliderAttachment(vts, "idTsSelection", sliderSelection.slider));
+void ToneStackGroup::attachVTS(AudioProcessorValueTreeState& vts)
+{
   attLow.reset(new SliderAttachment(vts, "idTsLow", sliderLow.slider));
   attMid.reset(new SliderAttachment(vts, "idTsMid", sliderMid.slider));
   attHigh.reset(new SliderAttachment(vts, "idTsHigh", sliderHigh.slider));
@@ -52,15 +48,16 @@ void ToneStackGroup::attachVTS(AudioProcessorValueTreeState &vts) {
       new SliderAttachment(vts, "idTsPresence", sliderPresence.slider));
 }
 
-void ToneStackGroup::attachTooltips(const TooltipsData &tooltips) {
-  sliderSelection.slider.setTooltip(tooltips.getForParam("idTsSelection"));
+void ToneStackGroup::attachTooltips(const TooltipsData& tooltips)
+{
   sliderLow.slider.setTooltip(tooltips.getForParam("idTsLow"));
   sliderMid.slider.setTooltip(tooltips.getForParam("idTsMid"));
   sliderHigh.slider.setTooltip(tooltips.getForParam("idTsHigh"));
   sliderPresence.slider.setTooltip(tooltips.getForParam("idTsPresence"));
 }
 
-void ToneStackGroup::resized() {
+void ToneStackGroup::resized()
+{
   const int prevInnerHeight = getBorderBounds().getHeight() - 2 * spacing;
   const Point<int> prevCorner =
       getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
@@ -72,14 +69,7 @@ void ToneStackGroup::resized() {
       getBorderBounds().getTopLeft() + Point<int>(spacing, spacing);
 
   // only re-set the positions when the height or position changes
-  if (prevInnerHeight == innerHeight && prevCorner == corner)
-    return;
-
-  sliderSelection.setTopLeftPosition(corner);
-  sliderSelection.slider.setMargin(0.15f * (float)innerHeight);
-  sliderSelection.setHeight(innerHeight);
-
-  corner = sliderSelection.getBounds().getTopRight() + Point<int>(spacing, 0);
+  if (prevInnerHeight == innerHeight && prevCorner == corner) return;
 
   sliderLow.setTopLeftPosition(corner);
   sliderLow.slider.setMargin(0.15f * (float)innerHeight);

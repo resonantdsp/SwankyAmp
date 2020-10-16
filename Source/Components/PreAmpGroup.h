@@ -24,7 +24,8 @@
 #include "ParameterGroup.h"
 #include "RSliderLabel.h"
 
-class PreAmpGroup : public ParameterGroup {
+class PreAmpGroup : public ParameterGroup
+{
 public:
   PreAmpGroup();
   ~PreAmpGroup() {}
@@ -32,19 +33,17 @@ public:
   void setHeight(int height) { setSize(0, height); }
   void resized() override;
 
-  void attachVTS(AudioProcessorValueTreeState &vts) override;
-  void attachTooltips(const TooltipsData &tooltips) override;
+  void attachVTS(AudioProcessorValueTreeState& vts) override;
+  void attachTooltips(const TooltipsData& tooltips) override;
 
 private:
   RSliderLabel sliderDrive;
   RSliderLabel sliderTight;
   RSliderLabel sliderGrit;
-  RSliderLabel sliderFilter;
 
   std::unique_ptr<SliderAttachment> attDrive;
   std::unique_ptr<SliderAttachment> attTight;
   std::unique_ptr<SliderAttachment> attGrit;
-  std::unique_ptr<SliderAttachment> attFilter;
 
   DISABLE_COMPONENT_RESIZE()
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PreAmpGroup)

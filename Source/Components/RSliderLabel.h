@@ -23,14 +23,16 @@
 #include "../Utils.h"
 #include "RSlider.h"
 
-class RSliderLabel : public Component {
+class RSliderLabel : public Component
+{
 public:
   RSliderLabel();
   ~RSliderLabel() {}
 
   void resized() override;
 
-  void setLabel(const String &text) {
+  void setLabel(const String& text)
+  {
     label.setText(text, NotificationType::dontSendNotification);
   }
 
@@ -45,7 +47,12 @@ public:
 private:
   Label label;
 
-  enum class SetDimension { SetFromHeight, SetFromWidth, NoDimension };
+  enum class SetDimension
+  {
+    SetFromHeight,
+    SetFromWidth,
+    NoDimension
+  };
   SetDimension setDimension = SetDimension::NoDimension;
 
   DISABLE_COMPONENT_RESIZE()

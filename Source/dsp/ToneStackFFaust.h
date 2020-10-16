@@ -16,56 +16,73 @@ Compilation options: -lang cpp -inpl -scal -ftz 2
 #include "Meta.h"
 #include "UI.h"
 
-class FaustImpl : public UI, public Meta {
+class FaustImpl : public UI, public Meta
+{
 public:
   FaustImpl() = default;
   ~FaustImpl() = default;
 
-  FAUSTFLOAT *getParameter(const char *name) {
+  FAUSTFLOAT* getParameter(const char* name)
+  {
     const auto entry = parameterMap.find(name);
     if (entry == parameterMap.end())
       throw std::invalid_argument(
-          std::string("FaustImpl::getParameter: invalid parameter name: ") +
-          name);
+          std::string("FaustImpl::getParameter: invalid parameter name: ")
+          + name);
     return entry->second;
   }
 
-  void setParameter(const char *name, FAUSTFLOAT *value) {
+  void setParameter(const char* name, FAUSTFLOAT* value)
+  {
     const auto entry = parameterMap.find(name);
-    if (entry != parameterMap.end())
-      entry->second = value;
+    if (entry != parameterMap.end()) entry->second = value;
   }
 
   // blank implementations for UI
-  virtual void openTabBox(const char *){};
-  virtual void openHorizontalBox(const char *){};
-  virtual void openVerticalBox(const char *){};
+  virtual void openTabBox(const char*){};
+  virtual void openHorizontalBox(const char*){};
+  virtual void openVerticalBox(const char*){};
   virtual void closeBox(){};
-  virtual void addButton(const char *, FAUSTFLOAT *){};
-  virtual void addCheckButton(const char *, FAUSTFLOAT *){};
-  virtual void addVerticalSlider(const char *, FAUSTFLOAT *, FAUSTFLOAT,
-                                 FAUSTFLOAT, FAUSTFLOAT, FAUSTFLOAT){};
-  virtual void addHorizontalSlider(const char *, FAUSTFLOAT *, FAUSTFLOAT,
-                                   FAUSTFLOAT, FAUSTFLOAT, FAUSTFLOAT){};
+  virtual void addButton(const char*, FAUSTFLOAT*){};
+  virtual void addCheckButton(const char*, FAUSTFLOAT*){};
+  virtual void addVerticalSlider(
+      const char*,
+      FAUSTFLOAT*,
+      FAUSTFLOAT,
+      FAUSTFLOAT,
+      FAUSTFLOAT,
+      FAUSTFLOAT){};
+  virtual void addHorizontalSlider(
+      const char*,
+      FAUSTFLOAT*,
+      FAUSTFLOAT,
+      FAUSTFLOAT,
+      FAUSTFLOAT,
+      FAUSTFLOAT){};
   virtual void
   // use UI entry to expose user parameters
-  addNumEntry(const char *label, FAUSTFLOAT *zone, FAUSTFLOAT, FAUSTFLOAT,
-              FAUSTFLOAT, FAUSTFLOAT) {
-    if (zone == nullptr)
-      return;
+  addNumEntry(
+      const char* label,
+      FAUSTFLOAT* zone,
+      FAUSTFLOAT,
+      FAUSTFLOAT,
+      FAUSTFLOAT,
+      FAUSTFLOAT)
+  {
+    if (zone == nullptr) return;
     parameterMap.insert_or_assign(label, zone);
   }
-  virtual void addHorizontalBargraph(const char *, FAUSTFLOAT *, FAUSTFLOAT,
-                                     FAUSTFLOAT){};
-  virtual void addVerticalBargraph(const char *, FAUSTFLOAT *, FAUSTFLOAT,
-                                   FAUSTFLOAT){};
-  virtual void addSoundfile(const char *, const char *, Soundfile **){};
+  virtual void
+  addHorizontalBargraph(const char*, FAUSTFLOAT*, FAUSTFLOAT, FAUSTFLOAT){};
+  virtual void
+  addVerticalBargraph(const char*, FAUSTFLOAT*, FAUSTFLOAT, FAUSTFLOAT){};
+  virtual void addSoundfile(const char*, const char*, Soundfile**){};
 
   // blank implememtation for Meta
-  virtual void declare(const char *, const char *){};
+  virtual void declare(const char*, const char*){};
 
 private:
-  std::unordered_map<const char *, FAUSTFLOAT *> parameterMap;
+  std::unordered_map<const char*, FAUSTFLOAT*> parameterMap;
 };
 
 #endif
@@ -77,7 +94,8 @@ private:
 #include <cmath>
 #include <math.h>
 
-static float ToneStackFFaust_faustpower2_f(float value) {
+static float ToneStackFFaust_faustpower2_f(float value)
+{
   return (value * value);
 }
 
@@ -90,8 +108,8 @@ static float ToneStackFFaust_faustpower2_f(float value) {
 #define exp10 __exp10
 #endif
 
-class ToneStackFFaust : public FaustImpl {
-
+class ToneStackFFaust : public FaustImpl
+{
 private:
   int fSampleRate;
   float fConst0;
@@ -116,36 +134,42 @@ private:
   float fRec0[3];
 
 public:
-  void metadata(Meta *m) {
+  void metadata(Meta* m)
+  {
     m->declare("basics.lib/name", "Faust Basic Element Library");
     m->declare("basics.lib/version", "0.1");
     m->declare("filename", "ToneStackF.dsp");
     m->declare("filters.lib/fir:author", "Julius O. Smith III");
-    m->declare("filters.lib/fir:copyright",
-               "Copyright (C) 2003-2019 by Julius O. Smith III "
-               "<jos@ccrma.stanford.edu>");
+    m->declare(
+        "filters.lib/fir:copyright",
+        "Copyright (C) 2003-2019 by Julius O. Smith III "
+        "<jos@ccrma.stanford.edu>");
     m->declare("filters.lib/fir:license", "MIT-style STK-4.3 license");
     m->declare("filters.lib/iir:author", "Julius O. Smith III");
-    m->declare("filters.lib/iir:copyright",
-               "Copyright (C) 2003-2019 by Julius O. Smith III "
-               "<jos@ccrma.stanford.edu>");
+    m->declare(
+        "filters.lib/iir:copyright",
+        "Copyright (C) 2003-2019 by Julius O. Smith III "
+        "<jos@ccrma.stanford.edu>");
     m->declare("filters.lib/iir:license", "MIT-style STK-4.3 license");
     m->declare("filters.lib/lowpass0_highpass1", "MIT-style STK-4.3 license");
     m->declare("filters.lib/name", "Faust Filters Library");
     m->declare("filters.lib/peak_eq:author", "Julius O. Smith III");
-    m->declare("filters.lib/peak_eq:copyright",
-               "Copyright (C) 2003-2019 by Julius O. Smith III "
-               "<jos@ccrma.stanford.edu>");
+    m->declare(
+        "filters.lib/peak_eq:copyright",
+        "Copyright (C) 2003-2019 by Julius O. Smith III "
+        "<jos@ccrma.stanford.edu>");
     m->declare("filters.lib/peak_eq:license", "MIT-style STK-4.3 license");
     m->declare("filters.lib/tf2:author", "Julius O. Smith III");
-    m->declare("filters.lib/tf2:copyright",
-               "Copyright (C) 2003-2019 by Julius O. Smith III "
-               "<jos@ccrma.stanford.edu>");
+    m->declare(
+        "filters.lib/tf2:copyright",
+        "Copyright (C) 2003-2019 by Julius O. Smith III "
+        "<jos@ccrma.stanford.edu>");
     m->declare("filters.lib/tf2:license", "MIT-style STK-4.3 license");
     m->declare("filters.lib/tf2s:author", "Julius O. Smith III");
-    m->declare("filters.lib/tf2s:copyright",
-               "Copyright (C) 2003-2019 by Julius O. Smith III "
-               "<jos@ccrma.stanford.edu>");
+    m->declare(
+        "filters.lib/tf2s:copyright",
+        "Copyright (C) 2003-2019 by Julius O. Smith III "
+        "<jos@ccrma.stanford.edu>");
     m->declare("filters.lib/tf2s:license", "MIT-style STK-4.3 license");
     m->declare("maths.lib/author", "GRAME");
     m->declare("maths.lib/copyright", "GRAME");
@@ -159,28 +183,36 @@ public:
 
   virtual int getNumInputs() { return 1; }
   virtual int getNumOutputs() { return 1; }
-  virtual int getInputRate(int channel) {
+  virtual int getInputRate(int channel)
+  {
     int rate;
-    switch ((channel)) {
-    case 0: {
+    switch ((channel))
+    {
+    case 0:
+    {
       rate = 1;
       break;
     }
-    default: {
+    default:
+    {
       rate = -1;
       break;
     }
     }
     return rate;
   }
-  virtual int getOutputRate(int channel) {
+  virtual int getOutputRate(int channel)
+  {
     int rate;
-    switch ((channel)) {
-    case 0: {
+    switch ((channel))
+    {
+    case 0:
+    {
       rate = 1;
       break;
     }
-    default: {
+    default:
+    {
       rate = -1;
       break;
     }
@@ -190,7 +222,8 @@ public:
 
   static void classInit(int) {}
 
-  virtual void instanceConstants(int sample_rate) {
+  virtual void instanceConstants(int sample_rate)
+  {
     fSampleRate = sample_rate;
     fConst0 =
         std::min<float>(192000.0f, std::max<float>(1.0f, float(fSampleRate)));
@@ -208,40 +241,39 @@ public:
     fConst12 = (6283.18555f / (fConst0 * std::sin((25132.7422f / fConst0))));
   }
 
-  virtual void instanceResetUserInterface() {
+  virtual void instanceResetUserInterface()
+  {
     fEntry0 = FAUSTFLOAT(0.0f);
     fEntry1 = FAUSTFLOAT(0.0f);
     fEntry2 = FAUSTFLOAT(0.0f);
     fEntry3 = FAUSTFLOAT(0.0f);
   }
 
-  virtual void instanceClear() {
-    for (int l0 = 0; (l0 < 3); l0 = (l0 + 1)) {
-      fRec1[l0] = 0.0f;
-    }
-    for (int l1 = 0; (l1 < 3); l1 = (l1 + 1)) {
-      fRec2[l1] = 0.0f;
-    }
-    for (int l2 = 0; (l2 < 3); l2 = (l2 + 1)) {
-      fRec0[l2] = 0.0f;
-    }
+  virtual void instanceClear()
+  {
+    for (int l0 = 0; (l0 < 3); l0 = (l0 + 1)) { fRec1[l0] = 0.0f; }
+    for (int l1 = 0; (l1 < 3); l1 = (l1 + 1)) { fRec2[l1] = 0.0f; }
+    for (int l2 = 0; (l2 < 3); l2 = (l2 + 1)) { fRec0[l2] = 0.0f; }
   }
 
-  virtual void init(int sample_rate) {
+  virtual void init(int sample_rate)
+  {
     classInit(sample_rate);
     instanceInit(sample_rate);
   }
-  virtual void instanceInit(int sample_rate) {
+  virtual void instanceInit(int sample_rate)
+  {
     instanceConstants(sample_rate);
     instanceResetUserInterface();
     instanceClear();
   }
 
-  virtual ToneStackFFaust *clone() { return new ToneStackFFaust(); }
+  virtual ToneStackFFaust* clone() { return new ToneStackFFaust(); }
 
   virtual int getSampleRate() { return fSampleRate; }
 
-  virtual void buildUserInterface(UI *ui_interface) {
+  virtual void buildUserInterface(UI* ui_interface)
+  {
     ui_interface->openVerticalBox("ToneStackF");
     ui_interface->addNumEntry("bass", &fEntry0, 0.0f, 0.0f, 1.0f, 1.0f);
     ui_interface->addNumEntry("mids", &fEntry1, 0.0f, 0.0f, 1.0f, 1.0f);
@@ -250,9 +282,10 @@ public:
     ui_interface->closeBox();
   }
 
-  virtual void compute(int count, FAUSTFLOAT **inputs, FAUSTFLOAT **outputs) {
-    FAUSTFLOAT *input0 = inputs[0];
-    FAUSTFLOAT *output0 = outputs[0];
+  virtual void compute(int count, FAUSTFLOAT** inputs, FAUSTFLOAT** outputs)
+  {
+    FAUSTFLOAT* input0 = inputs[0];
+    FAUSTFLOAT* output0 = outputs[0];
     float fSlow0 = ToneStackFFaust_faustpower2_f(
         ((0.495000005f * float(fEntry0)) + 0.504999995f));
     float fSlow1 = ((0.495000005f * float(fEntry1)) + 0.504999995f);
@@ -283,29 +316,30 @@ public:
     float fSlow24 = (iSlow19 ? fSlow20 : fConst12);
     float fSlow25 = ((fConst11 * (fConst11 + fSlow24)) + 1.0f);
     float fSlow26 = ((fConst11 * (fConst11 - fSlow24)) + 1.0f);
-    for (int i = 0; (i < count); i = (i + 1)) {
+    for (int i = 0; (i < count); i = (i + 1))
+    {
       float fTemp0 = float(input0[i]);
       float fTempFTZ0 =
           (fTemp0 - (fSlow9 * ((fSlow10 * fRec1[2]) + (fSlow11 * fRec1[1]))));
       fRec1[0] =
-          ((*reinterpret_cast<int *>(&fTempFTZ0) & 2139095040) ? fTempFTZ0
-                                                               : 0.0f);
+          ((*reinterpret_cast<int*>(&fTempFTZ0) & 2139095040) ? fTempFTZ0
+                                                              : 0.0f);
       float fTempFTZ1 =
-          (fTemp0 -
-           (fConst9 * ((fConst10 * fRec2[2]) + (276000.0f * fRec2[1]))));
+          (fTemp0
+           - (fConst9 * ((fConst10 * fRec2[2]) + (276000.0f * fRec2[1]))));
       fRec2[0] =
-          ((*reinterpret_cast<int *>(&fTempFTZ1) & 2139095040) ? fTempFTZ1
-                                                               : 0.0f);
+          ((*reinterpret_cast<int*>(&fTempFTZ1) & 2139095040) ? fTempFTZ1
+                                                              : 0.0f);
       float fTemp1 = (fConst2 * fRec0[1]);
       float fTempFTZ2 =
-          (((4.0f *
-             ((fSlow8 * fRec1[1]) +
-              (fSlow12 * ((fSlow14 * fRec1[0]) + (fSlow15 * fRec1[2]))))) +
-            (12.0f * ((fSlow16 * fRec2[0]) + (fSlow17 * fRec2[2])))) -
-           (((fRec0[2] * fSlow22) + fTemp1) / fSlow23));
+          (((4.0f
+             * ((fSlow8 * fRec1[1])
+                + (fSlow12 * ((fSlow14 * fRec1[0]) + (fSlow15 * fRec1[2])))))
+            + (12.0f * ((fSlow16 * fRec2[0]) + (fSlow17 * fRec2[2]))))
+           - (((fRec0[2] * fSlow22) + fTemp1) / fSlow23));
       fRec0[0] =
-          ((*reinterpret_cast<int *>(&fTempFTZ2) & 2139095040) ? fTempFTZ2
-                                                               : 0.0f);
+          ((*reinterpret_cast<int*>(&fTempFTZ2) & 2139095040) ? fTempFTZ2
+                                                              : 0.0f);
       output0[i] = FAUSTFLOAT(
           (((fTemp1 + (fRec0[0] * fSlow25)) + (fRec0[2] * fSlow26)) / fSlow23));
       fRec1[2] = fRec1[1];

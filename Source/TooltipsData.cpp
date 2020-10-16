@@ -18,23 +18,26 @@
 
 #include "TooltipsData.h"
 
-TooltipsData::TooltipsData(const std::unique_ptr<XmlElement> &xml) {
-  if (xml == nullptr)
-    return;
+TooltipsData::TooltipsData(const std::unique_ptr<XmlElement>& xml)
+{
+  if (xml == nullptr) return;
 
-  XmlElement *element = xml->getFirstChildElement();
-  while (element != nullptr) {
-    if (element->hasTagName("param") && element->hasAttribute("id")) {
-      const String &id = element->getStringAttribute("id");
-      const String &text = element->getAllSubText().trimStart().trimEnd();
-      paramStrings.insert(std::pair<const String &, const String &>(id, text));
+  XmlElement* element = xml->getFirstChildElement();
+  while (element != nullptr)
+  {
+    if (element->hasTagName("param") && element->hasAttribute("id"))
+    {
+      const String& id = element->getStringAttribute("id");
+      const String& text = element->getAllSubText().trimStart().trimEnd();
+      paramStrings.insert(std::pair<const String&, const String&>(id, text));
     }
 
     element = element->getNextElement();
   }
 }
 
-const String &TooltipsData::getForParam(const String &name) const {
+const String& TooltipsData::getForParam(const String& name) const
+{
   const static String empty = "";
   if (paramStrings.find(name) == paramStrings.end())
     return empty;

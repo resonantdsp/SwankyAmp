@@ -23,21 +23,24 @@
 #include "../Utils.h"
 #include "ParameterGroup.h"
 
-class PresetGroup : public ParameterGroup {
+class PresetGroup : public ParameterGroup
+{
 public:
   PresetGroup();
   ~PresetGroup() {}
 
-  void attachVTS(AudioProcessorValueTreeState &) override {}
-  void addPresetListener(ComboBox::Listener *listener) {
+  void attachVTS(AudioProcessorValueTreeState&) override {}
+  void addPresetListener(ComboBox::Listener* listener)
+  {
     presetSelector.addListener(listener);
   }
 
   void setHeight(int height) { setSize(0, height); }
-  void paint(Graphics &g) override;
+  void paint(Graphics& g) override;
   void resized() override;
 
-  enum ComboIds {
+  enum ComboIds
+  {
     PresetInit = 1,
     PresetOther = 2,
   };

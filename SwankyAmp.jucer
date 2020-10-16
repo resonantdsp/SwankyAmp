@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<JUCERPROJECT id="sJgmJL" name="SwankyAmp" projectType="audioplug" version="1.1.0"
+<JUCERPROJECT id="sJgmJL" name="SwankyAmp" projectType="audioplug" version="1.2.0"
               projectLineFeed="&#10;" companyName="Resonant DSP" companyWebsite="https://www.resonantdsp.com/"
               companyEmail="info@resonantdsp.com" pluginFormats="buildAAX,buildAU,buildStandalone,buildVST3"
               pluginName="Swanky Amp" pluginDesc="Tube amplifiers simulation"
@@ -112,7 +112,6 @@
         <MODULEPATH id="juce_audio_formats" path="../../../AppData/Local/JUCE/modules"/>
         <MODULEPATH id="juce_audio_plugin_client" path="../../../AppData/Local/JUCE/modules"/>
         <MODULEPATH id="juce_audio_processors" path="../../../AppData/Local/JUCE/modules"/>
-        <MODULEPATH id="juce_audio_utils" path="../../../AppData/Local/JUCE/modules"/>
         <MODULEPATH id="juce_core" path="../../../AppData/Local/JUCE/modules"/>
         <MODULEPATH id="juce_cryptography" path="../../../AppData/Local/JUCE/modules"/>
         <MODULEPATH id="juce_data_structures" path="../../../AppData/Local/JUCE/modules"/>
@@ -121,6 +120,7 @@
         <MODULEPATH id="juce_gui_basics" path="../../../AppData/Local/JUCE/modules"/>
         <MODULEPATH id="juce_gui_extra" path="../../../AppData/Local/JUCE/modules"/>
         <MODULEPATH id="juce_opengl" path="../../../AppData/Local/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_utils" path="../../../../../JUCE/modules"/>
       </MODULEPATHS>
     </XCODE_MAC>
     <VS2019 targetFolder="Builds/VisualStudio2019">
@@ -134,7 +134,6 @@
         <MODULEPATH id="juce_audio_formats" path="../../../AppData/Local/JUCE/modules"/>
         <MODULEPATH id="juce_audio_plugin_client" path="../../../AppData/Local/JUCE/modules"/>
         <MODULEPATH id="juce_audio_processors" path="../../../AppData/Local/JUCE/modules"/>
-        <MODULEPATH id="juce_audio_utils" path="../../../AppData/Local/JUCE/modules"/>
         <MODULEPATH id="juce_core" path="../../../AppData/Local/JUCE/modules"/>
         <MODULEPATH id="juce_cryptography" path="../../../AppData/Local/JUCE/modules"/>
         <MODULEPATH id="juce_data_structures" path="../../../AppData/Local/JUCE/modules"/>
@@ -143,6 +142,7 @@
         <MODULEPATH id="juce_gui_basics" path="../../../AppData/Local/JUCE/modules"/>
         <MODULEPATH id="juce_gui_extra" path="../../../AppData/Local/JUCE/modules"/>
         <MODULEPATH id="juce_opengl" path="../../../AppData/Local/JUCE/modules"/>
+        <MODULEPATH id="juce_audio_utils" path="../../../../../JUCE/modules"/>
       </MODULEPATHS>
     </VS2019>
   </EXPORTFORMATS>
