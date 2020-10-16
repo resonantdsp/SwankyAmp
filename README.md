@@ -10,7 +10,7 @@ You can find the installers on the website:
 
 ## Demo
 
-[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/pz3v87VMQfk/0.jpg)](https://www.youtube.com/watch?v=pz3v87VMQfk)
+[![Swanky Amp Demo](https://img.youtube.com/vi/pz3v87VMQfk/0.jpg)](https://www.youtube.com/watch?v=pz3v87VMQfk)
 
 ## Usage
 
