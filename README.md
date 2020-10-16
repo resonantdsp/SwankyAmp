@@ -2,9 +2,11 @@
 
 Swanky Amp is a tube amplifier simulation DSP plugin which aims to capture the details in the dynamics of tube amplifiers.
 
-The software is currently in beta and is distributed as a VST3 for 64-bit Windows systems, as well as VST3 and AU for Mac OSX systems. You can find the installers on the website:
+You can find the installers on the website:
 
-<http://www.resonantdsp.com/swankyamp/>
+<https://www.resonantdsp.com/swankyamp/>
+
+![Swanky Amp](https://www.resonantdsp.com/images/swanky-amp.jpg)
 
 ## Usage
 
@@ -20,7 +22,7 @@ The model was developed by running finite-difference simulation methods (spice),
 
 Some more information about the process can be found here:
 
-<http://www.resonantdsp.com/blog/tube-emulation/tube-emulation-4.html>
+<https://www.resonantdsp.com/blog/tube-emulation/tube-emulation-4.html>
 
 ## Building
 
@@ -82,6 +84,17 @@ Only available with VisualStudio at the moment.
 * Run `Builds\VisualStudio\x64\Debug\SwankyAmp.exe`
 
 ## Change log
+
+Version 1.2.0:
+
+* re-wokred drive ranges
+* re-worked sag slightly
+* use sinh transformation to make central range more sensitive
+* changed windows installer to MSI
+
+Version 1.1.0:
+
+* Added ability to blend the tone stacks
 
 Version 1.0.0:
 
