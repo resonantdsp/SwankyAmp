@@ -12,7 +12,7 @@ namespace BinaryData
     const int            logo_svgSize = 7224;
 
     extern const char*   presets_xml;
-    const int            presets_xmlSize = 11131;
+    const int            presets_xmlSize = 11303;
 
     extern const char*   PTSansBold_ttf;
     const int            PTSansBold_ttfSize = 287936;
@@ -24,7 +24,7 @@ namespace BinaryData
     const int            PTSansNarrowRegular_ttfSize = 234208;
 
     extern const char*   tooltips_xml;
-    const int            tooltips_xmlSize = 3464;
+    const int            tooltips_xmlSize = 3470;
 
     // Number of elements in the namedResourceList and originalFileNames arrays.
     const int namedResourceListSize = 6;
