@@ -91,6 +91,7 @@ Version 1.2.0:
 * re-worked sag slightly
 * use sinh transformation to make central range more sensitive
 * changed windows installer to MSI
+* changes to the layout
 
 Version 1.1.0:
 
