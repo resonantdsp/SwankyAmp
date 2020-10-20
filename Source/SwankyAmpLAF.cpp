@@ -397,7 +397,7 @@ void SwankyAmpLAF::drawRotarySlider(
     rangePath.closeSubPath();
 
     g.setColour(
-        findColour(RSlider::dialDotColourId).withMultipliedSaturation(0.33f));
+        findColour(RSlider::dialDotColourId).withMultipliedSaturation(0.45f));
     g.fillPath(rangePath);
   }
 

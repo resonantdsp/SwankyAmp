@@ -59,6 +59,6 @@
 		The amoumt of signal in the higher mids, lower highs. Increase for more definition, more detail. Decrease to reduce brittle harshness.
 	</param>
 	<param id="idTsSelection">
-        Tone stack model: 0 will give you a Fender-like tone stack with scooped mids, while 10 will give you a Marshall-like tone stack with lots of mids.
+        Tone stack: 0 for a Fender-like mids scoop, 5 for a Marshall-like tone with mids, 10 for an AC30-like tone with added mids control.
 	</param>
 </tooltips>

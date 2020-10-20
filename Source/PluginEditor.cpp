@@ -200,3 +200,8 @@ void SwankyAmpAudioProcessorEditor::resized()
   // translated, but in future might want to re-scale as well
   buildBgPattern();
 }
+
+void SwankyAmpAudioProcessorEditor::setPresetTextDontNotify(const String& text)
+{
+  presetManager.setStateText(text);
+}

@@ -41,6 +41,7 @@ public:
   void resized() override;
 
   String getPresetName() const { return presetGroup.presetSelector.getText(); }
+  void setPresetTextDontNotify(const String& text);
 
 private:
   // TODO: consdier setting and calling resized, bur for now these are const
