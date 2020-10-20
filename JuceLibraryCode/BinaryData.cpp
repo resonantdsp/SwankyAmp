@@ -9792,7 +9792,7 @@ static const unsigned char temp_binary_data_5[] =
 "\t\tThe amoumt of signal in the higher mids, lower highs. Increase for more definition, more detail. Decrease to reduce brittle harshness.\r\n"
 "\t</param>\r\n"
 "\t<param id=\"idTsSelection\">\r\n"
-"        Tone stack model: 0 will give you a Fender-like tone stack with scooped mids, while 10 will give you a Marshall-like tone stack with lots of mids.\r\n"
+"        Tone stack: 0 for a Fender-like mids scoop, 5 for a Marshall-like tone with mids, 10 for an AC30-like tone with added mids control.\r\n"
 "\t</param>\r\n"
 "</tooltips>\r\n";
 
@@ -9814,7 +9814,7 @@ const char* getNamedResource (const char* resourceNameUTF8, int& numBytes)
         case 0xc9b4bb03:  numBytes = 287936; return PTSansBold_ttf;
         case 0x1200a58c:  numBytes = 278168; return PTSansRegular_ttf;
         case 0xadb49371:  numBytes = 234208; return PTSansNarrowRegular_ttf;
-        case 0x0e764828:  numBytes = 3470; return tooltips_xml;
+        case 0x0e764828:  numBytes = 3455; return tooltips_xml;
         default: break;
     }
 
