@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<JUCERPROJECT id="sJgmJL" name="SwankyAmp" projectType="audioplug" version="1.2.0"
+<JUCERPROJECT id="sJgmJL" name="SwankyAmp" projectType="audioplug" version="1.3.0"
               projectLineFeed="&#10;" companyName="Resonant DSP" companyWebsite="https://www.resonantdsp.com/"
               companyEmail="info@resonantdsp.com" pluginFormats="buildAAX,buildAU,buildStandalone,buildVST3"
               pluginName="Swanky Amp" pluginDesc="Tube amplifiers simulation"
