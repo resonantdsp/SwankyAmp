@@ -60,7 +60,7 @@ SwankyAmpAudioProcessor::SwankyAmpAudioProcessor() :
             MAKE_PARAMETER_UNIT(TsMid),
             MAKE_PARAMETER_UNIT(TsHigh),
             MAKE_PARAMETER_UNIT(TsPresence),
-            MAKE_PARAMETER(TsSelection, 0.0f, 1.0f, 0.0f),
+            MAKE_PARAMETER(TsSelection, 0.0f, 2.0f, 0.0f),
 
             std::make_unique<AudioParameterInt>(
                 "idGainStages", "GainStages", 1, 5, 3),
