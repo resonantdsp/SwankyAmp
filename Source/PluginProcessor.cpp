@@ -678,7 +678,7 @@ void SwankyAmpAudioProcessor::setStateInformation(
     {
       const double value = values["idPowerAmpDrive"];
       const float post = invertRemapSinh(
-          remap_xy((float)value, -1.0f, 1.0f, -0.85, 1.14), -0.2f, 1.0f);
+          remap_xy((float)value, -1.0f, 1.0f, -0.85f, 1.14f), -0.2f, 1.0f);
       values["idPowerAmpDrive"] = (double)post;
     }
     if (values.find("idPowerAmpSag") != values.end())
