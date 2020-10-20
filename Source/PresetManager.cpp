@@ -25,6 +25,40 @@
 #include "Components/PresetGroup.h"
 #include "PresetManager.h"
 
+std::pair<int, String> extractNumAndName(const String& name)
+{
+  static const String digits = "09";
+  static const String div = " ";
+
+  int startIdx = -1;
+
+  for (int i = 0; i < name.length(); i++)
+  {
+    const juce_wchar c = name[i];
+
+    if (c >= digits[0] && c <= digits[1]) continue;
+
+    const bool hasNumber = i > 0;
+    const bool hasDivider = i + div.length() <= name.length()
+        && name.substring(i, i + div.length()) == div;
+
+    if (hasNumber && hasDivider) startIdx = i + div.length();
+
+    break;
+  }
+
+  if (startIdx > 1)
+  {
+    int num = std::atoi(name.substring(0, startIdx - div.length()).toRawUTF8());
+    String nameStripped = name.substring(startIdx);
+    return std::pair<int, String>(num, nameStripped);
+  }
+  else
+  {
+    return std::pair<int, String>(-1, name);
+  }
+}
+
 // TODO: could be useful for building parameter list in processor?
 std::vector<String> buildParameterIds(const SerializedState& state)
 {
@@ -95,7 +129,6 @@ PresetManager::PresetManager(
 
   updatePresetDir();
   updateComboBox();
-  clearUI();
 
   comboBox.onChange = [&]() { comboBoxChanged(); };
   buttonSave.onClick = [&]() { buttonSaveClicked(); };
@@ -104,15 +137,8 @@ PresetManager::PresetManager(
   buttonPrev.onClick = [&]() { buttonPrevClicked(); };
   buttonOpen.onClick = [&]() { buttonOpenClicked(); };
 
-  const String storedName = processor.storedPresetName;
-  if (storedName.isNotEmpty())
-  {
-    auto state = processor.parameters.copyState();
-    std::unique_ptr<XmlElement> xml(state.createXml());
-    comboBox.setText(storedName, NotificationType::sendNotificationSync);
-    processor.setStateInformation(xml);
-    if (storedName != "init") buttonSave.setEnabled(true);
-  }
+  const String storedText = processor.getPresetText();
+  setStateText(storedText);
 }
 
 PresetManager::~PresetManager()
@@ -146,7 +172,7 @@ void PresetManager::addStateEntry(
 
 void PresetManager::removeStateEntry(const String& name)
 {
-  if (stateEntryIdx.find(name) == stateEntryIdx.end()) return;
+  if (!containsName(name)) return;
 
   const size_t idx = stateEntryIdx[name];
   stateEntries.erase(stateEntries.begin() + idx);
@@ -225,40 +251,6 @@ void PresetManager::loadFactoryPresets()
   }
 }
 
-std::pair<int, String> extractNumAndName(const String& name)
-{
-  static const String digits = "09";
-  static const String div = " ";
-
-  int startIdx = -1;
-
-  for (int i = 0; i < name.length(); i++)
-  {
-    const juce_wchar c = name[i];
-
-    if (c >= digits[0] && c <= digits[1]) continue;
-
-    const bool hasNumber = i > 0;
-    const bool hasDivider = i + div.length() <= name.length()
-        && name.substring(i, i + div.length()) == div;
-
-    if (hasNumber && hasDivider) startIdx = i + div.length();
-
-    break;
-  }
-
-  if (startIdx > 1)
-  {
-    int num = std::atoi(name.substring(0, startIdx - div.length()).toRawUTF8());
-    String nameStripped = name.substring(startIdx);
-    return std::pair<int, String>(num, nameStripped);
-  }
-  else
-  {
-    return std::pair<int, String>(-1, name);
-  }
-}
-
 bool PresetManager::loadPresetsFromDir()
 {
   std::vector<String> filePaths;
@@ -296,13 +288,6 @@ bool PresetManager::loadPresetsFromDir()
   }
 
   return true;
-}
-
-void PresetManager::clearUI()
-{
-  comboBox.setSelectedId(0);
-  buttonSave.setEnabled(false);
-  buttonRemove.setEnabled(false);
 }
 
 void PresetManager::updateComboBox()
@@ -359,6 +344,19 @@ void PresetManager::updatePresetDir()
   }
 }
 
+void PresetManager::updateButtonState()
+{
+  if (currentName == "init")
+  {
+    buttonSave.setEnabled(false);
+    buttonRemove.setEnabled(false);
+    return;
+  }
+
+  buttonSave.setEnabled(true);
+  if (containsName(currentName)) buttonRemove.setEnabled(true);
+}
+
 void PresetManager::comboBoxChanged()
 {
   const auto numAndName = extractNumAndName(comboBox.getText());
@@ -367,15 +365,16 @@ void PresetManager::comboBoxChanged()
 
   if (name == "") return;
 
-  if (stateEntryIdx.find(name) == stateEntryIdx.end())
+  if (!containsName(name))
   {
-    const bool makeNew = !currentName.has_value()
+    const bool makeNew = currentName == "init" || !containsName(currentName)
         || AlertWindow::showOkCancelBox(
-            AlertWindow::AlertIconType::QuestionIcon,
-            "New preset name",
-            "Create new preset or rename existing?",
-            "new",
-            "rename");
+                             AlertWindow::AlertIconType::QuestionIcon,
+                             "New preset name",
+                             "Create new preset \"" + name + "\" or rename \""
+                                 + currentName + "\"?",
+                             "new",
+                             "rename");
 
     if (makeNew)
     {
@@ -384,13 +383,14 @@ void PresetManager::comboBoxChanged()
       currentName = name;
       buttonSaveClicked();
     }
-    else if (stateEntryIdx.find(*currentName) != stateEntryIdx.end())
+    // can only happen if not init and currentName exists
+    else
     {
-      const size_t idx = stateEntryIdx[*currentName];
+      const size_t idx = stateEntryIdx[currentName];
       StateEntry& currentEntry = stateEntries[idx];
       currentEntry.name = name;
       stateEntryIdx[name] = idx;
-      stateEntryIdx.erase(*currentName);
+      stateEntryIdx.erase(currentName);
       currentName = name;
     }
 
@@ -399,17 +399,17 @@ void PresetManager::comboBoxChanged()
         && ord != stateEntryIdx[name])
       moveStateEntry(stateEntryIdx[name], (size_t)ord);
 
-    // although the change has already been saved, this lets the user know
-    // something has changed and they can compulsively re-save
-
-    buttonSave.setEnabled(true);
-
     updatePresetDir();
     updateComboBox();
+    updateButtonState();
+
+    // after making a new preset, leave enabled to help user with feedback
+    if (makeNew) buttonSave.setEnabled(true);
   }
   else
   {
     currentName = name;
+    // cn only happen if name exists
     const StateEntry& currentEntry = stateEntries[stateEntryIdx[name]];
 
     if (currentEntry.stateIdx != std::nullopt)
@@ -417,17 +417,16 @@ void PresetManager::comboBoxChanged()
       // load the state for this entry
       setState(states[*currentEntry.stateIdx]);
 
-      // this is a custom state, can be removed
-      buttonRemove.setEnabled(true);
-      // can't save until modified
-      buttonSave.setEnabled(false);
-
       if (ord > 0 && ord != (int)(stateEntryIdx[name]))
       {
         moveStateEntry(stateEntryIdx[name], (size_t)ord);
         updatePresetDir();
         updateComboBox();
       }
+
+      updateButtonState();
+      // just loaded a preset
+      buttonSave.setEnabled(false);
     }
     else
     {
@@ -441,9 +440,16 @@ void PresetManager::comboBoxChanged()
 
 void PresetManager::buttonSaveClicked()
 {
-  if (!currentName.has_value()) return;
+  if (currentName == "init") return;
+  if (!containsName(currentName))
+  {
+    // not currently a valid selection, create one
+    comboBoxChanged();
+    return;
+  }
 
-  StateEntry& currentEntry = stateEntries[stateEntryIdx[*currentName]];
+  // can only happen if currentName exists
+  StateEntry& currentEntry = stateEntries[stateEntryIdx[currentName]];
   if (currentEntry.name == "") return;
 
   SerializedState state = vts.state.createXml();
@@ -453,7 +459,7 @@ void PresetManager::buttonSaveClicked()
       && !AlertWindow::showOkCancelBox(
           AlertWindow::AlertIconType::QuestionIcon,
           "Confirm save",
-          "Save preset: " + *currentName + "?"))
+          "Save preset: " + currentName + "?"))
     return;
 
   state->setAttribute("pluginVersion", JucePlugin_VersionString);
@@ -475,15 +481,18 @@ void PresetManager::buttonSaveClicked()
   states.push_back(std::move(state));
   currentEntry.stateIdx = {states.size() - 1};
 
-  // can't save again until something changes
-  buttonSave.setEnabled(false);
-  buttonRemove.setEnabled(true);
+  // TODO: properly extract save functionaliy from button callback, this is
+  // button specific, not save-specific
+  updatePresetDir();
 }
 
 void PresetManager::buttonRemoveClicked()
 {
-  if (!currentName.has_value()) return;
-  StateEntry& currentEntry = stateEntries[stateEntryIdx[*currentName]];
+  if (currentName == "init") return;
+  if (!containsName(currentName)) return;
+
+  // can only happen if currentName exists
+  StateEntry& currentEntry = stateEntries[stateEntryIdx[currentName]];
 
   if (currentEntry.file.getFullPathName() != "")
   {
@@ -492,48 +501,46 @@ void PresetManager::buttonRemoveClicked()
   }
 
   removeStateEntry(currentEntry.name);
-  currentName = std::nullopt;
-
-  updateComboBox();
   updatePresetDir();
-  clearUI();
+  updateComboBox();
+  setStateText("init");
 }
 
 void PresetManager::buttonNextClicked()
 {
-  if (currentName == std::nullopt)
+  if (!containsName(currentName))
   {
-    comboBox.setSelectedId(1);
+    comboBox.setSelectedId(1, NotificationType::sendNotificationSync);
     return;
   }
 
-  size_t currentIdx = stateEntryIdx[*currentName];
+  size_t currentIdx = stateEntryIdx[currentName];
 
   if (currentIdx < stateEntries.size() - 1)
   {
     currentIdx += 1;
     currentName = stateEntries[currentIdx].name;
     const int id = (int)(currentIdx + 1);
-    comboBox.setSelectedId(id);
+    comboBox.setSelectedId(id, NotificationType::sendNotificationSync);
   }
 }
 
 void PresetManager::buttonPrevClicked()
 {
-  if (currentName == std::nullopt)
+  if (!containsName(currentName))
   {
-    comboBox.setSelectedId(1);
+    comboBox.setSelectedId(1, NotificationType::sendNotificationSync);
     return;
   }
 
-  size_t currentIdx = stateEntryIdx[*currentName];
+  size_t currentIdx = stateEntryIdx[currentName];
 
   if (currentIdx > 1)
   {
     currentIdx -= 1;
     currentName = stateEntries[currentIdx].name;
     const int id = (int)(currentIdx + 1);
-    comboBox.setSelectedId(id);
+    comboBox.setSelectedId(id, NotificationType::sendNotificationSync);
   }
 }
 
@@ -541,13 +548,27 @@ void PresetManager::buttonOpenClicked() { presetDir.startAsProcess(); }
 
 void PresetManager::parameterChanged(const String& id, float)
 {
-  if (!currentName.has_value()) return;
-  StateEntry& currentEntry = stateEntries[stateEntryIdx[*currentName]];
-  if (currentEntry.name != "init" && id != "idInputLevel" && id != "idCabOnOff")
+  if (currentName != "init" && id != "idInputLevel" && id != "idCabOnOff")
     buttonSave.setEnabled(true);
 }
 
 void PresetManager::setState(const SerializedState& state)
 {
-  processor.setStateInformation(state, false);
+  processor.setStateInformation(state, comboBox.getText(), false);
+}
+
+void PresetManager::setStateText(const String& text)
+{
+  const auto name = extractNumAndName(text).second;
+  if (name.isEmpty())
+  {
+    currentName = "init";
+    comboBox.setText("init", NotificationType::dontSendNotification);
+  }
+  else
+  {
+    currentName = name;
+    comboBox.setText(text, NotificationType::dontSendNotification);
+  }
+  updateButtonState();
 }

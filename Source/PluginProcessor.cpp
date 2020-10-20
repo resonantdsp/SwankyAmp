@@ -489,14 +489,22 @@ AudioProcessorEditor* SwankyAmpAudioProcessor::createEditor()
   return new SwankyAmpAudioProcessorEditor(*this, parameters);
 }
 
+void SwankyAmpAudioProcessor::setPresetText(const String& text)
+{
+  storedPresetText = text;
+}
+
+const String& SwankyAmpAudioProcessor::getPresetText() const
+{
+  return storedPresetText;
+}
+
 void SwankyAmpAudioProcessor::getStateInformation(MemoryBlock& destData)
 {
   auto state = parameters.copyState();
   std::unique_ptr<XmlElement> xml(state.createXml());
-  SwankyAmpAudioProcessorEditor* editor =
-      dynamic_cast<SwankyAmpAudioProcessorEditor*>(getActiveEditor());
-  if (editor != nullptr)
-  { xml->setAttribute("presetName", editor->getPresetName()); }
+  const String presetText = getPresetText();
+  if (presetText.isNotEmpty()) { xml->setAttribute("presetName", presetText); }
   copyXmlToBinary(*xml, destData);
 }
 
@@ -505,8 +513,20 @@ void SwankyAmpAudioProcessor::setStateInformation(
 {
   std::unique_ptr<XmlElement> xmlState(getXmlFromBinary(data, sizeInBytes));
   if (xmlState.get() != nullptr)
+  {
     if (xmlState->hasTagName(parameters.state.getType()))
-      setStateInformation(xmlState, true);
+    {
+      if (xmlState->hasAttribute("presetName"))
+      {
+        setStateInformation(
+            xmlState, xmlState->getStringAttribute("presetName"), true);
+      }
+      else
+      {
+        setStateInformation(xmlState, "", true);
+      }
+    }
+  }
 }
 
 /**
@@ -629,14 +649,11 @@ VersionNumber parseVersionString(const String& versionString)
 }
 
 void SwankyAmpAudioProcessor::setStateInformation(
-    const std::unique_ptr<XmlElement>& state, bool useAll)
+    const std::unique_ptr<XmlElement>& state,
+    const String& presetText,
+    bool useAll)
 {
-  if (state != nullptr && state->hasAttribute("presetName"))
-  { storedPresetName = state->getStringAttribute("presetName"); }
-  else
-  {
-    storedPresetName = "";
-  }
+  setPresetText(presetText);
 
   std::unordered_map<String, double> values;
   if (state != nullptr) values = mapParameterValues(state);
@@ -684,15 +701,19 @@ void SwankyAmpAudioProcessor::setStateInformation(
     if (values.find("idPowerAmpSag") != values.end())
     {
       const double value = values["idPowerAmpSag"];
-      const float post = remapSinh((double)value, 0.0f, 1.0f);
-      values["idPowerAmpSag"] = (float)post;
+      const float post = remapSinh((float)value, 0.0f, 1.0f);
+      values["idPowerAmpSag"] = (double)post;
     }
   }
 
-  // Not clear if multiple threads trying to set state could cause issues as
-  // they would both trigger notirications to the host (the parameters changes
-  // are atomic so that aspect should be ok). This is a precaution.
   setStateMutex.enter();
+
+  if (presetText.isNotEmpty())
+  {
+    SwankyAmpAudioProcessorEditor* editor =
+        dynamic_cast<SwankyAmpAudioProcessorEditor*>(getActiveEditor());
+    if (editor != nullptr) { editor->setPresetTextDontNotify(presetText); }
+  }
 
   for (const auto& id : parameterIds)
   {

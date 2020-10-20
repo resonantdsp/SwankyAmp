@@ -62,15 +62,21 @@ public:
   const std::vector<String>& getParameterIds() const { return parameterIds; }
 
   void setState(const SerializedState& state);
+  void setStateText(const String& text);
 
 private:
   void loadPreset(SerializedState state, File file, const String& name);
   void loadFactoryPresets();
   bool loadPresetsFromDir();
 
-  void clearUI();
   void updateComboBox();
   void updatePresetDir();
+  void updateButtonState();
+
+  bool containsName(const String& name) const
+  {
+    return stateEntryIdx.find(name) != stateEntryIdx.end();
+  }
 
   void
   addStateEntry(const String& name, const File& file, SerializedState state);
@@ -89,7 +95,7 @@ private:
 
   std::vector<String> parameterIds;
 
-  std::optional<String> currentName = std::nullopt;
+  String currentName = "init";
   std::vector<StateEntry> stateEntries;
   std::unordered_map<String, size_t> stateEntryIdx;
   std::vector<SerializedState> states;

@@ -82,8 +82,6 @@ public:
       "idPowerAmpSag",   "idPowerAmpSagRatio",
   };
 
-  String storedPresetName;
-
   void setAmpParameters();
 
   void prepareToPlay(double sampleRate, int samplesPerBlock) override;
@@ -114,10 +112,16 @@ public:
   void getStateInformation(MemoryBlock& destData) override;
   void setStateInformation(const void* data, int sizeInBytes) override;
   void setStateInformation(
-      const std::unique_ptr<XmlElement>& state, bool useAll = true);
+      const std::unique_ptr<XmlElement>& state,
+      const String& presetName,
+      bool useAll = true);
+
+  void setPresetText(const String& text);
+  const String& getPresetText() const;
 
 private:
   CriticalSection setStateMutex;
+  String storedPresetText;
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SwankyAmpAudioProcessor)
 };
