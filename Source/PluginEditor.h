@@ -30,7 +30,20 @@
 typedef AudioProcessorValueTreeState::SliderAttachment SliderAttachment;
 typedef AudioProcessorValueTreeState::ButtonAttachment ButtonAttachment;
 
-class SwankyAmpAudioProcessorEditor : public AudioProcessorEditor
+class StateChangeMonitor : public Timer
+{
+public:
+  StateChangeMonitor(int refreshRateHz) { startTimerHz(refreshRateHz); }
+  virtual ~StateChangeMonitor() = default;
+  virtual void stateChangeCallback() = 0;
+
+private:
+  void timerCallback() override { stateChangeCallback(); }
+};
+
+class SwankyAmpAudioProcessorEditor :
+    public AudioProcessorEditor,
+    public StateChangeMonitor
 {
 public:
   SwankyAmpAudioProcessorEditor(
@@ -77,6 +90,7 @@ private:
   Random rng;
 
   void buildBgPattern();
+  void stateChangeCallback() override;
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SwankyAmpAudioProcessorEditor)
 };

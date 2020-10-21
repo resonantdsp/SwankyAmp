@@ -82,6 +82,8 @@ public:
       "idPowerAmpSag",   "idPowerAmpSagRatio",
   };
 
+  std::atomic<bool> notifyStateChanged = false;
+
   void setAmpParameters();
 
   void prepareToPlay(double sampleRate, int samplesPerBlock) override;

@@ -706,15 +706,6 @@ void SwankyAmpAudioProcessor::setStateInformation(
     }
   }
 
-  setStateMutex.enter();
-
-  if (presetText.isNotEmpty())
-  {
-    SwankyAmpAudioProcessorEditor* editor =
-        dynamic_cast<SwankyAmpAudioProcessorEditor*>(getActiveEditor());
-    if (editor != nullptr) { editor->setPresetTextDontNotify(presetText); }
-  }
-
   for (const auto& id : parameterIds)
   {
     if (!useAll && (id == "idInputLevel" || id == "idCabOnOff")) continue;
@@ -733,7 +724,7 @@ void SwankyAmpAudioProcessor::setStateInformation(
   // parameters
   for (int i = 0; i < 2; i++) amp_channel[i].reset();
 
-  setStateMutex.exit();
+  notifyStateChanged = true;
 }
 
 AudioProcessor* JUCE_CALLTYPE createPluginFilter()
