@@ -24,6 +24,7 @@
 SwankyAmpAudioProcessorEditor::SwankyAmpAudioProcessorEditor(
     SwankyAmpAudioProcessor& p, AudioProcessorValueTreeState& vts) :
     AudioProcessorEditor(&p),
+    StateChangeMonitor(30),
     processor(p),
     valueTreeState(vts),
     presetManager(
@@ -201,7 +202,8 @@ void SwankyAmpAudioProcessorEditor::resized()
   buildBgPattern();
 }
 
-void SwankyAmpAudioProcessorEditor::setPresetTextDontNotify(const String& text)
+void SwankyAmpAudioProcessorEditor::stateChangeCallback()
 {
-  presetManager.setStateText(text);
+  const String& text = processor.getPresetText();
+  if (text.isNotEmpty()) presetManager.setStateText(text);
 }

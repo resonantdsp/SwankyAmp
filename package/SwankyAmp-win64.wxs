@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
     <Product
-        Id="37be9110-4f6b-48ee-99d0-cc4106efb836"
-        UpgradeCode="3cef449f-e243-4036-959b-fc89eb375ff2"
-        Version="1.3.0"
+        Id="d76f50a9-0677-4d26-9a37-9ee83d9dbb03"
+        UpgradeCode="ae6f361c-8fbf-4d1a-a6d4-f240d5aaf8ce"
+        Version="1.3.1"
         Language="1033"
         Name="Swanky Amp"
         Manufacturer="Resonant DSP">

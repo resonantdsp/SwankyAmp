@@ -220,7 +220,8 @@ void SwankyAmpAudioProcessor::setAmpParameters()
 {
   for (int i = 0; i < 2; i++)
   {
-    const float preAmpDriveMap = *parPreAmpDrive;
+    const float preAmpDriveMap =
+        jmax(-0.9f, remapSinh(*parPreAmpDrive, 0.5f, 1.0f));
     const float powerAmpDriveMap = remapSinh(*parPowerAmpDrive, -0.2f, 1.0f);
     const float powerAmpSagMap = remapSinh(*parPowerAmpSag, 0.0f, 1.0f);
 
@@ -706,13 +707,17 @@ void SwankyAmpAudioProcessor::setStateInformation(
     }
   }
 
-  setStateMutex.enter();
-
-  if (presetText.isNotEmpty())
+  // from 1.3.0 to 1.3.1
+  if (state != nullptr && state->hasAttribute("pluginVersion")
+      && parseVersionString(state->getStringAttribute("pluginVersion"))
+          < VersionNumber(1, 3, 1))
   {
-    SwankyAmpAudioProcessorEditor* editor =
-        dynamic_cast<SwankyAmpAudioProcessorEditor*>(getActiveEditor());
-    if (editor != nullptr) { editor->setPresetTextDontNotify(presetText); }
+    if (values.find("idPreAmpDrive") != values.end())
+    {
+      const double value = values["idPreAmpDrive"];
+      const float post = invertRemapSinh((float)value, 0.5f, 1.0f);
+      values["idPreAmpDrive"] = (double)post;
+    }
   }
 
   for (const auto& id : parameterIds)
@@ -733,7 +738,7 @@ void SwankyAmpAudioProcessor::setStateInformation(
   // parameters
   for (int i = 0; i < 2; i++) amp_channel[i].reset();
 
-  setStateMutex.exit();
+  notifyStateChanged = true;
 }
 
 AudioProcessor* JUCE_CALLTYPE createPluginFilter()

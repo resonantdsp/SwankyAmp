@@ -89,6 +89,15 @@ Only available with VisualStudio at the moment.
 
 ## Change log
 
+Version 1.3.1:
+
+* fix issue where processor thread calls editor and can hang the audio for a bit
+  * processor sets a flag when the state is changed
+  * the editor monitors that on a timer
+  * eventually should implement a better message queue / state system
+* fix issue where pre amp drive would go too low and start getting digital artifacts
+* improve pre amp drive range mapping
+
 Version 1.3.0:
 
 * re-worked the preset manager to fix issues with re-loading preset names
