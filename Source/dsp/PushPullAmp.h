@@ -436,7 +436,6 @@ private:
   FAUSTFLOAT inputLevel = 0.0f;
   FAUSTFLOAT outputLevel = 0.0f;
   bool cabinetOn = true;
-  float toneStackSelector = 0;
 
   const float preAmpSweepScales[NUM_SWEEP_BINS + 1] = {
       8.676414e-03f,
@@ -468,6 +467,7 @@ private:
   {
     set_input_level(0.0f);
     set_output_level(0.0f);
+    set_cabinet_on(true);
   }
 };
 
