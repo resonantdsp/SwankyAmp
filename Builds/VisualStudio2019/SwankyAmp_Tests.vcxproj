@@ -85,6 +85,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\Source\Tests\catch.hpp" />
     <ClInclude Include="..\..\Source\Tests\Tests_PluginProcessor.cpp" />
+    <ClInclude Include="..\..\Source\Tests\Tests_PushPullAmp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include=".\resources.rc" />
