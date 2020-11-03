@@ -364,7 +364,6 @@ void SwankyAmpAudioProcessor::prepareToPlay(
   // Use this method as the place to do any pre-playback
   // initialisation that you need..
   for (int i = 0; i < 2; i++) amp_channel[i].prepare(jmax(1, (int)sampleRate));
-  setAmpParameters();
 }
 
 void SwankyAmpAudioProcessor::releaseResources()
@@ -411,6 +410,8 @@ void SwankyAmpAudioProcessor::processBlock(
     AudioBuffer<float>& buffer, MidiBuffer& midiMessages)
 {
   ignoreUnused(midiMessages);
+
+  if (buffer.getNumSamples() <= 0) return;
 
   ScopedNoDenormals noDenormals;
   auto totalNumInputChannels = getTotalNumInputChannels();
