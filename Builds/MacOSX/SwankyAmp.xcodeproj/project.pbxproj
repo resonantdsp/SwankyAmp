@@ -357,6 +357,13 @@
 			path = System/Library/Frameworks/CoreAudioKit.framework;
 			sourceTree = SDKROOT;
 		};
+		1F1B9FB0BB1210239AB18DE4 = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = Triode.h;
+			path = ../../Source/dsp/Triode.h;
+			sourceTree = "SOURCE_ROOT";
+		};
 		1FCB1AA449AE94A4D345108C = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.cpp.cpp;
@@ -446,13 +453,6 @@
 			lastKnownFileType = sourcecode.c.h;
 			name = PreAmpGroup.h;
 			path = ../../Source/Components/PreAmpGroup.h;
-			sourceTree = "SOURCE_ROOT";
-		};
-		3C7FA2BB55DC9826415CF3D4 = {
-			isa = PBXFileReference;
-			lastKnownFileType = sourcecode.c.h;
-			name = TriodePlate.h;
-			path = ../../Source/dsp/TriodePlate.h;
 			sourceTree = "SOURCE_ROOT";
 		};
 		400E1D00001C3783C3A62E97 = {
@@ -707,6 +707,13 @@
 			path = ../../Source/Components/ToneStackGroup.h;
 			sourceTree = "SOURCE_ROOT";
 		};
+		7612405782FFCF01908D67CA = {
+			isa = PBXFileReference;
+			lastKnownFileType = sourcecode.c.h;
+			name = TriodeFaust.h;
+			path = ../../Source/dsp/TriodeFaust.h;
+			sourceTree = "SOURCE_ROOT";
+		};
 		770B3ACDF988E53FB21014C9 = {
 			isa = PBXFileReference;
 			lastKnownFileType = sourcecode.cpp.cpp;
@@ -775,13 +782,6 @@
 			lastKnownFileType = sourcecode.c.h;
 			name = LevelMeter.h;
 			path = ../../Source/Components/LevelMeter.h;
-			sourceTree = "SOURCE_ROOT";
-		};
-		8C162E29A4D362E4D36FF395 = {
-			isa = PBXFileReference;
-			lastKnownFileType = sourcecode.c.h;
-			name = TriodeGrid.h;
-			path = ../../Source/dsp/TriodeGrid.h;
 			sourceTree = "SOURCE_ROOT";
 		};
 		8F406035EFC8B04531C8C9F4 = {
@@ -860,20 +860,6 @@
 			name = QuartzCore.framework;
 			path = System/Library/Frameworks/QuartzCore.framework;
 			sourceTree = SDKROOT;
-		};
-		B5CD1517E746199C71F7AD93 = {
-			isa = PBXFileReference;
-			lastKnownFileType = sourcecode.c.h;
-			name = TriodePlateFaust.h;
-			path = ../../Source/dsp/TriodePlateFaust.h;
-			sourceTree = "SOURCE_ROOT";
-		};
-		B6693397E6A28B904EEB8290 = {
-			isa = PBXFileReference;
-			lastKnownFileType = sourcecode.c.h;
-			name = TriodeGridFaust.h;
-			path = ../../Source/dsp/TriodeGridFaust.h;
-			sourceTree = "SOURCE_ROOT";
 		};
 		B7F720F0A6051D989891B057 = {
 			isa = PBXFileReference;
@@ -1149,10 +1135,8 @@
 				08F63A57D0FD52F670B72A05,
 				2E10367FDC8EB67CDA056A86,
 				385221ADA0E00B5D8ADBF4BE,
-				8C162E29A4D362E4D36FF395,
-				B6693397E6A28B904EEB8290,
-				3C7FA2BB55DC9826415CF3D4,
-				B5CD1517E746199C71F7AD93,
+				1F1B9FB0BB1210239AB18DE4,
+				7612405782FFCF01908D67CA,
 				4DC6BA8BB4C049A5834A43F4,
 			);
 			name = dsp;

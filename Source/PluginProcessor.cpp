@@ -63,8 +63,7 @@ SwankyAmpAudioProcessor::SwankyAmpAudioProcessor() :
             MAKE_PARAMETER_UNIT(TsPresence),
             MAKE_PARAMETER(TsSelection, 0.0f, 2.0f, 0.0f),
 
-            std::make_unique<AudioParameterInt>(
-                "idGainStages", "GainStages", 1, 5, 3),
+            MAKE_PARAMETER(GainStages, 1.0f, 5.0f, 3.0f),
             MAKE_PARAMETER_UNIT(GainOverhead),
             MAKE_PARAMETER(LowCut, -1.0f, 1.0f, 0.4f),
 
@@ -146,7 +145,7 @@ void SwankyAmpAudioProcessor::setAmpParameters()
     amp_channel[i].set_tonestack_presence(*parTsPresence);
     amp_channel[i].set_tonestack_selection(*parTsSelection);
 
-    amp_channel[i].set_triode_num_stages((int)(*parGainStages));
+    amp_channel[i].set_triode_num_stages(*parGainStages);
     amp_channel[i].set_triode_overhead(*parGainOverhead);
 
     amp_channel[i].set_cabinet_on((*parCabOnOff > 0.5f) ? true : false);

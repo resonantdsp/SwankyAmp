@@ -2112,10 +2112,8 @@
     <ClInclude Include="..\..\Source\dsp\ToneStackFFaust.h"/>
     <ClInclude Include="..\..\Source\dsp\ToneStackM.h"/>
     <ClInclude Include="..\..\Source\dsp\ToneStackMFaust.h"/>
-    <ClInclude Include="..\..\Source\dsp\TriodeGrid.h"/>
-    <ClInclude Include="..\..\Source\dsp\TriodeGridFaust.h"/>
-    <ClInclude Include="..\..\Source\dsp\TriodePlate.h"/>
-    <ClInclude Include="..\..\Source\dsp\TriodePlateFaust.h"/>
+    <ClInclude Include="..\..\Source\dsp\Triode.h"/>
+    <ClInclude Include="..\..\Source\dsp\TriodeFaust.h"/>
     <ClInclude Include="..\..\Source\dsp\UI.h"/>
     <ClInclude Include="..\..\Source\Components\AmpGroup.h"/>
     <ClInclude Include="..\..\Source\Components\CabGroup.h"/>

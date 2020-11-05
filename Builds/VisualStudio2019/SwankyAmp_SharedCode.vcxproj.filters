@@ -2649,16 +2649,10 @@
     <ClInclude Include="..\..\Source\dsp\ToneStackMFaust.h">
       <Filter>SwankyAmp\Source\dsp</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\dsp\TriodeGrid.h">
+    <ClInclude Include="..\..\Source\dsp\Triode.h">
       <Filter>SwankyAmp\Source\dsp</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Source\dsp\TriodeGridFaust.h">
-      <Filter>SwankyAmp\Source\dsp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Source\dsp\TriodePlate.h">
-      <Filter>SwankyAmp\Source\dsp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\Source\dsp\TriodePlateFaust.h">
+    <ClInclude Include="..\..\Source\dsp\TriodeFaust.h">
       <Filter>SwankyAmp\Source\dsp</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\dsp\UI.h">

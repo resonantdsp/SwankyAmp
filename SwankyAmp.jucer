@@ -37,12 +37,8 @@
         <FILE id="NQfdn0" name="ToneStackM.h" compile="0" resource="0" file="Source/dsp/ToneStackM.h"/>
         <FILE id="ZdaTGL" name="ToneStackMFaust.h" compile="0" resource="0"
               file="Source/dsp/ToneStackMFaust.h"/>
-        <FILE id="U8dfxs" name="TriodeGrid.h" compile="0" resource="0" file="Source/dsp/TriodeGrid.h"/>
-        <FILE id="ltVYoy" name="TriodeGridFaust.h" compile="0" resource="0"
-              file="Source/dsp/TriodeGridFaust.h"/>
-        <FILE id="n2kjcw" name="TriodePlate.h" compile="0" resource="0" file="Source/dsp/TriodePlate.h"/>
-        <FILE id="ZYEa0v" name="TriodePlateFaust.h" compile="0" resource="0"
-              file="Source/dsp/TriodePlateFaust.h"/>
+        <FILE id="LcxMHz" name="Triode.h" compile="0" resource="0" file="Source/dsp/Triode.h"/>
+        <FILE id="lBGU5c" name="TriodeFaust.h" compile="0" resource="0" file="Source/dsp/TriodeFaust.h"/>
         <FILE id="Dtj0gw" name="UI.h" compile="0" resource="0" file="Source/dsp/UI.h"/>
       </GROUP>
       <GROUP id="{2BC335E6-8421-3F7B-5FF8-345C44B52666}" name="Components">
