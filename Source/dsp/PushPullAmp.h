@@ -82,7 +82,9 @@ public:
 
   void process(int count, FAUSTFLOAT** buffer)
   {
-    scaleBuffer(count, buffer, drive);
+    // drive below 0.5 can cause high-pitch artifacts due to float precision
+    // loss, so bound it here to be sure and to allow UI to maintain old range
+    scaleBuffer(count, buffer, drive < 0.5f ? 0.5f : drive);
     const int numStagesLow = (int)std::floor(numStagesActive());
     const int numStagesHigh = (int)std::ceil(numStagesActive());
     const float stageMix = numStagesActive() - numStagesLow;
@@ -189,7 +191,9 @@ private:
   inline float numStagesActive() const
   {
     float num = numStages > MAX_STAGES ? (float)MAX_STAGES : numStages;
-    num = num < 1 ? 1.0f : num;
+    // keep always some amount of stage 2 mixed in to smooth out artifcats
+    // that can arise from a single stage
+    num = num < 1.1f ? 1.1f : num;
     return num;
   }
 

@@ -127,8 +127,7 @@ void SwankyAmpAudioProcessor::setAmpParameters()
 {
   for (int i = 0; i < 2; i++)
   {
-    const float preAmpDriveMap =
-        jmax(-0.9f, remapSinh(*parPreAmpDrive, 0.5f, 1.0f));
+    const float preAmpDriveMap = remapSinh(*parPreAmpDrive, 0.5f, 1.0f);
     const float powerAmpDriveMap = remapSinh(*parPowerAmpDrive, -0.2f, 1.0f);
     const float powerAmpSagMap = remapSinh(*parPowerAmpSag, 0.0f, 1.0f);
 
