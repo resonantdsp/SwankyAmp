@@ -327,13 +327,6 @@ void SwankyAmpAudioProcessor::processBlock(
   // copy plugin parameter values into the amp object
   setAmpParameters();
 
-  if (doBurnIn)
-  {
-    amp_channel[0].doBurnIn();
-    amp_channel[1].doBurnIn();
-    doBurnIn = false;
-  }
-
   // In case we have more outputs than inputs, this code clears any output
   // channels that didn't contain input data, (because these aren't
   // guaranteed to be empty - they may contain garbage).
@@ -392,6 +385,13 @@ void SwankyAmpAudioProcessor::processBlock(
     if (ichannel == 0 && totalNumOutputChannels < 2
         && meterListenersOut[1] != nullptr)
       meterListenersOut[1]->update(outLevel);
+  }
+
+  if (numBurnIn > 0)
+  {
+    const int numBurnInUsed = jmin(numBurnIn.load(), buffer.getNumSamples());
+    buffer.applyGain(0, numBurnInUsed, 0.0f);
+    numBurnIn -= numBurnInUsed;
   }
 }
 
@@ -474,7 +474,7 @@ void SwankyAmpAudioProcessor::setStateInformation(
   for (int i = 0; i < 2; i++) amp_channel[i].reset();
 
   notifyStateChanged = true;
-  doBurnIn = true;
+  numBurnIn = burnInLength;
 }
 
 AudioProcessor* JUCE_CALLTYPE createPluginFilter()

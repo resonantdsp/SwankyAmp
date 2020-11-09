@@ -83,7 +83,8 @@ public:
   };
 
   std::atomic<bool> notifyStateChanged = false;
-  std::atomic<bool> doBurnIn = true;
+  const int burnInLength = 1024;
+  std::atomic<int> numBurnIn = burnInLength;
 
   void setAmpParameters();
 

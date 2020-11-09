@@ -446,13 +446,6 @@ public:
   float get_tetrode_drive() const { return powerAmp.get_drive(); }
   float get_triode_drive() const { return preAmp.get_drive(); }
 
-  void doBurnIn()
-  {
-    std::fill(burnInBuffer.begin(), burnInBuffer.end(), (FAUSTFLOAT)0);
-    FAUSTFLOAT* buff = &burnInBuffer[0];
-    process((int)burnInBuffer.size(), &buff);
-  }
-
 private:
   PreAmp preAmp;
   ToneStack toneStack;
@@ -462,9 +455,6 @@ private:
   FAUSTFLOAT inputLevel = 0.0f;
   FAUSTFLOAT outputLevel = 0.0f;
   bool cabinetOn = true;
-
-  std::vector<FAUSTFLOAT> burnInBuffer =
-      std::vector<FAUSTFLOAT>(32, (FAUSTFLOAT)0);
 
   const float preAmpSweepScales[NUM_SWEEP_BINS + 1] = {
       4.487723e-03f,
