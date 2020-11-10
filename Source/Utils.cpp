@@ -45,3 +45,117 @@ Image buildImageNoise(int width, int height, Random& rng, float alpha)
   fillImageNoise(noise, rng, alpha);
   return noise;
 }
+
+VersionNumber parseVersionString(const String& versionString)
+{
+  int section = 0;
+  VersionNumber versionNumber;
+  String buff;
+  for (const auto c : versionString)
+  {
+    if (c == '.')
+    {
+      if (buff.isNotEmpty())
+      {
+        if (section == 0)
+          versionNumber.major = buff.getIntValue();
+        else if (section == 1)
+          versionNumber.minor = buff.getIntValue();
+        else if (section == 2)
+          versionNumber.patch = buff.getIntValue();
+      }
+      section += 1;
+      buff.clear();
+      continue;
+    }
+    buff += c;
+  }
+
+  if (buff.isNotEmpty())
+  {
+    if (section == 0)
+      versionNumber.major = buff.getIntValue();
+    else if (section == 1)
+      versionNumber.minor = buff.getIntValue();
+    else if (section == 2)
+      versionNumber.patch = buff.getIntValue();
+  }
+
+  return versionNumber;
+}
+
+/**
+ * @brief Build map of serialized state parameter names to values.
+ * @param state serialized state
+ * @return map of parameter names to values
+ */
+std::unordered_map<String, double>
+mapParameterValues(const SerializedState& state)
+{
+  std::unordered_map<String, double> values;
+
+  XmlElement* element = state->getFirstChildElement();
+
+  while (element != nullptr)
+  {
+    if (element->getTagName() == "PARAM" && element->hasAttribute("id")
+        && element->hasAttribute("value"))
+    {
+      const String& id = element->getStringAttribute("id");
+      const double value = element->getDoubleAttribute("value");
+      values[id] = value;
+    }
+
+    element = element->getNextElement();
+  }
+
+  return values;
+}
+
+/**
+ * @brief Set serialized state from map of parameter to value
+ * @param state serialized state
+ * @param map map of parameter names to values
+ */
+void updateStateFromMap(
+    SerializedState& state, const std::unordered_map<String, double>& map)
+{
+  std::unordered_map<String, double> values;
+
+  XmlElement* element = state->getFirstChildElement();
+
+  while (element != nullptr)
+  {
+    if (element->getTagName() == "PARAM" && element->hasAttribute("id")
+        && element->hasAttribute("value"))
+    {
+      const String& id = element->getStringAttribute("id");
+      if (map.find(id) == map.end()) continue;
+      element->setAttribute("value", map.at(id));
+    }
+    element = element->getNextElement();
+  }
+}
+
+// TODO: could be useful for building parameter list in processor?
+std::vector<String> buildParameterIds(const SerializedState& state)
+{
+  if (state == nullptr) return {};
+
+  std::vector<String> parameterIds;
+
+  XmlElement* element = state->getFirstChildElement();
+
+  while (element != nullptr)
+  {
+    if (element->getTagName() == "PARAM" && element->hasAttribute("id"))
+    {
+      const String& id = element->getStringAttribute("id");
+      parameterIds.push_back(id);
+    }
+
+    element = element->getNextElement();
+  }
+
+  return parameterIds;
+}

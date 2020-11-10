@@ -57,7 +57,7 @@ public:
 
   inline void set_clip(FAUSTFLOAT x)
   {
-    x += 5.126636e-01f;
+    x += 5.126605e-01f;
     *par_clip = uscale(x, 10.0f, 50.0f);
   }
   inline void set_clip_corner(FAUSTFLOAT x)
@@ -67,52 +67,52 @@ public:
   }
   inline void set_comp_depth(FAUSTFLOAT x)
   {
-    x += -5.413460e-01f;
+    x += -5.413471e-01f;
     *par_comp_depth = ulscale(x, 1e-1f, 1e+1f);
   }
   inline void set_comp_tau(FAUSTFLOAT x)
   {
-    x += -1.314456e+00f;
+    x += -1.314454e+00f;
     *par_comp_tau = ulscale(x, 1e-3f, 1e0f);
   }
   inline void set_cross_corner(FAUSTFLOAT x)
   {
-    x += 5.975771e-01f;
+    x += 5.975769e-01f;
     *par_cross_corner = ulscale(x, 1e-1f, 1e+2f);
   }
   inline void set_drift2_depth(FAUSTFLOAT x)
   {
-    x += 2.965889e-02f;
+    x += 3.820307e-02f;
     *par_drift2_depth = ulscale(x, 1e-1f, 1e+1f);
   }
   inline void set_drift2_level(FAUSTFLOAT x)
   {
-    x += 5.679661e-01f;
+    x += 5.687942e-01f;
     *par_drift2_level = uscale(x, -50.0f, +50.0f);
   }
   inline void set_drift_depth(FAUSTFLOAT x)
   {
-    x += 1.725648e-01f;
+    x += 1.725652e-01f;
     *par_drift_depth = ulscale(x, 1e-1f, 1e+1f);
   }
   inline void set_drift_level(FAUSTFLOAT x)
   {
-    x += 1.145700e+00f;
+    x += 1.145707e+00f;
     *par_drift_level = uscale(x, -100.0f, +100.0f);
   }
   inline void set_drift_tau(FAUSTFLOAT x)
   {
-    x += -2.449028e-01f;
+    x += -2.449016e-01f;
     *par_drift_tau = ulscale(x, 1e-3f, 1e0f);
   }
   inline void set_hp_freq(FAUSTFLOAT x)
   {
-    x += -2.867797e+00f;
+    x += -2.867792e+00f;
     *par_hp_freq = ulscale(x, 1e1f, 1e2f);
   }
   inline void set_lp_freq(FAUSTFLOAT x)
   {
-    x += 4.804993e-01f;
+    x += 4.804991e-01f;
     *par_lp_freq = ulscale(x, 5e3f, 15e3f);
   }
   inline void set_sag_depth(FAUSTFLOAT x)
@@ -147,7 +147,7 @@ public:
   }
   inline void set_scale(FAUSTFLOAT x)
   {
-    x += 3.354131e-01f;
+    x += 3.354130e-01f;
     *par_scale = ulscale(x, 1e-2f, 1e+2f);
   }
 

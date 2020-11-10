@@ -89,6 +89,15 @@ Only available with VisualStudio at the moment.
 
 ## Change log
 
+Version 1.4.0:
+
+* rework staging in pre-amp: move pre-amp into FAUST and use multiplexing to mix stages
+* rework low cut: increase range, add non-linearity
+* rework state loading, convert on XML load and avoid making changes to memory in the audio thread (instead use a flag to indicate state changed)
+* add vst ID registered with Steinberg to avoid registry problems
+* review the plugin state reset and loading to avoid issues
+* fix dmg installer issue for older macos releases
+
 Version 1.3.1:
 
 * fix issue where processor thread calls editor and can hang the audio for a bit

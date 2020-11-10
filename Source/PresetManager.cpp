@@ -59,29 +59,6 @@ std::pair<int, String> extractNumAndName(const String& name)
   }
 }
 
-// TODO: could be useful for building parameter list in processor?
-std::vector<String> buildParameterIds(const SerializedState& state)
-{
-  if (state == nullptr) return {};
-
-  std::vector<String> parameterIds;
-
-  XmlElement* element = state->getFirstChildElement();
-
-  while (element != nullptr)
-  {
-    if (element->getTagName() == "PARAM" && element->hasAttribute("id"))
-    {
-      const String& id = element->getStringAttribute("id");
-      parameterIds.push_back(id);
-    }
-
-    element = element->getNextElement();
-  }
-
-  return parameterIds;
-}
-
 StateEntry::StateEntry(
     const String& name, File file, std::optional<size_t> stateIdx) :
     name(name), file(file), stateIdx(stateIdx)
@@ -213,6 +190,84 @@ void PresetManager::loadPreset(
     SerializedState state, File file, const String& name)
 {
   if (state == nullptr) return;
+
+  auto values = mapParameterValues(state);
+
+  // range changes from 0.6 to 0.7
+  if (state != nullptr && state->hasAttribute("pluginVersion")
+      && parseVersionString(state->getStringAttribute("pluginVersion"))
+          < VersionNumber(0, 7, 0))
+  {
+    if (values.find("idPowerAmpDrive") != values.end())
+    {
+      const double value = values["idPowerAmpDrive"];
+      const double post =
+          transformUnitScale(value, log(1.0), log(1e3), log(0.5), log(5e2));
+      values["idPowerAmpDrive"] = post;
+    }
+    if (values.find("idPowerAmpSag") != values.end())
+    {
+      const double value = values["idPowerAmpSag"];
+      const double post = transformUnitScale(value, 0.0, 1.0, 0.0, 0.5);
+      values["idPowerAmpSag"] = post;
+    }
+  }
+
+  // from 1.1 to 1.2
+  if (state != nullptr && state->hasAttribute("pluginVersion")
+      && parseVersionString(state->getStringAttribute("pluginVersion"))
+          < VersionNumber(1, 2, 0))
+  {
+    if (values.find("idPreAmpDrive") != values.end())
+    {
+      const double value = values["idPreAmpDrive"];
+      const float post = remapXY((float)value, -1.0f, 1.0f, -0.67f, 0.86f);
+      values["idPreAmpDrive"] = (double)post;
+    }
+    if (values.find("idPowerAmpDrive") != values.end())
+    {
+      const double value = values["idPowerAmpDrive"];
+      const float post = invertRemapSinh(
+          remapXY((float)value, -1.0f, 1.0f, -0.85f, 1.14f), -0.2f, 1.0f);
+      values["idPowerAmpDrive"] = (double)post;
+    }
+    if (values.find("idPowerAmpSag") != values.end())
+    {
+      const double value = values["idPowerAmpSag"];
+      const float post = remapSinh((float)value, 0.0f, 1.0f);
+      values["idPowerAmpSag"] = (double)post;
+    }
+  }
+
+  // from 1.3.0 to 1.3.1
+  if (state != nullptr && state->hasAttribute("pluginVersion")
+      && parseVersionString(state->getStringAttribute("pluginVersion"))
+          < VersionNumber(1, 3, 1))
+  {
+    if (values.find("idPreAmpDrive") != values.end())
+    {
+      const double value = values["idPreAmpDrive"];
+      const float post = invertRemapSinh((float)value, 0.5f, 1.0f);
+      values["idPreAmpDrive"] = (double)post;
+    }
+  }
+
+  // from 1.3.1 to 1.4
+  if (state != nullptr && state->hasAttribute("pluginVersion")
+      && parseVersionString(state->getStringAttribute("pluginVersion"))
+          < VersionNumber(1, 4, 0))
+  {
+    if (values.find("idLowCut") != values.end())
+    {
+      const double value = values["idLowCut"];
+      const float post = remapXY(
+          invertRemapSinh((float)value, 0.5f, 1.0f), 0.0f, 1.23f, -1.0f, +1.0f);
+      values["idLowCut"] = (double)post;
+    }
+  }
+
+  updateStateFromMap(state, values);
+
   addStateEntry(name, file, std::move(state));
 }
 

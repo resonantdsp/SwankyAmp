@@ -56,7 +56,7 @@
  #define JucePlugin_ManufacturerCode       0x4d616e75
 #endif
 #ifndef  JucePlugin_PluginCode
- #define JucePlugin_PluginCode             0x536a676d
+ #define JucePlugin_PluginCode             0x63637766
 #endif
 #ifndef  JucePlugin_IsSynth
  #define JucePlugin_IsSynth                0
@@ -74,13 +74,13 @@
  #define JucePlugin_EditorRequiresKeyboardFocus  0
 #endif
 #ifndef  JucePlugin_Version
- #define JucePlugin_Version                1.3.1
+ #define JucePlugin_Version                1.4.0
 #endif
 #ifndef  JucePlugin_VersionCode
- #define JucePlugin_VersionCode            0x10301
+ #define JucePlugin_VersionCode            0x10400
 #endif
 #ifndef  JucePlugin_VersionString
- #define JucePlugin_VersionString          "1.3.1"
+ #define JucePlugin_VersionString          "1.4.0"
 #endif
 #ifndef  JucePlugin_VSTUniqueID
  #define JucePlugin_VSTUniqueID            JucePlugin_PluginCode

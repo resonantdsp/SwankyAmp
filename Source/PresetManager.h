@@ -24,8 +24,6 @@
 
 #include "PluginProcessor.h"
 
-using SerializedState = std::unique_ptr<XmlElement>;
-
 struct StateEntry
 {
   StateEntry(const String& name, File file, std::optional<size_t> stateIdx);
