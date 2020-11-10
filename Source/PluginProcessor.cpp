@@ -131,7 +131,7 @@ void SwankyAmpAudioProcessor::setAmpParameters()
     const float powerAmpDriveMap = remapSinh(*parPowerAmpDrive, -0.2f, 1.0f);
     const float powerAmpSagMap = remapSinh(*parPowerAmpSag, 0.0f, 1.0f);
     const float lowCutMap =
-        remapSinh(remapXY(*parLowCut, -1.0f, 1.0f, 0.0f, 1.2f), 0.0f, 1.0f);
+        remapSinh(remapXY(*parLowCut, -1.0f, 1.0f, 0.0f, 1.23f), 0.5f, 1.0f);
 
     amp_channel[i].set_input_level(*parInputLevel);
     amp_channel[i].set_output_level(

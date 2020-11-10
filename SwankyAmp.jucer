@@ -6,7 +6,7 @@
               pluginName="Swanky Amp" pluginDesc="Tube amplifiers simulation"
               pluginManufacturer="Resonant DSP" pluginAAXCategory="8192" pluginRTASCategory="8192"
               splashScreenColour="Light" cppLanguageStandard="17" displaySplashScreen="1"
-              jucerFormatVersion="1">
+              jucerFormatVersion="1" pluginCode="ccwf">
   <MAINGROUP id="qolZJU" name="SwankyAmp">
     <GROUP id="{DE71F08C-9BB3-E05B-B09D-49D3564FD2D1}" name="Resources">
       <FILE id="A3p67q" name="logo.svg" compile="0" resource="1" file="Resources/logo.svg"/>
