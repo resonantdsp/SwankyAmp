@@ -252,6 +252,23 @@ void PresetManager::loadPreset(
     }
   }
 
+  // from 1.3.1 to 1.4
+  // extend to 1.25
+  if (state != nullptr && state->hasAttribute("pluginVersion")
+      && parseVersionString(state->getStringAttribute("pluginVersion"))
+          < VersionNumber(1, 4, 0))
+  {
+    if (values.find("idLowCut") != values.end())
+    {
+      const double value = values["idLowCut"];
+      const float post = remapXY(
+          invertRemapSinh((float)value, 0.0f, 1.0f), 0.0f, 1.2f, -1.0f, +1.0f);
+      values["idLowCut"] = (double)post;
+    }
+  }
+
+  updateStateFromMap(state, values);
+
   addStateEntry(name, file, std::move(state));
 }
 

@@ -69,6 +69,9 @@ VersionNumber parseVersionString(const String& versionString);
 std::unordered_map<String, double>
 mapParameterValues(const SerializedState& state);
 
+void updateStateFromMap(
+    SerializedState& state, const std::unordered_map<String, double>& map);
+
 std::vector<String> buildParameterIds(const SerializedState& state);
 
 float angleModulo(float angle);

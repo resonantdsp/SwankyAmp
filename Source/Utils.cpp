@@ -112,6 +112,31 @@ mapParameterValues(const SerializedState& state)
   return values;
 }
 
+/**
+ * @brief Set serialized state from map of parameter to value
+ * @param state serialized state
+ * @param map map of parameter names to values
+ */
+void updateStateFromMap(
+    SerializedState& state, const std::unordered_map<String, double>& map)
+{
+  std::unordered_map<String, double> values;
+
+  XmlElement* element = state->getFirstChildElement();
+
+  while (element != nullptr)
+  {
+    if (element->getTagName() == "PARAM" && element->hasAttribute("id")
+        && element->hasAttribute("value"))
+    {
+      const String& id = element->getStringAttribute("id");
+      if (map.find(id) == map.end()) continue;
+      element->setAttribute("value", map.at(id));
+    }
+    element = element->getNextElement();
+  }
+}
+
 // TODO: could be useful for building parameter list in processor?
 std::vector<String> buildParameterIds(const SerializedState& state)
 {

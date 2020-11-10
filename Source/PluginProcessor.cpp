@@ -65,7 +65,7 @@ SwankyAmpAudioProcessor::SwankyAmpAudioProcessor() :
 
             MAKE_PARAMETER(GainStages, 1.0f, 5.0f, 3.0f),
             MAKE_PARAMETER_UNIT(GainOverhead),
-            MAKE_PARAMETER(LowCut, -1.0f, 1.0f, 0.4f),
+            MAKE_PARAMETER_UNIT(LowCut),
 
             std::make_unique<AudioParameterBool>(
                 "idCabOnOff", "CabOnOff", true),
@@ -130,6 +130,8 @@ void SwankyAmpAudioProcessor::setAmpParameters()
     const float preAmpDriveMap = remapSinh(*parPreAmpDrive, 0.5f, 1.0f);
     const float powerAmpDriveMap = remapSinh(*parPowerAmpDrive, -0.2f, 1.0f);
     const float powerAmpSagMap = remapSinh(*parPowerAmpSag, 0.0f, 1.0f);
+    const float lowCutMap =
+        remapSinh(remapXY(*parLowCut, -1.0f, 1.0f, 0.0f, 1.2f), 0.0f, 1.0f);
 
     amp_channel[i].set_input_level(*parInputLevel);
     amp_channel[i].set_output_level(
@@ -157,8 +159,8 @@ void SwankyAmpAudioProcessor::setAmpParameters()
     // move the dynamic level down over the dynamic knob range
     amp_channel[i].set_cabinet_dynamic_level(-1.0f * *parCabDynamic);
 
-    amp_channel[i].set_triode_hp_freq(remapSided(*parLowCut, -1.0f, +0.75f));
-    amp_channel[i].set_tetrode_hp_freq(remapSided(*parLowCut, -1.0f, +0.75f));
+    amp_channel[i].set_triode_hp_freq(remapSided(lowCutMap, -1.0f, +0.75f));
+    // amp_channel[i].set_tetrode_hp_freq(remapSided(lowCutMap, -1.0f, +0.75f));
 
     const float minPreAmpTight =
         remapXY(preAmpDriveMap, -0.5f, +1.0f, -1.0f, 0.0f);
