@@ -306,3 +306,9 @@ Version 0.0.2:
 * Components should have sensible defaults so that a default conctructor can be provided, otherwise the no copy convention causes problems.
 * The Look and Feel (LAF) contains defintions that can change on-the-fly (mainly colours). Default dimensions should be defined in component classes, as those don't need to be looked-up at each paint call.
 
+## Technologies
+
+<img src="https://www.resonantdsp.com/images/VST_Compatible_Logo_Steinberg.png" width="150" height="auto" />
+
+VST® is a trademark of Steinberg Media Technologies GmbH,
+registered in Europe and other countries. 
