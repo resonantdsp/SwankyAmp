@@ -2,7 +2,7 @@
 
 <tooltips>
 	<param id="idInputLevel">
-		Use to gain stage the guitar singal. A lightly strummed open chord should peak just above the "S" level for a single coil pickup, or "H" for humbucker pickup.
+		Use to gain stage the guitar signal. A lightly strummed open chord should peak just above the "S" level for a single coil pickup, or "H" for humbucker pickup.
 	</param>
 	<param id="idOutputLevel">
 		Use to gain stage the overall plugin master volume. This affects only how loud the plugin will sound.
