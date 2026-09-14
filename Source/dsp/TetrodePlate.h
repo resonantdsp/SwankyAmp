@@ -4,8 +4,7 @@
 #include <cmath>
 
 #define uscale(x, l, u) (x + 1.0f) / 2.0f * (u - l) + l;
-#define ulscale(x, l, u) \
-  std::exp((x + 1.0f) / 2.0f * (std::log(u) - std::log(l)) + std::log(l));
+#define ulscale(x, l, u) std::exp((x + 1.0f) / 2.0f * (std::log(u) - std::log(l)) + std::log(l));
 
 #include "TetrodePlateFaust.h"
 

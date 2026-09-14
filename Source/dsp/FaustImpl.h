@@ -7,7 +7,9 @@
 #include "Meta.h"
 #include "UI.h"
 
-class FaustImpl : public UI, public Meta
+class FaustImpl
+  : public UI
+  , public Meta
 {
 public:
   FaustImpl() = default;
@@ -17,16 +19,15 @@ public:
   {
     const auto entry = parameterMap.find(name);
     if (entry == parameterMap.end())
-      throw std::invalid_argument(
-          std::string("FaustImpl::getParameter: invalid parameter name: ")
-          + name);
+      throw std::invalid_argument(std::string("FaustImpl::getParameter: invalid parameter name: ") + name);
     return entry->second;
   }
 
   void setParameter(const char* name, FAUSTFLOAT* value)
   {
     const auto entry = parameterMap.find(name);
-    if (entry != parameterMap.end()) entry->second = value;
+    if (entry != parameterMap.end())
+      entry->second = value;
   }
 
   // blank implementations for UI
@@ -36,37 +37,19 @@ public:
   virtual void closeBox(){};
   virtual void addButton(const char*, FAUSTFLOAT*){};
   virtual void addCheckButton(const char*, FAUSTFLOAT*){};
-  virtual void addVerticalSlider(
-      const char*,
-      FAUSTFLOAT*,
-      FAUSTFLOAT,
-      FAUSTFLOAT,
-      FAUSTFLOAT,
-      FAUSTFLOAT){};
-  virtual void addHorizontalSlider(
-      const char*,
-      FAUSTFLOAT*,
-      FAUSTFLOAT,
-      FAUSTFLOAT,
-      FAUSTFLOAT,
-      FAUSTFLOAT){};
+  virtual void addVerticalSlider(const char*, FAUSTFLOAT*, FAUSTFLOAT, FAUSTFLOAT, FAUSTFLOAT, FAUSTFLOAT){};
+  virtual void
+  addHorizontalSlider(const char*, FAUSTFLOAT*, FAUSTFLOAT, FAUSTFLOAT, FAUSTFLOAT, FAUSTFLOAT){};
   virtual void
   // use UI entry to expose user parameters
-  addNumEntry(
-      const char* label,
-      FAUSTFLOAT* zone,
-      FAUSTFLOAT,
-      FAUSTFLOAT,
-      FAUSTFLOAT,
-      FAUSTFLOAT)
+  addNumEntry(const char* label, FAUSTFLOAT* zone, FAUSTFLOAT, FAUSTFLOAT, FAUSTFLOAT, FAUSTFLOAT)
   {
-    if (zone == nullptr) return;
+    if (zone == nullptr)
+      return;
     parameterMap.insert_or_assign(label, zone);
   }
-  virtual void
-  addHorizontalBargraph(const char*, FAUSTFLOAT*, FAUSTFLOAT, FAUSTFLOAT){};
-  virtual void
-  addVerticalBargraph(const char*, FAUSTFLOAT*, FAUSTFLOAT, FAUSTFLOAT){};
+  virtual void addHorizontalBargraph(const char*, FAUSTFLOAT*, FAUSTFLOAT, FAUSTFLOAT){};
+  virtual void addVerticalBargraph(const char*, FAUSTFLOAT*, FAUSTFLOAT, FAUSTFLOAT){};
   virtual void addSoundfile(const char*, const char*, Soundfile**){};
 
   // blank implememtation for Meta

@@ -39,7 +39,8 @@
 
 struct Soundfile;
 
-template<typename REAL> class UIReal
+template<typename REAL>
+class UIReal
 {
 public:
   UIReal() {}
@@ -56,39 +57,19 @@ public:
 
   virtual void addButton(const char* label, REAL* zone) = 0;
   virtual void addCheckButton(const char* label, REAL* zone) = 0;
-  virtual void addVerticalSlider(
-      const char* label,
-      REAL* zone,
-      REAL init,
-      REAL min,
-      REAL max,
-      REAL step) = 0;
-  virtual void addHorizontalSlider(
-      const char* label,
-      REAL* zone,
-      REAL init,
-      REAL min,
-      REAL max,
-      REAL step) = 0;
-  virtual void addNumEntry(
-      const char* label,
-      REAL* zone,
-      REAL init,
-      REAL min,
-      REAL max,
-      REAL step) = 0;
+  virtual void addVerticalSlider(const char* label, REAL* zone, REAL init, REAL min, REAL max, REAL step) = 0;
+  virtual void
+  addHorizontalSlider(const char* label, REAL* zone, REAL init, REAL min, REAL max, REAL step) = 0;
+  virtual void addNumEntry(const char* label, REAL* zone, REAL init, REAL min, REAL max, REAL step) = 0;
 
   // -- passive widgets
 
-  virtual void
-  addHorizontalBargraph(const char* label, REAL* zone, REAL min, REAL max) = 0;
-  virtual void
-  addVerticalBargraph(const char* label, REAL* zone, REAL min, REAL max) = 0;
+  virtual void addHorizontalBargraph(const char* label, REAL* zone, REAL min, REAL max) = 0;
+  virtual void addVerticalBargraph(const char* label, REAL* zone, REAL min, REAL max) = 0;
 
   // -- soundfiles
 
-  virtual void addSoundfile(
-      const char* label, const char* filename, Soundfile** sf_zone) = 0;
+  virtual void addSoundfile(const char* label, const char* filename, Soundfile** sf_zone) = 0;
 
   // -- metadata declarations
 
