@@ -1,8 +1,11 @@
 use super::cabinet::Cabinet;
 pub use super::mapping::AmpControls;
 use super::mapping::AmpVoicing;
-use super::stage::{STAGES, Tetrode, Triode};
+use super::oversample::Oversampler;
+use super::stage::{PlateFilter, STAGES, Tetrode, Triode};
 use super::tone_stack::ToneStack;
+
+pub(crate) const MAX_OVERSAMPLING: usize = 2;
 
 const SETTLE_SECONDS: f32 = 1.;
 const TRIODE_SCALE: f32 = 35.013_34;
@@ -73,37 +76,35 @@ impl SeamOutput {
     }
 }
 
-pub struct AmpPath {
+struct TubePath {
     sample_rate: f32,
     voicing: AmpVoicing,
     triodes: [Triode; STAGES],
     tone_stack: ToneStack,
     tetrode: Tetrode,
-    cabinet: Cabinet,
     post_tone_gain: f32,
-    output_gain: f32,
 }
 
-impl AmpPath {
-    pub fn new(sample_rate: f32, controls: AmpControls) -> Self {
+impl TubePath {
+    fn new(sample_rate: f32, controls: AmpControls, plate_filter: PlateFilter) -> Self {
         let voicing = AmpVoicing::from_controls(controls);
-        let triodes = std::array::from_fn(|stage| Triode::new(stage, TRIODE_SCALE, sample_rate));
+        let triodes = std::array::from_fn(|stage| {
+            Triode::new(stage, TRIODE_SCALE, sample_rate, plate_filter)
+        });
         let mut path = Self {
             sample_rate,
             voicing,
             triodes,
             tone_stack: ToneStack::new(sample_rate),
             tetrode: Tetrode::new(sample_rate),
-            cabinet: Cabinet::new(sample_rate),
             post_tone_gain: 1.,
-            output_gain: 1.,
         };
         path.apply_voicing(voicing);
         path.settle();
         path
     }
 
-    pub fn prepare(&mut self, sample_rate: f32, controls: AmpControls) {
+    fn prepare(&mut self, sample_rate: f32, controls: AmpControls) {
         self.sample_rate = sample_rate;
         self.voicing = AmpVoicing::from_controls(controls);
         for triode in &mut self.triodes {
@@ -111,43 +112,24 @@ impl AmpPath {
         }
         self.tone_stack.prepare(sample_rate);
         self.tetrode.prepare(sample_rate);
-        self.cabinet.prepare(sample_rate);
         self.apply_voicing(self.voicing);
         self.settle();
     }
 
-    pub fn reset(&mut self) {
-        for triode in &mut self.triodes {
-            triode.reset();
+    fn configure(&mut self, voicing: AmpVoicing) {
+        if voicing != self.voicing {
+            self.apply_voicing(voicing);
         }
-        self.tone_stack.reset();
-        self.tetrode.reset();
-        self.cabinet.reset();
-        self.settle();
-    }
-
-    pub fn configure(&mut self, controls: AmpControls) {
-        let voicing = AmpVoicing::from_controls(controls);
-        if voicing == self.voicing {
-            return;
-        }
-        self.apply_voicing(voicing);
     }
 
     fn apply_voicing(&mut self, voicing: AmpVoicing) {
-        for stage in 0..STAGES {
-            self.triodes[stage].configure(voicing.triodes[stage]);
+        for (triode, controls) in self.triodes.iter_mut().zip(voicing.triodes) {
+            triode.configure(controls);
         }
         self.tone_stack.configure(voicing.tone);
         self.tetrode.configure(voicing.tetrode);
-        self.cabinet.set_brightness(voicing.cabinet_brightness);
-        self.cabinet.set_distance(voicing.cabinet_distance);
-        self.cabinet.set_dynamic(voicing.cabinet_dynamic);
-        self.cabinet
-            .set_dynamic_level(voicing.cabinet_dynamic_level);
         self.post_tone_gain =
             TONE_STACK_SCALE * interpolate(voicing.preamp_drive, &PREAMP_SWEEP) * PREAMP_TARGET;
-        self.output_gain = interpolate(voicing.power_drive, &POWER_SWEEP) * voicing.output_gain;
         self.voicing = voicing;
     }
 
@@ -156,14 +138,22 @@ impl AmpPath {
         let mut sample = [0.];
         for _ in 0..frames {
             sample[0] = 0.;
-            self.process_core(&mut sample, None);
-            if self.voicing.cabinet_on {
-                self.cabinet.process(&mut sample);
-            }
+            self.process(&mut sample, None);
         }
     }
 
-    fn process_core(&mut self, buffer: &mut [f32], mut seams: Option<&mut SeamOutput>) {
+    fn settle_equilibrium(&mut self) {
+        let mut value = 0.;
+        for triode in &mut self.triodes {
+            value = triode.settle(value);
+        }
+        value *= TRIODE_SCALE;
+        value = self.tone_stack.settle(value);
+        value *= self.post_tone_gain * self.voicing.power_gain;
+        self.tetrode.settle(value);
+    }
+
+    fn process(&mut self, buffer: &mut [f32], mut seams: Option<&mut SeamOutput>) {
         for sample in buffer {
             let mut value = *sample * self.voicing.input_gain * self.voicing.preamp_gain;
             for (stage, triode) in self.triodes.iter_mut().enumerate() {
@@ -187,11 +177,68 @@ impl AmpPath {
             *sample = value / PREAMP_TARGET;
         }
     }
+}
 
-    pub fn process(&mut self, buffer: &mut [f32]) {
-        self.process_core(buffer, None);
+pub struct AmpPath {
+    tubes: TubePath,
+    cabinet: Cabinet,
+    voicing: AmpVoicing,
+    output_gain: f32,
+}
+
+impl AmpPath {
+    pub fn new_legacy(sample_rate: f32, controls: AmpControls) -> Self {
+        Self::new(sample_rate, controls, PlateFilter::Released44k1)
+    }
+
+    fn new_shipping(sample_rate: f32, controls: AmpControls) -> Self {
+        Self::new(sample_rate, controls, PlateFilter::Fixed20k)
+    }
+
+    fn new(sample_rate: f32, controls: AmpControls, plate_filter: PlateFilter) -> Self {
+        let voicing = AmpVoicing::from_controls(controls);
+        let mut path = Self {
+            tubes: TubePath::new(sample_rate, controls, plate_filter),
+            cabinet: Cabinet::new(sample_rate),
+            voicing,
+            output_gain: 1.,
+        };
+        path.apply_voicing(voicing);
+        path
+    }
+
+    fn prepare(&mut self, sample_rate: f32, controls: AmpControls) {
+        let voicing = AmpVoicing::from_controls(controls);
+        self.tubes.prepare(sample_rate, controls);
+        self.cabinet.prepare(sample_rate);
+        self.cabinet.reset();
+        self.apply_voicing(voicing);
+    }
+
+    fn configure(&mut self, voicing: AmpVoicing) {
+        if voicing != self.voicing {
+            self.apply_voicing(voicing);
+        }
+    }
+
+    fn apply_voicing(&mut self, voicing: AmpVoicing) {
+        self.tubes.configure(voicing);
+        self.cabinet.set_brightness(voicing.cabinet_brightness);
+        self.cabinet.set_distance(voicing.cabinet_distance);
+        self.cabinet.set_dynamic(voicing.cabinet_dynamic);
+        self.cabinet
+            .set_dynamic_level(voicing.cabinet_dynamic_level);
+        self.output_gain = interpolate(voicing.power_drive, &POWER_SWEEP) * voicing.output_gain;
+        self.voicing = voicing;
+    }
+
+    fn finish(&mut self, buffer: &mut [f32], seams: Option<&mut SeamOutput>) {
         if self.voicing.cabinet_on {
             self.cabinet.process(buffer);
+        }
+        let mut seams = seams;
+        if let Some(output) = seams.as_deref_mut() {
+            output.cabinet.extend_from_slice(buffer);
         }
         let cabinet_gain = if self.voicing.cabinet_on {
             CABINET_SCALE
@@ -201,24 +248,167 @@ impl AmpPath {
         let gain = cabinet_gain * self.output_gain;
         for sample in &mut *buffer {
             *sample *= gain;
+        }
+        if let Some(output) = seams {
+            output.raw_output.extend_from_slice(buffer);
+        }
+    }
+
+    fn reset_realtime(&mut self) {
+        self.tubes.settle_equilibrium();
+        self.cabinet.reset();
+    }
+
+    pub fn process(&mut self, buffer: &mut [f32]) {
+        self.tubes.process(buffer, None);
+        self.finish(buffer, None);
+    }
+
+    pub fn process_with_seams(&mut self, buffer: &mut [f32], seams: &mut SeamOutput) {
+        self.tubes.process(buffer, Some(seams));
+        self.finish(buffer, Some(seams));
+    }
+}
+
+pub(crate) struct AmpChannel {
+    host: AmpPath,
+    oversampled: [TubePath; MAX_OVERSAMPLING],
+    oversamplers: [Oversampler; MAX_OVERSAMPLING],
+    high_rate: Vec<f32>,
+    prepared_doublings: usize,
+}
+
+impl AmpChannel {
+    pub(crate) fn new(sample_rate: f32, max_block: usize, controls: AmpControls) -> Self {
+        let prepared_doublings = crate::engine::doublings_cap(f64::from(sample_rate));
+        Self {
+            host: AmpPath::new_shipping(sample_rate, controls),
+            oversampled: std::array::from_fn(|index| {
+                TubePath::new(
+                    sample_rate * (2 << index) as f32,
+                    controls,
+                    PlateFilter::Fixed20k,
+                )
+            }),
+            oversamplers: std::array::from_fn(|index| {
+                Oversampler::new(index + 1, max_block.max(1))
+            }),
+            high_rate: vec![0.; max_block.max(1) << prepared_doublings],
+            prepared_doublings,
+        }
+    }
+
+    pub(crate) fn prepare(&mut self, sample_rate: f32, max_block: usize, controls: AmpControls) {
+        self.prepared_doublings = crate::engine::doublings_cap(f64::from(sample_rate));
+        self.host.prepare(sample_rate, controls);
+        for (index, path) in self.oversampled[..self.prepared_doublings]
+            .iter_mut()
+            .enumerate()
+        {
+            path.prepare(sample_rate * (2 << index) as f32, controls);
+        }
+        self.oversamplers =
+            std::array::from_fn(|index| Oversampler::new(index + 1, max_block.max(1)));
+        self.high_rate
+            .resize(max_block.max(1) << self.prepared_doublings, 0.);
+    }
+
+    pub(crate) fn configure(&mut self, controls: AmpControls) {
+        let voicing = AmpVoicing::from_controls(controls);
+        self.host.configure(voicing);
+        for path in &mut self.oversampled[..self.prepared_doublings] {
+            path.configure(voicing);
+        }
+    }
+
+    pub(crate) fn reset_realtime(&mut self, controls: AmpControls) {
+        self.configure(controls);
+        self.host.reset_realtime();
+        for path in &mut self.oversampled[..self.prepared_doublings] {
+            path.settle_equilibrium();
+        }
+        for oversampler in &mut self.oversamplers {
+            oversampler.reset();
+        }
+        self.high_rate.fill(0.);
+    }
+
+    pub(crate) fn process(&mut self, buffer: &mut [f32], doublings: usize) {
+        if doublings == 0 {
+            self.host.process(buffer);
+            return;
+        }
+        debug_assert!(doublings <= self.prepared_doublings);
+        let high = &mut self.high_rate[..buffer.len() << doublings];
+        let oversampler = &mut self.oversamplers[doublings - 1];
+        oversampler.up(buffer, high);
+        self.oversampled[doublings - 1].process(high, None);
+        oversampler.down(high, buffer);
+        self.host.finish(buffer, None);
+    }
+
+    pub(crate) fn process_with_seams(
+        &mut self,
+        buffer: &mut [f32],
+        doublings: usize,
+        seams: &mut SeamOutput,
+    ) {
+        if doublings == 0 {
+            self.host.process_with_seams(buffer, seams);
+            return;
+        }
+        debug_assert!(doublings <= self.prepared_doublings);
+        let high = &mut self.high_rate[..buffer.len() << doublings];
+        let oversampler = &mut self.oversamplers[doublings - 1];
+        oversampler.up(buffer, high);
+        self.oversampled[doublings - 1].process(high, Some(seams));
+        oversampler.down(high, buffer);
+        self.host.finish(buffer, Some(seams));
+    }
+
+    pub(crate) fn latency(&self, doublings: usize) -> usize {
+        if doublings == 0 {
+            0
+        } else {
+            self.oversamplers[doublings - 1].latency()
+        }
+    }
+}
+
+/// Offline corrected-model path used by the public measurement command.
+pub struct CorrectedPath {
+    channel: AmpChannel,
+    doublings: usize,
+}
+
+impl CorrectedPath {
+    pub fn new(
+        sample_rate: f32,
+        max_block: usize,
+        controls: AmpControls,
+        doublings: usize,
+    ) -> Self {
+        assert!(doublings <= crate::engine::doublings_cap(f64::from(sample_rate)));
+        Self {
+            channel: AmpChannel::new(sample_rate, max_block, controls),
+            doublings,
         }
     }
 
     pub fn process_with_seams(&mut self, buffer: &mut [f32], seams: &mut SeamOutput) {
-        self.process_core(buffer, Some(seams));
-        if self.voicing.cabinet_on {
-            self.cabinet.process(buffer);
-        }
-        seams.cabinet.extend_from_slice(buffer);
-        let cabinet_gain = if self.voicing.cabinet_on {
-            CABINET_SCALE
-        } else {
-            1.
-        };
-        let gain = cabinet_gain * self.output_gain;
-        for sample in &mut *buffer {
-            *sample *= gain;
-        }
-        seams.raw_output.extend_from_slice(buffer);
+        self.channel
+            .process_with_seams(buffer, self.doublings, seams);
+    }
+
+    pub fn process(&mut self, buffer: &mut [f32]) {
+        self.channel.process(buffer, self.doublings);
+    }
+
+    pub fn latency(&self) -> usize {
+        self.channel.latency(self.doublings)
+    }
+
+    pub fn factor(&self) -> usize {
+        1 << self.doublings
     }
 }

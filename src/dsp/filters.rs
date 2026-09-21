@@ -51,6 +51,13 @@ impl OnePole {
         self.x1 = 0.;
         self.y1 = 0.;
     }
+
+    pub(crate) fn settle(&mut self, input: f32) -> f32 {
+        let output = (self.b0 + self.b1) * input / (1. + self.a1);
+        self.x1 = input;
+        self.y1 = output;
+        output
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -123,6 +130,13 @@ impl Biquad {
         self.s1 = 0.;
         self.s2 = 0.;
     }
+
+    pub(crate) fn settle(&mut self, input: f32) -> f32 {
+        let output = (self.b0 + self.b1 + self.b2) * input / (1. + self.a1 + self.a2);
+        self.s1 = output - self.b0 * input;
+        self.s2 = self.b2 * input - self.a2 * output;
+        output
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -144,6 +158,11 @@ impl Smoother {
 
     pub(crate) fn reset(&mut self) {
         self.value = 0.;
+    }
+
+    pub(crate) fn settle(&mut self, input: f32) -> f32 {
+        self.value = input;
+        input
     }
 }
 
@@ -216,6 +235,28 @@ impl Charge {
 
     pub(crate) fn reset(&mut self) {
         self.value = 0.;
+    }
+
+    pub(crate) fn settle(&mut self, signal: f32, rise: f32, fall: f32) -> f32 {
+        self.value = if rise > 0. {
+            rise * signal.max(0.) / (rise + fall)
+        } else {
+            0.
+        };
+        self.value
+    }
+
+    pub(crate) fn settle_capped(&mut self, signal: f32, rise: f32, fall: f32, cap: Divisor) -> f32 {
+        let signal = signal.max(0.);
+        if rise <= 0. || signal == 0. {
+            self.value = 0.;
+            return self.value;
+        }
+        let capacity = cap.value();
+        let middle = rise * (capacity + signal) + fall * capacity;
+        let discriminant = (middle * middle - 4. * rise * rise * capacity * signal).max(0.);
+        self.value = 2. * rise * capacity * signal / (middle + discriminant.sqrt());
+        self.value
     }
 }
 

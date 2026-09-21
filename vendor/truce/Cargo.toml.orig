@@ -1,0 +1,57 @@
+[package]
+name = "truce"
+version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Audio plugin framework - write once, build CLAP, VST3, VST2, LV2, AU v2, AU v3, AAX, and a standalone host binary"
+keywords = ["audio", "plugin", "vst", "clap", "midi"]
+categories = ["multimedia::audio"]
+
+[dependencies]
+truce-core = { workspace = true }
+# `truce-gui-types` carries the lightweight layout / interaction /
+# render / theme types the prelude exports. `truce-plugin` carries
+# the `PluginLogic` leaf traits. Neither pulls a renderer - the
+# choice of renderer (truce-gui, truce-egui, truce-iced, truce-slint)
+# is a per-plugin Cargo dep, used inside the plugin's
+# `PluginLogic::editor()` impl.
+truce-gui-types = { workspace = true }
+truce-plugin = { workspace = true }
+truce-params = { workspace = true }
+truce-loader = { workspace = true }
+truce-derive = { workspace = true }
+
+[features]
+default = ["clap"]
+clap = ["dep:truce-clap"]
+vst3 = ["dep:truce-vst3"]
+vst2 = ["dep:truce-vst2"]
+lv2 = ["dep:truce-lv2"]
+shell = ["truce-loader/shell"]
+hot-debug = ["truce-loader/hot-debug"]
+# Paranoid real-time allocation checking (dev/test). Enables the check in
+# `process`; install the allocator at your crate root with
+# `truce::enable_rt_paranoid!()`.
+rt-paranoid = ["truce-core/rt-paranoid"]
+
+[dependencies.truce-clap]
+workspace = true
+optional = true
+
+[dependencies.truce-vst3]
+workspace = true
+optional = true
+
+[dependencies.truce-vst2]
+workspace = true
+optional = true
+
+[dependencies.truce-lv2]
+workspace = true
+optional = true
+
+[lints]
+workspace = true

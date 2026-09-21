@@ -247,10 +247,12 @@ struct ClapPluginData<P: PluginExport> {
     /// Host tail extension (for `changed`). Null if the host doesn't
     /// expose `clap.tail`.
     host_tail: *const clap_host_tail,
-    /// Set on the audio thread when `latency()` changes; drained on the
-    /// main thread, which notifies the host. Coalesces a burst of
-    /// changes into one host notification per main-thread callback.
+    /// Set on the audio thread when the requested latency differs from the
+    /// active latency. The main thread requests a restart; activation then
+    /// publishes the latency of the freshly reset instance.
     latency_dirty: AtomicBool,
+    /// Coalesces host restart requests until the next activation.
+    latency_restart_requested: AtomicBool,
     /// Queue of GUI-initiated parameter changes to emit as output events.
     gui_changes: Arc<GuiChangeQueue>,
     /// Bounded SPSC handoff for state loads. Host (`state_load`) and
@@ -673,13 +675,22 @@ unsafe extern "C" fn clap_plugin_activate<P: PluginExport>(
         {
             let mut instance = enter_plugin(&data.plugin);
             instance.reset(&AudioConfig::new(sample_rate, max_block).with_process_mode(mode));
-            // Refresh the caches from the freshly-reset instance so the
-            // host reads the real latency/tail before the first block -
-            // not the placeholder-rate value from create. No dirty flag:
-            // this is the baseline the host reads at activate, not a
-            // mid-session change needing changed() / request_restart.
-            data.latency_cache
-                .store(instance.latency(), Ordering::Relaxed);
+            // Latency is constant while active. Publish the freshly reset
+            // instance here, before `active` becomes true, and notify the
+            // host only from this inactive-to-active lifecycle boundary.
+            let new_latency = instance.latency();
+            let latency_changed =
+                data.latency_cache.swap(new_latency, Ordering::Relaxed) != new_latency;
+            data.latency_dirty.store(false, Ordering::Relaxed);
+            data.latency_restart_requested
+                .store(false, Ordering::Relaxed);
+            if latency_changed
+                && !data.host.is_null()
+                && !data.host_latency.is_null()
+                && let Some(changed) = (*data.host_latency).changed
+            {
+                changed(data.host);
+            }
             data.tail_cache.store(instance.tail(), Ordering::Relaxed);
         }
 
@@ -768,15 +779,11 @@ unsafe extern "C" fn clap_plugin_reset<P: PluginExport>(plugin: *const clap_plug
         let data = data_from_plugin::<P>(plugin);
         let mut audio = data.audio.enter();
         audio.sounding_notes.clear_all();
-        let mode = ProcessMode::from_u8(data.render_mode.load(Ordering::Relaxed));
         let mut instance = enter_plugin(&data.plugin);
-        instance.reset(
-            &AudioConfig::new(audio.sample_rate, audio.max_block_size).with_process_mode(mode),
-        );
-        // Same baseline refresh as `activate` (no dirty flag): keep the
-        // caches consistent with the reset instance.
-        data.latency_cache
-            .store(instance.latency(), Ordering::Relaxed);
+        instance.reset_realtime();
+        // CLAP reset runs while active, when the reported latency must stay
+        // constant. Dynamic-latency changes are applied by deactivate /
+        // activate after the main thread requests a restart.
         data.tail_cache.store(instance.tail(), Ordering::Relaxed);
     });
 }
@@ -792,21 +799,18 @@ unsafe extern "C" fn clap_plugin_on_main_thread<P: PluginExport>(plugin: *const 
             rescan(data.host, CLAP_PARAM_RESCAN_VALUES);
         }
 
-        // Latency changed on the audio thread: tell the host here, off
-        // the audio thread. `changed()` re-reads our reported latency;
-        // an active plugin additionally needs `request_restart` to apply
-        // the new delay compensation.
-        if data.latency_dirty.swap(false, Ordering::Relaxed) && !data.host.is_null() {
-            if !data.host_latency.is_null()
-                && let Some(changed) = (*data.host_latency).changed
-            {
-                changed(data.host);
-            }
-            if data.active.load(Ordering::Relaxed)
-                && let Some(req_restart) = (*data.host).request_restart
-            {
-                req_restart(data.host);
-            }
+        // The active instance keeps its published latency until the host
+        // restarts it. `activate` resets the current controls, updates the
+        // cache, and sends the latency notification while still inactive.
+        if data.latency_dirty.load(Ordering::Relaxed)
+            && data.active.load(Ordering::Relaxed)
+            && !data.host.is_null()
+            && let Some(req_restart) = (*data.host).request_restart
+            && !data
+                .latency_restart_requested
+                .swap(true, Ordering::Relaxed)
+        {
+            req_restart(data.host);
         }
     }
 }
@@ -1851,13 +1855,11 @@ unsafe extern "C" fn clap_plugin_process<P: PluginExport>(
             }
         }
 
-        // Refresh latency / tail caches so the host's main-thread
-        // queries don't have to touch the plugin. On an actual
-        // latency change, flag it and wake the main thread, which
-        // notifies the host (`clap.latency` requires the call off the
-        // audio thread).
+        // A requested latency change cannot alter the active CLAP latency.
+        // Wake the main thread once so it asks the host for a lifecycle
+        // restart; activation publishes the freshly reset value.
         let new_latency = instance.latency();
-        if data.latency_cache.swap(new_latency, Ordering::Relaxed) != new_latency
+        if data.latency_cache.load(Ordering::Relaxed) != new_latency
             && !data.latency_dirty.swap(true, Ordering::Relaxed)
             && !data.host.is_null()
             && let Some(req_cb) = (*data.host).request_callback
@@ -2377,6 +2379,283 @@ pub fn rt_paranoid_smoke<P: PluginExport>() -> u32 {
             "CLAP smoke harness produced silent output - process did not run"
         );
         count
+    }
+}
+
+/// Observations from a parameter-driven latency change through the CLAP ABI.
+#[doc(hidden)]
+pub struct DynamicLatencyTransition {
+    pub active_before: u32,
+    pub reported_while_active: u32,
+    pub active_after_restart: u32,
+    pub callback_requests: u32,
+    pub restart_requests: u32,
+    pub latency_notifications: u32,
+    pub active_reset_max_error: f32,
+    pub uncleared_state_error: f32,
+    pub active_reset_allocations: u32,
+    pub active_output_peak: f32,
+}
+
+/// Drive one parameter event through a live CLAP instance and complete the
+/// requested deactivate/activate sequence.
+#[doc(hidden)]
+#[must_use]
+pub fn dynamic_latency_transition<P: PluginExport>(param_id: u32, value: f64) -> DynamicLatencyTransition {
+    #[derive(Default)]
+    struct HostAudit {
+        callback_requests: u32,
+        restart_requests: u32,
+        latency_notifications: u32,
+    }
+
+    unsafe extern "C" fn latency_changed(host: *const clap_host) {
+        unsafe {
+            let audit = &mut *(*host).host_data.cast::<HostAudit>();
+            audit.latency_notifications += 1;
+        }
+    }
+
+    static HOST_LATENCY: clap_host_latency = clap_host_latency {
+        changed: Some(latency_changed),
+    };
+
+    unsafe extern "C" fn host_extension(
+        _host: *const clap_host,
+        id: *const c_char,
+    ) -> *const c_void {
+        unsafe {
+            if !id.is_null() && CStr::from_ptr(id) == CLAP_EXT_LATENCY {
+                return (&raw const HOST_LATENCY).cast::<c_void>();
+            }
+        }
+        ptr::null()
+    }
+
+    unsafe extern "C" fn request_callback(host: *const clap_host) {
+        unsafe {
+            let audit = &mut *(*host).host_data.cast::<HostAudit>();
+            audit.callback_requests += 1;
+        }
+    }
+
+    unsafe extern "C" fn request_restart(host: *const clap_host) {
+        unsafe {
+            let audit = &mut *(*host).host_data.cast::<HostAudit>();
+            audit.restart_requests += 1;
+        }
+    }
+
+    unsafe extern "C" fn event_count(_events: *const clap_input_events) -> u32 {
+        1
+    }
+
+    unsafe extern "C" fn event_get(
+        events: *const clap_input_events,
+        index: u32,
+    ) -> *const clap_event_header {
+        if index != 0 {
+            return ptr::null();
+        }
+        unsafe {
+            let event = &*(*events).ctx.cast::<clap_event_param_value>();
+            &raw const event.header
+        }
+    }
+
+    unsafe fn process_stereo(
+        plugin: *const clap_plugin,
+        input: &[f32],
+        event: Option<&clap_event_param_value>,
+    ) -> [Vec<f32>; 2] {
+        let vtable = unsafe { &*plugin };
+        let mut in_left = input.to_vec();
+        let mut in_right = input.to_vec();
+        let mut out_left = vec![0.; input.len()];
+        let mut out_right = vec![0.; input.len()];
+        let mut in_ptrs = [in_left.as_mut_ptr(), in_right.as_mut_ptr()];
+        let mut out_ptrs = [out_left.as_mut_ptr(), out_right.as_mut_ptr()];
+        let input_bus = clap_audio_buffer {
+            data32: in_ptrs.as_mut_ptr(),
+            data64: ptr::null_mut(),
+            channel_count: 2,
+            latency: 0,
+            constant_mask: 0,
+        };
+        let mut output_bus = clap_audio_buffer {
+            data32: out_ptrs.as_mut_ptr(),
+            data64: ptr::null_mut(),
+            channel_count: 2,
+            latency: 0,
+            constant_mask: 0,
+        };
+        let input_events = clap_input_events {
+            ctx: event.map_or(ptr::null_mut(), |value| {
+                (value as *const clap_event_param_value)
+                    .cast_mut()
+                    .cast::<c_void>()
+            }),
+            size: Some(event_count),
+            get: Some(event_get),
+        };
+        let process = clap_process {
+            steady_time: 0,
+            frames_count: u32::try_from(input.len()).unwrap_or(u32::MAX),
+            transport: ptr::null(),
+            audio_inputs: &raw const input_bus,
+            audio_outputs: &raw mut output_bus,
+            audio_inputs_count: 1,
+            audio_outputs_count: 1,
+            in_events: if event.is_some() {
+                &raw const input_events
+            } else {
+                ptr::null()
+            },
+            out_events: ptr::null(),
+        };
+        unsafe {
+            (vtable.process.unwrap())(plugin, &raw const process);
+        }
+        [out_left, out_right]
+    }
+
+    let mut audit = HostAudit::default();
+    let host = clap_host {
+        clap_version: CLAP_VERSION,
+        host_data: (&raw mut audit).cast::<c_void>(),
+        name: ptr::null(),
+        vendor: ptr::null(),
+        url: ptr::null(),
+        version: ptr::null(),
+        get_extension: Some(host_extension),
+        request_restart: Some(request_restart),
+        request_process: None,
+        request_callback: Some(request_callback),
+    };
+    let descriptor = clap_plugin_descriptor {
+        clap_version: CLAP_VERSION,
+        id: ptr::null(),
+        name: ptr::null(),
+        vendor: ptr::null(),
+        url: ptr::null(),
+        manual_url: ptr::null(),
+        support_url: ptr::null(),
+        version: ptr::null(),
+        description: ptr::null(),
+        features: ptr::null(),
+    };
+
+    unsafe {
+        let plugin = create_plugin_instance::<P>(&raw const descriptor, &raw const host);
+        let vtable = &*plugin;
+        (vtable.init.unwrap())(plugin);
+        (vtable.activate.unwrap())(plugin, 44_100., 1, 64);
+        (vtable.start_processing.unwrap())(plugin);
+        let latency_extension = (vtable.get_extension.unwrap())(plugin, CLAP_EXT_LATENCY.as_ptr())
+            .cast::<clap_plugin_latency>();
+        let latency_get = (*latency_extension).get.unwrap();
+        let active_before = latency_get(plugin);
+
+        let control = create_plugin_instance::<P>(&raw const descriptor, &raw const host);
+        let control_vtable = &*control;
+        (control_vtable.init.unwrap())(control);
+        (control_vtable.activate.unwrap())(control, 44_100., 1, 64);
+        (control_vtable.start_processing.unwrap())(control);
+
+        let stale = create_plugin_instance::<P>(&raw const descriptor, &raw const host);
+        let stale_vtable = &*stale;
+        (stale_vtable.init.unwrap())(stale);
+        (stale_vtable.activate.unwrap())(stale, 44_100., 1, 64);
+        (stale_vtable.start_processing.unwrap())(stale);
+
+        let event = clap_event_param_value {
+            header: clap_event_header {
+                size: size_of_u32::<clap_event_param_value>(),
+                time: 0,
+                space_id: CLAP_CORE_EVENT_SPACE_ID,
+                type_: CLAP_EVENT_PARAM_VALUE,
+                flags: CLAP_EVENT_IS_LIVE,
+            },
+            param_id,
+            cookie: ptr::null_mut(),
+            note_id: -1,
+            port_index: -1,
+            channel: -1,
+            key: -1,
+            value,
+        };
+        let driven: Vec<f32> = (0..2_048)
+            .map(|frame| {
+                let x = frame as f32;
+                0.65 * (x * 0.071).sin() + 0.25 * (x * 0.193).cos()
+            })
+            .collect();
+        for block in driven.chunks(64) {
+            process_stereo(plugin, block, None);
+            process_stereo(stale, block, None);
+        }
+        let silence = [0.; 64];
+        process_stereo(plugin, &silence, Some(&event));
+        let reported_while_active = latency_get(plugin);
+        (vtable.on_main_thread.unwrap())(plugin);
+        let (_, active_reset_allocations) = truce_core::rt::audit(|| {
+            let _realtime = truce_core::rt::RtSection::enter();
+            (vtable.reset.unwrap())(plugin);
+        });
+
+        let signal: Vec<f32> = (0..64)
+            .map(|frame| {
+                let x = frame as f32;
+                0.18 * (x * 0.071).sin() + 0.07 * (x * 0.193).cos()
+            })
+            .collect();
+        let active_output = process_stereo(plugin, &signal, None);
+        let control_output = process_stereo(control, &signal, None);
+        let stale_output = process_stereo(stale, &signal, None);
+        let active_reset_max_error = active_output
+            .iter()
+            .flatten()
+            .zip(control_output.iter().flatten())
+            .map(|(actual, expected)| (actual - expected).abs())
+            .fold(0., f32::max);
+        let uncleared_state_error = stale_output
+            .iter()
+            .flatten()
+            .zip(control_output.iter().flatten())
+            .map(|(actual, expected)| (actual - expected).abs())
+            .fold(0., f32::max);
+        let active_output_peak = active_output
+            .iter()
+            .flatten()
+            .copied()
+            .map(f32::abs)
+            .fold(0., f32::max);
+
+        (vtable.stop_processing.unwrap())(plugin);
+        (vtable.deactivate.unwrap())(plugin);
+        (vtable.activate.unwrap())(plugin, 44_100., 1, 64);
+        let active_after_restart = latency_get(plugin);
+        (vtable.deactivate.unwrap())(plugin);
+        (vtable.destroy.unwrap())(plugin);
+        (control_vtable.stop_processing.unwrap())(control);
+        (control_vtable.deactivate.unwrap())(control);
+        (control_vtable.destroy.unwrap())(control);
+        (stale_vtable.stop_processing.unwrap())(stale);
+        (stale_vtable.deactivate.unwrap())(stale);
+        (stale_vtable.destroy.unwrap())(stale);
+
+        DynamicLatencyTransition {
+            active_before,
+            reported_while_active,
+            active_after_restart,
+            callback_requests: audit.callback_requests,
+            restart_requests: audit.restart_requests,
+            latency_notifications: audit.latency_notifications,
+            active_reset_max_error,
+            uncleared_state_error,
+            active_reset_allocations,
+            active_output_peak,
+        }
     }
 }
 
@@ -4165,6 +4444,7 @@ pub unsafe fn create_plugin_instance<P: PluginExport>(
             host_latency: ptr::null(),
             host_tail: ptr::null(),
             latency_dirty: AtomicBool::new(false),
+            latency_restart_requested: AtomicBool::new(false),
             gui_changes: Arc::new(GuiChangeQueue::new(GUI_QUEUE_CAPACITY)),
             pending_state: Arc::new(StateLoadQueue::new(1)),
             active: AtomicBool::new(false),

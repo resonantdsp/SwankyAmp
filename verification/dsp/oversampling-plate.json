@@ -1,0 +1,1094 @@
+{
+  "latency_impulses": [
+    {
+      "dc_gain": 1.000004292,
+      "factor": 2,
+      "peak_sample": 32,
+      "peak_value": 0.966010809,
+      "reported_latency": 32,
+      "symmetry_max_error": 7e-09
+    },
+    {
+      "dc_gain": 1.000008345,
+      "factor": 4,
+      "peak_sample": 48,
+      "peak_value": 0.966010571,
+      "reported_latency": 48,
+      "symmetry_max_error": 1.5e-08
+    }
+  ],
+  "policy": [
+    {
+      "doublings": [
+        1,
+        0,
+        1,
+        2
+      ],
+      "sample_rate": 44100
+    },
+    {
+      "doublings": [
+        1,
+        0,
+        1,
+        2
+      ],
+      "sample_rate": 48000
+    },
+    {
+      "doublings": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "sample_rate": 88200
+    },
+    {
+      "doublings": [
+        0,
+        0,
+        1,
+        1
+      ],
+      "sample_rate": 96000
+    }
+  ],
+  "rates": {
+    "44100": {
+      "alias_auto_minus_1x_db": -7.531763790088901,
+      "alias_dbc": {
+        "1x": -9.702337066520156,
+        "auto": -17.234100856609057
+      },
+      "alias_factors": {
+        "1x": 1,
+        "auto": 2
+      },
+      "corrected_1x": {
+        "factor": 1,
+        "internal_rate": 44100,
+        "latency_samples": 0,
+        "model": "corrected",
+        "sample_rate": 44100
+      },
+      "corrected_auto": {
+        "factor": 2,
+        "internal_rate": 88200,
+        "latency_samples": 32,
+        "model": "corrected",
+        "sample_rate": 44100
+      },
+      "legacy": {
+        "factor": 1,
+        "internal_rate": 44100,
+        "latency_samples": 0,
+        "model": "legacy",
+        "sample_rate": 44100
+      },
+      "output_level_dbfs": {
+        "corrected_1x": {
+          "peak_dbfs": -12.746733101954792,
+          "rms_dbfs": -21.952504345976557
+        },
+        "corrected_auto": {
+          "peak_dbfs": -12.714370304536306,
+          "rms_dbfs": -21.921564779928282
+        },
+        "legacy": {
+          "peak_dbfs": -12.746733101954792,
+          "rms_dbfs": -21.952504345976557
+        }
+      },
+      "seam_level_auto_minus_corrected_1x": {
+        "cabinet": {
+          "peak_delta_db": 0.032362531875516964,
+          "rms_delta_db": 0.030939562392571673
+        },
+        "power_amp": {
+          "peak_delta_db": -0.0016704900127777478,
+          "rms_delta_db": 0.026072748898531728
+        },
+        "raw_output": {
+          "peak_delta_db": 0.03236279741848591,
+          "rms_delta_db": 0.03093956604827497
+        },
+        "tone_stack": {
+          "peak_delta_db": -1.2995955215086425,
+          "rms_delta_db": -0.09058795920472207
+        },
+        "triode_1": {
+          "peak_delta_db": -0.31131067324412953,
+          "rms_delta_db": -0.00675024041468042
+        },
+        "triode_2": {
+          "peak_delta_db": -1.1233216115935392,
+          "rms_delta_db": -0.006630552432179915
+        },
+        "triode_3": {
+          "peak_delta_db": -0.9222433163278074,
+          "rms_delta_db": -0.008032526320379985
+        },
+        "triode_4": {
+          "peak_delta_db": -0.7979786637195865,
+          "rms_delta_db": -0.011825292254493469
+        },
+        "triode_5": {
+          "peak_delta_db": -0.6926190581512435,
+          "rms_delta_db": -0.013772139892385127
+        }
+      },
+      "seam_level_auto_minus_legacy": {
+        "cabinet": {
+          "peak_delta_db": 0.032362531875516964,
+          "rms_delta_db": 0.030939562392571673
+        },
+        "power_amp": {
+          "peak_delta_db": -0.0016704900127777478,
+          "rms_delta_db": 0.026072748898531728
+        },
+        "raw_output": {
+          "peak_delta_db": 0.03236279741848591,
+          "rms_delta_db": 0.03093956604827497
+        },
+        "tone_stack": {
+          "peak_delta_db": -1.2995955215086425,
+          "rms_delta_db": -0.09058795920472207
+        },
+        "triode_1": {
+          "peak_delta_db": -0.31131067324412953,
+          "rms_delta_db": -0.00675024041468042
+        },
+        "triode_2": {
+          "peak_delta_db": -1.1233216115935392,
+          "rms_delta_db": -0.006630552432179915
+        },
+        "triode_3": {
+          "peak_delta_db": -0.9222433163278074,
+          "rms_delta_db": -0.008032526320379985
+        },
+        "triode_4": {
+          "peak_delta_db": -0.7979786637195865,
+          "rms_delta_db": -0.011825292254493469
+        },
+        "triode_5": {
+          "peak_delta_db": -0.6926190581512435,
+          "rms_delta_db": -0.013772139892385127
+        }
+      },
+      "seam_level_corrected_1x_minus_legacy": {
+        "cabinet": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "power_amp": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "raw_output": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "tone_stack": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "triode_1": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "triode_2": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "triode_3": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "triode_4": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "triode_5": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        }
+      }
+    },
+    "48000": {
+      "alias_auto_minus_1x_db": -4.554113556814427,
+      "alias_dbc": {
+        "1x": -9.581063918217536,
+        "auto": -14.135177475031963
+      },
+      "alias_factors": {
+        "1x": 1,
+        "auto": 2
+      },
+      "corrected_1x": {
+        "factor": 1,
+        "internal_rate": 48000,
+        "latency_samples": 0,
+        "model": "corrected",
+        "sample_rate": 48000
+      },
+      "corrected_auto": {
+        "factor": 2,
+        "internal_rate": 96000,
+        "latency_samples": 32,
+        "model": "corrected",
+        "sample_rate": 48000
+      },
+      "legacy": {
+        "factor": 1,
+        "internal_rate": 48000,
+        "latency_samples": 0,
+        "model": "legacy",
+        "sample_rate": 48000
+      },
+      "output_level_dbfs": {
+        "corrected_1x": {
+          "peak_dbfs": -12.64053747774686,
+          "rms_dbfs": -21.940475798100675
+        },
+        "corrected_auto": {
+          "peak_dbfs": -12.751414133754759,
+          "rms_dbfs": -21.915972040236873
+        },
+        "legacy": {
+          "peak_dbfs": -12.76940683037584,
+          "rms_dbfs": -21.947003917822844
+        }
+      },
+      "seam_level_auto_minus_corrected_1x": {
+        "cabinet": {
+          "peak_delta_db": -0.11087679324506539,
+          "rms_delta_db": 0.024503759211931708
+        },
+        "power_amp": {
+          "peak_delta_db": -0.08592773211691451,
+          "rms_delta_db": 0.02115945648880313
+        },
+        "raw_output": {
+          "peak_delta_db": -0.11087665600789798,
+          "rms_delta_db": 0.024503757863801212
+        },
+        "tone_stack": {
+          "peak_delta_db": -1.6138745284262725,
+          "rms_delta_db": -0.07445526000010005
+        },
+        "triode_1": {
+          "peak_delta_db": -0.2571840929447049,
+          "rms_delta_db": -0.0014751300212694218
+        },
+        "triode_2": {
+          "peak_delta_db": -1.3714423624564311,
+          "rms_delta_db": -0.002402625025719196
+        },
+        "triode_3": {
+          "peak_delta_db": -0.8721255989253045,
+          "rms_delta_db": -0.0051709211489426865
+        },
+        "triode_4": {
+          "peak_delta_db": -0.6696625886797403,
+          "rms_delta_db": -0.009696882308581678
+        },
+        "triode_5": {
+          "peak_delta_db": -0.4173121781302669,
+          "rms_delta_db": -0.013094111362926153
+        }
+      },
+      "seam_level_auto_minus_legacy": {
+        "cabinet": {
+          "peak_delta_db": 0.017992331714896892,
+          "rms_delta_db": 0.031031878063727092
+        },
+        "power_amp": {
+          "peak_delta_db": -0.15489469690889024,
+          "rms_delta_db": 0.02523880484934793
+        },
+        "raw_output": {
+          "peak_delta_db": 0.017992696621080384,
+          "rms_delta_db": 0.03103187758597059
+        },
+        "tone_stack": {
+          "peak_delta_db": -2.0149647179608223,
+          "rms_delta_db": -0.09708430453923
+        },
+        "triode_1": {
+          "peak_delta_db": -0.12255063677183387,
+          "rms_delta_db": -0.0019111572270720245
+        },
+        "triode_2": {
+          "peak_delta_db": -1.1077164728879323,
+          "rms_delta_db": -0.0036474801722619077
+        },
+        "triode_3": {
+          "peak_delta_db": -0.8524581964418818,
+          "rms_delta_db": -0.007664833038217744
+        },
+        "triode_4": {
+          "peak_delta_db": -0.7849246001461232,
+          "rms_delta_db": -0.012899015905698974
+        },
+        "triode_5": {
+          "peak_delta_db": -0.717030645836668,
+          "rms_delta_db": -0.016881996356859386
+        }
+      },
+      "seam_level_corrected_1x_minus_legacy": {
+        "cabinet": {
+          "peak_delta_db": 0.12886912495996228,
+          "rms_delta_db": 0.006528118851795384
+        },
+        "power_amp": {
+          "peak_delta_db": -0.06896696479197573,
+          "rms_delta_db": 0.004079348360544799
+        },
+        "raw_output": {
+          "peak_delta_db": 0.12886935262897836,
+          "rms_delta_db": 0.006528119722169379
+        },
+        "tone_stack": {
+          "peak_delta_db": -0.4010901895345498,
+          "rms_delta_db": -0.02262904453912995
+        },
+        "triode_1": {
+          "peak_delta_db": 0.13463345617287104,
+          "rms_delta_db": -0.0004360272058026027
+        },
+        "triode_2": {
+          "peak_delta_db": 0.26372588956849885,
+          "rms_delta_db": -0.0012448551465427116
+        },
+        "triode_3": {
+          "peak_delta_db": 0.01966740248342269,
+          "rms_delta_db": -0.002493911889275058
+        },
+        "triode_4": {
+          "peak_delta_db": -0.11526201146638293,
+          "rms_delta_db": -0.003202133597117296
+        },
+        "triode_5": {
+          "peak_delta_db": -0.2997184677064011,
+          "rms_delta_db": -0.0037878849939332326
+        }
+      }
+    },
+    "88200": {
+      "alias_auto_minus_1x_db": 0.0,
+      "alias_dbc": {
+        "1x": -16.849169999324644,
+        "auto": -16.849169999324644
+      },
+      "alias_factors": {
+        "1x": 1,
+        "auto": 1
+      },
+      "corrected_1x": {
+        "factor": 1,
+        "internal_rate": 88200,
+        "latency_samples": 0,
+        "model": "corrected",
+        "sample_rate": 88200
+      },
+      "corrected_auto": {
+        "factor": 1,
+        "internal_rate": 88200,
+        "latency_samples": 0,
+        "model": "corrected",
+        "sample_rate": 88200
+      },
+      "legacy": {
+        "factor": 1,
+        "internal_rate": 88200,
+        "latency_samples": 0,
+        "model": "legacy",
+        "sample_rate": 88200
+      },
+      "output_level_dbfs": {
+        "corrected_1x": {
+          "peak_dbfs": -12.746690425965234,
+          "rms_dbfs": -21.916042468202356
+        },
+        "corrected_auto": {
+          "peak_dbfs": -12.746690425965234,
+          "rms_dbfs": -21.916042468202356
+        },
+        "legacy": {
+          "peak_dbfs": -12.817232401728411,
+          "rms_dbfs": -21.952342279181384
+        }
+      },
+      "seam_level_auto_minus_corrected_1x": {
+        "cabinet": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "power_amp": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "raw_output": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "tone_stack": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "triode_1": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "triode_2": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "triode_3": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "triode_4": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "triode_5": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        }
+      },
+      "seam_level_auto_minus_legacy": {
+        "cabinet": {
+          "peak_delta_db": 0.07054170410532024,
+          "rms_delta_db": 0.036299811862029685
+        },
+        "power_amp": {
+          "peak_delta_db": -0.04141680908271894,
+          "rms_delta_db": 0.031095482233190808
+        },
+        "raw_output": {
+          "peak_delta_db": 0.07054197576317733,
+          "rms_delta_db": 0.03629981097902757
+        },
+        "tone_stack": {
+          "peak_delta_db": -3.060200185118397,
+          "rms_delta_db": -0.11728480828654497
+        },
+        "triode_1": {
+          "peak_delta_db": -0.16745695026147445,
+          "rms_delta_db": -0.0033211891933380144
+        },
+        "triode_2": {
+          "peak_delta_db": -0.8557166714943651,
+          "rms_delta_db": -0.008585173842026617
+        },
+        "triode_3": {
+          "peak_delta_db": -0.665797925411197,
+          "rms_delta_db": -0.01567257550616874
+        },
+        "triode_4": {
+          "peak_delta_db": -0.5959902844646114,
+          "rms_delta_db": -0.02000467302142206
+        },
+        "triode_5": {
+          "peak_delta_db": -0.43665253032810547,
+          "rms_delta_db": -0.024819194744061246
+        }
+      },
+      "seam_level_corrected_1x_minus_legacy": {
+        "cabinet": {
+          "peak_delta_db": 0.07054170410532024,
+          "rms_delta_db": 0.036299811862029685
+        },
+        "power_amp": {
+          "peak_delta_db": -0.04141680908271894,
+          "rms_delta_db": 0.031095482233190808
+        },
+        "raw_output": {
+          "peak_delta_db": 0.07054197576317733,
+          "rms_delta_db": 0.03629981097902757
+        },
+        "tone_stack": {
+          "peak_delta_db": -3.060200185118397,
+          "rms_delta_db": -0.11728480828654497
+        },
+        "triode_1": {
+          "peak_delta_db": -0.16745695026147445,
+          "rms_delta_db": -0.0033211891933380144
+        },
+        "triode_2": {
+          "peak_delta_db": -0.8557166714943651,
+          "rms_delta_db": -0.008585173842026617
+        },
+        "triode_3": {
+          "peak_delta_db": -0.665797925411197,
+          "rms_delta_db": -0.01567257550616874
+        },
+        "triode_4": {
+          "peak_delta_db": -0.5959902844646114,
+          "rms_delta_db": -0.02000467302142206
+        },
+        "triode_5": {
+          "peak_delta_db": -0.43665253032810547,
+          "rms_delta_db": -0.024819194744061246
+        }
+      }
+    },
+    "96000": {
+      "alias_auto_minus_1x_db": 0.0,
+      "alias_dbc": {
+        "1x": -14.33895058602426,
+        "auto": -14.33895058602426
+      },
+      "alias_factors": {
+        "1x": 1,
+        "auto": 1
+      },
+      "corrected_1x": {
+        "factor": 1,
+        "internal_rate": 96000,
+        "latency_samples": 0,
+        "model": "corrected",
+        "sample_rate": 96000
+      },
+      "corrected_auto": {
+        "factor": 1,
+        "internal_rate": 96000,
+        "latency_samples": 0,
+        "model": "corrected",
+        "sample_rate": 96000
+      },
+      "legacy": {
+        "factor": 1,
+        "internal_rate": 96000,
+        "latency_samples": 0,
+        "model": "legacy",
+        "sample_rate": 96000
+      },
+      "output_level_dbfs": {
+        "corrected_1x": {
+          "peak_dbfs": -12.735341005000297,
+          "rms_dbfs": -21.909590831661433
+        },
+        "corrected_auto": {
+          "peak_dbfs": -12.735341005000297,
+          "rms_dbfs": -21.909590831661433
+        },
+        "legacy": {
+          "peak_dbfs": -12.833218022066767,
+          "rms_dbfs": -21.94812506085672
+        }
+      },
+      "seam_level_auto_minus_corrected_1x": {
+        "cabinet": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "power_amp": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "raw_output": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "tone_stack": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "triode_1": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "triode_2": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "triode_3": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "triode_4": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        },
+        "triode_5": {
+          "peak_delta_db": 0.0,
+          "rms_delta_db": 0.0
+        }
+      },
+      "seam_level_auto_minus_legacy": {
+        "cabinet": {
+          "peak_delta_db": 0.09787702114990893,
+          "rms_delta_db": 0.038534228765174205
+        },
+        "power_amp": {
+          "peak_delta_db": -0.02406011738251479,
+          "rms_delta_db": 0.03280517688865103
+        },
+        "raw_output": {
+          "peak_delta_db": 0.09787701706646956,
+          "rms_delta_db": 0.038534229195288816
+        },
+        "tone_stack": {
+          "peak_delta_db": -3.3051148015029668,
+          "rms_delta_db": -0.12260309260258495
+        },
+        "triode_1": {
+          "peak_delta_db": -0.03225776261002977,
+          "rms_delta_db": -0.003541956868575724
+        },
+        "triode_2": {
+          "peak_delta_db": -0.6801184490525731,
+          "rms_delta_db": -0.009051683459431636
+        },
+        "triode_3": {
+          "peak_delta_db": -0.5106268023514939,
+          "rms_delta_db": -0.01661548625645215
+        },
+        "triode_4": {
+          "peak_delta_db": -0.5479629854845989,
+          "rms_delta_db": -0.0211726230056144
+        },
+        "triode_5": {
+          "peak_delta_db": -0.45777376704061723,
+          "rms_delta_db": -0.026303901190830148
+        }
+      },
+      "seam_level_corrected_1x_minus_legacy": {
+        "cabinet": {
+          "peak_delta_db": 0.09787702114990893,
+          "rms_delta_db": 0.038534228765174205
+        },
+        "power_amp": {
+          "peak_delta_db": -0.02406011738251479,
+          "rms_delta_db": 0.03280517688865103
+        },
+        "raw_output": {
+          "peak_delta_db": 0.09787701706646956,
+          "rms_delta_db": 0.038534229195288816
+        },
+        "tone_stack": {
+          "peak_delta_db": -3.3051148015029668,
+          "rms_delta_db": -0.12260309260258495
+        },
+        "triode_1": {
+          "peak_delta_db": -0.03225776261002977,
+          "rms_delta_db": -0.003541956868575724
+        },
+        "triode_2": {
+          "peak_delta_db": -0.6801184490525731,
+          "rms_delta_db": -0.009051683459431636
+        },
+        "triode_3": {
+          "peak_delta_db": -0.5106268023514939,
+          "rms_delta_db": -0.01661548625645215
+        },
+        "triode_4": {
+          "peak_delta_db": -0.5479629854845989,
+          "rms_delta_db": -0.0211726230056144
+        },
+        "triode_5": {
+          "peak_delta_db": -0.45777376704061723,
+          "rms_delta_db": -0.026303901190830148
+        }
+      }
+    }
+  },
+  "realtime_reset_equilibrium": {
+    "cases": [
+      {
+        "factor": 2,
+        "max_error": 0.000274092,
+        "preset": "clean",
+        "rms_error": 8.4149e-05,
+        "sample_rate": 44100,
+        "stale_max_error": 0.844348073
+      },
+      {
+        "factor": 2,
+        "max_error": 0.000246909,
+        "preset": "bright",
+        "rms_error": 6.0324e-05,
+        "sample_rate": 44100,
+        "stale_max_error": 0.364355117
+      },
+      {
+        "factor": 2,
+        "max_error": 0.000183269,
+        "preset": "edge",
+        "rms_error": 5.8306e-05,
+        "sample_rate": 44100,
+        "stale_max_error": 0.251268506
+      },
+      {
+        "factor": 2,
+        "max_error": 0.000104077,
+        "preset": "distort",
+        "rms_error": 3.47e-05,
+        "sample_rate": 44100,
+        "stale_max_error": 0.161763996
+      },
+      {
+        "factor": 2,
+        "max_error": 6.1372e-05,
+        "preset": "dirty distort",
+        "rms_error": 2.2679e-05,
+        "sample_rate": 44100,
+        "stale_max_error": 0.107843056
+      },
+      {
+        "factor": 2,
+        "max_error": 7.318e-05,
+        "preset": "pre drive",
+        "rms_error": 2.0745e-05,
+        "sample_rate": 44100,
+        "stale_max_error": 0.102703691
+      },
+      {
+        "factor": 2,
+        "max_error": 8.782e-05,
+        "preset": "power drive",
+        "rms_error": 2.9273e-05,
+        "sample_rate": 44100,
+        "stale_max_error": 0.204385102
+      },
+      {
+        "factor": 2,
+        "max_error": 8.0613e-05,
+        "preset": "full drive",
+        "rms_error": 2.3703e-05,
+        "sample_rate": 44100,
+        "stale_max_error": 0.135910779
+      },
+      {
+        "factor": 2,
+        "max_error": 7.7285e-05,
+        "preset": "high gain",
+        "rms_error": 2.1339e-05,
+        "sample_rate": 44100,
+        "stale_max_error": 0.10236197
+      },
+      {
+        "factor": 2,
+        "max_error": 4.8019e-05,
+        "preset": "level 11",
+        "rms_error": 1.6951e-05,
+        "sample_rate": 44100,
+        "stale_max_error": 0.097127393
+      },
+      {
+        "factor": 2,
+        "max_error": 0.000270501,
+        "preset": "clean",
+        "rms_error": 8.7082e-05,
+        "sample_rate": 48000,
+        "stale_max_error": 0.700909197
+      },
+      {
+        "factor": 2,
+        "max_error": 0.000221953,
+        "preset": "bright",
+        "rms_error": 7.1416e-05,
+        "sample_rate": 48000,
+        "stale_max_error": 0.326217324
+      },
+      {
+        "factor": 2,
+        "max_error": 0.000208959,
+        "preset": "edge",
+        "rms_error": 6.6069e-05,
+        "sample_rate": 48000,
+        "stale_max_error": 0.242880225
+      },
+      {
+        "factor": 2,
+        "max_error": 0.000110313,
+        "preset": "distort",
+        "rms_error": 3.4141e-05,
+        "sample_rate": 48000,
+        "stale_max_error": 0.155601144
+      },
+      {
+        "factor": 2,
+        "max_error": 7.3269e-05,
+        "preset": "dirty distort",
+        "rms_error": 2.6075e-05,
+        "sample_rate": 48000,
+        "stale_max_error": 0.1061389
+      },
+      {
+        "factor": 2,
+        "max_error": 7.8335e-05,
+        "preset": "pre drive",
+        "rms_error": 2.5583e-05,
+        "sample_rate": 48000,
+        "stale_max_error": 0.087984942
+      },
+      {
+        "factor": 2,
+        "max_error": 0.000106156,
+        "preset": "power drive",
+        "rms_error": 3.3499e-05,
+        "sample_rate": 48000,
+        "stale_max_error": 0.174887031
+      },
+      {
+        "factor": 2,
+        "max_error": 8.7029e-05,
+        "preset": "full drive",
+        "rms_error": 2.6597e-05,
+        "sample_rate": 48000,
+        "stale_max_error": 0.1253369
+      },
+      {
+        "factor": 2,
+        "max_error": 7.9827e-05,
+        "preset": "high gain",
+        "rms_error": 2.2156e-05,
+        "sample_rate": 48000,
+        "stale_max_error": 0.10017433
+      },
+      {
+        "factor": 2,
+        "max_error": 5.2527e-05,
+        "preset": "level 11",
+        "rms_error": 1.9173e-05,
+        "sample_rate": 48000,
+        "stale_max_error": 0.085136682
+      },
+      {
+        "factor": 1,
+        "max_error": 0.000401407,
+        "preset": "clean",
+        "rms_error": 0.000108631,
+        "sample_rate": 88200,
+        "stale_max_error": 1.208218098
+      },
+      {
+        "factor": 1,
+        "max_error": 0.000380158,
+        "preset": "bright",
+        "rms_error": 0.000119036,
+        "sample_rate": 88200,
+        "stale_max_error": 0.426083833
+      },
+      {
+        "factor": 1,
+        "max_error": 0.000291335,
+        "preset": "edge",
+        "rms_error": 9.0477e-05,
+        "sample_rate": 88200,
+        "stale_max_error": 0.340215564
+      },
+      {
+        "factor": 1,
+        "max_error": 0.00022237,
+        "preset": "distort",
+        "rms_error": 5.6839e-05,
+        "sample_rate": 88200,
+        "stale_max_error": 0.178249538
+      },
+      {
+        "factor": 1,
+        "max_error": 0.000145093,
+        "preset": "dirty distort",
+        "rms_error": 4.0223e-05,
+        "sample_rate": 88200,
+        "stale_max_error": 0.143189609
+      },
+      {
+        "factor": 1,
+        "max_error": 0.000127863,
+        "preset": "pre drive",
+        "rms_error": 3.7303e-05,
+        "sample_rate": 88200,
+        "stale_max_error": 0.094418854
+      },
+      {
+        "factor": 1,
+        "max_error": 0.00013151,
+        "preset": "power drive",
+        "rms_error": 4.7041e-05,
+        "sample_rate": 88200,
+        "stale_max_error": 0.182325855
+      },
+      {
+        "factor": 1,
+        "max_error": 0.000112984,
+        "preset": "full drive",
+        "rms_error": 3.8495e-05,
+        "sample_rate": 88200,
+        "stale_max_error": 0.080273882
+      },
+      {
+        "factor": 1,
+        "max_error": 8.5726e-05,
+        "preset": "high gain",
+        "rms_error": 2.7328e-05,
+        "sample_rate": 88200,
+        "stale_max_error": 0.077081025
+      },
+      {
+        "factor": 1,
+        "max_error": 0.000103147,
+        "preset": "level 11",
+        "rms_error": 2.8871e-05,
+        "sample_rate": 88200,
+        "stale_max_error": 0.062968075
+      },
+      {
+        "factor": 1,
+        "max_error": 0.000423014,
+        "preset": "clean",
+        "rms_error": 0.000136936,
+        "sample_rate": 96000,
+        "stale_max_error": 0.66554606
+      },
+      {
+        "factor": 1,
+        "max_error": 0.000465712,
+        "preset": "bright",
+        "rms_error": 0.000150316,
+        "sample_rate": 96000,
+        "stale_max_error": 0.326740324
+      },
+      {
+        "factor": 1,
+        "max_error": 0.000347927,
+        "preset": "edge",
+        "rms_error": 0.000108856,
+        "sample_rate": 96000,
+        "stale_max_error": 0.297738701
+      },
+      {
+        "factor": 1,
+        "max_error": 0.000208206,
+        "preset": "distort",
+        "rms_error": 6.5008e-05,
+        "sample_rate": 96000,
+        "stale_max_error": 0.162586823
+      },
+      {
+        "factor": 1,
+        "max_error": 0.000135895,
+        "preset": "dirty distort",
+        "rms_error": 3.973e-05,
+        "sample_rate": 96000,
+        "stale_max_error": 0.132068828
+      },
+      {
+        "factor": 1,
+        "max_error": 0.000127524,
+        "preset": "pre drive",
+        "rms_error": 4.8091e-05,
+        "sample_rate": 96000,
+        "stale_max_error": 0.071554169
+      },
+      {
+        "factor": 1,
+        "max_error": 0.00014823,
+        "preset": "power drive",
+        "rms_error": 5.0244e-05,
+        "sample_rate": 96000,
+        "stale_max_error": 0.164290652
+      },
+      {
+        "factor": 1,
+        "max_error": 0.000131674,
+        "preset": "full drive",
+        "rms_error": 4.5399e-05,
+        "sample_rate": 96000,
+        "stale_max_error": 0.07540825
+      },
+      {
+        "factor": 1,
+        "max_error": 9.883e-05,
+        "preset": "high gain",
+        "rms_error": 3.2238e-05,
+        "sample_rate": 96000,
+        "stale_max_error": 0.07238961
+      },
+      {
+        "factor": 1,
+        "max_error": 0.000121914,
+        "preset": "level 11",
+        "rms_error": 3.2398e-05,
+        "sample_rate": 96000,
+        "stale_max_error": 0.068112902
+      }
+    ],
+    "smallest_stale_max_error": 0.062968075,
+    "worst_max_error": 0.000465712,
+    "worst_rms_error": 0.000150316
+  },
+  "reset_control_extremes": [
+    {
+      "factor": 2,
+      "max_error": 1.43e-07,
+      "name": "minimum",
+      "rms_error": 6.7e-08,
+      "sample_rate": 44100,
+      "stale_max_error": 1.6489e-05
+    },
+    {
+      "factor": 2,
+      "max_error": 0.000203556,
+      "name": "maximum",
+      "rms_error": 9.5867e-05,
+      "sample_rate": 44100,
+      "stale_max_error": 0.300915331
+    },
+    {
+      "factor": 2,
+      "max_error": 1.08e-07,
+      "name": "minimum",
+      "rms_error": 5.3e-08,
+      "sample_rate": 48000,
+      "stale_max_error": 1.3057e-05
+    },
+    {
+      "factor": 2,
+      "max_error": 0.000803702,
+      "name": "maximum",
+      "rms_error": 0.00038155,
+      "sample_rate": 48000,
+      "stale_max_error": 0.278073072
+    },
+    {
+      "factor": 1,
+      "max_error": 1.01e-07,
+      "name": "minimum",
+      "rms_error": 4.4e-08,
+      "sample_rate": 88200,
+      "stale_max_error": 2.8005e-05
+    },
+    {
+      "factor": 1,
+      "max_error": 0.000254388,
+      "name": "maximum",
+      "rms_error": 0.000122585,
+      "sample_rate": 88200,
+      "stale_max_error": 0.275416613
+    },
+    {
+      "factor": 1,
+      "max_error": 9.5e-08,
+      "name": "minimum",
+      "rms_error": 3.8e-08,
+      "sample_rate": 96000,
+      "stale_max_error": 1.9079e-05
+    },
+    {
+      "factor": 1,
+      "max_error": 0.000634145,
+      "name": "maximum",
+      "rms_error": 0.000365068,
+      "sample_rate": 96000,
+      "stale_max_error": 0.263748497
+    }
+  ],
+  "scope": "oversampling and 20 kHz plate filter only; released knee and tone mapping retained"
+}

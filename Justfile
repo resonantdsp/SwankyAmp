@@ -39,6 +39,7 @@ clippy:
 
 test:
     cargo test --no-default-features
+    cargo test --no-default-features --features clap,standalone,rt-paranoid adapter_
 
 release-tests:
     python3 -m unittest discover -s .github/scripts -p 'test_*.py'
@@ -50,6 +51,12 @@ reference-check:
 model-check:
     cargo build --quiet --no-default-features --bin render-model
     python3 verification/model/check.py target/debug/render-model
+
+# Regenerate the measured oversampling and plate-filter evidence.
+dsp-report output="verification/dsp/oversampling-plate.json":
+    cargo build --quiet --no-default-features --bin render-model --bin dsp-probe
+    python3 verification/dsp/report.py \
+        target/debug/render-model target/debug/dsp-probe "{{ output }}"
 
 # Render one released factory preset through the Rust baseline, including the
 # internal seam WAVs used to localize any model drift.

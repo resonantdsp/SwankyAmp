@@ -4,7 +4,9 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-use swanky_amp::dsp::amp::{AmpControls, AmpPath, SeamOutput};
+use swanky_amp::dsp::amp::{AmpControls, AmpPath, CorrectedPath, SeamOutput};
+use swanky_amp::dsp::diagnostics::reset_equilibrium;
+use swanky_amp::engine::doublings_for;
 
 const BLOCK_SIZE: usize = 512;
 
@@ -15,6 +17,18 @@ fn option(name: &str) -> Result<String, String> {
         .find(|pair| pair[0] == name)
         .map(|pair| pair[1].clone())
         .ok_or_else(|| format!("missing option: {name}"))
+}
+
+fn optional_option(name: &str) -> Option<String> {
+    let arguments: Vec<String> = env::args().collect();
+    arguments
+        .windows(2)
+        .find(|pair| pair[0] == name)
+        .map(|pair| pair[1].clone())
+}
+
+fn flag(name: &str) -> bool {
+    env::args().any(|argument| argument == name)
 }
 
 fn read_u16(bytes: &[u8], offset: usize) -> Result<u16, String> {
@@ -181,13 +195,18 @@ fn preset(path: &Path, name: &str) -> Result<AmpControls, String> {
     Ok(controls)
 }
 
-fn write_seams(directory: &Path, sample_rate: u32, seams: SeamOutput) -> Result<(), String> {
+fn write_seams(
+    directory: &Path,
+    host_rate: u32,
+    tube_rate: u32,
+    seams: SeamOutput,
+) -> Result<(), String> {
     fs::create_dir_all(directory).map_err(|error| format!("{}: {error}", directory.display()))?;
     for (index, samples) in seams.triodes.iter().enumerate() {
         if !samples.is_empty() {
             write_wav(
                 &directory.join(format!("triode_{}.wav", index + 1)),
-                sample_rate,
+                tube_rate,
                 samples,
             )?;
         }
@@ -200,7 +219,11 @@ fn write_seams(directory: &Path, sample_rate: u32, seams: SeamOutput) -> Result<
     ] {
         write_wav(
             &directory.join(format!("{name}.wav")),
-            sample_rate,
+            if matches!(name, "cabinet" | "raw_output") {
+                host_rate
+            } else {
+                tube_rate
+            },
             &samples,
         )?;
     }
@@ -223,24 +246,95 @@ fn run() -> Result<(), String> {
         .windows(2)
         .find(|pair| pair[0] == "--seams-dir")
         .map(|pair| PathBuf::from(&pair[1]));
-    let controls = preset(&presets, &preset_name)?;
+    let mut controls = preset(&presets, &preset_name)?;
+    if flag("--cabinet-off") {
+        controls.cabinet_on = false;
+    }
+    if flag("--reset-audit") {
+        let choice = match optional_option("--oversampling")
+            .as_deref()
+            .unwrap_or("auto")
+        {
+            "auto" => 0,
+            "1x" => 1,
+            "2x" => 2,
+            "4x" => 3,
+            value => return Err(format!("unknown oversampling choice: {value}")),
+        };
+        let doublings = doublings_for(choice, f64::from(sample_rate));
+        let audit = reset_equilibrium(sample_rate as f32, controls, doublings);
+        fs::write(
+            &output,
+            format!(
+                "{{\n  \"preset\": \"{preset_name}\",\n  \"sample_rate\": {sample_rate},\n  \"factor\": {},\n  \"max_error\": {:.9},\n  \"rms_error\": {:.9},\n  \"stale_max_error\": {:.9}\n}}\n",
+                1 << doublings,
+                audit.max_error,
+                audit.rms_error,
+                audit.stale_max_error,
+            ),
+        )
+        .map_err(|error| format!("{}: {error}", output.display()))?;
+        return Ok(());
+    }
     let (input_rate, source) = read_wav(&input)?;
     let mut rendered = resample(&source, input_rate, sample_rate);
-    let mut path = AmpPath::new(sample_rate as f32, controls);
     let mut seam_output = SeamOutput::with_capacity(rendered.len());
-    for block in rendered.chunks_mut(BLOCK_SIZE) {
-        if seams.is_some() {
-            path.process_with_seams(block, &mut seam_output);
-        } else {
-            path.process(block);
+    let model = optional_option("--model").unwrap_or_else(|| "legacy".into());
+    let (factor, latency) = if model == "legacy" {
+        let mut path = AmpPath::new_legacy(sample_rate as f32, controls);
+        for block in rendered.chunks_mut(BLOCK_SIZE) {
+            if seams.is_some() {
+                path.process_with_seams(block, &mut seam_output);
+            } else {
+                path.process(block);
+            }
         }
-    }
+        (1, 0)
+    } else if model == "corrected" {
+        let choice = match optional_option("--oversampling")
+            .as_deref()
+            .unwrap_or("auto")
+        {
+            "auto" => 0,
+            "1x" => 1,
+            "2x" => 2,
+            "4x" => 3,
+            value => return Err(format!("unknown oversampling choice: {value}")),
+        };
+        let doublings = doublings_for(choice, f64::from(sample_rate));
+        let mut path = CorrectedPath::new(sample_rate as f32, BLOCK_SIZE, controls, doublings);
+        for block in rendered.chunks_mut(BLOCK_SIZE) {
+            if seams.is_some() {
+                path.process_with_seams(block, &mut seam_output);
+            } else {
+                path.process(block);
+            }
+        }
+        (path.factor(), path.latency())
+    } else {
+        return Err(format!("unknown model: {model}"));
+    };
     if rendered.iter().any(|sample| !sample.is_finite()) {
         return Err("model produced non-finite output".into());
     }
     write_wav(&output, sample_rate, &rendered)?;
     if let Some(directory) = seams {
-        write_seams(&directory, sample_rate, seam_output)?;
+        write_seams(
+            &directory,
+            sample_rate,
+            sample_rate * factor as u32,
+            seam_output,
+        )?;
+    }
+    if let Some(report) = optional_option("--report") {
+        fs::write(
+            &report,
+            format!(
+                "{{\n  \"model\": \"{model}\",\n  \"sample_rate\": {sample_rate},\n  \"factor\": {factor},\n  \"internal_rate\": {},\n  \"latency_samples\": {latency}\n}}\n",
+                sample_rate * factor as u32,
+            ),
+        )
+        .map_err(|error| format!("{report}: {error}"))?;
     }
     Ok(())
 }

@@ -57,6 +57,11 @@ impl Stack {
         self.treble.reset();
         self.mid_low.reset();
     }
+
+    fn settle(&mut self, input: f32) -> f32 {
+        self.treble_gain * self.treble.settle(input)
+            + self.mid_low_gain * self.mid_low.settle(input)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -239,5 +244,14 @@ impl ToneStack {
         let [fender_weight, marshall_weight, ac30_weight] = self.weights;
         self.presence
             .process(fender_weight * fender + marshall_weight * marshall + ac30_weight * ac30)
+    }
+
+    pub(crate) fn settle(&mut self, input: f32) -> f32 {
+        let fender = self.fender.settle(input);
+        let marshall = self.marshall.settle(input);
+        let ac30 = self.ac30_mids.settle(self.ac30.settle(input));
+        let [fender_weight, marshall_weight, ac30_weight] = self.weights;
+        self.presence
+            .settle(fender_weight * fender + marshall_weight * marshall + ac30_weight * ac30)
     }
 }
