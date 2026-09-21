@@ -509,5 +509,9 @@
     "cross_toolchain_band_level_db": 0.002,
     "cross_toolchain_seam_level_db": 0.03,
     "note": "The exact freeze environment must reproduce every WAV byte. Other recognized standard-library profiles gate every seam and six output-band levels; raw waveform max and RMS drift remain diagnostics because FP contraction changes sample trajectories."
+  },
+  "verification_renderer": {
+    "compatibility": "Adds opt-in seam WAV export and silence pre-roll; default cold rendering must reproduce the frozen corpus under the freeze environment.",
+    "renderer_sha256": "41fd50360f8359275f972e36a78cb757c3677961a5cfb726622baf1e506cda4e"
   }
 }

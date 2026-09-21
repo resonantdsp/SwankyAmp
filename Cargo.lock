@@ -2339,6 +2339,7 @@ dependencies = [
  "truce",
  "truce-clap",
  "truce-iced",
+ "truce-params",
  "truce-standalone",
  "truce-test",
  "truce-vst3",

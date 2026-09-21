@@ -21,6 +21,27 @@ c++ -std=c++20 -O2 renderer.cpp -o reference-renderer
   --output clean-88200.wav --report clean-88200.json
 ```
 
+For one released factory preset, `render-one.sh` provides the same build and
+stable naming without generating the 30-case corpus:
+
+```sh
+./render-one.sh --preset clean --sample-rate 44100 \
+  --output-dir /tmp/free-reference --seams --silence-preroll 44100
+```
+
+The optional `--seams` switch writes one mono float32 WAV for every active seam
+under `01-clean-44100-seams/`; the report's `seam_wavs` object contains paths
+relative to the report. `render-comparison.sh OUTPUT` builds once and emits all
+ten presets with seam WAVs at one rate, plus `comparison.json` for discovery:
+
+```sh
+./render-comparison.sh /tmp/free-reference-compare \
+  --sample-rate 44100 --silence-preroll 44100
+```
+
+The C++ command exposes the same optional `--seams-dir DIR` and
+`--silence-preroll SAMPLES` arguments.
+
 On macOS `render.sh` selects the full Xcode toolchain when it is installed. This
 avoids an incompatible Command Line Tools SDK while preserving the same source
 and compiler options.
@@ -54,6 +75,15 @@ Each JSON report separates `startup` (samples 0 through 1023) from `post_mute`
 Rendered WAVs apply the plugin's exact 1,024-sample startup mute, so their
 startup level is silence. `post_mute` deliberately does not claim the nonlinear
 state has settled; the legacy plugin began exposing output at that boundary.
+
+With a nonzero silence pre-roll, both the untouched and instrumented released
+chains process exactly that many zero samples after configuration and before DI
+sample 0. The silence is excluded from all WAVs and reported levels. Reports
+replace the cold windows with `after_preroll` and record the exact pre-roll and
+measurement boundary. Pre-roll consumes the released host mute, so a pre-roll
+of at least 1,024 samples exposes the rendered output from DI sample 0. The name
+`after_preroll` makes no general settling claim; callers choose and record a
+duration suitable for their comparison.
 
 The seam locations are:
 
@@ -99,10 +129,16 @@ flags; it must reproduce all 30 WAVs byte for byte. Every environment must
 preserve bit identity between the untouched and instrumented paths, match a
 strict detune fingerprint, and pass the seam and band-level gates.
 
-`render.sh` refuses to overwrite `frozen/` by default. The explicit
-`--replace-frozen` option is accepted only on the canonical macOS arm64 Apple
-Clang/libc++ environment; its changes still require review of the manifest and
-render hashes.
+`render.sh` refuses to overwrite `frozen/`. The original freeze renderer may
+use the explicit `--replace-frozen` option only on the canonical macOS arm64
+Apple Clang/libc++ environment. This extended comparison renderer cannot replace
+the authoritative cold baseline.
+
+The feature flags are opt-in. Omitting them preserves every frozen cold WAV and
+JSON report byte-for-byte. `frozen/` remains the authoritative released fixture;
+seam exports and warmed renders are generated comparison artifacts. The
+manifest records the original freeze renderer hash separately from the current
+compatible verification renderer hash.
 
 The renderer preserves the released octave-high tone-stack discretisation,
 soft-clip knee, two sweep tables, block-constant static gains, and seeded

@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -11,6 +12,7 @@
 #include <map>
 #include <random>
 #include <regex>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -371,9 +373,15 @@ struct WindowStats {
 struct SeamStats {
   WindowStats startup;
   WindowStats post_mute;
+  WindowStats after_preroll;
 
-  void add(const float* samples, int count, size_t absolute_offset) {
+  void add(const float* samples, int count, size_t absolute_offset,
+           bool has_preroll) {
     for (int i = 0; i < count; ++i) {
+      if (has_preroll) {
+        after_preroll.add(samples[i]);
+        continue;
+      }
       auto& window = absolute_offset + static_cast<size_t>(i) <
                              static_cast<size_t>(kBurnInSamples)
                          ? startup
@@ -384,9 +392,23 @@ struct SeamStats {
 };
 
 using SeamMap = std::map<std::string, SeamStats>;
+using SeamAudioMap = std::map<std::string, std::vector<float>>;
+
+void capture_seam(const std::string& name, const float* samples, int count,
+                  size_t offset, bool has_preroll, SeamMap* seams,
+                  SeamAudioMap* audio) {
+  if (seams != nullptr) {
+    (*seams)[name].add(samples, count, offset, has_preroll);
+  }
+  if (audio != nullptr) {
+    auto& destination = (*audio)[name];
+    destination.insert(destination.end(), samples, samples + count);
+  }
+}
 
 void process_instrumented(PushPullAmp& amp, int count, float** buffer,
-                          size_t offset, SeamMap& seams) {
+                          size_t offset, bool has_preroll, SeamMap* seams,
+                          SeamAudioMap* audio) {
   scaleBuffer(count, buffer, db_to_linear(amp.inputLevel));
 
   PreAmp& preamp = amp.preAmp;
@@ -398,7 +420,8 @@ void process_instrumented(PushPullAmp& amp, int count, float** buffer,
     preamp.triode[i].set_overhead(i > 0 ? preamp.overhead : 1.0f);
     preamp.triode[i].set_mix(i < stages_low ? 1.0f : stage_mix);
     preamp.triode[i].process(count, buffer);
-    seams["triode_" + std::to_string(i + 1)].add(buffer[0], count, offset);
+    capture_seam("triode_" + std::to_string(i + 1), buffer[0], count, offset,
+                 has_preroll, seams, audio);
   }
   scaleBuffer(count, buffer, preamp.triodeScale);
 
@@ -408,23 +431,27 @@ void process_instrumented(PushPullAmp& amp, int count, float** buffer,
   constexpr float preamp_target = 3.228806e+01f;
   constexpr float tone_stack_scale = 1.0f / 5.302220e-01f;
   amp.toneStack.process(count, buffer);
-  seams["tone_stack"].add(buffer[0], count, offset);
+  capture_seam("tone_stack", buffer[0], count, offset, has_preroll, seams,
+               audio);
   scaleBuffer(count, buffer, tone_stack_scale * preamp_scale * preamp_target);
 
   amp.powerAmp.process(count, buffer);
-  seams["power_amp"].add(buffer[0], count, offset);
+  capture_seam("power_amp", buffer[0], count, offset, has_preroll, seams,
+               audio);
   scaleBuffer(count, buffer, 1.0f / preamp_target);
 
   const float cabinet_scale = amp.cabinetOn ? 1.0f / 2.821151e+00f : 1.0f;
   if (amp.cabinetOn) amp.cabinet.process(count, buffer);
-  seams["cabinet"].add(buffer[0], count, offset);
+  capture_seam("cabinet", buffer[0], count, offset, has_preroll, seams,
+               audio);
 
   const float power_amp_scale = interp1d(
       amp.powerAmp.get_drive(), -1.0f, 1.0f, amp.powerAmpSweepScales,
       static_cast<size_t>(NUM_SWEEP_BINS));
   const float output_scale = db_to_linear(amp.outputLevel);
   scaleBuffer(count, buffer, power_amp_scale * cabinet_scale * output_scale);
-  seams["raw_output"].add(buffer[0], count, offset);
+  capture_seam("raw_output", buffer[0], count, offset, has_preroll, seams,
+               audio);
 }
 
 std::string db_json(double linear) {
@@ -458,15 +485,32 @@ std::string json_escape(const std::string& value) {
 void write_report(const std::string& path, const Preset& preset,
                   int sample_rate, size_t samples, const SeamMap& seams,
                   const SeamStats& rendered, uint64_t mismatch_count,
-                  float max_difference) {
+                  float max_difference, size_t silence_preroll,
+                  const std::map<std::string, std::string>& seam_paths) {
   std::ofstream stream(path);
   if (!stream) throw std::runtime_error("cannot open report: " + path);
   stream << "{\n"
          << "  \"preset\": \"" << json_escape(preset.name) << "\",\n"
          << "  \"sample_rate\": " << sample_rate << ",\n"
          << "  \"samples\": " << samples << ",\n"
-         << "  \"block_size\": " << kBlockSize << ",\n"
-         << "  \"legacy_output_mute_samples\": " << kBurnInSamples << ",\n"
+         << "  \"block_size\": " << kBlockSize << ",\n";
+  if (silence_preroll == 0) {
+    stream << "  \"legacy_output_mute_samples\": " << kBurnInSamples
+           << ",\n";
+  } else {
+    const size_t remaining_mute = silence_preroll >= kBurnInSamples
+                                      ? 0
+                                      : kBurnInSamples - silence_preroll;
+    stream << "  \"silence_preroll_samples\": " << silence_preroll
+           << ",\n"
+           << "  \"measurement_begins_after_silence_samples\": "
+           << silence_preroll << ",\n"
+           << "  \"released_startup_mute_total_samples\": "
+           << kBurnInSamples << ",\n"
+           << "  \"legacy_output_mute_samples\": " << remaining_mute
+           << ",\n";
+  }
+  stream
          << "  \"instrumented_comparison\": {\n"
          << "    \"bit_mismatches\": " << mismatch_count << ",\n"
          << "    \"max_abs_difference\": " << std::scientific
@@ -475,20 +519,41 @@ void write_report(const std::string& path, const Preset& preset,
          << "  \"seams\": {\n";
   size_t index = 0;
   for (const auto& [name, stats] : seams) {
-    stream << "    \"" << name << "\": {\n"
-           << "      \"startup\": ";
-    write_window_json(stream, stats.startup, 6);
-    stream << ",\n      \"post_mute\": ";
-    write_window_json(stream, stats.post_mute, 6);
+    stream << "    \"" << name << "\": {\n";
+    if (silence_preroll == 0) {
+      stream << "      \"startup\": ";
+      write_window_json(stream, stats.startup, 6);
+      stream << ",\n      \"post_mute\": ";
+      write_window_json(stream, stats.post_mute, 6);
+    } else {
+      stream << "      \"after_preroll\": ";
+      write_window_json(stream, stats.after_preroll, 6);
+    }
     stream << "\n    }" << (++index == seams.size() ? "\n" : ",\n");
   }
   stream << "  },\n"
-         << "  \"rendered_output\": {\n"
-         << "    \"startup\": ";
-  write_window_json(stream, rendered.startup, 4);
-  stream << ",\n    \"post_mute\": ";
-  write_window_json(stream, rendered.post_mute, 4);
-  stream << "\n  }\n}\n";
+         << "  \"rendered_output\": {\n";
+  if (silence_preroll == 0) {
+    stream << "    \"startup\": ";
+    write_window_json(stream, rendered.startup, 4);
+    stream << ",\n    \"post_mute\": ";
+    write_window_json(stream, rendered.post_mute, 4);
+  } else {
+    stream << "    \"after_preroll\": ";
+    write_window_json(stream, rendered.after_preroll, 4);
+  }
+  stream << "\n  }";
+  if (!seam_paths.empty()) {
+    stream << ",\n  \"seam_wavs\": {\n";
+    size_t path_index = 0;
+    for (const auto& [name, seam_path] : seam_paths) {
+      stream << "    \"" << name << "\": \""
+             << json_escape(seam_path) << "\""
+             << (++path_index == seam_paths.size() ? "\n" : ",\n");
+    }
+    stream << "  }";
+  }
+  stream << "\n}\n";
 }
 
 Preset find_preset(const std::vector<Preset>& presets, const std::string& name) {
@@ -504,6 +569,14 @@ std::string option(int argc, char** argv, const std::string& name) {
     if (argv[i] == name) return argv[i + 1];
   }
   throw std::runtime_error("missing option: " + name);
+}
+
+std::optional<std::string> optional_option(int argc, char** argv,
+                                           const std::string& name) {
+  for (int i = 1; i + 1 < argc; ++i) {
+    if (argv[i] == name) return argv[i + 1];
+  }
+  return std::nullopt;
 }
 
 int print_detuning() {
@@ -548,6 +621,12 @@ int main(int argc, char** argv) {
     const int sample_rate = std::stoi(option(argc, argv, "--sample-rate"));
     const std::string output_path = option(argc, argv, "--output");
     const std::string report_path = option(argc, argv, "--report");
+    const auto seam_directory = optional_option(argc, argv, "--seams-dir");
+    const auto preroll_option =
+        optional_option(argc, argv, "--silence-preroll");
+    const size_t silence_preroll = preroll_option.has_value()
+                                         ? std::stoull(*preroll_option)
+                                         : 0;
     if (sample_rate < 8000 || sample_rate > 384000) {
       throw std::runtime_error("sample rate must be between 8000 and 384000 Hz");
     }
@@ -570,8 +649,43 @@ int main(int argc, char** argv) {
     seams["cabinet"];
     seams["raw_output"];
     SeamStats rendered;
+    SeamAudioMap seam_audio;
     uint64_t mismatch_count = 0;
     float max_difference = 0.0f;
+
+    const auto compare_blocks = [&](const std::vector<float>& released_block,
+                                    const std::vector<float>&
+                                        instrumented_block) {
+      for (size_t i = 0; i < released_block.size(); ++i) {
+        if (!std::isfinite(released_block[i]) ||
+            !std::isfinite(instrumented_block[i])) {
+          throw std::runtime_error("DSP produced non-finite final output");
+        }
+        const float difference =
+            std::abs(released_block[i] - instrumented_block[i]);
+        max_difference = std::max(max_difference, difference);
+        if (std::bit_cast<uint32_t>(released_block[i]) !=
+            std::bit_cast<uint32_t>(instrumented_block[i])) {
+          ++mismatch_count;
+        }
+      }
+    };
+
+    for (size_t consumed = 0; consumed < silence_preroll;) {
+      const int count = static_cast<int>(std::min(
+          silence_preroll - consumed, static_cast<size_t>(kBlockSize)));
+      std::vector<float> released_block(static_cast<size_t>(count), 0.0f);
+      std::vector<float> instrumented_block = released_block;
+      float* released_ptr = released_block.data();
+      float* instrumented_ptr = instrumented_block.data();
+      set_amp_parameters(released, preset.parameters);
+      set_amp_parameters(instrumented, preset.parameters);
+      released.process(count, &released_ptr);
+      process_instrumented(instrumented, count, &instrumented_ptr, 0, true,
+                           nullptr, nullptr);
+      compare_blocks(released_block, instrumented_block);
+      consumed += static_cast<size_t>(count);
+    }
 
     for (size_t offset = 0; offset < source.size(); offset += kBlockSize) {
       const int count = static_cast<int>(
@@ -584,26 +698,22 @@ int main(int argc, char** argv) {
       set_amp_parameters(released, preset.parameters);
       set_amp_parameters(instrumented, preset.parameters);
       released.process(count, &released_ptr);
-      process_instrumented(instrumented, count, &instrumented_ptr, offset,
-                           seams);
+      process_instrumented(
+          instrumented, count, &instrumented_ptr, offset,
+          silence_preroll != 0, &seams,
+          seam_directory.has_value() ? &seam_audio : nullptr);
+
+      compare_blocks(released_block, instrumented_block);
 
       for (int i = 0; i < count; ++i) {
-        if (!std::isfinite(released_block[i]) ||
-            !std::isfinite(instrumented_block[i])) {
-          throw std::runtime_error("DSP produced non-finite final output");
-        }
-        const float difference =
-            std::abs(released_block[i] - instrumented_block[i]);
-        max_difference = std::max(max_difference, difference);
-        if (std::bit_cast<uint32_t>(released_block[i]) !=
-            std::bit_cast<uint32_t>(instrumented_block[i])) {
-          ++mismatch_count;
-        }
         const size_t absolute = offset + static_cast<size_t>(i);
-        output[absolute] = absolute < static_cast<size_t>(kBurnInSamples)
+        output[absolute] = absolute + silence_preroll <
+                                   static_cast<size_t>(kBurnInSamples)
                                ? 0.0f
                                : released_block[i];
-        if (absolute < static_cast<size_t>(kBurnInSamples)) {
+        if (silence_preroll != 0) {
+          rendered.after_preroll.add(output[absolute]);
+        } else if (absolute < static_cast<size_t>(kBurnInSamples)) {
           rendered.startup.add(output[absolute]);
         } else {
           rendered.post_mute.add(output[absolute]);
@@ -617,8 +727,24 @@ int main(int argc, char** argv) {
           std::to_string(mismatch_count) + " mismatched samples");
     }
     write_float_wav(output_path, sample_rate, output);
+    std::map<std::string, std::string> seam_paths;
+    if (seam_directory.has_value()) {
+      const std::filesystem::path directory(*seam_directory);
+      std::filesystem::create_directories(directory);
+      const std::filesystem::path report_parent =
+          std::filesystem::absolute(report_path).parent_path();
+      for (const auto& [name, samples] : seam_audio) {
+        const std::filesystem::path seam_path = directory / (name + ".wav");
+        write_float_wav(seam_path.string(), sample_rate, samples);
+        auto relative =
+            std::filesystem::absolute(seam_path).lexically_relative(report_parent);
+        seam_paths[name] = relative.empty() ? seam_path.generic_string()
+                                            : relative.generic_string();
+      }
+    }
     write_report(report_path, preset, sample_rate, output.size(), seams,
-                 rendered, mismatch_count, max_difference);
+                 rendered, mismatch_count, max_difference, silence_preroll,
+                 seam_paths);
   } catch (const std::exception& error) {
     std::cerr << "reference renderer: " << error.what() << '\n';
     return 1;

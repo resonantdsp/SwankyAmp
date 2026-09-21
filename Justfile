@@ -43,7 +43,20 @@ test:
 reference-check:
     bash verification/reference/check.sh
 
-check: fmt clippy test reference-check
+model-check:
+    cargo build --quiet --no-default-features --bin render-model
+    python3 verification/model/check.py target/debug/render-model
+
+# Render one released factory preset through the Rust baseline, including the
+# internal seam WAVs used to localize any model drift.
+render-model preset="clean" output="verification/model-output.wav":
+    cargo run --quiet --no-default-features --bin render-model -- \
+        --input verification/reference/input/single-coil.wav \
+        --presets verification/reference/released/Resources/presets.xml \
+        --preset "{{ preset }}" --sample-rate 44100 \
+        --output "{{ output }}" --seams-dir "{{ output }}-seams"
+
+check: fmt clippy test reference-check model-check
 
 build:
     bash scripts/truce.sh build

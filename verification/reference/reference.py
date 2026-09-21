@@ -37,6 +37,7 @@ PRESET_NAMES = (
     "level 11",
 )
 BASELINE_COMMIT = "5c32004862e5dcce8a453e1310da926dc9712464"
+FREEZE_RENDERER_SHA256 = "773fd17eb809a7cfb5112f7a4f2a8c2d14fb8a0f9eac7ee26abc28e89337b564"
 SEAM_LEVEL_TOLERANCE_DB = 0.03
 BAND_LEVEL_TOLERANCE_DB = 0.002
 BAND_EDGES_HZ = (120.0, 400.0, 1200.0, 3500.0, 8000.0)
@@ -103,47 +104,65 @@ def slug(index: int, name: str) -> str:
     return f"{index:02d}-{name.replace(' ', '-')}"
 
 
-def run_renderer(binary: Path, destination: Path) -> list[dict[str, object]]:
+def run_case(
+    binary: Path,
+    destination: Path,
+    index: int,
+    name: str,
+    rate: int,
+    *,
+    silence_preroll: int = 0,
+    export_seams: bool = False,
+) -> dict[str, object]:
     destination.mkdir(parents=True, exist_ok=True)
+    stem = f"{slug(index, name)}-{rate}"
+    wav = destination / f"{stem}.wav"
+    report = destination / f"{stem}.json"
+    command = [
+        str(binary),
+        "--input",
+        str(INPUT),
+        "--presets",
+        str(PRESETS),
+        "--preset",
+        name,
+        "--sample-rate",
+        str(rate),
+        "--output",
+        str(wav),
+        "--report",
+        str(report),
+    ]
+    if silence_preroll:
+        command.extend(["--silence-preroll", str(silence_preroll)])
+    if export_seams:
+        command.extend(["--seams-dir", str(destination / f"{stem}-seams")])
+    subprocess.run(command, check=True, cwd=ROOT)
+    report_data = json.loads(report.read_text())
+    comparison = report_data["instrumented_comparison"]
+    if comparison["bit_mismatches"] != 0:
+        raise RuntimeError(f"instrumentation changed output for {stem}")
+    entry: dict[str, object] = {
+        "preset": name,
+        "sample_rate": rate,
+        "silence_preroll_samples": silence_preroll,
+        "wav": wav.name,
+        "wav_sha256": sha256(wav),
+        "report": report.name,
+        "report_sha256": sha256(report),
+    }
+    if export_seams:
+        entry["seam_wavs"] = report_data["seam_wavs"]
+    return entry
+
+
+def run_renderer(binary: Path, destination: Path) -> list[dict[str, object]]:
     renders: list[dict[str, object]] = []
     for index, name in enumerate(PRESET_NAMES, start=1):
         for rate in RATES:
-            stem = f"{slug(index, name)}-{rate}"
-            wav = destination / f"{stem}.wav"
-            report = destination / f"{stem}.json"
-            subprocess.run(
-                [
-                    str(binary),
-                    "--input",
-                    str(INPUT),
-                    "--presets",
-                    str(PRESETS),
-                    "--preset",
-                    name,
-                    "--sample-rate",
-                    str(rate),
-                    "--output",
-                    str(wav),
-                    "--report",
-                    str(report),
-                ],
-                check=True,
-                cwd=ROOT,
-            )
-            report_data = json.loads(report.read_text())
-            comparison = report_data["instrumented_comparison"]
-            if comparison["bit_mismatches"] != 0:
-                raise RuntimeError(f"instrumentation changed output for {stem}")
-            renders.append(
-                {
-                    "preset": name,
-                    "sample_rate": rate,
-                    "wav": wav.name,
-                    "wav_sha256": sha256(wav),
-                    "report": report.name,
-                    "report_sha256": sha256(report),
-                }
-            )
+            entry = run_case(binary, destination, index, name, rate)
+            entry.pop("silence_preroll_samples")
+            renders.append(entry)
     return renders
 
 
@@ -222,6 +241,10 @@ def manifest(
             "cross_toolchain_band_level_db": BAND_LEVEL_TOLERANCE_DB,
             "band_edges_hz": list(BAND_EDGES_HZ),
             "note": "The exact freeze environment must reproduce every WAV byte. Other recognized standard-library profiles gate every seam and six output-band levels; raw waveform max and RMS drift remain diagnostics because FP contraction changes sample trajectories.",
+        },
+        "verification_renderer": {
+            "renderer_sha256": sha256(RENDERER_SOURCE),
+            "compatibility": "Adds opt-in seam WAV export and silence pre-roll; default cold rendering must reproduce the frozen corpus under the freeze environment.",
         },
         "renders": renders,
     }
@@ -368,6 +391,13 @@ def render(destination: Path, replace_frozen: bool = False) -> None:
         raise RuntimeError(
             "refusing to replace the versioned baseline without --replace-frozen"
         )
+    if (
+        destination == FROZEN.resolve()
+        and sha256(RENDERER_SOURCE) != FREEZE_RENDERER_SHA256
+    ):
+        raise RuntimeError(
+            "the opt-in comparison renderer cannot replace the authoritative cold baseline"
+        )
     with tempfile.TemporaryDirectory(prefix="swanky-free-reference-build-") as temp:
         binary, compiler, compiler_command = build_renderer(Path(temp))
         if destination == FROZEN.resolve() and (
@@ -386,6 +416,82 @@ def render(destination: Path, replace_frozen: bool = False) -> None:
     print(f"rendered {len(renders)} references to {destination}")
 
 
+def validate_case_options(sample_rate: int, silence_preroll: int) -> None:
+    if not 8000 <= sample_rate <= 384000:
+        raise RuntimeError("sample rate must be between 8000 and 384000 Hz")
+    if silence_preroll < 0:
+        raise RuntimeError("silence pre-roll must be non-negative")
+
+
+def render_one(
+    destination: Path,
+    preset: str,
+    sample_rate: int,
+    silence_preroll: int,
+    export_seams: bool,
+) -> None:
+    validate_case_options(sample_rate, silence_preroll)
+    if preset not in PRESET_NAMES:
+        raise RuntimeError(f"unknown released factory preset: {preset}")
+    with tempfile.TemporaryDirectory(prefix="swanky-free-reference-one-") as temp:
+        binary, _, _ = build_renderer(Path(temp))
+        entry = run_case(
+            binary,
+            destination,
+            PRESET_NAMES.index(preset) + 1,
+            preset,
+            sample_rate,
+            silence_preroll=silence_preroll,
+            export_seams=export_seams,
+        )
+    print(json.dumps(entry, indent=2, sort_keys=True))
+
+
+def render_comparison(
+    destination: Path, sample_rate: int, silence_preroll: int
+) -> None:
+    validate_case_options(sample_rate, silence_preroll)
+    with tempfile.TemporaryDirectory(
+        prefix="swanky-free-reference-comparison-"
+    ) as temp:
+        binary, compiler, compiler_command = build_renderer(Path(temp))
+        cases = [
+            run_case(
+                binary,
+                destination,
+                index,
+                preset,
+                sample_rate,
+                silence_preroll=silence_preroll,
+                export_seams=True,
+            )
+            for index, preset in enumerate(PRESET_NAMES, start=1)
+        ]
+    index = {
+        "schema": 1,
+        "purpose": "released seam WAVs for model comparison",
+        "baseline_commit": BASELINE_COMMIT,
+        "input_sha256": sha256(INPUT),
+        "renderer_sha256": sha256(RENDERER_SOURCE),
+        "compiler": compiler,
+        "compiler_command": compiler_command,
+        "compile_flags": list(COMPILE_FLAGS),
+        "sample_rate": sample_rate,
+        "silence_preroll_samples": silence_preroll,
+        "measurement_begins": (
+            "at DI sample 0 after the exact recorded silence pre-roll"
+            if silence_preroll
+            else "at the cold DI start"
+        ),
+        "cases": cases,
+    }
+    destination.mkdir(parents=True, exist_ok=True)
+    (destination / "comparison.json").write_text(
+        json.dumps(index, indent=2, sort_keys=True) + "\n"
+    )
+    print(f"rendered {len(cases)} seam comparison cases to {destination}")
+
+
 def check() -> None:
     frozen_manifest = json.loads((FROZEN / "manifest.json").read_text())
     if frozen_manifest["baseline"]["git_commit"] != BASELINE_COMMIT:
@@ -394,8 +500,12 @@ def check() -> None:
         raise RuntimeError("versioned DI hash differs from frozen provenance")
     if frozen_manifest["released_source_sha256"] != released_hashes():
         raise RuntimeError("released source extraction differs from provenance")
-    if frozen_manifest["generation"]["renderer_sha256"] != sha256(RENDERER_SOURCE):
-        raise RuntimeError("renderer source differs from the source that froze the baseline")
+    if frozen_manifest["generation"]["renderer_sha256"] != FREEZE_RENDERER_SHA256:
+        raise RuntimeError("frozen generation renderer provenance differs")
+    if frozen_manifest["verification_renderer"]["renderer_sha256"] != sha256(
+        RENDERER_SOURCE
+    ):
+        raise RuntimeError("verification renderer source differs from provenance")
     tolerances = frozen_manifest["verification_tolerances"]
     if tolerances["cross_toolchain_seam_level_db"] != SEAM_LEVEL_TOLERANCE_DB:
         raise RuntimeError("frozen seam-level tolerance differs from the checker")
@@ -530,10 +640,32 @@ def main() -> None:
     render_parser = subparsers.add_parser("render")
     render_parser.add_argument("destination", nargs="?", type=Path, default=ROOT / "generated")
     render_parser.add_argument("--replace-frozen", action="store_true")
+    one_parser = subparsers.add_parser("one")
+    one_parser.add_argument("--preset", required=True)
+    one_parser.add_argument("--sample-rate", required=True, type=int)
+    one_parser.add_argument("--output-dir", required=True, type=Path)
+    one_parser.add_argument("--silence-preroll", type=int, default=0)
+    one_parser.add_argument("--seams", action="store_true")
+    comparison_parser = subparsers.add_parser("comparison")
+    comparison_parser.add_argument("destination", type=Path)
+    comparison_parser.add_argument("--sample-rate", type=int, default=44100)
+    comparison_parser.add_argument("--silence-preroll", type=int, default=0)
     subparsers.add_parser("check")
     args = parser.parse_args()
     if args.command == "render":
         render(args.destination.resolve(), args.replace_frozen)
+    elif args.command == "one":
+        render_one(
+            args.output_dir.resolve(),
+            args.preset,
+            args.sample_rate,
+            args.silence_preroll,
+            args.seams,
+        )
+    elif args.command == "comparison":
+        render_comparison(
+            args.destination.resolve(), args.sample_rate, args.silence_preroll
+        )
     else:
         check()
 

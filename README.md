@@ -1,6 +1,6 @@
 # Swanky Amp
 
-Swanky Amp is Resonant DSP's free guitar amplifier. This repository is being rebuilt in Rust for version 2. The current version 2 tree is the product shell: it passes audio through unchanged and proves the plugin, iced editor, standalone app, bundle build, and format-validation paths before the amplifier model and finished interface land.
+Swanky Amp is Resonant DSP's free guitar amplifier. Version 2 is a Rust rebuild with the released Free 1.4.0 amplifier model, an iced editor, a standalone app, and CLAP and VST3 formats. It accepts mono and stereo host layouts and processes stereo channels through independent amplifier paths.
 
 The released JUCE 1.4.0 source is preserved at the `juce-1.4.0` tag. Version 2 deliberately uses a new host and installation identity, `Swanky Amp 2` / `com.resonantdsp.swanky-amp-2`, so it installs beside the released `Swanky Amp` and does not take over old sessions.
 
@@ -12,7 +12,17 @@ Install Rust through [rustup](https://rustup.rs/) and install [just](https://git
 just
 ```
 
-The gate checks formatting, lints the shell with and without the plugin-format features, runs its tests, and checks the [released reference renderer](verification/reference/README.md). It does not claim to validate artwork before an artwork package exists.
+The gate checks formatting, lints with and without the plugin-format features, runs the behavioral tests, verifies the [released reference renderer](verification/reference/README.md), and compares the Rust amplifier against all ten released factory presets at 44.1 kHz and 1x processing.
+
+Render one preset and its internal comparison seams with:
+
+```sh
+just render-model "high gain" /tmp/high-gain.wav
+```
+
+`just model-check` runs the ten-preset comparison by itself. It checks every active triode plus the tone stack, power amp, cabinet, and final output. The fixed acceptance bounds are 0.2% relative waveform RMS, 0.65% relative peak error, and 0.02 dB in each low, mid, and high band. The peak bound covers the measured 0.627% level-11 power-stage difference from a noncontracting C++ build; RMS and band bounds remain unchanged and retain the timing, polarity, state, and voicing checks.
+
+The versioned reference corpus captures the released cold startup, including its 1024-sample output mute. The Rust path settles its configured nonlinear state for one second before audio begins, and stages re-enter warm when the continuous stage-count control brings them back into the signal path. Model comparison therefore applies the same one-second silent pre-roll to the released chain and excludes it from the measured WAVs. The cold corpus and warmed comparison remain separate so the startup difference is explicit.
 
 After `just setup`, open the standalone shell with:
 
@@ -31,9 +41,11 @@ just validate
 
 ## Source and licences
 
-Swanky Amp is licensed under GPLv3 or later; see [LICENSE](LICENSE). The version 2 shell contains no Swanky Amp Pro product DSP, licensing logic, artwork, impulse responses, Blender sources, or production tooling. Later amplifier work uses the released Free source as its model authority.
+Swanky Amp is licensed under GPLv3 or later; see [LICENSE](LICENSE). The model authority is the exact Free 1.4.0 C++ wrapper and generated Faust headers preserved in `verification/reference/released` from the `juce-1.4.0` tag. The Rust port retains the released control mappings, detuning, fitted constants, stage behavior, calibration tables, old cubic knee, and old tone mapping. Small equation and filter primitives were selectively adapted from the separately implemented Pro code only where comparison proved that they express the released Free equations.
 
-Three framework patches were copied from the corresponding vendored upstream sources in the Swanky Amp Pro checkout because the shell exercises their public behavior:
+This repository contains no Pro parameter grids, cabinet impulse responses, pedals, gate, reverb, licensing logic, Blender sources, artwork production sources, or shared private DSP dependency.
+
+Three framework patches were copied from the corresponding vendored upstream sources in the Swanky Amp Pro checkout because the plugin exercises their public behavior:
 
 - `vendor/baseview-truce`: frame delivery and host keyboard/modifier fixes.
 - `vendor/truce-iced`: iced input, focus, redraw, and clipboard fixes.
