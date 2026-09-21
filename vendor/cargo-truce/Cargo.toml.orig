@@ -1,0 +1,70 @@
+[package]
+name = "cargo-truce"
+version.workspace = true
+edition = "2024"
+# The Truce License (LicenseRef-TruceLicense-1.0), same as the
+# workspace - dual Apache-2.0 / MIT plus the framework rider in LICENSE.
+license.workspace = true
+description = "Build tool for truce audio plugins (CLAP, VST3, VST2, LV2, AU v2, AU v3, AAX, and a standalone host binary)"
+repository = "https://github.com/truce-audio/truce"
+keywords = ["audio", "plugin", "vst", "clap", "midi"]
+categories = [
+    "multimedia::audio",
+    "development-tools::build-utils",
+    "development-tools::cargo-plugins",
+]
+
+[lib]
+name = "cargo_truce"
+path = "src/lib.rs"
+
+[[bin]]
+name = "cargo-truce"
+path = "src/main.rs"
+
+[dependencies]
+thiserror = { workspace = true }
+toml = { workspace = true }
+serde = { version = "1", features = ["derive"] }
+# Substitution engine for `cargo truce new` scaffolds. Single dep on
+# top of the existing serde - the only transitive that lands.
+tinytemplate = "1.2"
+# `cargo truce screenshot --check` decodes the rendered + reference
+# PNGs to count differing pixels. Same crate truce-core uses for
+# its FFI-side encode path; keeping versions aligned avoids
+# transitive duplication when both are in a workspace build.
+png = "0.18"
+truce-shim-types = { workspace = true }
+truce-build = { workspace = true }
+truce-utils = { workspace = true }
+base64 = { workspace = true }
+# `cargo truce preset`: decode host-saved `.aupreset` files (Logic
+# writes binary plists) and read/write preset packs.
+plist = "1"
+zip = { version = "8", default-features = false, features = ["deflate"] }
+
+[dependencies.libloading]
+version = "0.9"
+
+# AAX bridge header (`truce_aax_bridge.h`) + ABI version live in
+# the tiny `truce-aax-bridge` contract crate - depending on it
+# (rather than on the full `truce-aax` cdylib) keeps the CLI's
+# transitive graph from picking up `truce-core` / `truce-params` /
+# `crossbeam-queue` just to read a static string. Same pattern as
+# `truce-shim-types` for the AU v3 header. AAX is only packaged
+# on macOS / Windows, so the dep is gated to those targets.
+[target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
+truce-aax-bridge = { workspace = true }
+
+# Post-link icon embed for the standalone host .exe lives in
+# `windows_manifest::embed_icon` and calls `BeginUpdateResource` /
+# `UpdateResource` / `EndUpdateResource` directly - same shell-out-free
+# pattern as the mt.exe-driven manifest embed sitting next to it.
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_System_LibraryLoader"] }
+
+[dev-dependencies]
+hound = "3"
+
+[lints]
+workspace = true

@@ -3,7 +3,8 @@
 Source: crates.io `truce-clap` 6.3.0, upstream commit
 `ff6b573c7d845638656b03bbe4b4436559dd9725`, `crates/truce-clap` in
 [truce](https://github.com/truce-audio/truce).
-The upstream license texts are included unchanged.
+The upstream `LICENSE` (Truce License 1.0), `LICENSE-MIT` and `LICENSE-APACHE`
+texts are included unchanged.
 
 The published adapter restores parameter values without notifying the host.
 Hosts can consequently retain stale controls after session or preset loading.

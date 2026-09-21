@@ -1,0 +1,185 @@
+name: promote
+
+# Promotion never rebuilds. An operator first creates the stable tag on the
+# exact accepted RC commit, then records the candidate-record hash and human
+# qualification here. This copies those qualified bytes to the stable release.
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_tag:
+        description: "Qualified candidate tag: vX.Y.Z-rc.N"
+        required: true
+        type: string
+      tag:
+        description: "Stable tag on the same commit: vX.Y.Z"
+        required: true
+        type: string
+      record_sha256:
+        description: "Accepted SHA-256 of the candidate's release-record.json"
+        required: true
+        type: string
+      qualification:
+        description: "Reviewer, date, hosts, machines, install/UI/audio findings"
+        required: true
+        type: string
+
+concurrency:
+  group: promote
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  promote:
+    name: publish qualified bytes
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: write
+      actions: read
+    env:
+      CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+      TAG: ${{ inputs.tag }}
+      RECORD_SHA256: ${{ inputs.record_sha256 }}
+      QUALIFICATION: ${{ inputs.qualification }}
+      WEBSITE_REPO: resonantdsp/website
+      PRODUCT_REPOSITORY: https://github.com/resonantdsp/SwankyAmp
+    steps:
+      - name: Require the protected master dispatch ref
+        run: |
+          test "$GITHUB_REF_TYPE" = branch && test "$GITHUB_REF_NAME" = master || {
+            echo "Promotion must be dispatched with --ref master." >&2
+            exit 1
+          }
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.21.0"
+      - name: Check release transformations
+        run: |
+          python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+          node --test '.github/scripts/*.test.mjs'
+      - name: Require a concrete acceptance record
+        run: |
+          if [ -z "$(printf '%s' "$QUALIFICATION" | tr -d '[:space:]')" ]; then
+            echo "Qualification must name the reviewer, date, hosts, machines, and findings." >&2
+            exit 1
+          fi
+      - name: Fetch the immutable RC draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release=$(gh release view "$CANDIDATE_TAG" --json isDraft,tagName)
+          test "$(jq -r .tagName <<<"$release")" = "$CANDIDATE_TAG"
+          test "$(jq -r .isDraft <<<"$release")" = true || {
+            echo "$CANDIDATE_TAG is not an unpublished candidate draft." >&2
+            exit 1
+          }
+          mkdir candidate
+          gh release download "$CANDIDATE_TAG" --dir candidate
+      - name: Verify candidate run, tags, record, identity and artifact bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          commit=$(git rev-list -n 1 "$CANDIDATE_TAG")
+          runs=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/candidate.yml/runs?event=push&status=success&head_sha=${commit}&per_page=100")
+          jq -e --arg sha "$commit" --arg tag "$CANDIDATE_TAG" \
+            '.workflow_runs | any(.head_sha == $sha and .head_branch == $tag and .conclusion == "success")' \
+            <<<"$runs" >/dev/null || {
+            echo "No successful candidate workflow completed for $CANDIDATE_TAG at $commit." >&2
+            exit 1
+          }
+          python3 .github/scripts/release_contract.py verify-candidate \
+            "$CANDIDATE_TAG" "$TAG" "$RECORD_SHA256" candidate
+      - name: Prepare and validate the website catalogue change
+        env:
+          GH_TOKEN: ${{ secrets.WEBSITE_TOKEN }}
+        run: |
+          git config --global credential."https://github.com".helper \
+            '!f() { printf "username=x-access-token\npassword=%s\n" "$GH_TOKEN"; }; f'
+          git clone --depth 1 --branch master "https://github.com/${WEBSITE_REPO}.git" website
+          node .github/scripts/website_release.mjs site \
+            --record candidate/release-record.json --repository "$PRODUCT_REPOSITORY" \
+            --tag "$TAG" --site website/site --released-at "$(date -u +%Y-%m-%d)"
+          node .github/scripts/website_release.mjs downloads \
+            --record candidate/release-record.json --repository "$PRODUCT_REPOSITORY" \
+            --tag "$TAG" > downloads.json
+      - name: Publish the stable release from qualified bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(python3 .github/scripts/release_contract.py version)
+          awk -v version="$version" '
+            $0 ~ "^## " version "( |$)" { printing = 1; next }
+            printing && /^## / { exit }
+            printing { print }
+          ' CHANGELOG.md > notes.md
+          {
+            printf '\n## Qualification\n\n'
+            printf 'Candidate: %s\n\n' "$CANDIDATE_TAG"
+            printf 'Accepted release-record SHA-256: `%s`\n\n' "$RECORD_SHA256"
+            printf '%s\n' "$QUALIFICATION"
+          } >> notes.md
+          {
+            printf '# Qualification of %s from %s\n\n' "$TAG" "$CANDIDATE_TAG"
+            printf 'Accepted release-record SHA-256: `%s`\n\n' "$RECORD_SHA256"
+            printf '%s\n' "$QUALIFICATION"
+          } > candidate/qualification.md
+          if existing=$(gh release view "$TAG" --json isDraft,isPrerelease,tagName,url 2>/dev/null); then
+            test "$(jq -r .tagName <<<"$existing")" = "$TAG"
+            test "$(jq -r .isDraft <<<"$existing")" = false || {
+              echo "$TAG exists as a draft; refusing to replace or publish unverified assets." >&2
+              exit 1
+            }
+            test "$(jq -r .isPrerelease <<<"$existing")" = false || {
+              echo "$TAG exists as a prerelease, not the stable release this promotion describes." >&2
+              exit 1
+            }
+            mkdir published
+            gh release download "$TAG" --dir published
+            python3 .github/scripts/release_contract.py verify-stable-assets candidate published
+          else
+            gh release create "$TAG" --verify-tag --latest --title "$TAG" \
+              --notes-file notes.md candidate/*
+          fi
+          echo "RELEASE_URL=$(gh release view "$TAG" --json url --jq .url)" >> "$GITHUB_ENV"
+      - name: Prove public GitHub assets still match the qualified record
+        run: node .github/scripts/prove_downloads.mjs downloads.json
+      - name: Open the website catalogue pull request
+        env:
+          GH_TOKEN: ${{ secrets.WEBSITE_TOKEN }}
+        run: |
+          version=$(jq -r .version candidate/release-record.json)
+          branch="release/swanky-amp-2-${version}"
+          {
+            printf 'Swanky Amp %s is qualified and its exact candidate bytes are public.\n\n' "$version"
+            printf 'Release: %s\n\n' "$RELEASE_URL"
+            printf 'Candidate: `%s`  \nRecord SHA-256: `%s`\n\n' "$CANDIDATE_TAG" "$RECORD_SHA256"
+            printf '| Download | Bytes | SHA-256 |\n| --- | --- | --- |\n'
+            jq -r '.[] | "| [\(.os) \(.architecture)](\(.url)) | \(.bytes) | `\(.sha256)` |"' downloads.json
+            printf '\nEvery GitHub release URL resolved through GitHub’s asset host and matched the qualified record.\n\n'
+            printf '## Qualification\n\n%s\n' "$QUALIFICATION"
+          } > pr-body.md
+          cd website
+          git config user.name "resonantdsp release"
+          git config user.email "releases@resonantdsp.com"
+          git switch -c "$branch"
+          git add site/src/data/releases.json site/src/data/site.json
+          if git diff --quiet --cached; then
+            echo "The website already catalogues Swanky Amp ${version}; no pull request is needed."
+            exit 0
+          fi
+          git commit -m "Catalogue Swanky Amp ${version} downloads"
+          git fetch origin "refs/heads/${branch}:refs/remotes/origin/${branch}" || true
+          git push --force-with-lease origin "HEAD:refs/heads/${branch}"
+          existing=$(gh pr list --repo "$WEBSITE_REPO" --head "$branch" --state open --json url --jq '.[0].url // empty')
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" --body-file ../pr-body.md
+            echo "Updated $existing"
+          else
+            gh pr create --repo "$WEBSITE_REPO" --base master --head "$branch" \
+              --title "Swanky Amp ${version} downloads" --body-file ../pr-body.md
+          fi

@@ -11,3 +11,8 @@ crate = "swanky-amp"
 fourcc = "SwA2"
 category = "effect"
 vst3_subcategory = "Distortion"
+
+# Distribution packages are notarized and stapled. Local packaging can opt out
+# explicitly with --no-notarize; candidate builds may not.
+[macos.packaging]
+notarize = true

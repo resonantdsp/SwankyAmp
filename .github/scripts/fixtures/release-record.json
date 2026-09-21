@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "candidate": "v2.0.0-rc.1",
+  "commit": "3f1c0a9d7b2e45c8a1d6f0b39e7c2a4815d6e930",
+  "version": "2.0.0",
+  "toolchain": "1.97.1",
+  "cargo_truce": "6.3.0+resonantdsp.1",
+  "cargo_lock_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "artwork_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "product": {
+    "website_product_id": "SwankyAmp",
+    "plugin_name": "Swanky Amp 2",
+    "plugin_identity": "SwankyAmp2",
+    "bundle_id": "com.resonantdsp.swanky-amp-2",
+    "fourcc": "SwA2",
+    "crate": "swanky-amp",
+    "repository": "https://github.com/resonantdsp/SwankyAmp",
+    "license": "GPL-3.0-or-later"
+  },
+  "artifacts": [
+    { "name": "swanky-amp-2.0.0-macos.pkg", "kind": "macos-pkg", "platform": "macOS", "architecture": "universal", "bytes": 42315776, "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+    { "name": "swanky-amp-2.0.0-windows.exe", "kind": "windows-exe", "platform": "Windows", "architecture": "x86_64", "bytes": 27394048, "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+    { "name": "swanky-amp-2.0.0-linux-x86_64.tar.gz", "kind": "linux-tarball", "platform": "Linux", "architecture": "x86_64", "bytes": 19876543, "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc" }
+  ]
+}
