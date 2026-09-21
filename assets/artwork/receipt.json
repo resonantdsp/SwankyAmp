@@ -1,0 +1,268 @@
+{
+  "schema": 1,
+  "manifest": {
+    "schema": 1,
+    "view": "amp",
+    "content_sha256": "3309523163782fd1a0e4819c87c1004232f43cc437ea7bd800c0752aed894c79",
+    "physical_sha256": "fdb9458b619fe747291693ec34df62728b34aafd2459a2aee40e806398c9b798",
+    "logical_size": [
+      1080.0,
+      640.0
+    ],
+    "surface_counts": {
+      "groove": 6,
+      "knob": 19,
+      "meter": 4,
+      "panel": 3,
+      "section": 6
+    }
+  },
+  "producer": {
+    "revision": "79a28dcd64c404c9b61fb78f6dfc3007f3a9a6ec",
+    "source_sha256": "1e0b1a5c7c90e64c96ee28617e32f4f490431f10bb41aff6a673a585a3bd2b21",
+    "product_revision": "interface-working-tree"
+  },
+  "render": {
+    "blender": "5.2.1 LTS",
+    "engine": "CYCLES",
+    "samples": 8,
+    "seed": 2718,
+    "max_bounces": 8,
+    "base_denoised": true,
+    "responses_denoised": false
+  },
+  "response_library": {
+    "ring_radii": [
+      32.0
+    ],
+    "ring_steps": 12,
+    "meter_sizes": [
+      [
+        14.0,
+        6.15
+      ]
+    ],
+    "resolution": [
+      256,
+      96
+    ]
+  },
+  "layers": [
+    {
+      "role": "base",
+      "file": "base.exr",
+      "width": 1080,
+      "height": 640,
+      "channels": "RGB",
+      "semantics": "scene-linear-radiance",
+      "row_origin": "top-left",
+      "sha256": "b2d6ffc4ce9e50cf96fd4c2db73c200289bb954c9c0f94a7a8a8bd5ac26140fc"
+    },
+    {
+      "role": "shadow",
+      "file": "shadow.exr",
+      "width": 1080,
+      "height": 640,
+      "channels": "RGB",
+      "semantics": "display-linear-multiplicative",
+      "row_origin": "top-left",
+      "sha256": "d5bfc154d04dcbb43f49cdaddd83b4fd971fb41dfc29664ba51969b07e14aaca"
+    },
+    {
+      "role": "ring-response",
+      "file": "responses/ring-00-step-001.exr",
+      "width": 256,
+      "height": 96,
+      "channels": "RGB",
+      "semantics": "scene-linear-radiance",
+      "row_origin": "top-left",
+      "sha256": "c054e7ed8ec2ffe75d41655ddbcf1bbf548631129c34ff1ff8b43cab2f6fa662",
+      "family": 0,
+      "radius": 32.0,
+      "step": 1,
+      "value": 0.08333333333333333,
+      "peak": 0.12342967550687121
+    },
+    {
+      "role": "ring-response",
+      "file": "responses/ring-00-step-002.exr",
+      "width": 256,
+      "height": 96,
+      "channels": "RGB",
+      "semantics": "scene-linear-radiance",
+      "row_origin": "top-left",
+      "sha256": "3c93c99782e3d95e8d807e39236fcedbc4cb429269eab0daa31270436cb66bdb",
+      "family": 0,
+      "radius": 32.0,
+      "step": 2,
+      "value": 0.16666666666666666,
+      "peak": 0.1244713724814796
+    },
+    {
+      "role": "ring-response",
+      "file": "responses/ring-00-step-003.exr",
+      "width": 256,
+      "height": 96,
+      "channels": "RGB",
+      "semantics": "scene-linear-radiance",
+      "row_origin": "top-left",
+      "sha256": "f72a96bb935d8d3a3b6095b6c110662f466a1029dab02d8f232758187c31641f",
+      "family": 0,
+      "radius": 32.0,
+      "step": 3,
+      "value": 0.25,
+      "peak": 0.12474856448245461
+    },
+    {
+      "role": "ring-response",
+      "file": "responses/ring-00-step-004.exr",
+      "width": 256,
+      "height": 96,
+      "channels": "RGB",
+      "semantics": "scene-linear-radiance",
+      "row_origin": "top-left",
+      "sha256": "082749f2ecf2e22bcaed5925358397c73d2d42b6ba907ca71df7ebe38e2dd1ef",
+      "family": 0,
+      "radius": 32.0,
+      "step": 4,
+      "value": 0.3333333333333333,
+      "peak": 0.12558174282353263
+    },
+    {
+      "role": "ring-response",
+      "file": "responses/ring-00-step-005.exr",
+      "width": 256,
+      "height": 96,
+      "channels": "RGB",
+      "semantics": "scene-linear-radiance",
+      "row_origin": "top-left",
+      "sha256": "589cdf75124378a0bb6f268fa21c68e5b18bd9af6f0f4503c409af39f9a8e98a",
+      "family": 0,
+      "radius": 32.0,
+      "step": 5,
+      "value": 0.4166666666666667,
+      "peak": 0.12599390733306143
+    },
+    {
+      "role": "ring-response",
+      "file": "responses/ring-00-step-006.exr",
+      "width": 256,
+      "height": 96,
+      "channels": "RGB",
+      "semantics": "scene-linear-radiance",
+      "row_origin": "top-left",
+      "sha256": "b26d275e87494297bbde0da4f25892c346c0efb91ad91720eed4edb5d590d2e9",
+      "family": 0,
+      "radius": 32.0,
+      "step": 6,
+      "value": 0.5,
+      "peak": 0.1352143266747144
+    },
+    {
+      "role": "ring-response",
+      "file": "responses/ring-00-step-007.exr",
+      "width": 256,
+      "height": 96,
+      "channels": "RGB",
+      "semantics": "scene-linear-radiance",
+      "row_origin": "top-left",
+      "sha256": "d0b6f79f48bca87d63880e53a6fc9155c8153e0a1b78c48577d2f7bdf832b5a1",
+      "family": 0,
+      "radius": 32.0,
+      "step": 7,
+      "value": 0.5833333333333334,
+      "peak": 0.1371483849276749
+    },
+    {
+      "role": "ring-response",
+      "file": "responses/ring-00-step-008.exr",
+      "width": 256,
+      "height": 96,
+      "channels": "RGB",
+      "semantics": "scene-linear-radiance",
+      "row_origin": "top-left",
+      "sha256": "e501f3142798c4b4889f040cbf242e5b96f4c7564779572f5b5192329976fe78",
+      "family": 0,
+      "radius": 32.0,
+      "step": 8,
+      "value": 0.6666666666666666,
+      "peak": 0.14120706516452136
+    },
+    {
+      "role": "ring-response",
+      "file": "responses/ring-00-step-009.exr",
+      "width": 256,
+      "height": 96,
+      "channels": "RGB",
+      "semantics": "scene-linear-radiance",
+      "row_origin": "top-left",
+      "sha256": "20ef54a678d4cf1e652ae9a104b55e79433a336f838ba80e61aa7d6c19b463cb",
+      "family": 0,
+      "radius": 32.0,
+      "step": 9,
+      "value": 0.75,
+      "peak": 0.1704189201187657
+    },
+    {
+      "role": "ring-response",
+      "file": "responses/ring-00-step-010.exr",
+      "width": 256,
+      "height": 96,
+      "channels": "RGB",
+      "semantics": "scene-linear-radiance",
+      "row_origin": "top-left",
+      "sha256": "32c3194bf96104a4eae8901611285688aa05f298dfc4700f1a0cd59e53c87a0a",
+      "family": 0,
+      "radius": 32.0,
+      "step": 10,
+      "value": 0.8333333333333334,
+      "peak": 0.15760063966665883
+    },
+    {
+      "role": "ring-response",
+      "file": "responses/ring-00-step-011.exr",
+      "width": 256,
+      "height": 96,
+      "channels": "RGB",
+      "semantics": "scene-linear-radiance",
+      "row_origin": "top-left",
+      "sha256": "50fed7d22dcfef882888689d46c319cd1c1a19cee9d2f2869b2dbd511172fb04",
+      "family": 0,
+      "radius": 32.0,
+      "step": 11,
+      "value": 0.9166666666666666,
+      "peak": 0.23442714547677185
+    },
+    {
+      "role": "ring-response",
+      "file": "responses/ring-00-step-012.exr",
+      "width": 256,
+      "height": 96,
+      "channels": "RGB",
+      "semantics": "scene-linear-radiance",
+      "row_origin": "top-left",
+      "sha256": "ff63c6d1184ee1021deffb8f624f36623834d3a3a5483188e6fd4bc0ac4dd3e9",
+      "family": 0,
+      "radius": 32.0,
+      "step": 12,
+      "value": 1.0,
+      "peak": 0.1434381349027388
+    },
+    {
+      "role": "meter-response",
+      "file": "responses/meter-00.exr",
+      "width": 256,
+      "height": 96,
+      "channels": "RGB",
+      "semantics": "scene-linear-radiance",
+      "row_origin": "top-left",
+      "sha256": "65823a2f5b99126ecded5903cd8110f29a1d011c122cf8c62b784558f524ec4d",
+      "family": 0,
+      "size": [
+        14.0,
+        6.15
+      ],
+      "peak": 0.6468250155448914
+    }
+  ]
+}

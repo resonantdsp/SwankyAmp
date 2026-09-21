@@ -30,6 +30,39 @@ After `just setup`, open the standalone shell with:
 just run
 ```
 
+The editor uses one iced widget tree for the live controls and the artwork
+layout contract. Its six sections preserve the Free signal-flow groups, while
+the bundled CC BY 4.0 material layers provide the graphite, brushed metal,
+shadows, and response lighting. Export the exact resolved geometry or capture
+the editor at 1x and 2x with:
+
+```sh
+just export-layout /tmp/swanky-layout
+just capture /tmp/swanky-capture
+```
+
+`capture` needs a working GPU adapter. The layout export remains available when
+the artwork package is missing or stale so a new bake can be produced from
+changed widget geometry.
+
+Artwork contributors can make a public, reproducible round trip without the
+production renderer. Unpack the deterministic RGB9E5 package to editable ZIP
+float32 RGB EXRs, edit them in a standard HDR image tool, refresh the receipt,
+then repack and validate:
+
+```sh
+just unpack-artwork assets/artwork.pack /tmp/swanky-artwork
+just refresh-artwork /tmp/swanky-artwork
+just pack-artwork /tmp/swanky-artwork /tmp/swanky-artwork.pack
+just validate-assets /tmp/swanky-artwork.pack /tmp/swanky-artwork
+```
+
+The receipt records the scene-linear radiance and display-linear shadow
+semantics, dimensions, hashes, and public layout provenance. Producer metadata
+is descriptive, so replacement CC artwork does not depend on Blender or the
+original production sources. `just` validates that the checked-in package is
+the deterministic result of the editable layers.
+
 Bundle validation is a separate platform check:
 
 ```sh
@@ -156,6 +189,10 @@ read-only identity and byte checks from the stable tag checkout.
 ## Source and licences
 
 Swanky Amp is licensed under GPLv3 or later; see [LICENSE](LICENSE). The model authority is the exact Free 1.4.0 C++ wrapper and generated Faust headers preserved in `verification/reference/released` from the `juce-1.4.0` tag. The Rust port retains the released control mappings, detuning, fitted constants, stage behavior, calibration tables, old cubic knee, and old tone mapping. Small equation and filter primitives were selectively adapted from the separately implemented Pro code only where comparison proved that they express the released Free equations.
+
+The editable artwork in `assets/artwork` is licensed under CC BY 4.0; see its
+`ARTWORK-LICENSE.txt`. The editor typography uses PT Sans under the SIL Open
+Font License in `assets/fonts/PTSans-OFL.txt`.
 
 This repository contains no Pro parameter grids, cabinet impulse responses, pedals, gate, reverb, licensing logic, Blender sources, artwork production sources, or shared private DSP dependency.
 

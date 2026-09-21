@@ -1,13 +1,12 @@
 use truce::prelude::*;
-use truce_iced::iced::widget::{column, container, text};
-use truce_iced::iced::{Alignment, Element, Length};
-use truce_iced::{IcedPlugin, Message, ParamCache};
-
-const EDITOR_SIZE: (u32, u32) = (640, 360);
-
+pub mod artwork;
 pub mod dsp;
 pub mod engine;
+pub mod layout;
 pub mod params;
+pub mod style;
+pub mod ui;
+pub mod widgets;
 
 pub use params::SwankyAmpParams;
 
@@ -37,34 +36,13 @@ impl PluginLogic for SwankyAmp {
     }
 
     fn editor(params: Arc<Self::Params>) -> Box<dyn Editor> {
-        truce_iced::IcedEditor::<_, ShellUi>::new(params, EDITOR_SIZE).into_editor()
-    }
-}
-
-struct ShellUi;
-
-impl IcedPlugin<SwankyAmpParams> for ShellUi {
-    type Message = ();
-
-    fn new(_: Arc<SwankyAmpParams>) -> Self {
-        Self
-    }
-
-    fn title(&self) -> String {
-        "Swanky Amp 2".into()
-    }
-
-    fn view<'a>(
-        &'a self,
-        _: &'a ParamCache<SwankyAmpParams>,
-    ) -> Element<'a, Message<Self::Message>> {
-        container(
-            column![text("SWANKY AMP 2").size(30)]
-                .align_x(Alignment::Center)
-                .spacing(12),
+        style::load_fonts();
+        truce_iced::IcedEditor::<_, ui::FreeUi>::new(
+            params,
+            (style::WIDTH as u32, style::HEIGHT as u32),
         )
-        .center(Length::Fill)
-        .into()
+        .with_font(style::FONT_BYTES)
+        .into_editor()
     }
 }
 
