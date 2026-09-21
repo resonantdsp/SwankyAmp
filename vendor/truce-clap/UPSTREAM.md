@@ -8,7 +8,7 @@ texts are included unchanged.
 
 The published adapter restores parameter values without notifying the host.
 Hosts can consequently retain stale controls after session or preset loading.
-The only source changes notify `clap_host_params.rescan` with
+The state-notification changes call `clap_host_params.rescan` with
 `CLAP_PARAM_RESCAN_VALUES` after a successful state or preset parameter restore.
 Both entry points are main-thread CLAP callbacks.
 
