@@ -1,0 +1,73 @@
+//! Toggle switch widget wrapping iced's toggler.
+
+use std::fmt::Debug;
+use std::marker::PhantomData;
+
+use crate::iced::Element;
+use crate::iced::widget::{column, text, toggler};
+
+use crate::param_cache::ParamCache;
+use crate::param_message::{Message, ParamMessage};
+use crate::theme;
+use truce_params::Params;
+
+/// Builder for a parameter-bound toggle switch.
+pub struct ToggleWidget<'a, M> {
+    id: u32,
+    value: bool,
+    label: Option<&'a str>,
+    _phantom: PhantomData<M>,
+}
+
+impl<'a, M: Clone + Debug + 'static> ToggleWidget<'a, M> {
+    pub fn new(id: impl Into<u32>, params: &'a ParamCache<impl Params>) -> Self {
+        let id = id.into();
+        Self {
+            id,
+            value: params.get(id) >= 0.5,
+            label: None,
+            _phantom: PhantomData,
+        }
+    }
+
+    #[must_use]
+    pub fn label(mut self, label: &'a str) -> Self {
+        self.label = Some(label);
+        self
+    }
+
+    #[must_use]
+    pub fn into_element(self) -> Element<'a, Message<M>> {
+        let id = self.id;
+
+        let t = toggler(self.value)
+            .on_toggle(move |on| {
+                // Bracket the write in a begin/end gesture so VST3/AU
+                // hosts record it to an automation lane and log one
+                // undo entry - a bare set_param is ignored in
+                // touch/latch write modes.
+                Message::Param(ParamMessage::Batch(vec![
+                    ParamMessage::BeginEdit(id),
+                    ParamMessage::SetNormalized(id, if on { 1.0 } else { 0.0 }),
+                    ParamMessage::EndEdit(id),
+                ]))
+            })
+            .size(18.0);
+
+        let mut col = column![t]
+            .spacing(4)
+            .align_x(crate::iced::Alignment::Center);
+
+        if let Some(label) = self.label {
+            col = col.push(text(label).size(10).color(theme::TEXT_DIM));
+        }
+
+        col.into()
+    }
+}
+
+impl<'a, M: Clone + Debug + 'static> From<ToggleWidget<'a, M>> for Element<'a, Message<M>> {
+    fn from(t: ToggleWidget<'a, M>) -> Self {
+        t.into_element()
+    }
+}

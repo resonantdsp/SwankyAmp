@@ -1,0 +1,14 @@
+[vendor]
+name = "Resonant DSP"
+id = "com.resonantdsp"
+url = "https://www.resonantdsp.com"
+au_manufacturer = "Rsnt"
+
+[[plugin]]
+name = "Swanky Amp 2"
+bundle_id = "swanky-amp-2"
+crate = "swanky-amp"
+fourcc = "SwA2"
+category = "effect"
+vst3_subcategory = "Distortion"
+

@@ -1,0 +1,5 @@
+# Reproducible source and bundle metadata on every build platform.
+* text=auto eol=lf
+
+# These files are a byte-for-byte extraction used as the released-tone oracle.
+verification/reference/released/** -text

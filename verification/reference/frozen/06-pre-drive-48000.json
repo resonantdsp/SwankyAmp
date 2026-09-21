@@ -1,0 +1,133 @@
+{
+  "preset": "pre drive",
+  "sample_rate": 48000,
+  "samples": 68704,
+  "block_size": 512,
+  "legacy_output_mute_samples": 1024,
+  "instrumented_comparison": {
+    "bit_mismatches": 0,
+    "max_abs_difference": 0.000000e+00
+  },
+  "seams": {
+    "cabinet": {
+      "startup": {
+        "samples": 1024,
+        "rms_dbfs": 4.231249991,
+        "peak_dbfs": 11.843730772
+      },
+      "post_mute": {
+        "samples": 67680,
+        "rms_dbfs": 5.842315786,
+        "peak_dbfs": 15.153470752
+      }
+    },
+    "power_amp": {
+      "startup": {
+        "samples": 1024,
+        "rms_dbfs": 24.820575566,
+        "peak_dbfs": 32.176616175
+      },
+      "post_mute": {
+        "samples": 67680,
+        "rms_dbfs": 24.407406510,
+        "peak_dbfs": 30.851770124
+      }
+    },
+    "raw_output": {
+      "startup": {
+        "samples": 1024,
+        "rms_dbfs": -21.939862798,
+        "peak_dbfs": -14.327382324
+      },
+      "post_mute": {
+        "samples": 67680,
+        "rms_dbfs": -20.328797002,
+        "peak_dbfs": -11.017642258
+      }
+    },
+    "tone_stack": {
+      "startup": {
+        "samples": 1024,
+        "rms_dbfs": 33.069195104,
+        "peak_dbfs": 47.607081623
+      },
+      "post_mute": {
+        "samples": 67680,
+        "rms_dbfs": 34.388987687,
+        "peak_dbfs": 48.721983802
+      }
+    },
+    "triode_1": {
+      "startup": {
+        "samples": 1024,
+        "rms_dbfs": 12.691348552,
+        "peak_dbfs": 16.753439296
+      },
+      "post_mute": {
+        "samples": 67680,
+        "rms_dbfs": 11.429934472,
+        "peak_dbfs": 16.894390516
+      }
+    },
+    "triode_2": {
+      "startup": {
+        "samples": 1024,
+        "rms_dbfs": 9.833529020,
+        "peak_dbfs": 17.867750855
+      },
+      "post_mute": {
+        "samples": 67680,
+        "rms_dbfs": 10.108524041,
+        "peak_dbfs": 18.260649390
+      }
+    },
+    "triode_3": {
+      "startup": {
+        "samples": 1024,
+        "rms_dbfs": 7.782055600,
+        "peak_dbfs": 16.970773158
+      },
+      "post_mute": {
+        "samples": 67680,
+        "rms_dbfs": 8.997988345,
+        "peak_dbfs": 19.238320781
+      }
+    },
+    "triode_4": {
+      "startup": {
+        "samples": 1024,
+        "rms_dbfs": 5.919292279,
+        "peak_dbfs": 15.744634275
+      },
+      "post_mute": {
+        "samples": 67680,
+        "rms_dbfs": 7.821918946,
+        "peak_dbfs": 18.977271463
+      }
+    },
+    "triode_5": {
+      "startup": {
+        "samples": 1024,
+        "rms_dbfs": 5.266416146,
+        "peak_dbfs": 14.644269741
+      },
+      "post_mute": {
+        "samples": 67680,
+        "rms_dbfs": 7.264185312,
+        "peak_dbfs": 18.607573084
+      }
+    }
+  },
+  "rendered_output": {
+    "startup": {
+      "samples": 1024,
+      "rms_dbfs": null,
+      "peak_dbfs": null
+    },
+    "post_mute": {
+      "samples": 67680,
+      "rms_dbfs": -20.328797002,
+      "peak_dbfs": -11.017642258
+    }
+  }
+}

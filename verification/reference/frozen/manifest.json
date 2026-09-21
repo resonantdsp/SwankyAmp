@@ -1,0 +1,379 @@
+{
+  "baseline": {
+    "git_commit": "5c32004862e5dcce8a453e1310da926dc9712464",
+    "git_tag": "juce-1.4.0",
+    "product": "Swanky Amp 1.4.0",
+    "source_repository": "resonantdsp/SwankyAmp"
+  },
+  "detuning": {
+    "algorithm": "released std::minstd_rand seeds 123+n with std::uniform_real_distribution<float>(-0.2, 0.2)",
+    "portability": "minstd_rand is specified, but uniform_real_distribution mapping is implementation-defined; these libc++ values are frozen and other standard libraries may differ",
+    "values_on_freeze_toolchain": {
+      "grid_clip": [
+        -0.198858127,
+        0.119648412,
+        -0.0512876511,
+        -0.106147125,
+        0.172149658
+      ],
+      "grid_tau": [
+        -0.198876113,
+        0.0516224615,
+        -0.132369742,
+        -0.0194361452,
+        0.197785094
+      ],
+      "hp_freq": [
+        -0.198885098,
+        0.017609477,
+        0.027089214,
+        0.0239193439,
+        -0.189397186
+      ],
+      "plate_bias": [
+        -0.198849127,
+        0.1536614,
+        0.189253405,
+        -0.14950262,
+        0.159331948
+      ],
+      "plate_clip": [
+        -0.198831156,
+        -0.178312644,
+        -0.129664525,
+        0.163786411,
+        0.133696511
+      ],
+      "plate_comp_level": [
+        -0.19880417,
+        -0.0762737021,
+        0.191958591,
+        0.0337199457,
+        0.0952433348
+      ],
+      "plate_drift_level": [
+        -0.198822156,
+        -0.144299671,
+        0.110876516,
+        0.120430924,
+        0.120878793
+      ],
+      "plate_drift_tau": [
+        -0.19881317,
+        -0.110286683,
+        -0.0485824347,
+        0.0770754367,
+        0.108061075
+      ]
+    }
+  },
+  "generation": {
+    "compiler": "Apple clang version 17.0.0 (clang-1700.6.3.2)",
+    "machine": "arm64",
+    "platform": "macOS-27.0-arm64-arm-64bit",
+    "renderer_sha256": "773fd17eb809a7cfb5112f7a4f2a8c2d14fb8a0f9eac7ee26abc28e89337b564"
+  },
+  "input": {
+    "cabinet": "enabled fixture precondition: a fresh session starts enabled; factory selection preserves the live cabinet switch even though the XML carries idCabOnOff",
+    "channels": 1,
+    "format": "24-bit PCM",
+    "level_before_factory_preset": "0 dB fixture precondition: a fresh session's Input Level 0.0 maps to 0 dB; factory selection preserves the live Input Level",
+    "origin": "Owner-recorded DI copied from code/SwankyAmpPro/verification/calibration/single-coil.wav; no Pro DSP is used",
+    "path": "input/single-coil.wav",
+    "sample_rate": 48000,
+    "samples": 68704,
+    "sha256": "a6033580b0e1ddee73b90d06020b465da91f3e39720a731daf56f6d3d90ffefb"
+  },
+  "released_source_sha256": {
+    "released/LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+    "released/Resources/presets.xml": "f1f7f904457e233f30a273c93278c9e9be07b4b4bd611254af343f0d6e819f16",
+    "released/Source/PluginProcessor.cpp": "6856046708d93639d03fcd12c6f83ab9e1cbde27dd043180b03953e6226a1093",
+    "released/Source/Utils.h": "08f5b489aac015915611c4ed2b5ba7690d06a1ca04e1a8b9eb902114593a5db5",
+    "released/Source/dsp/Cabinet.h": "c0d1e1098390e3241606a2e61a5bb0b7598a7875c8a0b72ed1ef672ff69b9920",
+    "released/Source/dsp/CabinetFaust.h": "0644b7ada38137b05f7e7169365aee4f98d3ad68013c2fd90479d13dcb5be12e",
+    "released/Source/dsp/FaustImpl.h": "6fd4e17dd7fbe25faa7bc64eec06e064b5ef58e54059ac7f08b5e1ee6c9c5b96",
+    "released/Source/dsp/Meta.h": "fbfc1ae5f254c9c00c3e9c4a925f5687d4e04f65400c38750a2d172274104db6",
+    "released/Source/dsp/PushPullAmp.h": "d9acf00a3968c735add03c3f38e9149bcbd21c4daeb17f718c045c65f114fb8f",
+    "released/Source/dsp/TetrodeGrid.h": "9bbd691397e50a869fe49249fb1a8279892be87d81ec6a6d53a729ccdc03a7f2",
+    "released/Source/dsp/TetrodeGridFaust.h": "70c952c13704c68006a548e2263dded6c51f65daf28b418a691c1f1453851269",
+    "released/Source/dsp/TetrodePlate.h": "2fdebaa924f0022c10695bffdcd4632732feb55cb04892ae17c59ae00bc1093b",
+    "released/Source/dsp/TetrodePlateFaust.h": "02853fbaa245346247c88be7814e06eacbf5781b994e5f08d2a4f7bdc124c8e1",
+    "released/Source/dsp/ToneStack.h": "b6d833ff11daddcdc009808569410de06ff960b372c01b0f8ff53f8b107d7455",
+    "released/Source/dsp/ToneStackF.h": "ebfcb2503f3c7cd52a9a4751400e184e0a8216b55c52d5763fa8f935da7f0ca1",
+    "released/Source/dsp/ToneStackFFaust.h": "5fcbcbdd52940134e270e7ee0e178f8b5ade49b416d63e551ba65ad0a0313790",
+    "released/Source/dsp/ToneStackFaust.h": "532543dff0b39eb25c9e1da73e2163ab0b69fb202365a7595b95d044ff423430",
+    "released/Source/dsp/ToneStackM.h": "ed24d547c5970bf5997e35a6d186ded9f9b13faccaa2b045dacd12b1405dc346",
+    "released/Source/dsp/ToneStackMFaust.h": "7260f3f91fd9dcdecf2b06d15bc61b69e0da1e81415d194987cc25b68d9f57ca",
+    "released/Source/dsp/Triode.h": "6a7466c4c84040d2daa01413e0c80102dd4ad4c5b4b873b22275f1b901f96dfb",
+    "released/Source/dsp/TriodeFaust.h": "bbccd30e9cec9e956d23b0e5953616d612f03597491b5e63d15775f4a068dba0",
+    "released/Source/dsp/UI.h": "81e3d456672cfdec95088a8965bc7de78c16d9fc7c184e00b898cdd1c9a7385c"
+  },
+  "render_contract": {
+    "block_size": 512,
+    "frozen_sample_rates": [
+      44100,
+      48000,
+      96000
+    ],
+    "output": "mono 32-bit IEEE-float WAV",
+    "post_mute": "samples from 1024 onward; this name makes no claim that nonlinear state has settled",
+    "resampling": "linear interpolation from the versioned 48 kHz DI; output frame count is round(input_frames * output_rate / 48000)",
+    "seams": {
+      "cabinet": "immediately after Cabinet::process, before cabinetScale, powerAmpScale, and outputScale",
+      "power_amp": "immediately after grid and plate processing, before division by preAmpTarget",
+      "raw_output": "after all released compensation and output scaling, before the legacy startup mute",
+      "tone_stack": "immediately after ToneStack::process, before toneStackScale * preAmpScale * preAmpTarget",
+      "triode_N": "immediately after each active Triode::process, before the shared triodeScale; inactive stage entries contain zero samples"
+    },
+    "startup": "cold released state; raw seams retain samples 0..1023 while the rendered output applies the released 1024-sample mute"
+  },
+  "renders": [
+    {
+      "preset": "clean",
+      "report": "01-clean-44100.json",
+      "report_sha256": "1ce986ccd648f9fc96bf3d7287aec3caad62c97b6e5e366f1ea1f96902240ca4",
+      "sample_rate": 44100,
+      "wav": "01-clean-44100.wav",
+      "wav_sha256": "0a89706c35a613e45b95def0446c5877963cebbe92bbfd1be92cb1c0288345c5"
+    },
+    {
+      "preset": "clean",
+      "report": "01-clean-48000.json",
+      "report_sha256": "6c405db41e82959faf8ed830ef7a4de14e461ed2bde3527545aa6a60c43d01e4",
+      "sample_rate": 48000,
+      "wav": "01-clean-48000.wav",
+      "wav_sha256": "9c34f10a11185fb8a6173dd3ac8dc547a646bfcd22e81800b3c7ff01ad96f428"
+    },
+    {
+      "preset": "clean",
+      "report": "01-clean-96000.json",
+      "report_sha256": "013ebb15c7ae64e67414f8981701303f3079612437315a55aa6c6cf1c327aa06",
+      "sample_rate": 96000,
+      "wav": "01-clean-96000.wav",
+      "wav_sha256": "3474b08d8ab705c28cf6406aa8cc0d353b93fdb06738018aa42d5063eaed3143"
+    },
+    {
+      "preset": "bright",
+      "report": "02-bright-44100.json",
+      "report_sha256": "62a15bf8735025934bfee6dfaa5601ef1df759ca6df785aa03bca1a19788dfa2",
+      "sample_rate": 44100,
+      "wav": "02-bright-44100.wav",
+      "wav_sha256": "323fd4261db69df1b88ff4cb81fb7b17951ee1fbbfe7d994d195ee76159152b9"
+    },
+    {
+      "preset": "bright",
+      "report": "02-bright-48000.json",
+      "report_sha256": "3acd3f27643c1e7fd5ea2c464d86c240b81bb88e3d78d4948e939874ba7844f5",
+      "sample_rate": 48000,
+      "wav": "02-bright-48000.wav",
+      "wav_sha256": "9f278090b4707ec9e58eb3d825ce0adb6beaf89e552f88bc198dc2fbea12313d"
+    },
+    {
+      "preset": "bright",
+      "report": "02-bright-96000.json",
+      "report_sha256": "04159a47535cb3016dcb32734f637796e882ef8396f716bba6c28d1b780e5af6",
+      "sample_rate": 96000,
+      "wav": "02-bright-96000.wav",
+      "wav_sha256": "de460fb6af50c2409224ef8d2e1c3f8f46e4e0c83b8eb65370ee42d7daad021b"
+    },
+    {
+      "preset": "edge",
+      "report": "03-edge-44100.json",
+      "report_sha256": "787b2100ef3f518ec06f0ed8e1b773c20e37bce74c8a62741791de0a89416ab6",
+      "sample_rate": 44100,
+      "wav": "03-edge-44100.wav",
+      "wav_sha256": "a4a713888a8c9552ad026df1d1b2757b2a2e4cbeb46e3bd1bd0359408c3c1023"
+    },
+    {
+      "preset": "edge",
+      "report": "03-edge-48000.json",
+      "report_sha256": "dbc9f10c1630a6a89909e24120debe1e445f03ccba75724f0158a12d0d464360",
+      "sample_rate": 48000,
+      "wav": "03-edge-48000.wav",
+      "wav_sha256": "76e0852fe37e81377122a48cb3d59b4e82b4327a22677db44f1abe8caa1d752f"
+    },
+    {
+      "preset": "edge",
+      "report": "03-edge-96000.json",
+      "report_sha256": "55c93140d2dafe867b9fa9bb5715742f6730c4e36e3a7d19c62293de830bad76",
+      "sample_rate": 96000,
+      "wav": "03-edge-96000.wav",
+      "wav_sha256": "19d406e141a82c890aeec2111d268feecb9492ba856c27a2a9a779f61e810e14"
+    },
+    {
+      "preset": "distort",
+      "report": "04-distort-44100.json",
+      "report_sha256": "3ee80aa64f66bd8572759dba2116fd9590e08356c11978c58a80b2c94c3022c7",
+      "sample_rate": 44100,
+      "wav": "04-distort-44100.wav",
+      "wav_sha256": "5afe1957011703aa525de8a6cb8e5bb4c3d65539a9abb53468ccebaa35f632bf"
+    },
+    {
+      "preset": "distort",
+      "report": "04-distort-48000.json",
+      "report_sha256": "ce2220aacd459607ae4e39feaf97b066f93ca2ceb70f8f5776ecda51654728bd",
+      "sample_rate": 48000,
+      "wav": "04-distort-48000.wav",
+      "wav_sha256": "cb6cb2309fd4be8c1855d099802caea0fc2ea2dce1d3f213cb8e3f56b686ddb4"
+    },
+    {
+      "preset": "distort",
+      "report": "04-distort-96000.json",
+      "report_sha256": "e2e59eb1fc6bab4a0a3cdebd7767d8d373785497168eb7460675e256542b284b",
+      "sample_rate": 96000,
+      "wav": "04-distort-96000.wav",
+      "wav_sha256": "4ff735cbf08f2e629eb10a17b8883b6f4f1541c170f8b36501ed420414932495"
+    },
+    {
+      "preset": "dirty distort",
+      "report": "05-dirty-distort-44100.json",
+      "report_sha256": "10892268e4984c27cd91825ed85a1181996ad85215195681244fc7d10159124d",
+      "sample_rate": 44100,
+      "wav": "05-dirty-distort-44100.wav",
+      "wav_sha256": "37938a4724a047689d0beafd3d21e985677f9a2e64dd2aea1ab7a38ea4f27271"
+    },
+    {
+      "preset": "dirty distort",
+      "report": "05-dirty-distort-48000.json",
+      "report_sha256": "91b5fb4bf6756859899b4ee66be01a77d2b4d367e92129a1911b0302f606de43",
+      "sample_rate": 48000,
+      "wav": "05-dirty-distort-48000.wav",
+      "wav_sha256": "e28617423529b318ef73fcd4e18ee3a86045d9ef675ff59f79db5428229932e9"
+    },
+    {
+      "preset": "dirty distort",
+      "report": "05-dirty-distort-96000.json",
+      "report_sha256": "138b100ca12cf305516e1185512dc7fd8096bdbb110255877114351a0a2c1bd3",
+      "sample_rate": 96000,
+      "wav": "05-dirty-distort-96000.wav",
+      "wav_sha256": "0c00139b64fd1ff53388682d2e147fb3e32b1147220ecd43d9a47b80eef09423"
+    },
+    {
+      "preset": "pre drive",
+      "report": "06-pre-drive-44100.json",
+      "report_sha256": "da9eda3eda5a7e9626a665e08377bf697566bda1bd9f048bebe38a56849eaab6",
+      "sample_rate": 44100,
+      "wav": "06-pre-drive-44100.wav",
+      "wav_sha256": "dd5bb0a8d6a5e042f039e3bb92261b886b7c504d492128523d42047ed79c2890"
+    },
+    {
+      "preset": "pre drive",
+      "report": "06-pre-drive-48000.json",
+      "report_sha256": "3e3d0c36c8cf2b38fe7ab37d6d089b040d159dac3444c50c825ed3a1838e0089",
+      "sample_rate": 48000,
+      "wav": "06-pre-drive-48000.wav",
+      "wav_sha256": "79d05570aa9de2fd8bf31f076832f6d2459aa49e41f24745e61f21ccfbfbf1b5"
+    },
+    {
+      "preset": "pre drive",
+      "report": "06-pre-drive-96000.json",
+      "report_sha256": "48cbe11cf613ac2258e75ac9d44458ece916a6794cb7c0bc1056b2171db81c88",
+      "sample_rate": 96000,
+      "wav": "06-pre-drive-96000.wav",
+      "wav_sha256": "0f13f71fc7eb340aba87220891747cdde592cf734573f4f83d1c76f87358afd3"
+    },
+    {
+      "preset": "power drive",
+      "report": "07-power-drive-44100.json",
+      "report_sha256": "fa41db7972a2fe738c25eb44532472f80cf88bc3313d001ada5e05ffd2ebe67b",
+      "sample_rate": 44100,
+      "wav": "07-power-drive-44100.wav",
+      "wav_sha256": "e152117d61dddd525f6482db37a1471e779ad21bbcdc74abe3c4a557d63825a4"
+    },
+    {
+      "preset": "power drive",
+      "report": "07-power-drive-48000.json",
+      "report_sha256": "2a5d986820a82a45449dc7c5a5dfb3b7fb9b3e1e52ee8d64aa392fa443358048",
+      "sample_rate": 48000,
+      "wav": "07-power-drive-48000.wav",
+      "wav_sha256": "9796069af3065151cade94068143a204ed9e8b81d05e2e8791077db8afbf3c30"
+    },
+    {
+      "preset": "power drive",
+      "report": "07-power-drive-96000.json",
+      "report_sha256": "8f2c0863dd0a27628229f4dff1f95a045125a6a56d59f11d8b262b62c18a2903",
+      "sample_rate": 96000,
+      "wav": "07-power-drive-96000.wav",
+      "wav_sha256": "d38c09714e3d3932ba34a4e1c3aef75bd61bdf41a2509a62a1989b7f2e4e529b"
+    },
+    {
+      "preset": "full drive",
+      "report": "08-full-drive-44100.json",
+      "report_sha256": "40077dbb67237ac52c48868ddf441073090fc59258f70b3030c6df08ab554cd7",
+      "sample_rate": 44100,
+      "wav": "08-full-drive-44100.wav",
+      "wav_sha256": "c7981aaa303f2d17ba89fca4b4bd4ee5e9989dbc04c5e39a1a511a10531fd9e1"
+    },
+    {
+      "preset": "full drive",
+      "report": "08-full-drive-48000.json",
+      "report_sha256": "1d90d06d429b6ee6b7d5b015b5190bac80250dcdb6106e7a12007416a03ecb0d",
+      "sample_rate": 48000,
+      "wav": "08-full-drive-48000.wav",
+      "wav_sha256": "63d340cb294874bc72d570d64b7d7ad5fdea003994c0002ec8be42a31917b7a7"
+    },
+    {
+      "preset": "full drive",
+      "report": "08-full-drive-96000.json",
+      "report_sha256": "2ad10d85b0ed56b916ce7abf9b1cd0004afe295a7e70714b13ec8523d4870e0b",
+      "sample_rate": 96000,
+      "wav": "08-full-drive-96000.wav",
+      "wav_sha256": "6f5d64f569f2c0256dcaa3fd8725e9148b9403012c7c951a4fe29484e0905988"
+    },
+    {
+      "preset": "high gain",
+      "report": "09-high-gain-44100.json",
+      "report_sha256": "6dd63878eeec50d38608c35126bc179a6dd90da72c20c64c817be6f36636e2ec",
+      "sample_rate": 44100,
+      "wav": "09-high-gain-44100.wav",
+      "wav_sha256": "7fc559edb44a209c61f58889bae0f6b457ab133ac7a45903d47b8fd529af18cc"
+    },
+    {
+      "preset": "high gain",
+      "report": "09-high-gain-48000.json",
+      "report_sha256": "b257a95c57226798251a2546865f2b86bc14703df334dfda5f40e9222f4416fe",
+      "sample_rate": 48000,
+      "wav": "09-high-gain-48000.wav",
+      "wav_sha256": "86f1ac06be9dbafa2af7629eedbdb9562c8ccff9b2bbda7ff63a6df24cd27c9f"
+    },
+    {
+      "preset": "high gain",
+      "report": "09-high-gain-96000.json",
+      "report_sha256": "072320b0e7cee291ded7eb34ef041c84c7606e364ecd6e2e6c02f2692229c0b1",
+      "sample_rate": 96000,
+      "wav": "09-high-gain-96000.wav",
+      "wav_sha256": "216c39ea4606d6985ffc7b78c1951c5629dfb1818d71925914b025c8237a03d6"
+    },
+    {
+      "preset": "level 11",
+      "report": "10-level-11-44100.json",
+      "report_sha256": "9a305883ae26c2a9b75d176eb9a99c6c5d3564feb92149c62a5f46f4894a3a72",
+      "sample_rate": 44100,
+      "wav": "10-level-11-44100.wav",
+      "wav_sha256": "d9d55059591baf36c0ff3c96fb4f482754733030c2b68399329b50393fcbcb2e"
+    },
+    {
+      "preset": "level 11",
+      "report": "10-level-11-48000.json",
+      "report_sha256": "f2c96a88f49a18caa4e6c6a49a9f1a53396e230c1e01a4563d5a2ea1acb23216",
+      "sample_rate": 48000,
+      "wav": "10-level-11-48000.wav",
+      "wav_sha256": "360038cf47a4bd4c5eee4eba91f01edf2849dff7798d574fb1451cf69e020629"
+    },
+    {
+      "preset": "level 11",
+      "report": "10-level-11-96000.json",
+      "report_sha256": "5f121b7f4e7dc1bf714bff8f7d1b83b92789bacd9fe976853e3f3448aabee8ff",
+      "sample_rate": 96000,
+      "wav": "10-level-11-96000.wav",
+      "wav_sha256": "3a2751c2f1c05ff78cef5d6e4a66b864a65bf7a60651c664c5fb537e0c0f4739"
+    }
+  ],
+  "schema": 1,
+  "verification_tolerances": {
+    "note": "Same-process untouched-versus-instrumented output is always bit exact. Frozen re-renders use tolerances for compiler, libm, and C++ standard-library differences.",
+    "seam_level_db": 0.02,
+    "waveform_max_absolute": 0.0002,
+    "waveform_rms_error": 2e-05
+  }
+}

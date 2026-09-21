@@ -1,0 +1,48 @@
+[package]
+name = "swanky-amp"
+version = "2.0.0"
+edition = "2024"
+rust-version = "1.92"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/resonantdsp/SwankyAmp"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[[bin]]
+name = "swanky-amp-2"
+path = "src/main.rs"
+required-features = ["standalone"]
+
+[features]
+default = ["clap", "vst3", "standalone"]
+clap = ["dep:truce-clap", "dep:clap-sys"]
+vst3 = ["dep:truce-vst3"]
+standalone = ["dep:truce-standalone"]
+
+[dependencies]
+truce = { version = "=6.3.0", default-features = false }
+truce-clap = { version = "=6.3.0", optional = true }
+clap-sys = { version = "0.5", optional = true }
+truce-vst3 = { version = "=6.3.0", optional = true }
+truce-standalone = { version = "=6.3.0", features = ["gui"], optional = true }
+truce-iced = "=6.3.0"
+
+[dev-dependencies]
+truce-test = "=6.3.0"
+
+[patch.crates-io]
+baseview-truce = { path = "vendor/baseview-truce" }
+truce-clap = { path = "vendor/truce-clap" }
+truce-iced = { path = "vendor/truce-iced" }
+
+[profile.dev]
+debug = 1
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+lto = "thin"
+strip = true
