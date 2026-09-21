@@ -7,6 +7,7 @@ pub mod artwork;
 pub mod dsp;
 pub mod engine;
 pub mod layout;
+pub mod meters;
 pub mod params;
 pub mod presets;
 pub mod release_notice;
@@ -39,9 +40,17 @@ impl PluginLogic for SwankyAmp {
         params: &Self::Params,
         buffer: &mut AudioBuffer,
         _: &EventList,
-        _: &mut ProcessContext,
+        context: &mut ProcessContext,
     ) -> ProcessStatus {
         engine.process(params, buffer);
+        for (id, value) in params
+            .display_meter_ids()
+            .into_iter()
+            .zip(engine.meter_levels())
+        {
+            context.set_meter(id, value);
+        }
+        params.meter_state.publish(engine.meter_levels());
         ProcessStatus::Normal
     }
 
@@ -65,7 +74,9 @@ truce::plugin! { logic: SwankyAmp, params: SwankyAmpParams }
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
     use truce::core::PluginRuntime;
+    use truce_test::{InputSource, MeterReadings};
 
     fn signal(frames: usize, phase: f32) -> Vec<f32> {
         (0..frames)
@@ -130,6 +141,74 @@ mod tests {
         truce_test::assert_bus_config_effect::<Plugin>();
         truce_test::assert_has_editor::<Plugin>();
         truce_test::assert_state_round_trip::<Plugin>();
+    }
+
+    #[test]
+    fn live_meters_publish_instance_local_mono_levels() {
+        let active = truce_test::driver!(Plugin)
+            .channels(1)
+            .block_size(128)
+            .duration(Duration::from_millis(40))
+            .input(InputSource::Generator(Box::new(|frame, sample_rate| {
+                (std::f64::consts::TAU * 440. * frame as f64 / sample_rate).sin() as f32 * 0.1
+            })))
+            .run();
+        let MeterReadings::Final(active_levels) = &active.meters else {
+            panic!("driver did not capture final live meter values");
+        };
+        let ids = SwankyAmpParams::default().display_meter_ids();
+        let level = |id| {
+            active_levels
+                .iter()
+                .find_map(|(meter_id, value)| (*meter_id == id).then_some(*value))
+                .unwrap_or_else(|| panic!("missing meter id {id}"))
+        };
+        assert_eq!(level(ids[0]).to_bits(), level(ids[1]).to_bits());
+        assert_eq!(level(ids[2]).to_bits(), level(ids[3]).to_bits());
+        assert!(level(ids[0]) > 0.15, "input signal did not reach the meter");
+        assert!(
+            level(ids[2]) > 0.,
+            "post-amp signal did not reach the meter"
+        );
+
+        let silent = truce_test::driver!(Plugin)
+            .channels(1)
+            .block_size(128)
+            .duration(Duration::from_millis(40))
+            .run();
+        let MeterReadings::Final(silent_levels) = silent.meters else {
+            panic!("driver did not capture final silent meter values");
+        };
+        assert!(
+            silent_levels
+                .iter()
+                .all(|(_, value)| value.to_bits() == 0.0_f32.to_bits()),
+            "a separate silent plugin instance inherited live meter state: {silent_levels:?}"
+        );
+    }
+
+    #[test]
+    fn input_meter_uses_the_released_gain_scale_and_time_based_release() {
+        let params = SwankyAmpParams::default();
+        params.input.set_value(1.);
+        let mut engine = engine::Engine::new(&params);
+        engine.reset(&params, 44_100., 22_050);
+        let signal = vec![vec![0.01; 64]];
+        let _ = render(&mut engine, &params, &signal, 64);
+        let active = engine.meter_levels()[0];
+        let expected = 21. / 34.;
+        assert!(
+            (active - expected).abs() < 1e-5,
+            "+35 dB Input mapped a -40 dBFS signal to {active}, expected {expected}"
+        );
+
+        let silence = vec![vec![0.; 22_050]];
+        let _ = render(&mut engine, &params, &silence, 22_050);
+        let released = engine.meter_levels()[0];
+        assert!(
+            (released - active * 0.5).abs() < 1e-5,
+            "input meter released from {active} to {released} in 0.5 seconds"
+        );
     }
 
     #[test]

@@ -51,3 +51,7 @@ install beside Swanky Amp 1.4.0. The interface, factory preset bank and signed c
   of a V track two discs tall, with the ON label lit in the accent.
 - Set the knob markers to Pro's divot proportions, so both knob sizes match
   Pro's knobs.
+- Lit the level meters from each instance's own signal: input after the Input
+  control on the released -26 to +8 dB scale, output after the cabinet and
+  Output control on -30 to 0 dB, with instant attack and a half-second
+  release. Hosts that show plugin meters receive the same four levels.

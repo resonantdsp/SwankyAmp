@@ -71,6 +71,18 @@ pub struct SwankyAmpParams {
     /// the editor, never host state.
     #[skip]
     pub resolved_oversampling: ResolvedOversampling,
+    /// The latest live meter levels, shared from the audio thread to this
+    /// instance's editor. Session state, never host state.
+    #[skip]
+    pub meter_state: std::sync::Arc<crate::meters::MeterState>,
+    #[meter]
+    pub input_meter_left: MeterSlot,
+    #[meter]
+    pub input_meter_right: MeterSlot,
+    #[meter]
+    pub output_meter_left: MeterSlot,
+    #[meter]
+    pub output_meter_right: MeterSlot,
 }
 
 /// Doublings of the host rate the engine is running, shared from the audio
@@ -106,6 +118,16 @@ fn plain(param: &FloatParam) -> f32 {
 }
 
 impl SwankyAmpParams {
+    /// Host meter ids in the order of [`crate::engine::Engine::meter_levels`].
+    pub fn display_meter_ids(&self) -> [u32; 4] {
+        [
+            self.input_meter_left.id(),
+            self.input_meter_right.id(),
+            self.output_meter_left.id(),
+            self.output_meter_right.id(),
+        ]
+    }
+
     pub fn oversampling_choice(&self) -> usize {
         self.oversampling.value_usize()
     }

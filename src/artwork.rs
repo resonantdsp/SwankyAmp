@@ -194,8 +194,12 @@ struct RuntimeScene {
     data_start: usize,
     base: PackedLayer,
     shadow: PackedLayer,
-    ring_responses: Vec<PackedLayer>,
+    /// Ring responses by family and step, then one meter cell response per
+    /// meter size family.
+    responses: Vec<PackedLayer>,
     ring_steps: u32,
+    /// Index into `responses` of each `layout::METERS` column's cell family.
+    meter_response_layers: [u32; 4],
     disc: Vec<PackedLayer>,
 }
 
@@ -217,12 +221,37 @@ fn load_runtime_scene() -> Option<RuntimeScene> {
         .iter()
         .find(|layer| layer.role == "shadow")?
         .clone();
-    let ring_responses: Vec<_> = header
+    let mut responses: Vec<_> = header
         .layers
         .iter()
         .filter(|layer| layer.role == "ring-response")
         .cloned()
         .collect();
+    let meter_response_start = responses.len() as u32;
+    responses.extend(
+        header
+            .layers
+            .iter()
+            .filter(|layer| layer.role == "meter-response")
+            .cloned(),
+    );
+    let physical = style::PhysicalStyle::default();
+    let meter_response_layers = std::array::from_fn(|index| {
+        let bounds = layout::METERS[index].bounds;
+        let cell = [
+            bounds[2],
+            bounds[3] / physical.meter_bars as f32 * (1. - physical.meter_gap),
+        ];
+        header
+            .response_library
+            .meter_sizes
+            .iter()
+            .position(|size| (size[0] - cell[0]).abs() < 0.01 && (size[1] - cell[1]).abs() < 0.01)
+            .map_or(u32::MAX, |family| meter_response_start + family as u32)
+    });
+    if meter_response_layers.contains(&u32::MAX) {
+        return None;
+    }
     let disc: Vec<_> = DISC_LAYERS
         .iter()
         .map(|(role, ..)| {
@@ -241,8 +270,9 @@ fn load_runtime_scene() -> Option<RuntimeScene> {
         data_start: 12 + header_length,
         base,
         shadow,
-        ring_responses,
+        responses,
         ring_steps: header.response_library.ring_steps,
+        meter_response_layers,
         disc,
     })
 }
@@ -251,14 +281,17 @@ pub fn loaded() -> bool {
     runtime_scene().is_some()
 }
 
+/// The baked scene with the knobs at their values and each meter column
+/// lit to its level in `meter_levels` (input L/R, output L/R, 0..1).
 pub fn backdrop<'a, R>(
     params: &truce_iced::ParamCache<SwankyAmpParams>,
+    meter_levels: [f32; 4],
 ) -> Option<Element<'a, Msg, Theme, R>>
 where
     R: iced_core::Renderer + iced_wgpu::primitive::Renderer + 'a,
 {
     let scene = runtime_scene()?;
-    let uniform = Uniform::new(params, scene.ring_steps);
+    let uniform = Uniform::new(params, scene, meter_levels);
     Some(
         iced_widget::shader(SceneProgram { scene, uniform })
             .width(Length::Fill)
@@ -285,15 +318,22 @@ struct Uniform {
     extent: [f32; 4],
     /// The disc sprite's top-left corner and size, in interface pixels.
     disc: [f32; 4],
+    meter_style: [f32; 4],
+    meter_colors: [[f32; 4]; 2],
+    meters: [Control; 4],
     controls: [Control; 32],
 }
 
 impl Uniform {
-    fn new(params: &truce_iced::ParamCache<SwankyAmpParams>, ring_steps: u32) -> Self {
+    fn new(
+        params: &truce_iced::ParamCache<SwankyAmpParams>,
+        scene: &RuntimeScene,
+        meter_levels: [f32; 4],
+    ) -> Self {
         let physical = style::PhysicalStyle::default();
         let marker = style::MarkerStyle::default();
         let mut result = Self {
-            scene: [style::WIDTH, style::HEIGHT, 0.0, ring_steps as f32],
+            scene: [style::WIDTH, style::HEIGHT, 0.0, scene.ring_steps as f32],
             ring: [
                 physical.ring_radius,
                 physical.ring_half_width,
@@ -323,11 +363,35 @@ impl Uniform {
                 layout::SWITCH.bounds,
                 params.get(layout::CABINET_SWITCH) >= 0.5,
             ),
+            meter_style: [
+                physical.meter_bars as f32,
+                physical.meter_gap,
+                physical.meter_reflection_extent,
+                layout::METERS.len() as f32,
+            ],
+            meter_colors: physical
+                .meter_radiance
+                .map(|color| [color[0], color[1], color[2], 0.0]),
+            meters: [Control {
+                geometry: [0.0; 4],
+                state: [0.0; 4],
+            }; 4],
             controls: [Control {
                 geometry: [0.0; 4],
                 state: [0.0; 4],
             }; 32],
         };
+        for (index, (meter, level)) in layout::METERS.iter().zip(meter_levels).enumerate() {
+            result.meters[index] = Control {
+                geometry: meter.bounds,
+                state: [
+                    level,
+                    scene.meter_response_layers[index] as f32,
+                    f32::from(meter.appearance.starts_with("output")),
+                    0.0,
+                ],
+            };
+        }
         for (index, control) in layout::CONTROLS
             .iter()
             .filter(|control| control.kind == layout::ControlKind::Knob)
@@ -494,7 +558,7 @@ impl Primitive for ScenePrimitive {
         if pipeline.binding.as_ref().map(|(key, _)| key) != Some(&self.scene.physical_sha256) {
             let base = upload_layer(device, queue, self.scene, &self.scene.base);
             let shadow = upload_layer(device, queue, self.scene, &self.scene.shadow);
-            let responses = upload_array(device, queue, self.scene, &self.scene.ring_responses);
+            let responses = upload_array(device, queue, self.scene, &self.scene.responses);
             let disc = upload_array(device, queue, self.scene, &self.scene.disc);
             let binding = device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("Free artwork binding"),

@@ -105,6 +105,15 @@ just capture /tmp/swanky-capture
 the artwork package is missing or stale so a new bake can be produced from
 changed widget geometry.
 
+The four live meter columns, captioned L and R, are local to each plugin
+instance. The blue input pair observes the signal after the Input control on
+the released -26 to +8 dB scale; the output pair, in the accent, observes the
+final signal after the optional cabinet and Output control on a -30 to 0 dB
+scale. Cells light from the bottom up. A mono instance mirrors its reading into
+L and R. Immediate attack and a half-second release settle to exact darkness,
+after which the editor has no meter change to redraw; the meters also go dark
+while the editor window has lost focus and the pointer is elsewhere.
+
 Artwork contributors can make a public, reproducible round trip without the
 production renderer. Unpack the deterministic RGB9E5 package to editable ZIP
 float32 RGB EXRs, edit them in a standard HDR image tool, refresh the receipt,

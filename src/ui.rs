@@ -1,5 +1,6 @@
 use crate::{
     layout::{self, Component, ControlKind, SurfaceSpec},
+    meters::MeterState,
     params::SwankyAmpParams,
     release_notice::{self, Notice},
     style,
@@ -9,7 +10,7 @@ use iced_core::{Element, Length, Padding, Theme, mouse, text::LineHeight};
 use std::sync::Arc;
 use truce::prelude::Params;
 use truce_iced::iced::widget::{Column, Space, column, container, mouse_area, row, stack, text};
-use truce_iced::iced::{Alignment, Border, Color, Task};
+use truce_iced::iced::{Alignment, Border, Color, Subscription, Task, event, window};
 use truce_iced::{IcedPlugin, Message, ParamCache, ParamMessage, PluginContext};
 
 const INK: Color = style::INK;
@@ -31,11 +32,18 @@ const KNOB_ROW_HEIGHT: f32 = 84.0;
 #[derive(Debug, Clone)]
 pub enum Action {
     OpenReleaseNotice,
+    Focus(bool),
+    Pointer(bool),
 }
 
 pub struct FreeUi {
     releases: Option<release_notice::Service>,
     notice: Option<Notice>,
+    meters: Option<Arc<MeterState>>,
+    meter_levels: [f32; 4],
+    meter_revision: u64,
+    focused: bool,
+    hovered: bool,
 }
 
 impl FreeUi {
@@ -45,6 +53,29 @@ impl FreeUi {
         Self {
             releases: None,
             notice: None,
+            meters: None,
+            meter_levels: [0.0; 4],
+            meter_revision: 0,
+            focused: true,
+            hovered: false,
+        }
+    }
+
+    /// Meters go dark while the window has lost focus and the pointer is
+    /// elsewhere, so a background editor stops repainting under running
+    /// audio.
+    fn displays_live(&self) -> bool {
+        self.focused || self.hovered
+    }
+
+    fn sync_meters(&mut self) {
+        match &self.meters {
+            Some(meters) if self.displays_live() => {
+                let snapshot = meters.snapshot();
+                self.meter_levels = snapshot.levels;
+                self.meter_revision = snapshot.revision;
+            }
+            _ => self.meter_levels = [0.0; 4],
         }
     }
 
@@ -74,7 +105,7 @@ impl FreeUi {
             layers.push(surface(section, None));
         }
         layers.push(surface(layout::SWITCH, None));
-        if baked && let Some(backdrop) = crate::artwork::backdrop::<R>(params) {
+        if baked && let Some(backdrop) = crate::artwork::backdrop::<R>(params, self.meter_levels) {
             layers.push(backdrop);
         }
         for section in layout::SECTIONS {
@@ -93,7 +124,7 @@ impl FreeUi {
             ));
         }
         layers.extend(header(self.notice.as_ref(), params));
-        layers.extend(levels_meters());
+        layers.extend(levels_meters(self.meter_levels));
         for control in layout::CONTROLS {
             layers.push(match control.kind {
                 ControlKind::Knob => control_column(control, params),
@@ -120,11 +151,29 @@ impl FreeUi {
 impl IcedPlugin<SwankyAmpParams> for FreeUi {
     type Message = Action;
 
-    fn new(_: Arc<SwankyAmpParams>) -> Self {
-        Self {
+    fn new(params: Arc<SwankyAmpParams>) -> Self {
+        let mut ui = Self {
             releases: Some(release_notice::Service::start()),
-            notice: None,
-        }
+            meters: Some(Arc::clone(&params.meter_state)),
+            // Some hosts never send focus to an embedded editor, so it
+            // starts live until a focus or pointer event says otherwise.
+            ..Self::resting()
+        };
+        ui.sync_meters();
+        ui
+    }
+
+    fn subscription(&self) -> Subscription<Msg> {
+        event::listen_with(|event, _, _| {
+            let action = match event {
+                iced_core::Event::Window(window::Event::Focused) => Action::Focus(true),
+                iced_core::Event::Window(window::Event::Unfocused) => Action::Focus(false),
+                iced_core::Event::Mouse(mouse::Event::CursorMoved { .. }) => Action::Pointer(true),
+                iced_core::Event::Mouse(mouse::Event::CursorLeft) => Action::Pointer(false),
+                _ => return None,
+            };
+            Some(Message::Plugin(action))
+        })
     }
 
     fn update(
@@ -134,21 +183,40 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
         _: &PluginContext<SwankyAmpParams>,
     ) -> Task<Msg> {
         match message {
-            Message::Tick => self.notice = self.latest_notice(),
+            Message::Tick => {
+                self.notice = self.latest_notice();
+                self.sync_meters();
+            }
             Message::Plugin(Action::OpenReleaseNotice) => {
                 if let Some(notice) = &self.notice {
                     notice.open();
                 }
+            }
+            Message::Plugin(Action::Focus(focused)) => {
+                self.focused = focused;
+                self.sync_meters();
+            }
+            Message::Plugin(Action::Pointer(hovered)) => {
+                self.hovered = hovered;
+                self.sync_meters();
             }
             _ => {}
         }
         Task::none()
     }
 
-    // A notice lands from the worker while the editor may be idle; asking
-    // for a frame lets the next tick pick it up.
+    // A notice lands from the worker and meter levels from the audio thread
+    // while the editor may be idle; asking for a frame lets the next tick
+    // pick them up. Settled meters publish no new revision, so a quiet
+    // instance stops asking.
     fn needs_redraw(&self) -> bool {
-        self.releases.is_some() && self.latest_notice() != self.notice
+        let notice = self.releases.is_some() && self.latest_notice() != self.notice;
+        let meters = self.displays_live()
+            && self
+                .meters
+                .as_ref()
+                .is_some_and(|meters| meters.revision() != self.meter_revision);
+        notice || meters
     }
 
     fn title(&self) -> String {
@@ -512,9 +580,9 @@ fn flat_switch<'a, R: FreeRenderer + 'a>(
     ]
 }
 
-fn levels_meters<'a, R: FreeRenderer + 'a>() -> Vec<Element<'a, Msg, Theme, R>> {
+fn levels_meters<'a, R: FreeRenderer + 'a>(levels: [f32; 4]) -> Vec<Element<'a, Msg, Theme, R>> {
     let mut layers = Vec::new();
-    for meter in layout::METERS {
+    for (meter, level) in layout::METERS.into_iter().zip(levels) {
         let color = if meter.appearance.starts_with("output") {
             style::METER_OUTPUT
         } else {
@@ -524,7 +592,7 @@ fn levels_meters<'a, R: FreeRenderer + 'a>() -> Vec<Element<'a, Msg, Theme, R>> 
         let [x, y, width, height] = meter.bounds;
         layers.push(place(
             meter.bounds,
-            layout::mark(component, meter_column(color, height)),
+            layout::mark(component, meter_column(color, height, level)),
         ));
         // The caption shares the knob readout's line, as in Pro.
         let caption = if meter.appearance.ends_with("left") {
@@ -546,14 +614,25 @@ fn levels_meters<'a, R: FreeRenderer + 'a>() -> Vec<Element<'a, Msg, Theme, R>> 
     layers
 }
 
-fn meter_column<'a, R: FreeRenderer + 'a>(color: Color, height: f32) -> Element<'a, Msg, Theme, R> {
+/// Without a bake the cells are flat: lit cells in full colour from the
+/// bottom, matching which cells the baked compositor lights.
+fn meter_column<'a, R: FreeRenderer + 'a>(
+    color: Color,
+    height: f32,
+    level: f32,
+) -> Element<'a, Msg, Theme, R> {
     let pitch = height / style::METER_BARS as f32;
     let gap = pitch * style::METER_GAP;
     let bar_height = pitch - gap;
+    let baked = R::LOAD_ARTWORK && crate::artwork::loaded();
+    let lit = (level.clamp(0.0, 1.0) * style::METER_BARS as f32).floor() as u32;
     let bars: Vec<Element<'a, Msg, Theme, R>> = (0..style::METER_BARS)
-        .map(|_| {
-            let alpha = if R::LOAD_ARTWORK && crate::artwork::loaded() {
+        .rev()
+        .map(|bar| {
+            let alpha = if baked {
                 0.0
+            } else if bar < lit {
+                1.0
             } else {
                 0.12
             };

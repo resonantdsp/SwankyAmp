@@ -1,10 +1,17 @@
 use crate::dsp::amp::{AmpChannel, AmpControls, MAX_OVERSAMPLING};
+use crate::dsp::mapping::AmpVoicing;
 use crate::params::SwankyAmpParams;
 use truce::prelude::AudioBuffer;
 
 const INITIAL_BLOCK: usize = 1024;
 const AUTO_TARGET_RATE: f64 = 88_200.;
 const MAX_INTERNAL_RATE: f64 = 192_000. * 1.01;
+const METER_RELEASE_SECONDS: f32 = 0.5;
+const METER_DARK_THRESHOLD: f32 = 0.001;
+// The released editor's meter scales, input after the Input control and
+// output after the cabinet and Output control.
+const INPUT_METER_DB: (f32, f32) = (-26., 8.);
+const OUTPUT_METER_DB: (f32, f32) = (-30., 0.);
 
 pub(crate) fn doublings_cap(sample_rate: f64) -> usize {
     (0..=MAX_OVERSAMPLING)
@@ -31,6 +38,7 @@ pub struct Engine {
     requested_doublings: usize,
     paths: [AmpChannel; 2],
     scratch: [Vec<f32>; 2],
+    meters: [f32; 4],
 }
 
 impl Default for Engine {
@@ -55,6 +63,7 @@ impl Engine {
                 AmpChannel::new(sample_rate as f32, INITIAL_BLOCK, controls, doublings)
             }),
             scratch: std::array::from_fn(|_| vec![0.; INITIAL_BLOCK]),
+            meters: [0.; 4],
         }
     }
 
@@ -71,6 +80,7 @@ impl Engine {
         for scratch in &mut self.scratch {
             scratch.resize(max_block.max(1), 0.);
         }
+        self.meters = [0.; 4];
     }
 
     pub fn reset_realtime(&mut self, params: &SwankyAmpParams) {
@@ -84,6 +94,7 @@ impl Engine {
         for scratch in &mut self.scratch {
             scratch.fill(0.);
         }
+        self.meters = [0.; 4];
     }
 
     pub fn process(&mut self, params: &SwankyAmpParams, buffer: &mut AudioBuffer) {
@@ -111,13 +122,19 @@ impl Engine {
             return;
         }
 
+        let input_gain = AmpVoicing::from_controls(controls).input_gain;
+        let mut input_peaks = [0.0_f32; 2];
+        let mut output_peaks = [0.0_f32; 2];
         let mut start = 0;
         while start < frames {
             let length = (frames - start).min(capacity);
             for channel in 0..channels {
-                self.scratch[channel][..length]
-                    .copy_from_slice(&buffer.input(channel)[start..start + length]);
+                let input = &buffer.input(channel)[start..start + length];
+                input_peaks[channel] = input_peaks[channel].max(peak(input) * input_gain);
+                self.scratch[channel][..length].copy_from_slice(input);
                 self.paths[channel].process(&mut self.scratch[channel][..length], self.doublings);
+                output_peaks[channel] =
+                    output_peaks[channel].max(peak(&self.scratch[channel][..length]));
                 buffer.output(channel)[start..start + length]
                     .copy_from_slice(&self.scratch[channel][..length]);
             }
@@ -126,9 +143,52 @@ impl Engine {
         for channel in channels..buffer.num_output_channels() {
             buffer.output(channel).fill(0.);
         }
+
+        if channels == 1 {
+            input_peaks[1] = input_peaks[0];
+            output_peaks[1] = output_peaks[0];
+        }
+        let targets = [
+            meter_level(input_peaks[0], INPUT_METER_DB),
+            meter_level(input_peaks[1], INPUT_METER_DB),
+            meter_level(output_peaks[0], OUTPUT_METER_DB),
+            meter_level(output_peaks[1], OUTPUT_METER_DB),
+        ];
+        let release = 0.5_f32.powf(frames as f32 / (self.sample_rate * METER_RELEASE_SECONDS));
+        for (level, target) in self.meters.iter_mut().zip(targets) {
+            if target >= *level {
+                *level = target;
+            } else {
+                *level = target.max(*level * release);
+                if *level < METER_DARK_THRESHOLD {
+                    *level = 0.;
+                }
+            }
+        }
+    }
+
+    /// Input L/R then output L/R, each 0..1 on its meter's scale.
+    pub fn meter_levels(&self) -> [f32; 4] {
+        self.meters
     }
 
     pub fn latency(&self) -> u32 {
         u32::try_from(self.paths[0].latency(self.requested_doublings)).unwrap_or(u32::MAX)
     }
+}
+
+fn peak(samples: &[f32]) -> f32 {
+    samples
+        .iter()
+        .copied()
+        .filter(|sample| sample.is_finite())
+        .map(f32::abs)
+        .fold(0., f32::max)
+}
+
+fn meter_level(peak: f32, (minimum_db, maximum_db): (f32, f32)) -> f32 {
+    if peak <= 0. || !peak.is_finite() {
+        return 0.;
+    }
+    ((20. * peak.log10() - minimum_db) / (maximum_db - minimum_db)).clamp(0., 1.)
 }
