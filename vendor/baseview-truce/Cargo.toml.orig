@@ -1,0 +1,117 @@
+[package]
+name = "baseview-truce"
+version = "0.1.1-truce.13"
+authors = [
+    "Mahae Koh <mahae@truce.audio>",
+    "William Light <git@wrl.lhiaudio.com>",
+    "Charles Saracco <crsaracco@gmail.com>",
+    "Mirko Covizzi <mrkcvzz@gmail.com>",
+    "Micah Johnston <micah@glowcoil.com>",
+    "Billy Messenger <billydm@protonmail.com>",
+    "Anton Lazarev <https://antonok.com>",
+    "Joakim Frostegård <joakim.frostegard@gmail.com>",
+    "Robbert van der Helm <mail@robbertvanderhelm.nl>",
+    "Adrien Prokopowicz <prokopylmc@gmail.com>"
+]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Low-level windowing system geared towards making audio plugin UIs. truce-audio fork of RustAudio/baseview carrying a Pro Tools (AAX) teardown fix and macOS cursor implementation."
+keywords = ["windowing", "audio", "plugin"]
+categories = ["gui"]
+repository = "https://github.com/truce-audio/baseview"
+
+# `scripts` holds the release tooling (bump / verify / publish); it has no
+# business in the published crate. Excluding it also keeps `cargo publish`
+# from dirty-checking those files, which the executable bit (100755) makes
+# libgit2 report as modified on Windows even when the tree is clean.
+exclude = [".github", "scripts"]
+rust-version = "1.80"
+
+[features]
+default = []
+opengl = [
+    "uuid",
+    "objc2-core-foundation/CFBundle",
+    "objc2-app-kit/NSOpenGL",
+    "objc2-app-kit/NSOpenGLView",
+    "objc2-app-kit/objc2-open-gl"
+]
+
+# [lib].name is `baseview` (not the default `baseview_truce` cargo
+# would synthesize from the package name): lets downstream `[patch]`
+# sections substitute this crate cleanly for upstream `baseview`
+# without requiring a wrapper shim. vizia and any other consumer
+# pinning baseview via git/crates.io can now do
+# `[patch.<source>] baseview = { package = "baseview-truce" }`
+# and have the substitution link, since rustc sees a crate named
+# `baseview` either way. truce's existing consumers go through the
+# workspace alias `baseview = { package = "baseview-truce", ... }`
+# so their `use baseview::*` lines are unaffected.
+[lib]
+name = "baseview"
+
+[dependencies]
+keyboard-types = { version = "0.7", default-features = false }
+raw-window-handle = "0.5"
+
+[target.'cfg(target_os="linux")'.dependencies]
+x11rb = { version = "0.13.2", features = ["cursor", "resource_manager", "allow-unsafe-code", "dl-libxcb"], default-features = false }
+x11-dl = { version = "2.21" }
+nix = "0.22.0"
+
+[target.'cfg(target_os="windows")'.dependencies]
+# Later versions of the windows crates need MSRV 1.80
+windows = { version = "=0.61.3", features = [
+    "Win32_Graphics_Gdi",
+    "Win32_Graphics_OpenGL",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Ole",
+    "Win32_System_SystemServices",
+    "Win32_UI_WindowsAndMessaging",
+] }
+windows-sys = { version = "0.61.2", features = [
+    "Win32_Graphics_Gdi",
+    "Win32_Graphics_OpenGL",
+    "Win32_Media",
+    "Win32_System_Rpc",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Ole",
+    "Win32_System_SystemServices",
+    "Win32_System_Threading",
+    "Win32_UI_Controls",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+windows-core = { version = "=0.61.2" }
+uuid = { version = "0.8", features = ["v4"], optional = true }
+
+[target.'cfg(target_os="macos")'.dependencies]
+objc2 = "0.6.4"
+objc2-core-foundation = { version = "0.3.2", default-features = false, features = ["std", "CFString", "CFUUID"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSEnumerator"] }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = [
+    "NSApplication",
+    "NSCursor",
+    "NSDragging",
+    "NSEvent",
+    "NSGraphics",
+    "NSPasteboard",
+    "NSResponder",
+    "NSRunningApplication",
+    "NSTrackingArea",
+    "NSView",
+    "NSWindow",
+    "objc2-core-foundation",
+    "objc2-quartz-core"
+] }
+
+[workspace]
+members = ["examples/open_parented", "examples/open_window", "examples/render_femtovg"]
+
+[lints.clippy]
+missing-safety-doc = "allow"
+
+[package.metadata.docs.rs]
+all-features = true

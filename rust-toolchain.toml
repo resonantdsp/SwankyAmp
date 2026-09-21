@@ -1,0 +1,4 @@
+# Pinned so local and hosted checks compile the same source with the same lints.
+[toolchain]
+channel = "1.97.1"
+components = ["rustfmt", "clippy"]

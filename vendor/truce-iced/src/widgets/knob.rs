@@ -1,0 +1,306 @@
+//! Rotary knob widget rendered via iced Canvas.
+
+use std::fmt::Debug;
+use std::marker::PhantomData;
+
+use crate::iced::widget::Canvas;
+use crate::iced::widget::canvas::{
+    self, Event, Frame, Geometry, LineCap, Path, Stroke, Text, path::Arc,
+};
+use crate::iced::{Color, Element, Length, Point, Rectangle, Renderer, Theme, alignment, mouse};
+
+use crate::param_cache::ParamCache;
+use crate::param_message::{Message, ParamMessage};
+use crate::theme;
+use truce_core::Float;
+use truce_params::Params;
+
+const START_ANGLE: f32 = std::f32::consts::PI * 0.75;
+const END_ANGLE: f32 = std::f32::consts::PI * 2.25;
+const DRAG_SENSITIVITY: f32 = 200.0;
+
+/// Builder for a rotary knob widget.
+pub struct KnobWidget<'a, M> {
+    id: u32,
+    value: f64,
+    display: String,
+    label: Option<&'a str>,
+    size: f32,
+    font: crate::iced::Font,
+    _phantom: PhantomData<M>,
+}
+
+impl<'a, M: Clone + Debug + 'static> KnobWidget<'a, M> {
+    pub fn new(id: impl Into<u32>, params: &'a ParamCache<impl Params>) -> Self {
+        let id = id.into();
+        Self {
+            id,
+            value: params.get(id),
+            display: params.label(id).to_string(),
+            label: None,
+            size: 60.0,
+            font: params.font(),
+            _phantom: PhantomData,
+        }
+    }
+
+    #[must_use]
+    pub fn label(mut self, label: &'a str) -> Self {
+        self.label = Some(label);
+        self
+    }
+
+    #[must_use]
+    pub fn size(mut self, size: f32) -> Self {
+        self.size = size;
+        self
+    }
+
+    #[must_use]
+    pub fn font(mut self, font: crate::iced::Font) -> Self {
+        self.font = font;
+        self
+    }
+
+    /// Convert into an iced Element.
+    #[must_use]
+    pub fn into_element(self) -> Element<'a, Message<M>> {
+        let total_h = self.size + 22.0; // Extra space for label + value text
+        let program = KnobProgram {
+            id: self.id,
+            value: f32::from_f64(self.value),
+            display: self.display,
+            label: self.label.unwrap_or("").to_string(),
+            font: self.font,
+        };
+
+        Canvas::new(program)
+            .width(Length::Fixed(self.size))
+            .height(Length::Fixed(total_h))
+            .into()
+    }
+}
+
+impl<'a, M: Clone + Debug + 'static> From<KnobWidget<'a, M>> for Element<'a, Message<M>> {
+    fn from(knob: KnobWidget<'a, M>) -> Self {
+        knob.into_element()
+    }
+}
+
+// Canvas program
+
+struct KnobProgram {
+    id: u32,
+    value: f32,
+    display: String,
+    label: String,
+    font: crate::iced::Font,
+}
+
+#[derive(Default)]
+struct KnobState {
+    dragging: bool,
+    start_value: f32,
+    start_y: f32,
+}
+
+impl<M: Clone + Debug + 'static> canvas::Program<Message<M>> for KnobProgram {
+    type State = KnobState;
+
+    fn draw(
+        &self,
+        state: &Self::State,
+        renderer: &Renderer,
+        _theme: &Theme,
+        bounds: Rectangle,
+        cursor: mouse::Cursor,
+    ) -> Vec<Geometry> {
+        let mut frame = Frame::new(renderer, bounds.size());
+
+        let cx = bounds.width / 2.0;
+        let cy = bounds.width / 2.0; // Square knob area
+        let radius = (bounds.width / 2.0 - 5.0).max(8.0);
+
+        // Hover highlight ring
+        let hovered = state.dragging
+            || cursor.position_in(bounds).is_some_and(|pos| {
+                let dx = pos.x - cx;
+                let dy = pos.y - cy;
+                (dx * dx + dy * dy).sqrt() <= radius + 5.0
+            });
+        if hovered {
+            let hover_ring = Path::new(|b| {
+                b.arc(Arc {
+                    center: Point::new(cx, cy),
+                    radius: radius + 3.0,
+                    start_angle: crate::iced::Radians(START_ANGLE),
+                    end_angle: crate::iced::Radians(END_ANGLE),
+                });
+            });
+            frame.stroke(
+                &hover_ring,
+                Stroke::default()
+                    .with_color(theme::ACCENT)
+                    .with_width(1.5)
+                    .with_line_cap(LineCap::Round),
+            );
+        }
+
+        // Track arc (full range background)
+        let track = Path::new(|b| {
+            b.arc(Arc {
+                center: Point::new(cx, cy),
+                radius,
+                start_angle: crate::iced::Radians(START_ANGLE),
+                end_angle: crate::iced::Radians(END_ANGLE),
+            });
+        });
+        frame.stroke(
+            &track,
+            Stroke::default()
+                .with_color(theme::KNOB_TRACK)
+                .with_width(3.0)
+                .with_line_cap(LineCap::Round),
+        );
+
+        // Value arc
+        let value_angle = START_ANGLE + self.value * (END_ANGLE - START_ANGLE);
+        if self.value > 0.001 {
+            let value_path = Path::new(|b| {
+                b.arc(Arc {
+                    center: Point::new(cx, cy),
+                    radius,
+                    start_angle: crate::iced::Radians(START_ANGLE),
+                    end_angle: crate::iced::Radians(value_angle),
+                });
+            });
+            frame.stroke(
+                &value_path,
+                Stroke::default()
+                    .with_color(theme::KNOB_FILL)
+                    .with_width(3.0)
+                    .with_line_cap(LineCap::Round),
+            );
+        }
+
+        // Pointer line
+        let pointer_len = radius * 0.65;
+        let px = cx + pointer_len * value_angle.cos();
+        let py = cy + pointer_len * value_angle.sin();
+        let pointer = Path::line(Point::new(cx, cy), Point::new(px, py));
+        frame.stroke(
+            &pointer,
+            Stroke::default()
+                .with_color(theme::KNOB_POINTER)
+                .with_width(2.0),
+        );
+
+        // Value text
+        let value_y = bounds.width / 2.0 + (bounds.width / 2.0 - 5.0) + 2.0; // arc bottom + 2px
+        frame.fill_text(Text {
+            content: self.display.clone(),
+            position: Point::new(cx, value_y),
+            color: Color::from_rgb(0.90, 0.90, 0.92),
+            size: crate::iced::Pixels(10.0),
+            align_x: alignment::Horizontal::Center.into(),
+            align_y: alignment::Vertical::Top,
+            font: self.font,
+            ..Text::default()
+        });
+
+        // Label text
+        if !self.label.is_empty() {
+            let label_y = value_y + 12.0;
+            frame.fill_text(Text {
+                content: self.label.clone(),
+                position: Point::new(cx, label_y),
+                color: theme::TEXT_DIM,
+                size: crate::iced::Pixels(10.0),
+                align_x: alignment::Horizontal::Center.into(),
+                align_y: alignment::Vertical::Top,
+                font: self.font,
+                ..Text::default()
+            });
+        }
+
+        vec![frame.into_geometry()]
+    }
+
+    fn update(
+        &self,
+        state: &mut Self::State,
+        event: &Event,
+        bounds: Rectangle,
+        cursor: mouse::Cursor,
+    ) -> Option<canvas::Action<Message<M>>> {
+        match event {
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+                if let Some(pos) = cursor.position_in(bounds) {
+                    let cx = bounds.width / 2.0;
+                    let cy = bounds.width / 2.0;
+                    let dx = pos.x - cx;
+                    let dy = pos.y - cy;
+                    let dist = (dx * dx + dy * dy).sqrt();
+                    let radius = bounds.width / 2.0 - 5.0;
+
+                    if dist <= radius + 5.0 {
+                        state.dragging = true;
+                        state.start_value = self.value;
+                        state.start_y = pos.y;
+                        return Some(
+                            canvas::Action::publish(Message::Param(ParamMessage::BeginEdit(
+                                self.id,
+                            )))
+                            .and_capture(),
+                        );
+                    }
+                }
+            }
+            Event::Mouse(mouse::Event::CursorMoved { .. }) if state.dragging => {
+                if let Some(pos) = cursor.position() {
+                    let delta = (state.start_y - (pos.y - bounds.y)) / DRAG_SENSITIVITY;
+                    let new_value = (state.start_value + delta).clamp(0.0, 1.0);
+                    return Some(
+                        canvas::Action::publish(Message::Param(ParamMessage::SetNormalized(
+                            self.id,
+                            f64::from(new_value),
+                        )))
+                        .and_capture(),
+                    );
+                }
+            }
+            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) if state.dragging => {
+                state.dragging = false;
+                return Some(
+                    canvas::Action::publish(Message::Param(ParamMessage::EndEdit(self.id)))
+                        .and_capture(),
+                );
+            }
+            _ => {}
+        }
+
+        None
+    }
+
+    fn mouse_interaction(
+        &self,
+        state: &Self::State,
+        bounds: Rectangle,
+        cursor: mouse::Cursor,
+    ) -> mouse::Interaction {
+        if state.dragging {
+            return mouse::Interaction::Grabbing;
+        }
+        if let Some(pos) = cursor.position_in(bounds) {
+            let cx = bounds.width / 2.0;
+            let cy = bounds.width / 2.0;
+            let dx = pos.x - cx;
+            let dy = pos.y - cy;
+            let dist = (dx * dx + dy * dy).sqrt();
+            if dist <= bounds.width / 2.0 {
+                return mouse::Interaction::Grab;
+            }
+        }
+        mouse::Interaction::default()
+    }
+}
