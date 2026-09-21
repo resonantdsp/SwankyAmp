@@ -15,6 +15,10 @@ name = "swanky-amp-2"
 path = "src/main.rs"
 required-features = ["standalone"]
 
+[[bin]]
+name = "render-model"
+path = "src/bin/render-model.rs"
+
 [features]
 default = ["clap", "vst3", "standalone"]
 clap = ["dep:truce-clap", "dep:clap-sys"]
@@ -28,6 +32,7 @@ clap-sys = { version = "0.5", optional = true }
 truce-vst3 = { version = "=6.3.0", optional = true }
 truce-standalone = { version = "=6.3.0", features = ["gui"], optional = true }
 truce-iced = "=6.3.0"
+truce-params = "=6.3.0"
 
 [dev-dependencies]
 truce-test = "=6.3.0"
