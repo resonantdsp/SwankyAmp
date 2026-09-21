@@ -78,12 +78,26 @@ The frozen macOS/libc++ detune table includes all eight released five-stage
 families: high-pass, grid time, grid clip, plate bias, plate clip, drift level,
 drift time, and compression level. `std::minstd_rand` has a specified sequence,
 but `std::uniform_real_distribution<float>` does not specify an identical value
-mapping across C++ libraries. Faust's calls into `libm` can also differ in their
-last bits. The check therefore requires bit identity only between the untouched
-and instrumented paths in one process. Across frozen and current toolchains it
-allows a maximum waveform error of `2e-4`, RMS error of `2e-5`, and seam-level
-drift of `0.02 dB`. The command reports whether all WAVs were byte exact and
-whether the current detune table equals the frozen libc++ table.
+mapping across C++ libraries. The manifest therefore records the complete
+libc++ freeze fingerprint and the complete observed libstdc++ fingerprint. The
+check accepts only an exact match to one of them, including all eight families
+and all five values per family.
+
+Floating-point contraction changes the nonlinear sample trajectory: on Linux,
+all 30 WAVs differed from the Apple arm64 freeze even though the instrumented
+and untouched paths remained bit identical in each process. Compiling the same
+source on the freeze machine with contraction disabled reproduced that drift.
+The Linux matrix observed a worst sample error of `0.00185403`, RMS error of
+`0.000399044`, seam-level drift of `0.026258 dB`, and six-band output-level
+drift of `0.00162867 dB`. Raw sample and RMS errors remain diagnostics. The
+portable gate checks every seam within `0.03 dB` and six output bands split at
+120, 400, 1,200, 3,500, and 8,000 Hz within `0.002 dB`.
+
+The exact freeze environment is identified by its OS/platform, arm64
+architecture, compiler driver and Apple Clang version, and `-std=c++20 -O2`
+flags; it must reproduce all 30 WAVs byte for byte. Every environment must
+preserve bit identity between the untouched and instrumented paths, match a
+strict detune fingerprint, and pass the seam and band-level gates.
 
 `render.sh` refuses to overwrite `frozen/` by default. The explicit
 `--replace-frozen` option is accepted only on the canonical macOS arm64 Apple

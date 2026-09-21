@@ -37,10 +37,20 @@ PRESET_NAMES = (
     "level 11",
 )
 BASELINE_COMMIT = "5c32004862e5dcce8a453e1310da926dc9712464"
-ABSOLUTE_TOLERANCE = 2.0e-4
-RMS_TOLERANCE = 2.0e-5
-LEVEL_TOLERANCE_DB = 0.02
+SEAM_LEVEL_TOLERANCE_DB = 0.03
+BAND_LEVEL_TOLERANCE_DB = 0.002
 BAND_EDGES_HZ = (120.0, 400.0, 1200.0, 3500.0, 8000.0)
+COMPILE_FLAGS = ("-std=c++20", "-O2")
+LIBSTDCXX_DETUNING = {
+    "grid_clip": [-0.198858127, 0.119648412, -0.0512876511, -0.106147125, 0.172149673],
+    "grid_tau": [-0.198876113, 0.0516224653, -0.132369727, -0.0194361508, 0.197785094],
+    "hp_freq": [-0.198885098, 0.017609477, 0.0270892084, 0.0239193439, -0.189397186],
+    "plate_bias": [-0.198849127, 0.153661385, 0.189253405, -0.149502605, 0.159331933],
+    "plate_clip": [-0.198831156, -0.178312644, -0.129664525, 0.163786426, 0.133696511],
+    "plate_comp_level": [-0.19880417, -0.0762737021, 0.191958591, 0.033719942, 0.0952433497],
+    "plate_drift_level": [-0.198822156, -0.144299656, 0.110876516, 0.120430931, 0.120878801],
+    "plate_drift_tau": [-0.19881317, -0.110286683, -0.0485824347, 0.0770754367, 0.10806109],
+}
 
 
 def sha256(path: Path) -> str:
@@ -70,11 +80,11 @@ def toolchain() -> tuple[list[str], dict[str, str]]:
     return ["c++"], os.environ.copy()
 
 
-def build_renderer(build_dir: Path) -> tuple[Path, str]:
+def build_renderer(build_dir: Path) -> tuple[Path, str, list[str]]:
     compiler, environment = toolchain()
     binary = build_dir / "reference-renderer"
     subprocess.run(
-        [*compiler, "-std=c++20", "-O2", str(RENDERER_SOURCE), "-o", str(binary)],
+        [*compiler, *COMPILE_FLAGS, str(RENDERER_SOURCE), "-o", str(binary)],
         check=True,
         cwd=ROOT,
         env=environment,
@@ -86,7 +96,7 @@ def build_renderer(build_dir: Path) -> tuple[Path, str]:
         stdout=subprocess.PIPE,
         env=environment,
     ).stdout.splitlines()[0]
-    return binary, version
+    return binary, version, compiler
 
 
 def slug(index: int, name: str) -> str:
@@ -148,7 +158,13 @@ def detuning(binary: Path) -> dict[str, list[float]]:
     return json.loads(completed.stdout)
 
 
-def manifest(binary: Path, compiler: str, renders: list[dict[str, object]]) -> dict:
+def manifest(
+    binary: Path,
+    compiler: str,
+    compiler_command: list[str],
+    renders: list[dict[str, object]],
+) -> dict:
+    freeze_detuning = detuning(binary)
     return {
         "schema": 1,
         "baseline": {
@@ -185,21 +201,27 @@ def manifest(binary: Path, compiler: str, renders: list[dict[str, object]]) -> d
         },
         "detuning": {
             "algorithm": "released std::minstd_rand seeds 123+n with std::uniform_real_distribution<float>(-0.2, 0.2)",
-            "values_on_freeze_toolchain": detuning(binary),
-            "portability": "minstd_rand is specified, but uniform_real_distribution mapping is implementation-defined; these libc++ values are frozen and other standard libraries may differ",
+            "values_on_freeze_toolchain": freeze_detuning,
+            "accepted_profiles": {
+                "libc++ freeze": freeze_detuning,
+                "libstdc++": LIBSTDCXX_DETUNING,
+            },
+            "portability": "minstd_rand is specified, but uniform_real_distribution mapping is implementation-defined; the complete observed libc++ and libstdc++ float arrays are accepted as distinct strict fingerprints",
         },
         "generation": {
             "compiler": compiler,
+            "compiler_command": compiler_command,
+            "compile_flags": list(COMPILE_FLAGS),
             "platform": platform.platform(),
             "machine": platform.machine(),
             "renderer_sha256": sha256(RENDERER_SOURCE),
         },
         "released_source_sha256": released_hashes(),
         "verification_tolerances": {
-            "waveform_max_absolute": ABSOLUTE_TOLERANCE,
-            "waveform_rms_error": RMS_TOLERANCE,
-            "seam_level_db": LEVEL_TOLERANCE_DB,
-            "note": "Same-process untouched-versus-instrumented output is always bit exact. Frozen re-renders use tolerances for compiler, libm, and C++ standard-library differences.",
+            "cross_toolchain_seam_level_db": SEAM_LEVEL_TOLERANCE_DB,
+            "cross_toolchain_band_level_db": BAND_LEVEL_TOLERANCE_DB,
+            "band_edges_hz": list(BAND_EDGES_HZ),
+            "note": "The exact freeze environment must reproduce every WAV byte. Other recognized standard-library profiles gate every seam and six output-band levels; raw waveform max and RMS drift remain diagnostics because FP contraction changes sample trajectories.",
         },
         "renders": renders,
     }
@@ -315,9 +337,30 @@ def measure_level_drift(expected: dict, observed: dict, name: str) -> dict[str, 
                     if left != right:
                         raise RuntimeError(f"seam silence drift for {name} {seam}")
                 else:
+                    if not math.isfinite(left) or not math.isfinite(right):
+                        raise RuntimeError(
+                            f"non-finite seam statistic for {name} {seam} {window}"
+                        )
                     maximum = max(maximum, abs(left - right))
         drift[seam] = maximum
     return drift
+
+
+def validate_detuning_profiles(detuning_data: dict) -> None:
+    frozen = detuning_data["values_on_freeze_toolchain"]
+    profiles = detuning_data["accepted_profiles"]
+    expected_families = set(frozen)
+    if len(expected_families) != 8:
+        raise RuntimeError("frozen detuning does not contain all eight families")
+    for profile, families in profiles.items():
+        if set(families) != expected_families:
+            raise RuntimeError(f"detune fingerprint families differ for {profile}")
+        for family, values in families.items():
+            if len(values) != 5 or any(not math.isfinite(value) for value in values):
+                raise RuntimeError(
+                    f"detune fingerprint must contain five finite values: "
+                    f"{profile} {family}"
+                )
 
 
 def render(destination: Path, replace_frozen: bool = False) -> None:
@@ -326,7 +369,7 @@ def render(destination: Path, replace_frozen: bool = False) -> None:
             "refusing to replace the versioned baseline without --replace-frozen"
         )
     with tempfile.TemporaryDirectory(prefix="swanky-free-reference-build-") as temp:
-        binary, compiler = build_renderer(Path(temp))
+        binary, compiler, compiler_command = build_renderer(Path(temp))
         if destination == FROZEN.resolve() and (
             sys.platform != "darwin"
             or platform.machine() != "arm64"
@@ -336,7 +379,7 @@ def render(destination: Path, replace_frozen: bool = False) -> None:
                 "the frozen baseline must be generated on canonical macOS arm64/libc++"
             )
         renders = run_renderer(binary, destination)
-        data = manifest(binary, compiler, renders)
+        data = manifest(binary, compiler, compiler_command, renders)
         (destination / "manifest.json").write_text(
             json.dumps(data, indent=2, sort_keys=True) + "\n"
         )
@@ -353,6 +396,16 @@ def check() -> None:
         raise RuntimeError("released source extraction differs from provenance")
     if frozen_manifest["generation"]["renderer_sha256"] != sha256(RENDERER_SOURCE):
         raise RuntimeError("renderer source differs from the source that froze the baseline")
+    tolerances = frozen_manifest["verification_tolerances"]
+    if tolerances["cross_toolchain_seam_level_db"] != SEAM_LEVEL_TOLERANCE_DB:
+        raise RuntimeError("frozen seam-level tolerance differs from the checker")
+    if tolerances["cross_toolchain_band_level_db"] != BAND_LEVEL_TOLERANCE_DB:
+        raise RuntimeError("frozen band-level tolerance differs from the checker")
+    if tuple(tolerances["band_edges_hz"]) != BAND_EDGES_HZ:
+        raise RuntimeError("frozen band edges differ from the checker")
+    if tuple(frozen_manifest["generation"]["compile_flags"]) != COMPILE_FLAGS:
+        raise RuntimeError("frozen compile flags differ from the checker")
+    validate_detuning_profiles(frozen_manifest["detuning"])
 
     frozen_by_key = {
         (entry["preset"], entry["sample_rate"]): entry
@@ -373,9 +426,21 @@ def check() -> None:
 
     with tempfile.TemporaryDirectory(prefix="swanky-free-reference-check-") as temp:
         temp_path = Path(temp)
-        binary, compiler = build_renderer(temp_path)
+        binary, compiler, compiler_command = build_renderer(temp_path)
         actual_dir = temp_path / "renders"
         actual_renders = run_renderer(binary, actual_dir)
+        actual_keys = {
+            (entry["preset"], entry["sample_rate"]) for entry in actual_renders
+        }
+        if actual_keys != expected_keys or len(actual_renders) != 30:
+            raise RuntimeError("renderer did not produce the required 10 x 3 corpus")
+        freeze_environment = frozen_manifest["generation"]
+        exact_freeze_toolchain = (
+            compiler == freeze_environment["compiler"]
+            and compiler_command == freeze_environment["compiler_command"]
+            and platform.platform() == freeze_environment["platform"]
+            and platform.machine() == freeze_environment["machine"]
+        )
         worst_max = 0.0
         worst_rms = 0.0
         worst_level = 0.0
@@ -416,15 +481,26 @@ def check() -> None:
                 )
             )
             if (
-                maximum > ABSOLUTE_TOLERANCE
-                or rms > RMS_TOLERANCE
-                or case_level > LEVEL_TOLERANCE_DB
+                case_level > SEAM_LEVEL_TOLERANCE_DB
+                or case_band > BAND_LEVEL_TOLERANCE_DB
             ):
-                violations.append(actual["wav"])
+                violations.append(
+                    f"{actual['wav']} (seam {case_level:.6g} dB, "
+                    f"band {case_band:.6g} dB)"
+                )
 
         current_detuning = detuning(binary)
+        detuning_profiles = frozen_manifest["detuning"]["accepted_profiles"]
         frozen_detuning = frozen_manifest["detuning"]["values_on_freeze_toolchain"]
-        detuning_status = "exact" if current_detuning == frozen_detuning else "different standard-library mapping"
+        if detuning_profiles["libc++ freeze"] != frozen_detuning:
+            raise RuntimeError("libc++ detune fingerprint differs from freeze provenance")
+        matching_profiles = [
+            name for name, values in detuning_profiles.items() if current_detuning == values
+        ]
+        if len(matching_profiles) != 1:
+            print("reference-detuning-current: " + json.dumps(current_detuning, sort_keys=True))
+            raise RuntimeError("detuning does not match a recognized full-array fingerprint")
+        detuning_profile = matching_profiles[0]
         detuning_delta = max(
             abs(current - frozen)
             for family, values in frozen_detuning.items()
@@ -434,14 +510,16 @@ def check() -> None:
             f"reference: 30 renders compared; {exact}/30 byte exact; "
             f"worst max error {worst_max:.3g}, rms error {worst_rms:.3g}; "
             f"worst seam level {worst_level:.3g} dB, band level "
-            f"{worst_band:.3g} dB; detuning {detuning_status} "
+            f"{worst_band:.3g} dB; detuning profile {detuning_profile} "
             f"(max delta {detuning_delta:.3g}); compiler {compiler}"
         )
-        if current_detuning != frozen_detuning:
-            print("reference-detuning-current: " + json.dumps(current_detuning, sort_keys=True))
+        if exact_freeze_toolchain and exact != len(actual_renders):
+            raise RuntimeError(
+                f"freeze toolchain reproduced only {exact}/{len(actual_renders)} WAVs byte exactly"
+            )
         if violations:
             raise RuntimeError(
-                f"{len(violations)}/30 renders exceeded portability tolerances: "
+                f"{len(violations)}/30 renders exceeded cross-toolchain level tolerances: "
                 + ", ".join(violations)
             )
 
