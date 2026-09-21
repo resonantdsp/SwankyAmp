@@ -1,0 +1,1333 @@
+//! Generic helpers shared across commands: paths, sub-process invocation,
+//! signing, and Visual Studio / `CMake` / Ninja location.
+//!
+//! Functions here have no per-command flavor - anything that's specific
+//! to install, package, or doctor lives next to the command that uses it.
+
+use crate::CargoTruceError;
+use std::collections::{BTreeMap, HashSet};
+use std::env;
+use std::ffi::OsStr;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Mutex, OnceLock};
+
+mod build;
+#[cfg(target_os = "macos")]
+mod bundle_link;
+mod codesign;
+mod locate;
+
+#[cfg(target_os = "windows")]
+pub(crate) use build::cargo_rustc_bin;
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+pub(crate) use build::rustup_has_target;
+#[cfg(target_os = "macos")]
+pub(crate) use build::{
+    MacArch, cargo_build_for_arch, cargo_build_multi_arch, cargo_build_multi_arch_with_profile,
+    lipo_into,
+};
+pub(crate) use build::{apply_extra_features, cargo_build, cargo_build_debug, sccache_wrapper};
+#[cfg(target_os = "macos")]
+pub(crate) use bundle_link::{
+    CLAP_EXPORTS, VST2_EXPORTS, VST3_EXPORTS, link_macos_bundle, missing_staticlib_error,
+};
+pub(crate) use codesign::codesign_bundle;
+#[cfg(target_os = "macos")]
+pub(crate) use codesign::{
+    is_production_identity, locate_wraptool_macos, pace_sign_aax_macos,
+    verify_signed_for_notarization,
+};
+pub(crate) use locate::find_on_path;
+#[cfg(target_os = "windows")]
+pub(crate) use locate::{
+    locate_cmake, locate_msvc_cl, locate_ninja, locate_vcvars64, locate_vcvarsall,
+    vs_install_paths, which_exe,
+};
+
+/// Path-aware wrappers around `std::fs`. `io::Error` alone doesn't include
+/// the path that triggered it, so a bare `fs::copy(src, dst)?` on a root-owned
+/// leftover surfaces as "Permission denied (os error 13)" with no hint at
+/// which file the user needs to fix. These wrappers bubble the path up.
+pub(crate) mod fs_ctx {
+    use crate::CargoTruceError;
+    use std::fs;
+    use std::path::Path;
+
+    pub(crate) fn copy(
+        from: impl AsRef<Path>,
+        to: impl AsRef<Path>,
+    ) -> Result<u64, CargoTruceError> {
+        let (from, to) = (from.as_ref(), to.as_ref());
+        fs::copy(from, to)
+            .map_err(|e| format!("copy {} -> {}: {e}", from.display(), to.display()).into())
+    }
+
+    pub(crate) fn create_dir_all(path: impl AsRef<Path>) -> Result<(), CargoTruceError> {
+        let path = path.as_ref();
+        fs::create_dir_all(path).map_err(|e| format!("mkdir -p {}: {e}", path.display()).into())
+    }
+
+    pub(crate) fn write(
+        path: impl AsRef<Path>,
+        contents: impl AsRef<[u8]>,
+    ) -> Result<(), CargoTruceError> {
+        let path = path.as_ref();
+        fs::write(path, contents).map_err(|e| format!("write {}: {e}", path.display()).into())
+    }
+
+    /// Write only if the target file is missing or its bytes differ. On a
+    /// no-op, the file's mtime stays put - important for tools like cmake
+    /// that rebuild based on mtime comparisons. Only the AAX template
+    /// and AU v3 staging (macOS / Windows) need the mtime-preserving
+    /// variant today.
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    pub(crate) fn write_if_changed(
+        path: impl AsRef<Path>,
+        contents: impl AsRef<[u8]>,
+    ) -> Result<bool, CargoTruceError> {
+        let path = path.as_ref();
+        let new = contents.as_ref();
+        if let Ok(existing) = fs::read(path)
+            && existing == new
+        {
+            return Ok(false);
+        }
+        fs::write(path, new)
+            .map_err(|e| -> CargoTruceError { format!("write {}: {e}", path.display()).into() })?;
+        Ok(true)
+    }
+}
+
+/// Convert a path to `&str`, panicking with a clear message if
+/// the path isn't valid UTF-8. The shell-out helpers in this
+/// crate (`run`, `run_capture`, codesign argv assembly) take
+/// `&[&str]` rather than `&[OsStr]` because every other arg in
+/// those vecs is a literal; this is the standard way to thread
+/// a path through. The panic is preferable to `to_string_lossy`,
+/// which would silently invoke a different binary than the caller
+/// named when passed to `Command::arg`.
+///
+/// Gated on `macos` because the iOS install pipeline is the only
+/// caller; widen the cfg if another shell-out site needs it.
+#[cfg(target_os = "macos")]
+#[track_caller]
+pub(crate) fn path_str(path: &Path) -> &str {
+    path.to_str().unwrap_or_else(|| {
+        panic!(
+            "non-UTF-8 path can't be passed as a string: {}",
+            path.display()
+        )
+    })
+}
+
+/// Consume the next CLI arg as the value for `flag`. Advances `*i`
+/// past the consumed slot. Used by every per-subcommand arg loop in
+/// `cargo-truce` (`build`/`install`/`uninstall`/`run`/`screenshot`/
+/// `validate`/`package`/Windows-packaging) so the
+/// `<flag> requires a value` error message stays uniform.
+pub(crate) fn arg_value<'a>(
+    args: &'a [String],
+    i: &mut usize,
+    flag: &str,
+) -> Result<&'a str, CargoTruceError> {
+    *i += 1;
+    args.get(*i)
+        .map(String::as_str)
+        .ok_or_else(|| format!("{flag} requires a value").into())
+}
+
+/// Shared library filename for a stem on the *host*. macOS:
+/// `lib{stem}.dylib`, Windows: `{stem}.dll`, Linux: `lib{stem}.so`.
+pub(crate) fn shared_lib_name(stem: &str) -> String {
+    let host_os = if cfg!(target_os = "windows") {
+        "windows"
+    } else if cfg!(target_os = "linux") {
+        "linux"
+    } else {
+        "macos"
+    };
+    shared_lib_name_for_os(stem, host_os)
+}
+
+/// Shared library filename for a stem targeting `os`. Keyed on the
+/// *target* OS so a cross build names the artifact for where it will
+/// run, not the build host - `cfg!(target_os)` in a builder would read
+/// the host.
+fn shared_lib_name_for_os(stem: &str, os: &str) -> String {
+    match os {
+        "windows" => format!("{stem}.dll"),
+        "linux" => format!("lib{stem}.so"),
+        _ => format!("lib{stem}.dylib"),
+    }
+}
+
+/// The OS component of a cargo target triple, used to drive bundle
+/// layout and artifact naming by *target* rather than the build host's
+/// `cfg!(target_os)`. Defaults to `"macos"` for Apple triples and for
+/// anything unrecognized (host-native builds resolve the triple via
+/// [`truce_build::host_triple`]).
+pub(crate) fn target_os_of(triple: &str) -> &'static str {
+    if triple.contains("windows") {
+        "windows"
+    } else if triple.contains("linux") || triple.contains("android") {
+        "linux"
+    } else if triple.contains("ios") {
+        "ios"
+    } else {
+        "macos"
+    }
+}
+
+// Process-scoped active build profile. Drives both `cargo build`'s
+// `--release` / `--profile <name>` flag selection and the
+// `release_lib*` path resolvers (which read `target/<profile>/...`).
+// Default is "release" so commands like `package` that never set
+// the profile keep producing release artifacts.
+//
+// Recognised values:
+//   - "release"  → `cargo build --release`,   `target/release/...`
+//   - "debug"    → `cargo build`,             `target/debug/...`
+//   - "shell"    → `cargo build --profile shell`, `target/shell/...`
+//   - any other  → `cargo build --profile <name>`, `target/<name>/...`
+// Each `cargo truce <command>` invocation sets the profile at most
+// once (in arg parsing, before any build), then reads it many times.
+// `OnceLock` matches that lifecycle: `set_build_profile` calls
+// `OnceLock::set` (idempotent if the same profile is set twice - the
+// second call's value is discarded), and reads never wait on a lock.
+static PROFILE: OnceLock<String> = OnceLock::new();
+
+/// Set the active cargo profile by name. `"release"` / `"debug"` map
+/// to cargo's built-in profiles; any other name maps to a custom
+/// profile defined in the user's `Cargo.toml` (e.g. `[profile.shell]
+/// inherits = "release"` for the shell-mode build).
+pub(crate) fn set_build_profile(name: &str) {
+    PROFILE.get_or_init(|| name.to_string());
+}
+
+/// Convenience wrapper for the common boolean-debug case. Equivalent
+/// to `set_build_profile("debug")` / `set_build_profile("release")`.
+pub(crate) fn set_debug_profile(debug: bool) {
+    set_build_profile(if debug { "debug" } else { "release" });
+}
+
+/// CPU baseline the build should target. Threaded into `RUSTFLAGS=-C
+/// target-cpu=<value>` so `wide`'s compile-time `cfg(target_feature)`
+/// dispatch picks the right SIMD path. Resolved per cargo target
+/// triple inside `cargo_build_inner`, so the same setting can apply
+/// across a multi-arch invocation without an x86-only flag leaking
+/// onto aarch64 slices (and vice versa).
+#[derive(Clone, Debug, Default)]
+pub(crate) enum TargetCpu {
+    /// No `--target-cpu` was passed. Apply a sane per-arch default:
+    /// `x86-64-v3` on `x86_64` targets (AVX2 + FMA + BMI2); nothing
+    /// on `aarch64` (NEON is the `ARMv8` baseline) or other arches.
+    ///
+    /// `x86-64-v3` matches the floor modern DAWs already require -
+    /// any host where a truce plugin actually loads already has
+    /// AVX2 - so the perf win is free in practice.
+    #[default]
+    Default,
+    /// `--target-cpu baseline`: drop the v3 default, pass no flag.
+    /// Yields rustc's base target (`x86-64` on `x86_64` = SSE2-only),
+    /// for plugin authors who need maximum compatibility.
+    Baseline,
+    /// `--target-cpu <value>`: pass `-C target-cpu=<value>` verbatim.
+    /// Accepts shorthands `v2` / `v3` / `v4` (expanded to
+    /// `x86-64-v<N>`) plus any literal rustc target-cpu name
+    /// (`apple-m1`, `znver4`, etc.).
+    Named(String),
+    /// `--target-cpu native`: pass `-C target-cpu=native`.
+    /// Local-development only; the resulting binary won't run on
+    /// machines without the build host's exact feature set.
+    Native,
+}
+
+static TARGET_CPU: OnceLock<TargetCpu> = OnceLock::new();
+
+pub(crate) fn set_target_cpu(choice: TargetCpu) {
+    TARGET_CPU.get_or_init(|| choice);
+}
+
+/// Parse a user-supplied `--target-cpu` value into a [`TargetCpu`].
+/// Accepts `baseline`, `native`, the level shorthands `v2`/`v3`/`v4`
+/// (expanded to `x86-64-v<N>`), and any other literal value (passed
+/// through to rustc unchanged).
+pub(crate) fn parse_target_cpu_arg(raw: &str) -> TargetCpu {
+    match raw {
+        "baseline" => TargetCpu::Baseline,
+        "native" => TargetCpu::Native,
+        "v2" => TargetCpu::Named("x86-64-v2".to_string()),
+        "v3" => TargetCpu::Named("x86-64-v3".to_string()),
+        "v4" => TargetCpu::Named("x86-64-v4".to_string()),
+        other => TargetCpu::Named(other.to_string()),
+    }
+}
+
+/// Resolve the active [`TargetCpu`] for a specific cargo target triple
+/// (e.g. `x86_64-apple-darwin`, `aarch64-unknown-linux-gnu`). Returns
+/// the string to pass to `-C target-cpu=<value>`, or `None` to omit
+/// the flag entirely.
+///
+/// The `Default` variant inspects the triple's arch prefix: x86 gets
+/// `x86-64-v3`, everything else gets `None`. This is why per-target
+/// resolution matters - a global `RUSTFLAGS=-C target-cpu=x86-64-v3`
+/// would error on an aarch64 slice of a universal macOS build.
+pub(crate) fn resolve_target_cpu(triple: &str) -> Option<String> {
+    let choice = TARGET_CPU.get().cloned().unwrap_or_default();
+    match choice {
+        TargetCpu::Default => {
+            if triple.starts_with("x86_64") || triple.starts_with("i686") {
+                Some("x86-64-v3".to_string())
+            } else {
+                None
+            }
+        }
+        TargetCpu::Baseline => None,
+        TargetCpu::Named(value) => Some(value),
+        TargetCpu::Native => Some("native".to_string()),
+    }
+}
+
+/// Extra Cargo features to enable for every build in this invocation, on
+/// top of the format features truce selects itself. Chosen once via
+/// `--features` during arg parsing and read by every `cargo` command
+/// sink through `apply_extra_features`, so the feature set stays uniform
+/// across the fan-out (per-format builds, the shell-mode logic dylib,
+/// iOS, the standalone bin). Same once-per-invocation lifecycle as
+/// `PROFILE` / `TARGET_CPU`.
+static EXTRA_FEATURES: OnceLock<Vec<String>> = OnceLock::new();
+
+/// Set the invocation's extra Cargo features. Idempotent (first set
+/// wins), so a command that re-invokes `cmd_build` doesn't clobber the
+/// features the outer command already chose.
+pub(crate) fn set_extra_features(features: Vec<String>) {
+    EXTRA_FEATURES.get_or_init(|| features);
+}
+
+/// The extra Cargo features set for this invocation, or an empty slice.
+pub(crate) fn extra_features() -> &'static [String] {
+    EXTRA_FEATURES.get().map_or(&[], Vec::as_slice)
+}
+
+/// Whether per-format builds re-add each plugin's non-format default
+/// features (see [`namespaced_nonformat_defaults`]). On by default;
+/// `cargo truce <cmd> --no-default-features` flips it off for a minimal
+/// build (just the format + the author's explicit `--features`).
+static KEEP_DEFAULT_FEATURES: OnceLock<bool> = OnceLock::new();
+
+/// Record whether the author passed `--no-default-features`. Idempotent
+/// (first set wins), matching the other invocation globals.
+pub(crate) fn set_no_default_features(on: bool) {
+    KEEP_DEFAULT_FEATURES.get_or_init(|| !on);
+}
+
+/// Whether to keep (re-add) plugin non-format default features. Defaults
+/// to `true` when the flag was never set.
+pub(crate) fn keep_default_features() -> bool {
+    *KEEP_DEFAULT_FEATURES.get().unwrap_or(&true)
+}
+
+/// Format-gating features truce enables itself per-build. Passing one
+/// through `--features` would cross-contaminate other formats' builds
+/// (a `--clap` build also lighting up VST3), so they are rejected with a
+/// pointer to the format flag.
+const RESERVED_FORMAT_FEATURES: &[&str] = &[
+    "clap",
+    "vst3",
+    "vst2",
+    "lv2",
+    "au",
+    "aax",
+    "standalone",
+    "shell",
+];
+
+/// Split a `--features` value (`"a, b c"`) into individual feature
+/// names, rejecting the format features truce drives via its own flags.
+pub(crate) fn parse_extra_features(value: &str) -> Result<Vec<String>, CargoTruceError> {
+    let mut out = Vec::new();
+    for f in value
+        .split([',', ' '])
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        if RESERVED_FORMAT_FEATURES.contains(&f) {
+            return Err(format!(
+                "`{f}` is a format feature truce enables itself; select it with the \
+                 matching format flag (--clap / --vst3 / --au2 / ...), not --features."
+            )
+            .into());
+        }
+        out.push(f.to_string());
+    }
+    Ok(out)
+}
+
+/// Preflight check for `cargo truce install --shell` / `build --shell`:
+/// the Cargo workspace root's `Cargo.toml` must declare a
+/// `[profile.shell]` table so `cargo build --profile shell` resolves.
+///
+/// Cargo only honors `[profile.*]` at the workspace root, which may be
+/// an ancestor of the truce project root when the plugin crate is a
+/// member of a larger Cargo workspace. We resolve that root via `cargo
+/// metadata` rather than assuming it sits next to `truce.toml`.
+///
+/// Returns `Ok(())` when the profile is declared. Otherwise returns
+/// an error string the caller can propagate; the message includes
+/// the exact lines to add.
+pub(crate) fn verify_shell_profile_declared() -> Result<(), CargoTruceError> {
+    let root = project_root();
+    let cargo_toml = cargo_workspace_root(&root)
+        .unwrap_or(root)
+        .join("Cargo.toml");
+    let content = fs::read_to_string(&cargo_toml).map_err(|e| -> CargoTruceError {
+        format!("failed to read {}: {e}", cargo_toml.display()).into()
+    })?;
+    let doc: toml::Table = content.parse().map_err(|e| -> CargoTruceError {
+        format!("failed to parse {}: {e}", cargo_toml.display()).into()
+    })?;
+    let has_profile_shell = doc
+        .get("profile")
+        .and_then(|v| v.as_table())
+        .and_then(|t| t.get("shell"))
+        .is_some();
+    if has_profile_shell {
+        return Ok(());
+    }
+    Err(format!(
+        "--shell requires `[profile.shell]` in {}.\n\
+         Add the following two lines and re-run:\n\
+         \n\
+             [profile.shell]\n\
+             inherits = \"release\"\n\
+         \n\
+         (Scaffolded plugins already include this.)",
+        cargo_toml.display()
+    )
+    .into())
+}
+
+/// Read the active build profile name, defaulting to `"release"` when
+/// no command has set one.
+pub(crate) fn build_profile_name() -> String {
+    PROFILE
+        .get()
+        .cloned()
+        .unwrap_or_else(|| "release".to_string())
+}
+
+/// Whether the current xtask invocation is operating in debug mode.
+/// Read by `cargo_build` so debug-flagged commands skip `--release`.
+pub(crate) fn is_debug_profile() -> bool {
+    build_profile_name() == "debug"
+}
+
+fn profile_subdir() -> String {
+    build_profile_name()
+}
+
+/// Return `<target>/<profile>/{shared_lib_name}` for a plugin.
+/// `<profile>` is `release` by default; commands that flip the active
+/// profile (`--debug` → `"debug"`, shell-mode builds → `"shell"`)
+/// move the resolution accordingly.
+pub(crate) fn release_lib(root: &Path, stem: &str) -> PathBuf {
+    truce_build::target_dir(root)
+        .join(profile_subdir())
+        .join(shared_lib_name(stem))
+}
+
+/// Per-target sibling of [`release_lib`]. `target` selects the triple
+/// subdir cargo writes to (macOS universal, Windows x64+arm64, Linux
+/// dual-arch); the profile subdir tracks `release_lib`.
+pub(crate) fn release_lib_for_target(root: &Path, stem: &str, target: Option<&str>) -> PathBuf {
+    match target {
+        Some(t) => truce_build::target_dir(root)
+            .join(t)
+            .join(profile_subdir())
+            .join(shared_lib_name_for_os(stem, target_os_of(t))),
+        None => release_lib(root, stem),
+    }
+}
+
+/// Per-target path to the Rust staticlib for a given stem. Rust always
+/// emits `lib<stem>.a` regardless of platform. Used by the macOS
+/// bundle-format link path (VST3 / CLAP / VST2) which feeds the static
+/// archive to `clang -bundle` rather than the cdylib.
+#[cfg(target_os = "macos")]
+pub(crate) fn release_static_for_target(root: &Path, stem: &str, target: Option<&str>) -> PathBuf {
+    let dir = match target {
+        Some(t) => truce_build::target_dir(root).join(t).join(profile_subdir()),
+        None => truce_build::target_dir(root).join(profile_subdir()),
+    };
+    dir.join(format!("lib{stem}.a"))
+}
+
+/// Canonical path to the linked bundle binary for a given plugin +
+/// format. Both the install and package pipelines write to this path
+/// after `clang -bundle` finishes; stage/install steps read from it.
+/// No `lib` prefix because the file is a loadable executable, not a
+/// library.
+#[cfg(target_os = "macos")]
+pub(crate) fn release_bundle_bin(root: &Path, stem: &str, format_suffix: &str) -> PathBuf {
+    truce_build::target_dir(root)
+        .join(profile_subdir())
+        .join(format!("{stem}{format_suffix}.bundle-bin"))
+}
+
+/// Return the Windows `%COMMONPROGRAMFILES%` directory (typically `C:\Program Files\Common Files`).
+#[cfg(target_os = "windows")]
+pub(crate) fn common_program_files() -> PathBuf {
+    if let Ok(v) = env::var("CommonProgramFiles") {
+        PathBuf::from(v)
+    } else {
+        PathBuf::from(r"C:\Program Files\Common Files")
+    }
+}
+
+/// Return the Windows `%PROGRAMFILES%` directory (typically `C:\Program Files`).
+#[cfg(target_os = "windows")]
+pub(crate) fn program_files() -> PathBuf {
+    if let Ok(v) = env::var("ProgramFiles") {
+        PathBuf::from(v)
+    } else {
+        PathBuf::from(r"C:\Program Files")
+    }
+}
+
+/// Read the version from `Cargo.toml`.
+/// Checks `[workspace.package] version` first, then `[package] version`.
+/// Consumed by the package pipelines (macOS .pkg, Windows .exe, Linux
+/// tarball).
+///
+/// # Errors
+///
+/// Returns `Err` when the manifest can't be read, parsed, or doesn't
+/// declare a version anywhere - callers want the IO/parse case
+/// distinguishable from the "no version key" case so the user can
+/// fix the right thing.
+pub(crate) fn read_workspace_version(root: &Path) -> Result<String, crate::CargoTruceError> {
+    let path = root.join("Cargo.toml");
+    let content = fs::read_to_string(&path).map_err(|e| -> crate::CargoTruceError {
+        format!("read {}: {e}", path.display()).into()
+    })?;
+    let doc: toml::Table = content.parse().map_err(|e| -> crate::CargoTruceError {
+        format!("parse {}: {e}", path.display()).into()
+    })?;
+    if let Some(v) = doc
+        .get("workspace")
+        .and_then(|w| w.get("package"))
+        .and_then(|p| p.get("version"))
+        .and_then(|v| v.as_str())
+    {
+        return Ok(v.to_string());
+    }
+    if let Some(v) = doc
+        .get("package")
+        .and_then(|p| p.get("version"))
+        .and_then(|v| v.as_str())
+    {
+        return Ok(v.to_string());
+    }
+    Err(format!(
+        "{} has no version (expected [workspace.package] version or [package] version)",
+        path.display()
+    )
+    .into())
+}
+
+/// Resolve a plugin crate's `Cargo.toml` path via `cargo metadata`.
+/// Used by `detect_default_features` to find the manifest in
+/// workspace layouts where plugins live in arbitrary subdirectories.
+pub(crate) fn locate_plugin_manifest(project_root: &Path, crate_name: &str) -> Option<PathBuf> {
+    let out = Command::new("cargo")
+        .args([
+            "metadata",
+            "--no-deps",
+            "--format-version=1",
+            "--manifest-path",
+        ])
+        .arg(project_root.join("Cargo.toml"))
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    // Cheap substring parse - avoids depending on serde_json here. We
+    // only need `"name":"crate_name"` and the package's `"manifest_path"`.
+    //
+    // `cargo metadata` emits each package as
+    // `{"name":..., "version":..., ..., "manifest_path":..., ...}` -
+    // `manifest_path` is always *after* `name` within the same object,
+    // and only appears at the package level (not in `dependencies` /
+    // `targets`). So scanning forward from the matched `name` lands on
+    // the right package's path. The earlier symmetric window scan
+    // could see the *previous* package's `manifest_path` (which sits
+    // right before the next `name` field) and silently return it.
+    let text = String::from_utf8_lossy(&out.stdout);
+    let name_needle = format!("\"name\":\"{crate_name}\"");
+    let idx = text.find(&name_needle)?;
+    let after = &text[idx + name_needle.len()..];
+    let mp_marker = "\"manifest_path\":\"";
+    let mp_idx = after.find(mp_marker)?;
+    let rest = &after[mp_idx + mp_marker.len()..];
+    let end = rest.find('"')?;
+    Some(PathBuf::from(&rest[..end]))
+}
+
+/// Resolve the Cargo *workspace* root for a manifest via `cargo
+/// metadata`. For a single-crate plugin this is the crate dir itself;
+/// for a workspace member it's the ancestor that owns `[workspace]`.
+/// Cargo only honors `[profile.*]` tables at this root.
+pub(crate) fn cargo_workspace_root(manifest_dir: &Path) -> Option<PathBuf> {
+    let out = Command::new("cargo")
+        .args([
+            "metadata",
+            "--no-deps",
+            "--format-version=1",
+            "--manifest-path",
+        ])
+        .arg(manifest_dir.join("Cargo.toml"))
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    // Substring parse to avoid a serde_json dependency here.
+    // `workspace_root` is a single top-level field, distinct from
+    // `workspace_members` / `workspace_default_members` by its `:"`.
+    let text = String::from_utf8_lossy(&out.stdout);
+    let marker = "\"workspace_root\":\"";
+    let idx = text.find(marker)?;
+    let rest = &text[idx + marker.len()..];
+    let end = rest.find('"')?;
+    Some(PathBuf::from(&rest[..end]))
+}
+
+/// Resolve the standalone binary's `[[bin]] name` from a plugin's
+/// `Cargo.toml`. Returns the bare stem (no `.exe`).
+///
+/// Looks for a `[[bin]]` whose `required-features` contains
+/// `"standalone"`; falls back to the only `[[bin]]` if exactly one is
+/// declared. Returns `None` if no match - callers (`cargo truce run`)
+/// then default to the scaffold convention `{crate_name}-standalone`,
+/// which is also what the doc instructs hand-written plugins to use.
+pub(crate) fn read_standalone_bin_name(crate_name: &str) -> Option<String> {
+    let manifest = locate_plugin_manifest(&project_root(), crate_name)?;
+    let content = fs::read_to_string(&manifest).ok()?;
+    let doc: toml::Table = content.parse().ok()?;
+    let bins = doc.get("bin")?.as_array()?;
+
+    // Prefer the `standalone`-gated bin when there are multiple
+    // `[[bin]]` entries (e.g. a plugin shipping both standalone +
+    // shell-loader binaries).
+    for bin in bins {
+        let table = bin.as_table()?;
+        let has_standalone = table
+            .get("required-features")
+            .and_then(toml::Value::as_array)
+            .is_some_and(|arr| arr.iter().any(|x| x.as_str() == Some("standalone")));
+        if has_standalone {
+            return table.get("name")?.as_str().map(str::to_string);
+        }
+    }
+    if bins.len() == 1 {
+        return bins[0]
+            .as_table()?
+            .get("name")?
+            .as_str()
+            .map(str::to_string);
+    }
+    None
+}
+
+/// Detect which format features to build when the user didn't pass
+/// any `--clap` / `--vst3` / etc. flags.
+///
+/// Lookup order:
+///
+/// 1. **Root `Cargo.toml`'s `[features].default`** - the single-crate
+///    layout (`cargo truce new` produces this). Most reliable signal.
+/// 2. **Plugin crates listed in `truce.toml`** - the workspace layout
+///    (`cargo truce new --workspace`). Reads each plugin's own
+///    `[features].default` and returns the **union**, so `install`
+///    tries the formats declared by at least one plugin and skips the
+///    rest.
+pub(crate) fn detect_default_features() -> HashSet<String> {
+    let root = project_root();
+
+    // Single-crate layout: root Cargo.toml has a `[features]` table.
+    let root_defaults = read_default_features(&root.join("Cargo.toml"));
+    if !root_defaults.is_empty() {
+        return root_defaults;
+    }
+
+    // Workspace layout: iterate plugins from `truce.toml` and union
+    // their declared default features.
+    let mut union = HashSet::new();
+    if let Ok(config) = crate::load_config() {
+        for p in &config.plugin {
+            union.extend(plugin_default_features(&root, &p.crate_name));
+        }
+    }
+    union
+}
+
+/// Parse a manifest's `[features]` table into `name -> its enabled
+/// entries` (feature names, `dep:pkg`, and `pkg/feat` alike). Empty when
+/// the file is unreadable or declares no features.
+fn read_features_table(manifest: &Path) -> BTreeMap<String, Vec<String>> {
+    let mut out = BTreeMap::new();
+    if let Ok(content) = fs::read_to_string(manifest)
+        && let Ok(doc) = content.parse::<toml::Table>()
+        && let Some(toml::Value::Table(feat)) = doc.get("features")
+    {
+        for (name, deps) in feat {
+            if let toml::Value::Array(deps) = deps {
+                let deps = deps
+                    .iter()
+                    .filter_map(|v| v.as_str().map(std::string::ToString::to_string))
+                    .collect();
+                out.insert(name.clone(), deps);
+            }
+        }
+    }
+    out
+}
+
+/// A manifest's `[features].default` array as a set.
+fn read_default_features(manifest: &Path) -> HashSet<String> {
+    read_features_table(manifest)
+        .get("default")
+        .map(|d| d.iter().cloned().collect())
+        .unwrap_or_default()
+}
+
+/// One plugin crate's declared default features (its `[features].default`).
+/// Empty when the crate declares none or its manifest can't be located.
+/// Resolves the crate's own manifest, so it works in both the single-crate
+/// and workspace layouts.
+pub(crate) fn plugin_default_features(root: &Path, crate_name: &str) -> HashSet<String> {
+    locate_plugin_manifest(root, crate_name)
+        .map(|m| read_default_features(&m))
+        .unwrap_or_default()
+}
+
+/// Cargo `--features` tokens (`crate/feature`) for every non-format
+/// default feature the given plugins declare. A per-format build passes
+/// `--no-default-features` (to drop the *other* formats), which also
+/// strips companion defaults like `ara`; these tokens re-add them.
+///
+/// Namespaced per crate so a batched multi-plugin build enables each
+/// feature only on the plugin that declares it - a bare `--features ara`
+/// across `-p a -p b` would error when `b` has no `ara`. Returns empty
+/// when the author passed `--no-default-features`.
+pub(crate) fn namespaced_nonformat_defaults(root: &Path, crate_names: &[&str]) -> Vec<String> {
+    if !keep_default_features() {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    for name in crate_names {
+        let Some(manifest) = locate_plugin_manifest(root, name) else {
+            continue;
+        };
+        let table = read_features_table(&manifest);
+        for feat in nonformat_default_features(&table) {
+            out.push(format!("{name}/{feat}"));
+        }
+    }
+    out
+}
+
+/// A plugin's default features that carry no format, sorted for a
+/// deterministic cargo invocation. A default is dropped when it, or
+/// anything it transitively enables, is a reserved format feature - so
+/// `standalone-playback = ["standalone", ...]` is dropped (it would drag
+/// the standalone host into a plain CLAP build), while an orthogonal
+/// companion like `ara` is kept.
+fn nonformat_default_features(table: &BTreeMap<String, Vec<String>>) -> Vec<String> {
+    let Some(defaults) = table.get("default") else {
+        return Vec::new();
+    };
+    let mut out: Vec<String> = defaults
+        .iter()
+        .filter(|f| !feature_enables_format(f, table))
+        .cloned()
+        .collect();
+    out.sort_unstable();
+    out.dedup();
+    out
+}
+
+/// Whether `feature` is, or transitively enables, a reserved format
+/// feature within the plugin's own feature graph. Only local feature
+/// names are followed; `dep:pkg` and `pkg/feat` entries can't name a
+/// local format feature, so they're ignored.
+fn feature_enables_format(feature: &str, table: &BTreeMap<String, Vec<String>>) -> bool {
+    let mut stack = vec![feature.to_string()];
+    let mut seen = HashSet::new();
+    while let Some(f) = stack.pop() {
+        if RESERVED_FORMAT_FEATURES.contains(&f.as_str()) {
+            return true;
+        }
+        if !seen.insert(f.clone()) {
+            continue;
+        }
+        if let Some(deps) = table.get(&f) {
+            for d in deps {
+                if !d.starts_with("dep:") && !d.contains('/') {
+                    stack.push(d.clone());
+                }
+            }
+        }
+    }
+    false
+}
+
+pub(crate) fn project_root() -> PathBuf {
+    // Walk up from the current directory looking for truce.toml. This
+    // is what `cargo truce` does - the globally installed binary runs
+    // from any project directory.
+    let cwd = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let mut dir = cwd.as_path();
+    loop {
+        if dir.join("truce.toml").exists() {
+            return dir.to_path_buf();
+        }
+        match dir.parent() {
+            Some(parent) => dir = parent,
+            None => break,
+        }
+    }
+    // Fallback: CARGO_MANIFEST_DIR (works when invoked inside the
+    // truce repo itself, e.g. for development).
+    if let Ok(manifest) = env::var("CARGO_MANIFEST_DIR") {
+        let p = Path::new(&manifest).parent().unwrap().to_path_buf();
+        if p.join("truce.toml").exists() {
+            return p;
+        }
+    }
+    cwd
+}
+
+/// Run a command via `sudo`. macOS-only: Windows uses per-process UAC
+/// elevation, not per-command, and Linux installs are always per-user, so
+/// no other supported platform has a sensible analogue.
+#[cfg(target_os = "macos")]
+pub(crate) fn run_sudo(cmd: &str, args: &[&OsStr]) -> crate::Res {
+    announce_sudo_once();
+    let status = Command::new("sudo").arg(cmd).args(args).status()?;
+    if !status.success() {
+        return Err(crate::CargoTruceError::Other(format!(
+            "sudo {cmd} failed with {status}"
+        )));
+    }
+    Ok(())
+}
+
+/// Print a one-line "why" before the first `sudo` call of the run, so the
+/// user understands the password prompt that's about to appear. No-op on
+/// subsequent calls - sudo's own cred cache covers the rest of the install.
+#[cfg(target_os = "macos")]
+fn announce_sudo_once() {
+    static ANNOUNCED: AtomicBool = AtomicBool::new(false);
+    if !ANNOUNCED.swap(true, Ordering::Relaxed) {
+        eprintln!(
+            "→ Installing to system plugin directories (/Library/Audio/Plug-Ins/, \
+             /Library/Application Support/Avid/) - sudo required."
+        );
+    }
+}
+
+/// Process-global verbose flag. Set at the top of `cargo_truce::run`
+/// from `-v` / `--verbose` and consulted by helpers that have output
+/// worth gating (`codesign`'s "replacing existing signature", etc.).
+static VERBOSE: AtomicBool = AtomicBool::new(false);
+
+pub fn set_verbose(v: bool) {
+    VERBOSE.store(v, Ordering::Relaxed);
+}
+
+pub(crate) fn is_verbose() -> bool {
+    VERBOSE.load(Ordering::Relaxed)
+}
+
+/// `eprintln!` that's a no-op unless `--verbose` was passed. Use for
+/// progress chatter (per-format build banners, per-bundle install
+/// destinations) that's load-bearing during debugging but noise during
+/// a normal multi-plugin install.
+macro_rules! vprintln {
+    ($($arg:tt)*) => {
+        if $crate::util::is_verbose() {
+            eprintln!($($arg)*);
+        }
+    };
+}
+pub(crate) use vprintln;
+
+/// Per-process collector of produced bundle paths so the calling command
+/// (`cmd_install` / `cmd_build`) can print a summary at the end (always
+/// visible, regardless of verbose). Each per-format helper pushes one
+/// line per bundle it writes.
+static OUTPUTS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// Record an output destination + echo it under `--verbose`. Used by
+/// `install_clap` / `install_vst3` / `stage_clap` / `stage_vst3` / etc.
+pub(crate) fn log_output(line: String) {
+    if is_verbose() {
+        eprintln!("{line}");
+    }
+    if let Ok(mut v) = OUTPUTS.lock() {
+        v.push(line);
+    }
+}
+
+/// Drain the output log. Called once by the surrounding command at the
+/// end so the summary prints exactly once and the static stays empty
+/// between calls.
+pub(crate) fn take_outputs() -> Vec<String> {
+    OUTPUTS
+        .lock()
+        .map(|mut v| std::mem::take(&mut *v))
+        .unwrap_or_default()
+}
+
+/// Per-process collector of soft-skipped install reasons (e.g. AAX with
+/// no SDK configured, AU v3 with ad-hoc signing). Same pattern as
+/// `INSTALLED` but printed under a `Skipped:` header at the end of
+/// `cmd_install` so the user sees what didn't make it.
+static SKIPPED: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// Append a soft-skip reason. One line per (format, plugin) target -
+/// callers should embed the plugin name in the message so the user
+/// can match each skip to the corresponding `Installed:` row.
+pub(crate) fn log_skip(line: String) {
+    if is_verbose() {
+        eprintln!("{line}");
+    }
+    if let Ok(mut v) = SKIPPED.lock() {
+        v.push(line);
+    }
+}
+
+pub(crate) fn take_skipped() -> Vec<String> {
+    SKIPPED
+        .lock()
+        .map(|mut v| std::mem::take(&mut *v))
+        .unwrap_or_default()
+}
+
+/// Run `codesign` with the given args. Prints a one-line success or
+/// failure summary per call (`    [ OK ] signed Truce Gain.vst3` /
+/// `    [FAIL] failed to sign ...`), using the same colored ASCII tags
+/// as `cargo truce doctor` so package output stays consistent across
+/// commands. The 4-space indent nests under the `  Staging X...` /
+/// `==> [n/N] crate` headers printed by the package / install drivers.
+/// In quiet mode, the `replacing existing signature` chatter and verify
+/// output is captured and only printed on failure. `--verbose` inherits
+/// stderr so everything surfaces.
+///
+/// Safe to redirect stderr even on the sudo path: `sudo` opens
+/// `/dev/tty` for the password prompt, not stderr, so the prompt
+/// stays visible to the user.
+///
+/// macOS-only: `codesign` is an Apple tool. CLAP / VST3 / LV2 on
+/// Linux are unsigned `.so` files; Windows signs via `signtool` in the
+/// Windows packager, not through here. The cross-platform
+/// `codesign_bundle` wrapper short-circuits on non-macOS, so callers
+/// never reach this function on other platforms.
+#[cfg(target_os = "macos")]
+pub(crate) fn run_codesign(args: &[&OsStr], use_sudo: bool) -> crate::Res {
+    use std::process::Stdio;
+    let target = args.last().copied().unwrap_or(OsStr::new("?"));
+    let target_label = std::path::Path::new(target).file_name().map_or_else(
+        || target.to_string_lossy().into_owned(),
+        |n| n.to_string_lossy().into_owned(),
+    );
+    let is_verify = args.iter().any(|a| *a == OsStr::new("--verify"));
+    let (verb_present, verb_past) = if is_verify {
+        ("verify", "verified")
+    } else {
+        ("sign", "signed")
+    };
+
+    let mut cmd = if use_sudo {
+        announce_sudo_once();
+        let mut c = Command::new("sudo");
+        c.arg("codesign");
+        c
+    } else {
+        Command::new("codesign")
+    };
+    cmd.args(args);
+
+    let (status, captured_stderr) = if is_verbose() {
+        (cmd.status()?, String::new())
+    } else {
+        let output = cmd.stderr(Stdio::piped()).output()?;
+        (
+            output.status,
+            String::from_utf8_lossy(&output.stderr).into_owned(),
+        )
+    };
+
+    if status.success() {
+        eprintln!("    {} {verb_past} {target_label}", tag_ok());
+        Ok(())
+    } else {
+        if !captured_stderr.is_empty() {
+            eprintln!("{captured_stderr}");
+        }
+        eprintln!("    {} failed to {verb_present} {target_label}", tag_fail());
+        Err(crate::CargoTruceError::Codesign(format!(
+            "failed to {verb_present} {target_label}"
+        )))
+    }
+}
+
+/// Fire-and-forget cleanup helper. Intended for `killall -9 pkd` /
+/// `killall -9 AudioComponentRegistrar` where non-zero exit
+/// ("No matching processes were found") is expected noise on clean
+/// systems and shouldn't clutter the install log. No sudo: both
+/// daemons run in the user's launchd session, so the user can kill
+/// their own processes. Only used by macOS-side AU v3 install +
+/// `reset-au`.
+#[cfg(target_os = "macos")]
+pub(crate) fn run_silent(cmd: &str, args: &[&OsStr]) {
+    use std::process::Stdio;
+    let _ = Command::new(cmd)
+        .args(args)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+}
+
+/// Return the project-local temp directory (`<target>/tmp/`), creating it if needed.
+///
+/// Every consumer (the macOS / Windows-only `tmp_manifests`,
+/// `tmp_scripts`, `tmp_aax_template`, `tmp_au_v3`, `tmp_lv2`, plus
+/// the macOS-only `reset_au`) is platform-gated, so the function is
+/// dead on Linux - gate it to keep the Linux build warning-free.
+#[cfg(any(target_os = "macos", target_os = "windows", test))]
+pub(crate) fn tmp_dir() -> PathBuf {
+    let dir = truce_build::target_dir(&project_root()).join("tmp");
+    let _ = fs::create_dir_all(&dir);
+    dir
+}
+
+// Per-purpose subdirs under `tmp/`. Keeping `tmp/` from becoming a flat
+// junk drawer of `aax_template/`, `entitlements.plist`, `*.bat`,
+// `<id>_lv2_stage/`, `<id>_vst3.plist`, `verify-pkg-*/` … each shape
+// gets its own subdir below. Helpers always create the dir lazily.
+
+/// `tmp/manifests/` - short-lived plist / `.manifest` / `.json` config
+/// files handed to platform tools (codesign, signtool, pkgbuild, etc).
+/// Linux's tarball pipeline doesn't shell out to platform tools, so the
+/// helper is gated to the platforms that actually consume it.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+pub(crate) fn tmp_manifests() -> PathBuf {
+    let dir = tmp_dir().join("manifests");
+    let _ = fs::create_dir_all(&dir);
+    dir
+}
+
+/// `tmp/scripts/` - generated `.bat` / shell driver scripts. Only the
+/// Windows AAX builder shells out to `.bat` files today; if macOS ever
+/// grows a similar driver this gate can widen.
+#[cfg(target_os = "windows")]
+pub(crate) fn tmp_scripts() -> PathBuf {
+    let dir = tmp_dir().join("scripts");
+    let _ = fs::create_dir_all(&dir);
+    dir
+}
+
+/// `tmp/verify/` - scratch dirs for post-build artifact verification
+/// (pkgutil --expand targets, validator inputs).
+#[cfg(any(target_os = "macos", test))]
+pub(crate) fn tmp_verify() -> PathBuf {
+    let dir = tmp_dir().join("verify");
+    let _ = fs::create_dir_all(&dir);
+    dir
+}
+
+/// `tmp/aax-template/` - Avid AAX C++ wrapper build directory.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+pub(crate) fn tmp_aax_template() -> PathBuf {
+    let dir = tmp_dir().join("aax-template");
+    let _ = fs::create_dir_all(&dir);
+    dir
+}
+
+/// `tmp/au-v3/<bundle_id>/` - per-plugin AU v3 framework + appex build root.
+#[cfg(target_os = "macos")]
+pub(crate) fn tmp_au_v3(bundle_id: &str) -> PathBuf {
+    let dir = tmp_dir().join("au-v3").join(bundle_id);
+    let _ = fs::create_dir_all(&dir);
+    dir
+}
+
+/// `tmp/lv2/<bundle_id>/` - LV2 bundle staging directory.
+///
+/// macOS-only: the staging detour exists so `stage_lv2` can write into
+/// a user-owned scratch dir before `run_sudo` copies the finished
+/// bundle into the root-owned system LV2 path. Windows and Linux
+/// installers write straight into the destination.
+#[cfg(target_os = "macos")]
+pub(crate) fn tmp_lv2(bundle_id: &str) -> PathBuf {
+    let dir = tmp_dir().join("lv2").join(bundle_id);
+    let _ = fs::create_dir_all(&dir);
+    dir
+}
+
+/// Recursive copy that preserves symlinks (critical for macOS .framework
+/// bundles) and creates the destination tree.
+///
+/// All callers (`commands::install::aax`, `commands::package::stage`,
+/// `commands::package::macos`) live behind macOS / Windows cfgs, so
+/// the function is genuinely dead on Linux - gate it the same way
+/// instead of using `#[allow(dead_code)]`.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+pub(crate) fn copy_dir_recursive(src: &Path, dst: &Path) -> crate::Res {
+    fs::create_dir_all(dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        let ft = entry.file_type()?;
+        // Preserve symlinks (critical for macOS .framework bundles)
+        #[cfg(unix)]
+        if ft.is_symlink() {
+            let target = fs::read_link(&src_path)?;
+            let _ = fs::remove_file(&dst_path);
+            std::os::unix::fs::symlink(&target, &dst_path)?;
+            continue;
+        }
+        if ft.is_dir() {
+            copy_dir_recursive(&src_path, &dst_path)?;
+        } else {
+            fs::copy(&src_path, &dst_path)?;
+        }
+    }
+    Ok(())
+}
+
+/// Extract the team ID from a signing identity string like
+/// `"Developer ID Application: Name (TEAMID)"`.
+#[cfg(target_os = "macos")]
+pub(crate) fn extract_team_id(sign_id: &str) -> String {
+    if let Some(start) = sign_id.rfind('(')
+        && let Some(end) = sign_id.rfind(')')
+    {
+        return sign_id[start + 1..end].to_string();
+    }
+    String::new()
+}
+
+/// Interactive `[y/N]` prompt that returns `true` only on an explicit yes.
+pub(crate) fn confirm_prompt(message: &str) -> bool {
+    eprint!("{message} [y/N] ");
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input).ok();
+    matches!(input.trim(), "y" | "Y" | "yes" | "YES")
+}
+
+/// Status markers for `cargo truce doctor` output. Colored when stderr is a
+/// terminal and `NO_COLOR` is unset; plain otherwise. All markers are 6 cols
+/// wide so they line up regardless of whether color is active.
+pub(crate) fn tag_ok() -> String {
+    paint("[ OK ]", "\x1b[1;32m")
+}
+pub(crate) fn tag_fail() -> String {
+    paint("[FAIL]", "\x1b[1;31m")
+}
+pub(crate) fn tag_warn() -> String {
+    paint("[WARN]", "\x1b[1;33m")
+}
+pub(crate) fn tag_info() -> String {
+    paint("[INFO]", "\x1b[1;36m")
+}
+
+fn paint(text: &str, ansi: &str) -> String {
+    if doctor_use_color() {
+        format!("{ansi}{text}\x1b[0m")
+    } else {
+        text.to_string()
+    }
+}
+
+/// Cached check: `NO_COLOR` unset AND stderr is a tty. Decided once per
+/// process - no need to re-stat the terminal on every line.
+fn doctor_use_color() -> bool {
+    use std::io::IsTerminal;
+    static USE: OnceLock<bool> = OnceLock::new();
+    *USE.get_or_init(|| {
+        if env::var_os("NO_COLOR").is_some() {
+            return false;
+        }
+        std::io::stderr().is_terminal()
+    })
+}
+
+/// Print a "tool present" line for `cargo truce doctor`. Runs the command
+/// with `args` and shows the first stdout line as the version, or "not found"
+/// when the command can't be executed.
+pub(crate) fn check_cmd(cmd: &str, args: &[&OsStr], label: &str) {
+    match Command::new(cmd).args(args).output() {
+        Ok(o) if o.status.success() => {
+            let ver = String::from_utf8_lossy(&o.stdout);
+            let first_line = ver.lines().next().unwrap_or("").trim();
+            if first_line.is_empty() {
+                eprintln!("    {} {label}", tag_ok());
+            } else {
+                eprintln!("    {} {label}: {first_line}", tag_ok());
+            }
+        }
+        Ok(_) => eprintln!("    {} {label}", tag_ok()),
+        Err(_) => eprintln!("    {} {label}: not found", tag_fail()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::AtomicU64;
+
+    #[test]
+    fn extra_features_split_on_comma_and_space() {
+        assert_eq!(
+            parse_extra_features("a, b c").unwrap(),
+            vec!["a".to_string(), "b".to_string(), "c".to_string()]
+        );
+        assert!(parse_extra_features("").unwrap().is_empty());
+        assert_eq!(
+            parse_extra_features(" fancy-dsp ").unwrap(),
+            vec!["fancy-dsp".to_string()]
+        );
+    }
+
+    /// Build a `[features]`-style graph from `(name, deps)` pairs.
+    fn feature_graph(entries: &[(&str, &[&str])]) -> BTreeMap<String, Vec<String>> {
+        entries
+            .iter()
+            .map(|(n, deps)| {
+                (
+                    (*n).to_string(),
+                    deps.iter().map(|d| (*d).to_string()).collect(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn nonformat_defaults_keep_companion_drop_formats() {
+        // Two formats plus one orthogonal companion feature.
+        let table = feature_graph(&[
+            ("default", &["clap", "vst3", "ara"]),
+            ("clap", &["dep:truce-clap"]),
+            ("vst3", &["dep:truce-vst3"]),
+            ("ara", &["dep:truce-ara"]),
+        ]);
+        assert_eq!(nonformat_default_features(&table), vec!["ara".to_string()]);
+    }
+
+    #[test]
+    fn nonformat_defaults_drop_transitive_format() {
+        // `standalone-playback` enables `standalone` (a format), so it must
+        // not be re-added to a plain format build - only `ara` survives.
+        let table = feature_graph(&[
+            ("default", &["clap", "vst3", "ara", "standalone-playback"]),
+            ("standalone", &["dep:truce-standalone"]),
+            (
+                "standalone-playback",
+                &["standalone", "truce-standalone/playback"],
+            ),
+            ("ara", &["dep:truce-ara"]),
+        ]);
+        assert_eq!(nonformat_default_features(&table), vec!["ara".to_string()]);
+    }
+
+    #[test]
+    fn nonformat_defaults_sorted_and_empty_cases() {
+        // Multiple companions come out sorted (map order is by key).
+        let table = feature_graph(&[("default", &["vst3", "zeta", "ara", "au"])]);
+        assert_eq!(
+            nonformat_default_features(&table),
+            vec!["ara".to_string(), "zeta".to_string()]
+        );
+        // Only formats → nothing to re-add.
+        let only_formats = feature_graph(&[("default", &["clap", "vst3", "standalone"])]);
+        assert!(nonformat_default_features(&only_formats).is_empty());
+        // No `default` key at all → empty.
+        assert!(nonformat_default_features(&BTreeMap::new()).is_empty());
+    }
+
+    #[test]
+    fn extra_features_reject_format_features() {
+        for reserved in ["clap", "vst3", "au", "standalone", "shell"] {
+            assert!(
+                parse_extra_features(reserved).is_err(),
+                "`{reserved}` should be rejected"
+            );
+        }
+        // A reserved name anywhere in the list rejects the whole value.
+        assert!(parse_extra_features("fancy-dsp,vst3").is_err());
+        // Normal features pass.
+        assert!(parse_extra_features("fancy-dsp,extra").is_ok());
+    }
+
+    fn fresh_tempdir(label: &str) -> PathBuf {
+        static N: AtomicU64 = AtomicU64::new(0);
+        let n = N.fetch_add(1, Ordering::Relaxed);
+        let p = env::temp_dir().join(format!("cargo-truce-ws-{}-{n}-{label}", std::process::id()));
+        let _ = fs::remove_dir_all(&p);
+        fs::create_dir_all(&p).unwrap();
+        p
+    }
+
+    fn write(path: &Path, body: &str) {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, body).unwrap();
+    }
+
+    // A plugin crate nested in a Cargo workspace must resolve the
+    // workspace root (where Cargo honors `[profile.shell]`), not its
+    // own crate dir.
+    #[test]
+    fn workspace_root_resolves_to_ancestor_for_member_crate() {
+        let ws = fresh_tempdir("member");
+        write(
+            &ws.join("Cargo.toml"),
+            "[workspace]\nmembers = [\"my-plugin\"]\nresolver = \"2\"\n\n\
+             [profile.shell]\ninherits = \"release\"\n",
+        );
+        write(
+            &ws.join("my-plugin/Cargo.toml"),
+            "[package]\nname = \"my-plugin\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+        );
+        write(&ws.join("my-plugin/src/lib.rs"), "");
+
+        let resolved = cargo_workspace_root(&ws.join("my-plugin")).unwrap();
+        assert_eq!(resolved.canonicalize().unwrap(), ws.canonicalize().unwrap());
+        let _ = fs::remove_dir_all(&ws);
+    }
+
+    // A standalone single-crate plugin is its own workspace root.
+    #[test]
+    fn workspace_root_resolves_to_self_for_single_crate() {
+        let krate = fresh_tempdir("solo");
+        write(
+            &krate.join("Cargo.toml"),
+            "[package]\nname = \"solo\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+        );
+        write(&krate.join("src/lib.rs"), "");
+
+        let resolved = cargo_workspace_root(&krate).unwrap();
+        assert_eq!(
+            resolved.canonicalize().unwrap(),
+            krate.canonicalize().unwrap()
+        );
+        let _ = fs::remove_dir_all(&krate);
+    }
+}

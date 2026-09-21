@@ -40,6 +40,10 @@ clippy:
 test:
     cargo test --no-default-features
 
+release-tests:
+    python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+    node --test '.github/scripts/*.test.mjs'
+
 reference-check:
     bash verification/reference/check.sh
 
@@ -56,7 +60,7 @@ render-model preset="clean" output="verification/model-output.wav":
         --preset "{{ preset }}" --sample-rate 44100 \
         --output "{{ output }}" --seams-dir "{{ output }}-seams"
 
-check: fmt clippy test reference-check model-check
+check: fmt clippy test release-tests reference-check model-check
 
 build:
     bash scripts/truce.sh build
@@ -71,6 +75,28 @@ run:
 validate *flags: build
     bash scripts/truce.sh install --user --no-build
     bash scripts/validate.sh {{ os() }} {{ flags }}
+
+validate-installed *flags:
+    bash scripts/validate.sh {{ os() }} {{ flags }}
+
+package *flags:
+    bash scripts/truce.sh package {{ flags }}
+
+version version:
+    bash .github/scripts/version.sh "{{ version }}"
+
+tag-candidate:
+    bash .github/scripts/release_tag.sh candidate
+
+tag-release:
+    bash .github/scripts/release_tag.sh release
+
+release-check kind tag:
+    python3 .github/scripts/release_contract.py check-tag "{{ kind }}" "{{ tag }}"
+
+promote-check candidate_tag tag record_sha256 directory:
+    python3 .github/scripts/release_contract.py verify-candidate \
+        "{{ candidate_tag }}" "{{ tag }}" "{{ record_sha256 }}" "{{ directory }}"
 
 ci-checks: check
 

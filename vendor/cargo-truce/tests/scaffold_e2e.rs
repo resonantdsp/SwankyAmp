@@ -1,0 +1,1161 @@
+//! End-to-end scaffold tests.
+//!
+//! Each user-visible `cargo truce new` / `cargo truce new --workspace`
+//! permutation runs through an actual `cargo check`. Catches
+//! cross-file scaffold bugs (workspace-dep vs plugin-dep mismatches,
+//! missing `[build-dependencies]`, stale feature-flag lists, etc.)
+//! that unit tests can't see because they only exercise one template
+//! at a time.
+//!
+//! Run: `cargo test -p cargo-truce --test scaffold_e2e`
+//!
+//! Tests self-serialize at the build step via a process-level mutex,
+//! so `--test-threads=1` is optional - scaffolding and rewriting run
+//! concurrently, only `cargo check` is single-threaded to share the
+//! target dir safely.
+//!
+//! Most tests run `cargo check` only - ~7s warm. `workspace_full_build`
+//! does a full `cargo build` on a multi-plugin workspace to catch
+//! link-time regressions (format wrapper symbol exports, cdylib link
+//! args, etc.) that `check` skips - ~60s cold, ~5-10s warm. Run just
+//! that one when iterating on link-related code:
+//!
+//! ```
+//! cargo test -p cargo-truce --test scaffold_e2e workspace_full_build
+//! ```
+
+use std::fmt::Write;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Mutex, OnceLock};
+
+use truce_utils::cast::sample_count_usize;
+
+// ---------------------------------------------------------------------------
+// Fixtures
+// ---------------------------------------------------------------------------
+
+/// `<truce-repo-root>/` - this crate's manifest lives at
+/// `<truce>/crates/cargo-truce/Cargo.toml`, so two parents up is the
+/// workspace root.
+fn truce_root() -> &'static Path {
+    static ROOT: OnceLock<PathBuf> = OnceLock::new();
+    ROOT.get_or_init(|| {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(Path::parent)
+            .expect("CARGO_MANIFEST_DIR should be <truce>/crates/cargo-truce")
+            .to_path_buf()
+    })
+}
+
+fn cargo_truce_bin() -> PathBuf {
+    PathBuf::from(env!("CARGO_BIN_EXE_cargo-truce"))
+}
+
+/// Shared cargo target dir across every e2e test in this run. First
+/// test compiles truce-* from source (~30s cold); subsequent tests
+/// reuse the artifacts (~1–5s each).
+fn shared_target() -> &'static Path {
+    static DIR: OnceLock<PathBuf> = OnceLock::new();
+    DIR.get_or_init(|| {
+        let p = std::env::temp_dir().join("truce-scaffold-e2e-target");
+        std::fs::create_dir_all(&p).unwrap();
+        p
+    })
+}
+
+/// Global mutex around `cargo check`. Scaffolding + rewriting can
+/// parallelize (each test has its own scratch dir); only the
+/// cache-sharing build step needs serialization.
+fn build_lock() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+}
+
+/// Unique per-test scratch dir. `pid + atomic counter` keeps parallel
+/// test runs (and repeated local runs) from stepping on each other.
+fn fresh_tempdir(label: &str) -> PathBuf {
+    static N: AtomicU64 = AtomicU64::new(0);
+    let pid = std::process::id();
+    let n = N.fetch_add(1, Ordering::SeqCst);
+    let p = std::env::temp_dir().join(format!("truce-scaffold-e2e-{pid}-{n}-{label}"));
+    let _ = std::fs::remove_dir_all(&p);
+    std::fs::create_dir_all(&p).unwrap();
+    p
+}
+
+// ---------------------------------------------------------------------------
+// Scaffold harness
+// ---------------------------------------------------------------------------
+
+struct Scaffold {
+    label: String,
+    /// Directory the scaffold command runs inside. The generated
+    /// project lands as a subdirectory of this.
+    run_dir: PathBuf,
+    /// `cargo-truce` subcommand + args.
+    args: Vec<String>,
+    /// Where the generated project lands after `run()`.
+    generated: PathBuf,
+    /// Per-test snapshot of the staged `bundles/` directory. After
+    /// each `truce_subcommand` call, the shared target's `bundles/`
+    /// is renamed here while still under `build_lock`, then
+    /// assertions read from this path. Decouples test reads from
+    /// concurrent tests' wipes of the shared `bundles/`.
+    bundles_snapshot: PathBuf,
+}
+
+impl Scaffold {
+    /// `cargo truce new <name>` → generates `<tmp>/<name>/`.
+    fn new(label: &str, name: &str) -> Self {
+        let run_dir = fresh_tempdir(label);
+        let generated = run_dir.join(name);
+        let bundles_snapshot = run_dir.join("bundles-out");
+        Self {
+            label: label.into(),
+            run_dir,
+            args: vec!["new".into(), name.into()],
+            generated,
+            bundles_snapshot,
+        }
+    }
+
+    /// `cargo truce new <ws> --workspace <p1> [pN..]` → generates
+    /// `<tmp>/<ws>/` with one plugin crate per plugin name.
+    fn new_workspace(label: &str, ws: &str, plugins: &[&str]) -> Self {
+        let run_dir = fresh_tempdir(label);
+        let generated = run_dir.join(ws);
+        let bundles_snapshot = run_dir.join("bundles-out");
+        let mut args = vec!["new".into(), ws.into(), "--workspace".into()];
+        args.extend(plugins.iter().map(std::string::ToString::to_string));
+        Self {
+            label: label.into(),
+            run_dir,
+            args,
+            generated,
+            bundles_snapshot,
+        }
+    }
+
+    fn arg(mut self, s: &str) -> Self {
+        self.args.push(s.into());
+        self
+    }
+
+    fn run(&self) -> Result<(), String> {
+        let out = Command::new(cargo_truce_bin())
+            .args(&self.args)
+            .current_dir(&self.run_dir)
+            .output()
+            .map_err(|e| format!("[{}] exec cargo-truce: {e}", self.label))?;
+        if !out.status.success() {
+            return Err(format!(
+                "[{}] cargo-truce {} failed: {}\nstdout: {}\nstderr: {}",
+                self.label,
+                self.args.join(" "),
+                out.status,
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr),
+            ));
+        }
+        if !self.generated.is_dir() {
+            return Err(format!(
+                "[{}] scaffold succeeded but {} is missing",
+                self.label,
+                self.generated.display()
+            ));
+        }
+        Ok(())
+    }
+
+    /// Walk the generated tree and rewrite every
+    /// `{ git = "https://github.com/truce-audio/truce", ... }` to
+    /// `{ path = "<truce-root>/crates/<name>", ... }`. Keeps `cargo
+    /// check` off the network.
+    fn rewrite_git_to_path(&self) -> Result<(), String> {
+        // Inject path deps with forward slashes even on Windows - TOML
+        // basic strings (`path = "..."`) treat backslash as an escape
+        // introducer, so a native `D:\a\truce\...` path would break
+        // toml parsing with `missing escaped value`. Cargo accepts
+        // forward slashes for path deps on Windows.
+        let crates_dir = truce_root()
+            .join("crates")
+            .to_string_lossy()
+            .replace('\\', "/");
+
+        let mut files = Vec::new();
+        walk_cargo_toml(&self.generated, &mut files);
+        for f in files {
+            let content =
+                std::fs::read_to_string(&f).map_err(|e| format!("read {}: {e}", f.display()))?;
+            let rewritten = rewrite_git_refs(&content, &crates_dir);
+            if rewritten != content {
+                std::fs::write(&f, rewritten).map_err(|e| format!("write {}: {e}", f.display()))?;
+            }
+        }
+        Ok(())
+    }
+
+    fn cargo_check(&self) -> Result<(), String> {
+        self.run_cargo("check")
+    }
+
+    fn cargo_build(&self) -> Result<(), String> {
+        self.run_cargo("build")
+    }
+
+    /// Run `cargo test --workspace` against the scaffolded project.
+    /// Compiles AND executes every `#[test]` block in the templates,
+    /// so a broken default test rendered by scaffolding fails here.
+    fn cargo_test(&self) -> Result<(), String> {
+        self.run_cargo("test")
+    }
+
+    /// Run `cargo clippy --workspace --all-targets -- -D warnings` -
+    /// the same lint policy CI applies to the truce repo itself, run
+    /// against a freshly-scaffolded plugin. Catches templates that
+    /// emit lint-noisy boilerplate that would surface in every user's
+    /// project.
+    fn cargo_clippy(&self) -> Result<(), String> {
+        let _guard = build_lock()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let out = Command::new("cargo")
+            .args([
+                "clippy",
+                "--workspace",
+                "--all-targets",
+                "--",
+                "-D",
+                "warnings",
+            ])
+            .env("CARGO_TARGET_DIR", shared_target())
+            .current_dir(&self.generated)
+            .output()
+            .map_err(|e| format!("[{}] exec cargo clippy: {e}", self.label))?;
+        if !out.status.success() {
+            return Err(format!(
+                "[{}] cargo clippy failed: {}\nstdout:\n{}\nstderr:\n{}",
+                self.label,
+                out.status,
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr),
+            ));
+        }
+        Ok(())
+    }
+
+    /// `cargo build --package <pkg> --bin <bin> --features <features>`
+    /// against the scaffolded project, returning the binary's path on
+    /// success. Used by tests that need to build a specific bin with
+    /// a non-default feature set (e.g. the standalone runner with the
+    /// optional `playback` feature) - `run_cargo` uses `--workspace`
+    /// which can't target per-package features.
+    fn cargo_build_bin(
+        &self,
+        package: &str,
+        bin: &str,
+        features: &[&str],
+    ) -> Result<PathBuf, String> {
+        let _guard = build_lock()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut cmd = Command::new("cargo");
+        cmd.arg("build").args(["--package", package, "--bin", bin]);
+        if !features.is_empty() {
+            cmd.args(["--no-default-features", "--features", &features.join(",")]);
+        }
+        let out = cmd
+            .env("CARGO_TARGET_DIR", shared_target())
+            .current_dir(&self.generated)
+            .output()
+            .map_err(|e| format!("[{}] exec cargo build --bin {bin}: {e}", self.label))?;
+        if !out.status.success() {
+            return Err(format!(
+                "[{}] cargo build --bin {bin} failed: {}\nstdout:\n{}\nstderr:\n{}",
+                self.label,
+                out.status,
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr),
+            ));
+        }
+        // Cargo writes to `<target>/debug/<bin>` on Unix and
+        // `<target>\debug\<bin>.exe` on Windows. Use std::env::consts
+        // so we don't have to gate on `cfg!(windows)`.
+        let bin_path = shared_target()
+            .join("debug")
+            .join(format!("{bin}{}", std::env::consts::EXE_SUFFIX));
+        if !bin_path.is_file() {
+            return Err(format!(
+                "[{}] cargo build --bin {bin} succeeded but {} is missing",
+                self.label,
+                bin_path.display(),
+            ));
+        }
+        Ok(bin_path)
+    }
+
+    /// Shared body for `cargo check` / `cargo build` / `cargo test`.
+    /// All hold `build_lock` (cache safety) and share the target dir.
+    fn run_cargo(&self, subcommand: &str) -> Result<(), String> {
+        let _guard = build_lock()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let out = Command::new("cargo")
+            .arg(subcommand)
+            .arg("--workspace")
+            // Explicit target dir so our shared cache survives across
+            // tests and across test runs.
+            .env("CARGO_TARGET_DIR", shared_target())
+            .current_dir(&self.generated)
+            .output()
+            .map_err(|e| format!("[{}] exec cargo {subcommand}: {e}", self.label))?;
+        if !out.status.success() {
+            return Err(format!(
+                "[{}] cargo {subcommand} failed: {}\nstdout:\n{}\nstderr:\n{}",
+                self.label,
+                out.status,
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Run a `cargo truce <subcommand>` invocation against the
+    /// scaffolded project. Exercises the actual `cargo-truce` binary
+    /// (not just bare `cargo build`), so xtask-side regressions -
+    /// bundle staging, per-format feature gating, `project_root`
+    /// resolution from a child cwd - surface here.
+    ///
+    /// Sets `CARGO_TARGET_DIR` to the shared cache so artifacts
+    /// land alongside the other tests' `cargo check` / `cargo build`
+    /// outputs. xtask honors this env var for both inner cargo
+    /// invocations and its own staging-path resolution.
+    fn truce_subcommand(&self, args: &[&str]) -> Result<(), String> {
+        let _guard = build_lock()
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        // Wipe the staged-bundles dir so this test's assertions don't
+        // pick up artifacts from earlier `truce_subcommand` runs.
+        // Cargo build artifacts under `release/` survive - that's the
+        // whole point of sharing the target dir.
+        let _ = std::fs::remove_dir_all(shared_target().join("bundles"));
+        let out = Command::new(cargo_truce_bin())
+            .args(args)
+            .env("CARGO_TARGET_DIR", shared_target())
+            .current_dir(&self.generated)
+            .output()
+            .map_err(|e| format!("[{}] exec cargo-truce {args:?}: {e}", self.label))?;
+        if !out.status.success() {
+            return Err(format!(
+                "[{}] cargo-truce {args:?} failed: {}\nstdout:\n{}\nstderr:\n{}",
+                self.label,
+                out.status,
+                String::from_utf8_lossy(&out.stdout),
+                String::from_utf8_lossy(&out.stderr),
+            ));
+        }
+        // Scaffolded builds should be warning-clean. Templates that
+        // accumulate `warning:` / `error:` lines in cargo output (rustc
+        // warnings, unused-manifest-key, deprecated APIs) get caught
+        // here instead of festering until a user files an issue.
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        let diagnostics = scan_for_diagnostics(&stdout, &stderr);
+        if !diagnostics.is_empty() {
+            return Err(format!(
+                "[{}] cargo-truce {args:?} succeeded but emitted {} diagnostic(s):\n{}",
+                self.label,
+                diagnostics.len(),
+                diagnostics.join("\n"),
+            ));
+        }
+        // Snapshot the staged bundles to a per-test path before
+        // releasing `build_lock`. Stops a concurrent test's wipe of
+        // `<shared-target>/bundles` from racing this test's
+        // assertions: by the time the lock is released, our copy
+        // lives at `self.bundles_snapshot` and no other test touches
+        // it. Rename is atomic on the same volume (temp dir).
+        let _ = std::fs::remove_dir_all(&self.bundles_snapshot);
+        let staged = shared_target().join("bundles");
+        if staged.is_dir() {
+            std::fs::rename(&staged, &self.bundles_snapshot).map_err(|e| {
+                format!(
+                    "[{}] snapshot bundles {} -> {}: {e}",
+                    self.label,
+                    staged.display(),
+                    self.bundles_snapshot.display()
+                )
+            })?;
+        }
+        // Echo cargo-truce output via eprintln so cargo test captures
+        // it for the panic dump if a downstream assertion fails. No
+        // output unless the test ultimately fails.
+        eprintln!(
+            "[{}] cargo-truce {args:?} succeeded.\nstdout:\n{stdout}\nstderr:\n{stderr}",
+            self.label
+        );
+        Ok(())
+    }
+
+    /// Assert that the per-test bundles snapshot holds exactly
+    /// `expected` entries whose name ends with `ext` (e.g. `.clap`,
+    /// `.vst3`). Stronger end-to-end check than "cargo-truce exited
+    /// 0" - catches silent staging regressions (e.g. format-flag
+    /// honored at build time but bundle never materialized).
+    ///
+    /// Reads from `self.bundles_snapshot`, populated by
+    /// `truce_subcommand` while holding `build_lock`. The shared
+    /// `<target>/bundles` would race with concurrent tests' wipes.
+    fn assert_bundle_count_by_ext(&self, ext: &str, expected: usize) {
+        let bundles = &self.bundles_snapshot;
+        let names: Vec<String> = std::fs::read_dir(bundles)
+            .unwrap_or_else(|e| {
+                panic!(
+                    "[{}] bundles snapshot missing at {}: {e}\n{}",
+                    self.label,
+                    bundles.display(),
+                    diagnose_target_layout(),
+                )
+            })
+            .filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().to_string()))
+            .collect();
+        let count = names.iter().filter(|n| n.ends_with(ext)).count();
+        assert_eq!(
+            count,
+            expected,
+            "[{}] expected {expected} {ext} bundle(s) in {}, got: {names:?}\n{}",
+            self.label,
+            bundles.display(),
+            diagnose_target_layout(),
+        );
+    }
+}
+
+/// Snapshot the shared target tree - top-level, `release/`,
+/// `debug/`, `bundles/` - for inclusion in failure messages. Helps
+/// pinpoint whether the build wrote to a different profile dir, the
+/// staging step skipped, or cargo silently produced no output.
+fn diagnose_target_layout() -> String {
+    let target = shared_target();
+    let mut out = format!("shared target dir: {}\n", target.display());
+    for sub in ["", "release", "debug", "bundles"] {
+        let dir = if sub.is_empty() {
+            target.to_path_buf()
+        } else {
+            target.join(sub)
+        };
+        let label = if sub.is_empty() { "<root>" } else { sub };
+        match std::fs::read_dir(&dir) {
+            Ok(entries) => {
+                let mut names: Vec<_> = entries
+                    .filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().into_owned()))
+                    .collect();
+                names.sort();
+                let _ = writeln!(out, "  {label}/ ({} entries):", names.len());
+                for n in names.iter().take(40) {
+                    let _ = writeln!(out, "    {n}");
+                }
+                if names.len() > 40 {
+                    let _ = writeln!(out, "    ... and {} more", names.len() - 40);
+                }
+            }
+            Err(e) => {
+                let _ = writeln!(out, "  {label}/: <not readable: {e}>");
+            }
+        }
+    }
+    out
+}
+
+// ---------------------------------------------------------------------------
+// Diagnostic scan
+// ---------------------------------------------------------------------------
+
+/// Pluck `warning:` / `error:` lines out of combined cargo output.
+///
+/// Matches the prefix at the start of a line (after optional ANSI color
+/// codes and whitespace). Skips three benign cases:
+///
+/// - "Compiling …": not a diagnostic, just cargo progress.
+/// - rustc's "warnings emitted" / "X warnings emitted" summary lines -
+///   redundant with the underlying warnings we're already capturing.
+/// - "warning: build failed, waiting for other jobs to finish…":
+///   cargo's job-cancellation noise, not a real diagnostic.
+fn scan_for_diagnostics(stdout: &str, stderr: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for stream in [stdout, stderr] {
+        for line in stream.lines() {
+            // Strip ANSI color escapes that cargo emits.
+            let stripped = strip_ansi(line);
+            let trimmed = stripped.trim_start();
+            let is_warning = trimmed.starts_with("warning:");
+            let is_error = trimmed.starts_with("error:");
+            if !(is_warning || is_error) {
+                continue;
+            }
+            if trimmed.contains("warnings emitted")
+                || trimmed.contains("warning emitted")
+                || trimmed.contains("build failed, waiting for other jobs")
+            {
+                continue;
+            }
+            out.push(stripped.into_owned());
+        }
+    }
+    out
+}
+
+fn strip_ansi(line: &str) -> std::borrow::Cow<'_, str> {
+    if !line.contains('\x1b') {
+        return std::borrow::Cow::Borrowed(line);
+    }
+    let mut out = String::with_capacity(line.len());
+    let mut chars = line.chars();
+    while let Some(c) = chars.next() {
+        if c != '\x1b' {
+            out.push(c);
+            continue;
+        }
+        // ESC [ ... <letter>
+        if chars.next() != Some('[') {
+            continue;
+        }
+        for inner in chars.by_ref() {
+            if inner.is_ascii_alphabetic() {
+                break;
+            }
+        }
+    }
+    std::borrow::Cow::Owned(out)
+}
+
+// ---------------------------------------------------------------------------
+// Git → path rewrite
+// ---------------------------------------------------------------------------
+
+fn walk_cargo_toml(dir: &Path, out: &mut Vec<PathBuf>) {
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for e in entries.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                walk_cargo_toml(&p, out);
+            } else if p.file_name().is_some_and(|n| n == "Cargo.toml") {
+                out.push(p);
+            }
+        }
+    }
+}
+
+/// Line-based rewrite:
+///
+/// ```text
+/// <key> = { git = "https://github.com/truce-audio/truce"[, tag = "..."][, ...] }
+///                           ↓
+/// <key> = { path = "<crates>/<key>"[, ...] }
+/// ```
+///
+/// `tag = "..."` is stripped because path deps reject the key.
+/// Scaffolds emit `tag = "vX.Y.Z"` exclusively (under the default
+/// git+tag form; the `--no-github` opt-in form emits a registry
+/// pin instead and is not covered by this rewriter — those
+/// scaffolds resolve from crates.io directly).
+///
+/// Skips commented-out lines (so the workspace `[workspace.dependencies]`
+/// block's commented "Uncomment to opt in" entries pass through
+/// unchanged). Scaffolded Cargo.tomls always use the single-line form,
+/// so a regex-less line scan suffices.
+fn rewrite_git_refs(content: &str, crates_dir: &str) -> String {
+    const GIT_NEEDLE: &str = r#"{ git = "https://github.com/truce-audio/truce""#;
+    const VERSION_NEEDLE: &str = r#"{ version = ""#;
+    let mut out = String::with_capacity(content.len());
+    for line in content.lines() {
+        let trimmed = line.trim_start();
+        // Only rewrite truce-* lines (registry-form deps in scaffold
+        // templates that pin published versions on crates.io;
+        // unrelated `{ version = ... }` lines for other deps pass
+        // through). Comments pass through too so commented opt-in
+        // hints stay readable.
+        let is_truce_dep = trimmed
+            .split_once('=')
+            .is_some_and(|(key, _)| key.trim().starts_with("truce"));
+        if trimmed.starts_with('#') || !is_truce_dep {
+            out.push_str(line);
+            out.push('\n');
+            continue;
+        }
+        // Extract the key (the `truce-foo` in `truce-foo = { ... }`).
+        let Some(eq_idx) = line.find('=') else {
+            out.push_str(line);
+            out.push('\n');
+            continue;
+        };
+        let key = line[..eq_idx].trim();
+        let replacement = format!(r#"{{ path = "{crates_dir}/{key}""#);
+        let rewritten = if line.contains(GIT_NEEDLE) {
+            let mut rewritten = line.replacen(GIT_NEEDLE, &replacement, 1);
+            // Strip `, tag = "..."` if present - invalid on path deps.
+            // Scaffolds emit it immediately after the URL.
+            let needle = r#", tag = ""#;
+            if let Some(start) = rewritten.find(needle) {
+                let after = start + needle.len();
+                if let Some(end_quote) = rewritten[after..].find('"') {
+                    rewritten.replace_range(start..=(after + end_quote), "");
+                }
+            }
+            rewritten
+        } else if let Some(start) = line.find(VERSION_NEEDLE) {
+            // Registry form: `truce-x = { version = "0.48.10" }`.
+            // Strip the `version = "..."` chunk and replace the
+            // `{` part with the path form. Path deps reject `version`.
+            let after_open = start + VERSION_NEEDLE.len();
+            let end_quote = line[after_open..]
+                .find('"')
+                .map_or(line.len(), |i| after_open + i + 1);
+            // Skip trailing comma / whitespace after the closing quote.
+            let trim_to = line[end_quote..]
+                .chars()
+                .take_while(|c| *c == ',' || c.is_whitespace())
+                .map(char::len_utf8)
+                .sum::<usize>();
+            let mut rewritten = String::with_capacity(line.len());
+            rewritten.push_str(&line[..start]);
+            rewritten.push_str(&replacement);
+            // Add `, ` only if the remainder isn't immediately the
+            // closing brace (i.e., there are other dep args).
+            let tail = &line[end_quote + trim_to..];
+            if tail.trim_start().starts_with('}') {
+                rewritten.push_str(tail);
+            } else {
+                rewritten.push_str(", ");
+                rewritten.push_str(tail);
+            }
+            rewritten
+        } else {
+            line.to_string()
+        };
+        out.push_str(&rewritten);
+        out.push('\n');
+    }
+    // Preserve trailing-newline state - `lines()` drops the final \n.
+    if !content.ends_with('\n') && out.ends_with('\n') {
+        out.pop();
+    }
+    out
+}
+
+// ---------------------------------------------------------------------------
+// Test matrix
+// ---------------------------------------------------------------------------
+
+#[test]
+fn single_plugin_effect() {
+    let s = Scaffold::new("single-effect", "demo_effect");
+    s.run().unwrap();
+    s.rewrite_git_to_path().unwrap();
+    s.cargo_check().unwrap();
+}
+
+#[test]
+fn single_plugin_instrument() {
+    let s = Scaffold::new("single-inst", "demo_inst").arg("--instrument");
+    s.run().unwrap();
+    s.rewrite_git_to_path().unwrap();
+    s.cargo_check().unwrap();
+}
+
+#[test]
+fn single_plugin_midi() {
+    let s = Scaffold::new("single-midi", "demo_midi").arg("--midi");
+    s.run().unwrap();
+    s.rewrite_git_to_path().unwrap();
+    s.cargo_check().unwrap();
+}
+
+#[test]
+fn workspace_one_plugin() {
+    let s = Scaffold::new_workspace("ws-one", "acme", &["gain"]);
+    s.run().unwrap();
+    s.rewrite_git_to_path().unwrap();
+    s.cargo_check().unwrap();
+}
+
+#[test]
+fn workspace_three_plugins() {
+    let s = Scaffold::new_workspace("ws-three", "acme", &["gain", "reverb", "delay"]);
+    s.run().unwrap();
+    s.rewrite_git_to_path().unwrap();
+    s.cargo_check().unwrap();
+}
+
+#[test]
+fn workspace_mixed_types() {
+    let s = Scaffold::new_workspace("ws-mixed", "acme", &["gain", "synth", "arp"])
+        .arg("--type:synth=instrument")
+        .arg("--type:arp=midi");
+    s.run().unwrap();
+    s.rewrite_git_to_path().unwrap();
+    s.cargo_check().unwrap();
+}
+
+#[test]
+fn workspace_with_vendor() {
+    let s = Scaffold::new_workspace("ws-vendor", "acme", &["gain"])
+        .arg("--vendor")
+        .arg("Demo Audio")
+        .arg("--vendor-id")
+        .arg("com.demo");
+    s.run().unwrap();
+    s.rewrite_git_to_path().unwrap();
+    s.cargo_check().unwrap();
+}
+
+#[test]
+fn single_plugin_no_standalone() {
+    let s = Scaffold::new("single-no-standalone", "demo_bare").arg("--no-standalone");
+    s.run().unwrap();
+    s.rewrite_git_to_path().unwrap();
+    // No `src/main.rs` - the standalone host shouldn't be scaffolded.
+    assert!(
+        !s.generated.join("src/main.rs").exists(),
+        "[single-no-standalone] src/main.rs leaked into a --no-standalone scaffold"
+    );
+    s.cargo_check().unwrap();
+}
+
+#[test]
+fn workspace_no_standalone() {
+    let s = Scaffold::new_workspace("ws-no-standalone", "acme", &["gain", "reverb"])
+        .arg("--no-standalone");
+    s.run().unwrap();
+    s.rewrite_git_to_path().unwrap();
+    for p in ["gain", "reverb"] {
+        assert!(
+            !s.generated
+                .join(format!("plugins/{p}/src/main.rs"))
+                .exists(),
+            "[ws-no-standalone] plugins/{p}/src/main.rs leaked into a --no-standalone scaffold"
+        );
+    }
+    s.cargo_check().unwrap();
+}
+
+// Lint-clean check on a fresh single-plugin scaffold. `clippy -D
+// warnings` matches the policy CI runs against the truce repo itself
+// - if we let a template emit code that triggers a lint, every user
+// of `cargo truce new` would inherit it.
+#[test]
+fn single_plugin_clippy_clean() {
+    let s = Scaffold::new("single-clippy", "demo_effect");
+    s.run().unwrap();
+    s.rewrite_git_to_path().unwrap();
+    s.cargo_clippy().unwrap();
+}
+
+// `--stateful` (the default) emits `impl PluginLogic` where the plugin
+// struct is its own DSP state (`type DspState = Self`, empty for a fresh
+// scaffold) with a `_state` argument. Clippy -D warnings on the result
+// guards that path: a scaffold mustn't inherit a warning from the empty
+// state or the unused `_state`.
+#[test]
+fn single_plugin_stateful_clippy_clean() {
+    let s = Scaffold::new("single-stateful", "demo_stateful").arg("--stateful");
+    s.run().unwrap();
+    s.rewrite_git_to_path().unwrap();
+    s.cargo_clippy().unwrap();
+}
+
+// `--pure` emits `impl PurePluginLogic` - no DSP-state struct, no `state`
+// argument. The non-default path, so give it its own lint-clean guard.
+#[test]
+fn single_plugin_pure_clippy_clean() {
+    let s = Scaffold::new("single-pure", "demo_pure").arg("--pure");
+    s.run().unwrap();
+    s.rewrite_git_to_path().unwrap();
+    s.cargo_clippy().unwrap();
+}
+
+// Full `cargo build` of a multi-plugin workspace. Catches link-time
+// regressions (format wrapper cdylib symbols, force-load /
+// exported-symbol link args, Mach-O / PE export tables) that
+// `cargo check` can't see. Cold runtime ~60s; warm ~5-10s if the
+// shared target dir is still populated.
+#[test]
+fn workspace_full_build() {
+    let s = Scaffold::new_workspace("ws-full-build", "acme", &["gain", "reverb", "delay"]);
+    s.run().unwrap();
+    s.rewrite_git_to_path().unwrap();
+    s.cargo_build().unwrap();
+}
+
+// `cargo test --workspace` on a single-plugin scaffold. The
+// scaffolded project ships a default `#[test]` block exercising the
+// templated DSP + bus config + state round-trip; compiling the test
+// binary AND running the tests catches both compile-time regressions
+// and broken assertions that templates accumulate.
+#[test]
+fn single_plugin_tests_pass() {
+    let s = Scaffold::new("single-tests", "demo_effect");
+    s.run().unwrap();
+    s.rewrite_git_to_path().unwrap();
+    s.cargo_test().unwrap();
+}
+
+// `cargo test --workspace` on a multi-plugin workspace mixing every
+// plugin kind (effect + instrument + midi). Doubles as a link-time
+// build check - `cargo test` compiles and links every cdylib like
+// `cargo build` does - and verifies the per-kind default test
+// templates (`render_effect` vs `render_instrument` vs note-effect
+// silence assertion) all pass.
+#[test]
+fn workspace_mixed_types_tests_pass() {
+    let s = Scaffold::new_workspace("ws-mixed-tests", "acme", &["gain", "synth", "arp"])
+        .arg("--type:synth=instrument")
+        .arg("--type:arp=midi");
+    s.run().unwrap();
+    s.rewrite_git_to_path().unwrap();
+    s.cargo_test().unwrap();
+}
+
+// `cargo truce build --clap` on a single-plugin scaffold. Exercises
+// the actual `cargo-truce` binary (not bare `cargo build`), so
+// xtask-side regressions - `project_root` resolution from a child
+// cwd, per-format feature gating in `detect_default_features`,
+// bundle staging into `target/bundles/` - surface here. Single
+// plugin + CLAP only to keep the test under a minute. Does not use
+// the shared target dir; see `truce_subcommand` for why.
+#[test]
+fn scaffold_cargo_truce_build_clap() {
+    let s = Scaffold::new("truce-build-clap", "demo_effect");
+    s.run().unwrap();
+    s.rewrite_git_to_path().unwrap();
+    s.truce_subcommand(&["build", "--clap"]).unwrap();
+    s.assert_bundle_count_by_ext(".clap", 1);
+}
+
+// `cargo truce build --clap --vst3` on a two-plugin workspace.
+// Doubles the matrix coverage of the build integration: workspace
+// (vs single plugin), multi-format invocation (vs one format),
+// and the VST3 C++ shim compile path (vs CLAP-only). One test
+// rather than three so we pay for the truce framework compile once.
+#[test]
+fn scaffold_cargo_truce_build_workspace_multi_format() {
+    let s = Scaffold::new_workspace("truce-build-multi", "acme", &["gain", "reverb"]);
+    s.run().unwrap();
+    s.rewrite_git_to_path().unwrap();
+    s.truce_subcommand(&["build", "--clap", "--vst3"]).unwrap();
+    s.assert_bundle_count_by_ext(".clap", 2);
+    s.assert_bundle_count_by_ext(".vst3", 2);
+}
+
+// `cargo truce screenshot --out <path>` on a fresh scaffold. The
+// PNG must land at the explicitly-supplied path inside the
+// scaffolded project, not in the truce repo. Catches the regression
+// class where the CLI's path resolution mixes up the truce checkout
+// with the scaffolded project.
+#[test]
+fn scaffold_cargo_truce_screenshot() {
+    let s = Scaffold::new("truce-screenshot", "demo_effect");
+    s.run().unwrap();
+    s.rewrite_git_to_path().unwrap();
+    // Belt-and-suspenders: ensure no leftover from a prior run in
+    // the truce checkout could mask a fresh leak.
+    let truce_leak = truce_root().join("target/screenshots/scaffold_smoke.png");
+    let _ = std::fs::remove_file(&truce_leak);
+
+    // --out is required and resolved relative to the cargo-truce
+    // process's CWD (which is the scaffolded project for this run).
+    s.truce_subcommand(&["screenshot", "--out", "screenshots/scaffold_smoke.png"])
+        .unwrap();
+
+    let project_pic = s.generated.join("screenshots/scaffold_smoke.png");
+    assert!(
+        project_pic.exists(),
+        "[truce-screenshot] expected PNG at {} but it's missing - \
+         did `--out` resolve elsewhere?",
+        project_pic.display()
+    );
+    assert!(
+        !truce_leak.exists(),
+        "[truce-screenshot] PNG leaked into truce checkout at {} - \
+         the CLI mis-resolved the output path against the wrong root",
+        truce_leak.display()
+    );
+}
+
+// Offline WAV-render workflow on a freshly-scaffolded effect plugin:
+// turn on the `playback` feature, generate an exponential sweep,
+// run the standalone with `--no-playback --input-file --output-file`,
+// then bit-exact diff input vs output. The scaffolded effect template
+// is a unity-gain passthrough at default settings (the gain param's
+// default plain value is 0 dB - see `truce-derive`'s
+// `default_plain = a.default.unwrap_or(0.0)`), so input and output
+// must agree to within i16 quantization noise. Catches regressions
+// in: the `playback` feature wiring, `--no-playback` offline-render
+// path, WAV decode/encode, and the scaffolded plugin's process loop.
+#[test]
+fn scaffold_standalone_offline_render() {
+    let s = Scaffold::new("offline-render", "demo_render");
+    s.run().unwrap();
+    s.rewrite_git_to_path().unwrap();
+
+    // The scaffold doesn't ship a `standalone-playback` feature
+    // (most users don't need it), so add one as a real plugin
+    // author would: a tiny passthrough that turns on the optional
+    // `playback` feature on truce-standalone.
+    let plugin_toml = s.generated.join("Cargo.toml");
+    let mut content = std::fs::read_to_string(&plugin_toml).unwrap();
+    let injection = "standalone-playback = [\"standalone\", \"truce-standalone/playback\"]\n";
+    let anchor = "standalone = [\"dep:truce-standalone\"]\n";
+    let pos = content.find(anchor).unwrap_or_else(|| {
+        panic!(
+            "[offline-render] couldn't find `standalone = ...` in {}",
+            plugin_toml.display()
+        )
+    });
+    content.insert_str(pos + anchor.len(), injection);
+    std::fs::write(&plugin_toml, content).unwrap();
+
+    // Build the standalone bin with the playback feature on.
+    let bin_path = s
+        .cargo_build_bin(
+            "demo_render",
+            "demo_render-standalone",
+            &["standalone-playback"],
+        )
+        .unwrap();
+
+    // 1-second exponential sweep, 20 Hz → 20 kHz, stereo i16 PCM
+    // @ 48 kHz. Short enough to keep the test fast; long enough
+    // that the offline runner exercises multiple blocks (1024-frame
+    // default → ~47 blocks per second).
+    let sweep_path = s.run_dir.join("sweep.wav");
+    let out_path = s.run_dir.join("rendered.wav");
+    write_sweep_wav(&sweep_path);
+
+    // Run the offline renderer.
+    let out = Command::new(&bin_path)
+        .args([
+            "--no-playback",
+            "--input-file",
+            sweep_path.to_str().unwrap(),
+            "--output-file",
+            out_path.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap_or_else(|e| panic!("[offline-render] exec {}: {e}", bin_path.display()));
+    assert!(
+        out.status.success(),
+        "[offline-render] standalone failed: {}\nstdout:\n{}\nstderr:\n{}",
+        out.status,
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr),
+    );
+    assert!(
+        out_path.exists(),
+        "[offline-render] standalone exited 0 but {} is missing",
+        out_path.display()
+    );
+
+    // Decode and diff. Default scaffold: stereo gain at 0 dB
+    // (unity), so output must equal input modulo the i16→f32
+    // dequant floor.
+    let in_samples = decode_to_f32(&sweep_path);
+    let out_samples = decode_to_f32(&out_path);
+    let cmp_len = in_samples.len().min(out_samples.len());
+    assert!(
+        cmp_len > 0,
+        "[offline-render] zero-length comparison - input/output decoded empty"
+    );
+    let (max_idx, max_diff) = in_samples
+        .iter()
+        .zip(out_samples.iter())
+        .take(cmp_len)
+        .enumerate()
+        .map(|(i, (a, b))| (i, (a - b).abs()))
+        .fold(
+            (0_usize, 0.0_f32),
+            |(bi, bd), (i, d)| {
+                if d > bd { (i, d) } else { (bi, bd) }
+            },
+        );
+    // 1 / 32768 ≈ 3.05e-5 is the i16 quant floor. Unity-gain
+    // passthrough should match exactly when the input was f32
+    // and round to within 1 LSB when it was i16. Sweep is i16,
+    // so allow 1 LSB of slop.
+    let i16_lsb = 1.0 / 32768.0;
+    assert!(
+        max_diff <= i16_lsb,
+        "[offline-render] passthrough diverged: max diff = {max_diff:.3e} \
+         at sample {max_idx} (i16 LSB = {i16_lsb:.3e})\n\
+         in[{max_idx}] = {:.6}, out[{max_idx}] = {:.6}",
+        in_samples[max_idx],
+        out_samples[max_idx],
+    );
+
+    // Tail past input EOF should be silence (gain has no tail
+    // and `mix_into` saturates after the file is consumed).
+    let tail = &out_samples[cmp_len..];
+    let tail_peak = tail.iter().fold(0.0_f32, |a, &b| a.max(b.abs()));
+    // Bit-exact zero is the contract - `mix_into` saturates by
+    // returning early, never touching the buffer past EOF.
+    #[allow(clippy::float_cmp)]
+    {
+        assert_eq!(
+            tail_peak,
+            0.0,
+            "[offline-render] post-EOF tail not silent: peak = {tail_peak:.3e} \
+             over {} samples",
+            tail.len(),
+        );
+    }
+}
+
+/// Generate a 1-second 20 Hz → 20 kHz exponential sweep as
+/// stereo i16 PCM @ 48 kHz at the given path. Exponential
+/// rather than linear so the test signal exercises the full
+/// audible band evenly on a log frequency axis - same shape
+/// most measurement tools use.
+//
+// `i as f64` for the sample-index/time relation; n = 48_000
+// is well below 2^52, so no precision is actually lost.
+#[allow(clippy::cast_precision_loss, clippy::many_single_char_names)]
+fn write_sweep_wav(path: &Path) {
+    let sr: u32 = 48_000;
+    let duration_secs = 1.0_f64;
+    let f0 = 20.0_f64;
+    let f1 = 20_000.0_f64;
+    let n = sample_count_usize(f64::from(sr) * duration_secs);
+    let spec = hound::WavSpec {
+        channels: 2,
+        sample_rate: sr,
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    };
+    let mut w = hound::WavWriter::create(path, spec)
+        .unwrap_or_else(|e| panic!("create sweep at {}: {e}", path.display()));
+    let k = duration_secs / (f1 / f0).ln();
+    for i in 0..n {
+        let t = i as f64 / f64::from(sr);
+        // Phase for an exp sweep: ∫₀ᵗ 2π f₀ (f₁/f₀)^(τ/T) dτ
+        //                       = 2π f₀ K (e^(t/K) − 1)   where K = T / ln(f₁/f₀).
+        let phase = 2.0 * std::f64::consts::PI * f0 * k * ((t / k).exp() - 1.0);
+        // `phase.sin() ∈ [-1, 1]`; multiplied by `i16::MAX` and 0.5,
+        // result is bounded in `[-16383, 16383]`, well within i16.
+        #[allow(clippy::cast_possible_truncation)]
+        let s = (0.5 * phase.sin() * f64::from(i16::MAX)) as i16;
+        w.write_sample(s).unwrap();
+        w.write_sample(s).unwrap();
+    }
+    w.finalize().unwrap();
+}
+
+/// Read a WAV at `path` and return interleaved samples as `f32`
+/// in `[-1.0, 1.0]`. Handles the two formats the offline render
+/// loop actually emits / consumes: i16 PCM (typical input) and
+/// 32-bit float (the standalone's output format).
+fn decode_to_f32(path: &Path) -> Vec<f32> {
+    let mut r =
+        hound::WavReader::open(path).unwrap_or_else(|e| panic!("open {}: {e}", path.display()));
+    let spec = r.spec();
+    match (spec.sample_format, spec.bits_per_sample) {
+        (hound::SampleFormat::Int, 16) => r
+            .samples::<i16>()
+            .map(|s| f32::from(s.unwrap()) / 32768.0)
+            .collect(),
+        (hound::SampleFormat::Float, 32) => r.samples::<f32>().map(|s| s.unwrap()).collect(),
+        (fmt, bits) => panic!(
+            "decode_to_f32: unexpected format {fmt:?} {bits}-bit at {}",
+            path.display()
+        ),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Unit tests for the rewrite helper
+// ---------------------------------------------------------------------------
+
+#[test]
+fn rewrite_simple_git_ref() {
+    let input = r#"truce = { git = "https://github.com/truce-audio/truce" }
+"#;
+    let expected = r#"truce = { path = "/abs/crates/truce" }
+"#;
+    assert_eq!(rewrite_git_refs(input, "/abs/crates"), expected);
+}
+
+#[test]
+fn rewrite_preserves_features_and_optional() {
+    let input = r#"truce-clap = { git = "https://github.com/truce-audio/truce", optional = true }
+truce-standalone = { git = "https://github.com/truce-audio/truce", features = ["gui"] }
+"#;
+    let expected = r#"truce-clap = { path = "/abs/crates/truce-clap", optional = true }
+truce-standalone = { path = "/abs/crates/truce-standalone", features = ["gui"] }
+"#;
+    assert_eq!(rewrite_git_refs(input, "/abs/crates"), expected);
+}
+
+#[test]
+fn rewrite_strips_tag_pin() {
+    let input = r#"truce = { git = "https://github.com/truce-audio/truce", tag = "v0.15.3" }
+truce-clap = { git = "https://github.com/truce-audio/truce", tag = "v0.15.3", optional = true }
+truce-standalone = { git = "https://github.com/truce-audio/truce", tag = "v0.15.3", features = ["gui"], optional = true }
+"#;
+    let expected = r#"truce = { path = "/abs/crates/truce" }
+truce-clap = { path = "/abs/crates/truce-clap", optional = true }
+truce-standalone = { path = "/abs/crates/truce-standalone", features = ["gui"], optional = true }
+"#;
+    assert_eq!(rewrite_git_refs(input, "/abs/crates"), expected);
+}
+
+#[test]
+fn scan_diagnostics_picks_up_warning_and_error() {
+    let stderr = "\
+   Compiling foo v0.1.0
+warning: unused import: `Foo`
+  --> src/lib.rs:3:5
+error: cannot find function `bar` in this scope
+  --> src/lib.rs:7:5
+";
+    let got = scan_for_diagnostics("", stderr);
+    assert_eq!(got.len(), 2, "got: {got:?}");
+    assert!(got[0].contains("warning: unused import"));
+    assert!(got[1].contains("error: cannot find function"));
+}
+
+#[test]
+fn scan_diagnostics_skips_summary_and_cancellation_lines() {
+    let stderr = "\
+warning: 3 warnings emitted
+
+warning: build failed, waiting for other jobs to finish...
+warning: real diagnostic here
+";
+    let got = scan_for_diagnostics("", stderr);
+    assert_eq!(got.len(), 1, "got: {got:?}");
+    assert!(got[0].contains("real diagnostic"));
+}
+
+#[test]
+fn scan_diagnostics_strips_ansi_color() {
+    // ESC[33m = yellow, ESC[0m = reset (typical rustc warning coloring).
+    let stderr = "\x1b[1m\x1b[33mwarning\x1b[0m: unused variable\n";
+    let got = scan_for_diagnostics("", stderr);
+    assert_eq!(got.len(), 1, "got: {got:?}");
+    assert!(got[0].contains("warning: unused variable"));
+}
+
+#[test]
+fn rewrite_leaves_commented_lines_alone() {
+    let input = r#"# truce-lv2 = { git = "https://github.com/truce-audio/truce" }
+#   truce-au = { git = "https://github.com/truce-audio/truce" }
+truce = { git = "https://github.com/truce-audio/truce" }
+"#;
+    let got = rewrite_git_refs(input, "/abs/crates");
+    assert!(got.contains(r#"# truce-lv2 = { git = "https://github.com/truce-audio/truce" }"#));
+    assert!(got.contains(r#"#   truce-au = { git = "https://github.com/truce-audio/truce" }"#));
+    assert!(got.contains(r#"truce = { path = "/abs/crates/truce" }"#));
+}

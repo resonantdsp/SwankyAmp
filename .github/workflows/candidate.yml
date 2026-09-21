@@ -1,0 +1,322 @@
+name: candidate
+
+# RC tags create immutable draft candidates. Manual runs are rehearsals from an
+# administrator-owned rehearsal/* branch and keep commit-labelled workflow
+# artifacts only. Stable tags never build; promotion copies qualified RC bytes.
+on:
+  push:
+    tags: ["v*-rc.*"]
+  workflow_dispatch:
+
+concurrency:
+  group: candidate-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions: {}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  identify:
+    name: identify
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      release: ${{ steps.release.outputs.release }}
+      tagged: ${{ steps.release.outputs.tagged }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+      - id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            python3 .github/scripts/release_contract.py check-tag candidate "$GITHUB_REF_NAME"
+            if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+              echo "$GITHUB_REF_NAME already has a draft; use a new RC tag for new bytes." >&2
+              exit 1
+            fi
+            echo "release=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+            echo "tagged=true" >> "$GITHUB_OUTPUT"
+          else
+            case "$GITHUB_REF_NAME" in
+              rehearsal/*) ;;
+              *) echo "Manual candidate runs require a rehearsal/* branch." >&2; exit 1 ;;
+            esac
+            echo "release=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+            echo "tagged=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  macos:
+    name: signed installer (macos)
+    needs: identify
+    runs-on: macos-15
+    environment: signing
+    permissions:
+      contents: read
+    env:
+      TRUCE_SIGNING_IDENTITY: "Developer ID Application: Garrin McGoldrick (U4JWU4JK99)"
+      TRUCE_INSTALLER_SIGNING_IDENTITY: "Developer ID Installer: Garrin McGoldrick (U4JWU4JK99)"
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+        with:
+          just-version: "1.58.0"
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          cache-on-failure: true
+          shared-key: bundles-macos-15
+      - run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - run: just setup
+      - run: just validate-assets
+      - name: Load signing identities and notarization profile
+        env:
+          APPLE_CERTIFICATES_P12: ${{ secrets.APPLE_CERTIFICATES_P12 }}
+          APPLE_CERTIFICATES_PASSWORD: ${{ secrets.APPLE_CERTIFICATES_PASSWORD }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          password=$(openssl rand -base64 24)
+          security create-keychain -p "$password" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$password" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          security default-keychain -s "$KEYCHAIN"
+          certificates="$RUNNER_TEMP/certificates.p12"
+          ( umask 077; printf '%s' "$APPLE_CERTIFICATES_P12" | base64 --decode > "$certificates" )
+          security import "$certificates" -k "$KEYCHAIN" -P "$APPLE_CERTIFICATES_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/productbuild -T /usr/bin/productsign
+          rm -f "$certificates"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$KEYCHAIN" >/dev/null
+          security find-identity -v -p codesigning "$KEYCHAIN"
+          key="$RUNNER_TEMP/notary.p8"
+          ( umask 077; printf '%s' "$APPLE_API_KEY_P8" > "$key" )
+          xcrun notarytool store-credentials TRUCE_NOTARY --key "$key" \
+            --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID" --keychain "$KEYCHAIN"
+          rm -f "$key"
+      - run: just package --system
+      - name: Install and validate the package contents
+        run: |
+          pkg=$(find target/dist -maxdepth 1 -name '*.pkg' -print -quit)
+          test -n "$pkg"
+          sudo installer -pkg "$pkg" -target /
+          just validate-installed --skip-gui-tests
+      - name: Verify publisher identity, notarization and staple
+        run: |
+          pkg=$(find target/dist -maxdepth 1 -name '*.pkg' -print -quit)
+          spctl -a -vv -t install "$pkg"
+          xcrun stapler validate "$pkg"
+          pkgutil --check-signature "$pkg" \
+            | grep 'Developer ID Installer: Garrin McGoldrick (U4JWU4JK99)'
+          for bundle in \
+            "/Library/Audio/Plug-Ins/VST3/Swanky Amp 2.vst3" \
+            "/Library/Audio/Plug-Ins/CLAP/Swanky Amp 2.clap" \
+            "/Applications/Swanky Amp 2.app"; do
+            test -e "$bundle"
+            codesign --verify --strict --verbose=2 "$bundle"
+            codesign --display --verbose=2 "$bundle" 2>&1 \
+              | grep '^Authority=Developer ID Application: Garrin McGoldrick (U4JWU4JK99)$'
+          done
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: candidate-macos-${{ needs.identify.outputs.release }}
+          path: target/dist/*.pkg
+          if-no-files-found: error
+      - name: Remove signing keychain
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
+
+  windows:
+    name: signed installer (windows)
+    needs: identify
+    runs-on: windows-2025
+    environment: signing
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      TRUCE_AZURE_ACCOUNT: ${{ vars.TRUCE_AZURE_ACCOUNT }}
+      TRUCE_AZURE_PROFILE: ${{ vars.TRUCE_AZURE_PROFILE }}
+      TRUCE_AZURE_ENDPOINT: ${{ vars.TRUCE_AZURE_ENDPOINT }}
+      WINDOWS_SIGNER_SUBJECT: ${{ vars.WINDOWS_SIGNER_SUBJECT }}
+      TRUSTED_SIGNING_CLIENT_VERSION: "1.0.95"
+      TRUCE_AZURE_EXCLUDE_CREDENTIALS: >-
+        environmentcredential,workloadidentitycredential,managedidentitycredential,
+        sharedtokencachecredential,visualstudiocredential,visualstudiocodecredential,
+        azurepowershellcredential,azuredeveloperclicredential,interactivebrowsercredential
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+        with:
+          just-version: "1.58.0"
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          cache-on-failure: true
+          shared-key: bundles-windows-2025
+      - run: just setup
+        shell: bash
+      - run: just validate-assets
+        shell: bash
+      - name: Require configured Free signing identity
+        shell: bash
+        run: |
+          for name in AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_SUBSCRIPTION_ID \
+            TRUCE_AZURE_ACCOUNT TRUCE_AZURE_PROFILE TRUCE_AZURE_ENDPOINT \
+            WINDOWS_SIGNER_SUBJECT; do
+            test -n "${!name:-}" || { echo "Repository variable $name is not configured." >&2; exit 1; }
+          done
+      - name: Install pinned Trusted Signing client
+        shell: pwsh
+        run: |
+          $version = $env:TRUSTED_SIGNING_CLIENT_VERSION
+          $url = "https://api.nuget.org/v3-flatcontainer/microsoft.trusted.signing.client/$version/microsoft.trusted.signing.client.$version.nupkg"
+          $package = Join-Path $env:RUNNER_TEMP "trusted-signing-client.zip"
+          Invoke-WebRequest -Uri $url -OutFile $package
+          $target = Join-Path $env:RUNNER_TEMP "trusted-signing"
+          Expand-Archive -Path $package -DestinationPath $target -Force
+          $dlib = Join-Path $target "bin\x64\Azure.CodeSigning.Dlib.dll"
+          if (-not (Test-Path $dlib)) { throw "No Azure.CodeSigning.Dlib.dll in the pinned package." }
+          "TRUCE_AZURE_DLIB=$dlib" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - uses: Azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+      - name: Prefetch signing token while the OIDC assertion is valid
+        shell: bash
+        run: az account get-access-token --scope https://codesigning.azure.net/.default --output none
+      - run: just package --host-only --system
+        shell: bash
+      - name: Install and validate the installer contents
+        shell: pwsh
+        run: |
+          $installer = (Get-ChildItem target\dist\*.exe)[0].FullName
+          $run = Start-Process -FilePath $installer -Wait -PassThru `
+            -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'
+          if ($run.ExitCode -ne 0) { throw "The installer exited $($run.ExitCode)." }
+      - shell: bash
+        run: |
+          common_files=${COMMONPROGRAMFILES:-${CommonProgramFiles:-}}
+          program_files=${PROGRAMFILES:-${ProgramFiles:-}}
+          test -n "$common_files"
+          test -n "$program_files"
+          test -f "$common_files/CLAP/Swanky Amp 2.clap"
+          test -f "$program_files/Resonant DSP/Swanky Amp 2/swanky-amp-2.exe"
+          CLAP_BUNDLE="$common_files/CLAP/Swanky Amp 2.clap" \
+            just validate-installed --skip-gui-tests
+      - name: Verify the exact installed files have the expected publisher identity
+        shell: pwsh
+        run: |
+          $installer = (Get-ChildItem target\dist\*.exe)[0].FullName
+          $signed = @(
+            $installer,
+            (Join-Path $env:COMMONPROGRAMFILES 'CLAP\Swanky Amp 2.clap'),
+            (Join-Path $env:COMMONPROGRAMFILES 'VST3\Swanky Amp 2.vst3\Contents\x86_64-win\Swanky Amp 2.vst3'),
+            (Join-Path $env:PROGRAMFILES 'Resonant DSP\Swanky Amp 2\swanky-amp-2.exe')
+          )
+          foreach ($file in $signed) {
+            if (-not (Test-Path $file -PathType Leaf)) { throw "Expected installed file is missing: $file" }
+            $signature = Get-AuthenticodeSignature -FilePath $file
+            if ($signature.Status -ne "Valid") {
+              throw "$file does not have a valid publisher signature."
+            }
+            if ($signature.SignerCertificate.Subject -ne $env:WINDOWS_SIGNER_SUBJECT) {
+              throw "$file is signed by '$($signature.SignerCertificate.Subject)', expected '$env:WINDOWS_SIGNER_SUBJECT'."
+            }
+            "{0}: {1}" -f (Split-Path $file -Leaf), $signature.SignerCertificate.Subject
+          }
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: candidate-windows-${{ needs.identify.outputs.release }}
+          path: target/dist/*.exe
+          if-no-files-found: error
+
+  linux:
+    name: bundle attempt (linux)
+    needs: identify
+    runs-on: ubuntu-22.04
+    continue-on-error: true
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - run: sudo apt-get update && sudo apt-get install --no-install-recommends -y pkg-config libasound2-dev
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+        with:
+          just-version: "1.58.0"
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          cache-on-failure: true
+          shared-key: bundles-ubuntu-22.04
+      - run: just setup
+      - run: just validate-assets
+      - run: just package --formats clap,vst3,standalone
+      - name: Install and validate the bundle contents
+        run: |
+          archive=$(find target/dist -maxdepth 1 -name '*.tar.gz' -print -quit)
+          test -n "$archive"
+          mkdir "$RUNNER_TEMP/archive" "$RUNNER_TEMP/home"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/archive"
+          installer=$(find "$RUNNER_TEMP/archive" -name install.sh -print -quit)
+          HOME="$RUNNER_TEMP/home" sh "$installer" --all
+          clap=$(find "$RUNNER_TEMP/home/.clap" -maxdepth 1 -name '*.clap' -print -quit)
+          HOME="$RUNNER_TEMP/home" CLAP_BUNDLE="$clap" just validate-installed --skip-gui-tests
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: candidate-linux-${{ needs.identify.outputs.release }}
+          path: target/dist/*.tar.gz
+          if-no-files-found: error
+
+  record:
+    name: immutable candidate record
+    needs: [identify, macos, windows, linux]
+    if: ${{ always() && needs.macos.result == 'success' && needs.windows.result == 'success' }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      RELEASE: ${{ needs.identify.outputs.release }}
+      TAGGED: ${{ needs.identify.outputs.tagged }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: candidate-*-${{ needs.identify.outputs.release }}
+          merge-multiple: true
+          path: candidate
+      - run: python3 .github/scripts/release_contract.py record "$RELEASE" candidate > candidate/release-record.json
+      - run: sha256sum candidate/release-record.json | tee candidate/release-record.sha256
+      - run: cat candidate/release-record.json
+      - name: Create immutable RC draft
+        if: env.TAGGED == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$RELEASE" >/dev/null 2>&1; then
+            echo "$RELEASE already has a GitHub release; refusing to replace candidate bytes." >&2
+            exit 1
+          fi
+          version=$(python3 .github/scripts/release_contract.py version)
+          awk -v version="$version" '
+            $0 ~ "^## " version "( |$)" { printing = 1; next }
+            printing && /^## / { exit }
+            printing { print }
+          ' CHANGELOG.md > notes.md
+          gh release create "$RELEASE" --verify-tag --draft --title "$RELEASE" \
+            --notes-file notes.md candidate/*
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: candidate-${{ needs.identify.outputs.release }}
+          path: candidate/*
+          if-no-files-found: error

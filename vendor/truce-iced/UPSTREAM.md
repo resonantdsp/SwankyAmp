@@ -3,7 +3,8 @@
 Source: crates.io `truce-iced` 6.3.0, upstream commit
 `ff6b573c7d845638656b03bbe4b4436559dd9725`, `crates/truce-iced` in
 [truce](https://github.com/truce-audio/truce).
-The upstream license texts are included unchanged.
+The upstream `LICENSE` (Truce License 1.0), `LICENSE-MIT` and `LICENSE-APACHE`
+texts are included unchanged.
 
 The published editor drops native focus events before they reach iced widgets.
 Consequently a knob cannot end its drag when another window takes focus.
