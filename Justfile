@@ -60,7 +60,25 @@ render-model preset="clean" output="verification/model-output.wav":
         --preset "{{ preset }}" --sample-rate 44100 \
         --output "{{ output }}" --seams-dir "{{ output }}-seams"
 
-check: fmt clippy test release-tests reference-check model-check
+export-layout output="assets/layout":
+    cargo run --quiet --bin swanky-amp-2 -- export-layout "{{ output }}"
+
+capture output="verification/interface":
+    cargo run --quiet --bin swanky-amp-2 -- capture "{{ output }}"
+
+pack-artwork layers package="assets/artwork.pack":
+    cargo run --quiet --bin swanky-amp-2 -- pack-artwork "{{ layers }}" "{{ package }}"
+
+unpack-artwork package="assets/artwork.pack" output="verification/artwork-unpacked":
+    cargo run --quiet --bin swanky-amp-2 -- unpack-artwork "{{ package }}" "{{ output }}"
+
+validate-assets package="assets/artwork.pack" layers="assets/artwork":
+    cargo run --quiet --bin swanky-amp-2 -- validate-assets "{{ package }}" "{{ layers }}"
+
+refresh-artwork layers="assets/artwork":
+    cargo run --quiet --bin swanky-amp-2 -- refresh-artwork "{{ layers }}"
+
+check: fmt clippy test release-tests reference-check model-check validate-assets
 
 build:
     bash scripts/truce.sh build
