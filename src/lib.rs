@@ -174,6 +174,34 @@ mod tests {
     }
 
     #[test]
+    fn increasing_stage_count_after_silence_reenters_warm() {
+        let params = SwankyAmpParams::default();
+        let mut engine = engine::Engine::new(&params);
+        engine.reset(&params, 44_100., 64);
+        let silence = vec![vec![0.; 2_048]];
+        let settled = render(&mut engine, &params, &silence, 127);
+        assert!(
+            settled[0].iter().all(|sample| sample.is_finite()),
+            "settled 3-stage silence contained non-finite output before the stage-count change"
+        );
+        let settled_peak = settled[0].iter().copied().map(f32::abs).fold(0., f32::max);
+
+        params.stages.set_value(5.);
+        let reentry = render(&mut engine, &params, &silence, 127);
+        assert!(
+            reentry[0].iter().all(|sample| sample.is_finite()),
+            "raising Stages from 3 to 5 produced non-finite output after settled silence"
+        );
+        let reentry_peak = reentry[0].iter().copied().map(f32::abs).fold(0., f32::max);
+        let allowed_peak = settled_peak + 1e-7;
+        assert!(
+            reentry_peak <= allowed_peak,
+            "raising Stages from 3 to 5 emitted a {reentry_peak} peak after settled silence; \
+             the measured silence floor was {settled_peak} and the allowed peak was {allowed_peak}"
+        );
+    }
+
+    #[test]
     fn mono_and_stereo_paths_are_finite_silent_and_independent() {
         let params = SwankyAmpParams::default();
         let left = signal(1_027, 0.);

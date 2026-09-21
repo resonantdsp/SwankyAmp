@@ -30,8 +30,8 @@ PRESET_NAMES = (
 )
 
 # These bounds describe numerical agreement between two translations of the
-# released equations. Spectral level is the audible acceptance criterion;
-# waveform bounds catch polarity, timing, and state errors that level can hide.
+# released equations. Band levels constrain voicing; waveform bounds catch
+# polarity, timing, and state errors that level comparisons can hide.
 RELATIVE_RMS_TOLERANCE = 0.002
 RELATIVE_PEAK_TOLERANCE = 0.006
 BAND_LEVEL_TOLERANCE_DB = 0.02
@@ -156,6 +156,7 @@ def run(binary: Path) -> None:
         model.mkdir()
         subprocess.run(
             [
+                "bash",
                 str(REFERENCE),
                 str(reference),
                 "--sample-rate",
