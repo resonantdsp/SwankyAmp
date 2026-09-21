@@ -20,3 +20,5 @@ factory preset bank and signed candidate qualification are still in progress.
 - Added automation to build, sign and qualify macOS and Windows candidates,
   attempt a qualified Linux bundle, and promote only the accepted candidate
   bytes.
+- Added the bounded, cached release-notice service. The header connection and
+  website's static current-release document remain release prerequisites.

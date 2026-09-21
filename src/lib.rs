@@ -4,6 +4,7 @@ pub mod dsp;
 pub mod engine;
 pub mod layout;
 pub mod params;
+pub mod release_notice;
 pub mod style;
 pub mod ui;
 pub mod widgets;

@@ -43,6 +43,16 @@ iced_graphics = "0.14"
 iced_runtime = "0.14"
 iced_widget = { version = "0.14", features = ["wgpu"] }
 iced_wgpu = "0.14"
+dirs = "5"
+ureq = { version = "3", default-features = false, features = [
+  "rustls-no-provider",
+  "platform-verifier",
+] }
+rustls = { version = "0.23", default-features = false, features = [
+  "ring",
+  "std",
+  "tls12",
+] }
 
 [dev-dependencies]
 truce-test = "=6.3.0"

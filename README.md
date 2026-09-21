@@ -186,6 +186,45 @@ that merge.
 `just promote-check CANDIDATE_TAG TAG RECORD_SHA256 DIRECTORY` runs the local,
 read-only identity and byte checks from the stable tag checkout.
 
+## Release notices
+
+Opening an editor starts a background check for the static current-release
+document at
+`https://resonantdsp.com/release-notices/swanky-amp.json`. The document is at
+most 4 KiB and has this schema:
+
+```json
+{"schemaVersion":1,"productId":"SwankyAmp","currentVersion":"2.0.1"}
+```
+
+The website emits `"currentVersion":null` until `SwankyAmp` is available and
+has verified downloads for that same version. The endpoint does not exist yet;
+the website change that generates it from the promoted release catalogue is a
+separate deployment. A missing endpoint, an offline computer, an invalid
+document and a timeout are all silent.
+
+The service accepts only a strict stable `major.minor.patch` version and exposes
+a newer version to the header integration. Once that integration lands, it will
+change the ordinary information action to an orange download action. An
+explicit press will open the fixed tagged catalogue URL
+`https://resonantdsp.com/products/swanky-amp/?utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=release-notice`;
+the downloaded document cannot choose a link.
+
+The check has a three-second total timeout, follows no redirects and retains its
+last valid answer and last attempt time in the process. It also stores them
+under the operating system's cache directory in
+`Resonant DSP/Swanky Amp 2/release-notice.json` when that location is writable.
+Successful and failed attempts both wait 24 hours before another request, even
+when the cache cannot be written. Invalid or future cache timestamps trigger a
+check instead of suppressing one indefinitely. All filesystem and network work
+stays on the notice worker, outside audio processing.
+
+The request is a bodyless `GET` to the exact URL above. It sends no query,
+custom User-Agent, running version, product key, machine identifier or user
+telemetry. As with any HTTPS request, the website or its delivery provider
+receives the public IP address and ordinary connection, TLS, HTTP-header and
+request-timing information needed to serve and operate the endpoint.
+
 ## Source and licences
 
 Swanky Amp is licensed under GPLv3 or later; see [LICENSE](LICENSE). The model authority is the exact Free 1.4.0 C++ wrapper and generated Faust headers preserved in `verification/reference/released` from the `juce-1.4.0` tag. The Rust port retains the released control mappings, detuning, fitted constants, stage behavior, calibration tables, old cubic knee, and old tone mapping. Small equation and filter primitives were selectively adapted from the separately implemented Pro code only where comparison proved that they express the released Free equations.
