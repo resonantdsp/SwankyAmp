@@ -11,4 +11,3 @@ crate = "swanky-amp"
 fourcc = "SwA2"
 category = "effect"
 vst3_subcategory = "Distortion"
-

@@ -40,6 +40,7 @@ BASELINE_COMMIT = "5c32004862e5dcce8a453e1310da926dc9712464"
 ABSOLUTE_TOLERANCE = 2.0e-4
 RMS_TOLERANCE = 2.0e-5
 LEVEL_TOLERANCE_DB = 0.02
+BAND_EDGES_HZ = (120.0, 400.0, 1200.0, 3500.0, 8000.0)
 
 
 def sha256(path: Path) -> str:
@@ -228,7 +229,7 @@ def read_float_wav(path: Path) -> tuple[int, tuple[float, ...]]:
     return rate, struct.unpack(f"<{len(payload) // 4}f", payload)
 
 
-def compare_wav(frozen: Path, actual: Path) -> tuple[float, float]:
+def measure_wav_drift(frozen: Path, actual: Path) -> tuple[float, float]:
     expected_rate, expected = read_float_wav(frozen)
     actual_rate, observed = read_float_wav(actual)
     if expected_rate != actual_rate or len(expected) != len(observed):
@@ -240,18 +241,70 @@ def compare_wav(frozen: Path, actual: Path) -> tuple[float, float]:
     differences = [abs(a - b) for a, b in zip(expected, observed)]
     maximum = max(differences, default=0.0)
     rms = math.sqrt(sum(value * value for value in differences) / len(differences))
-    if maximum > ABSOLUTE_TOLERANCE or rms > RMS_TOLERANCE:
-        raise RuntimeError(
-            f"audio drift for {actual.name}: max {maximum:.3g}, rms {rms:.3g}"
-        )
     return maximum, rms
 
 
-def compare_levels(expected: dict, observed: dict, name: str) -> None:
+def band_levels(sample_rate: int, samples: tuple[float, ...]) -> dict[str, float | None]:
+    edges = tuple(min(edge, sample_rate * 0.45) for edge in BAND_EDGES_HZ)
+    coefficients = tuple(math.exp(-2.0 * math.pi * edge / sample_rate) for edge in edges)
+    states = [0.0] * len(edges)
+    square_sums = [0.0] * (len(edges) + 1)
+    for sample in samples:
+        lows = []
+        for index, coefficient in enumerate(coefficients):
+            states[index] = (
+                (1.0 - coefficient) * sample + coefficient * states[index]
+            )
+            lows.append(states[index])
+        bands = [lows[0]]
+        bands.extend(lows[index] - lows[index - 1] for index in range(1, len(lows)))
+        bands.append(sample - lows[-1])
+        for index, value in enumerate(bands):
+            square_sums[index] += value * value
+    labels = (
+        "under_120",
+        "120_400",
+        "400_1200",
+        "1200_3500",
+        "3500_8000",
+        "over_8000",
+    )
+    return {
+        label: (
+            None
+            if square_sum == 0.0
+            else 10.0 * math.log10(square_sum / len(samples))
+        )
+        for label, square_sum in zip(labels, square_sums)
+    }
+
+
+def measure_band_level_drift(frozen: Path, actual: Path) -> dict[str, float]:
+    expected_rate, expected = read_float_wav(frozen)
+    actual_rate, observed = read_float_wav(actual)
+    if expected_rate != actual_rate or len(expected) != len(observed):
+        raise RuntimeError(f"WAV shape differs: {actual.name}")
+    expected_levels = band_levels(expected_rate, expected)
+    observed_levels = band_levels(actual_rate, observed)
+    drift: dict[str, float] = {}
+    for band, expected_level in expected_levels.items():
+        observed_level = observed_levels[band]
+        if expected_level is None or observed_level is None:
+            if expected_level != observed_level:
+                raise RuntimeError(f"band silence drift for {actual.name} {band}")
+            drift[band] = 0.0
+        else:
+            drift[band] = abs(expected_level - observed_level)
+    return drift
+
+
+def measure_level_drift(expected: dict, observed: dict, name: str) -> dict[str, float]:
     if observed["instrumented_comparison"]["bit_mismatches"] != 0:
         raise RuntimeError(f"instrumented renderer differs for {name}")
+    drift: dict[str, float] = {}
     for seam, expected_stats in expected["seams"].items():
         observed_stats = observed["seams"][seam]
+        maximum = 0.0
         for window in ("startup", "post_mute"):
             if expected_stats[window]["samples"] != observed_stats[window]["samples"]:
                 raise RuntimeError(f"seam sample count drift for {name} {seam}")
@@ -261,11 +314,10 @@ def compare_levels(expected: dict, observed: dict, name: str) -> None:
                 if left is None or right is None:
                     if left != right:
                         raise RuntimeError(f"seam silence drift for {name} {seam}")
-                elif abs(left - right) > LEVEL_TOLERANCE_DB:
-                    raise RuntimeError(
-                        f"seam level drift for {name} {seam} {window} {measure}: "
-                        f"{left:.6f} vs {right:.6f} dBFS"
-                    )
+                else:
+                    maximum = max(maximum, abs(left - right))
+        drift[seam] = maximum
+    return drift
 
 
 def render(destination: Path, replace_frozen: bool = False) -> None:
@@ -326,31 +378,72 @@ def check() -> None:
         actual_renders = run_renderer(binary, actual_dir)
         worst_max = 0.0
         worst_rms = 0.0
+        worst_level = 0.0
+        worst_band = 0.0
         exact = 0
+        violations: list[str] = []
         for actual in actual_renders:
             key = (actual["preset"], actual["sample_rate"])
             expected = frozen_by_key[key]
             frozen_wav = FROZEN / expected["wav"]
             actual_wav = actual_dir / actual["wav"]
-            maximum, rms = compare_wav(frozen_wav, actual_wav)
+            maximum, rms = measure_wav_drift(frozen_wav, actual_wav)
             worst_max = max(worst_max, maximum)
             worst_rms = max(worst_rms, rms)
             if sha256(frozen_wav) == sha256(actual_wav):
                 exact += 1
-            compare_levels(
+            level_drift = measure_level_drift(
                 json.loads((FROZEN / expected["report"]).read_text()),
                 json.loads((actual_dir / actual["report"]).read_text()),
                 actual["wav"],
             )
+            case_level = max(level_drift.values(), default=0.0)
+            worst_level = max(worst_level, case_level)
+            band_drift = measure_band_level_drift(frozen_wav, actual_wav)
+            case_band = max(band_drift.values(), default=0.0)
+            worst_band = max(worst_band, case_band)
+            seam_summary = " ".join(
+                f"{seam}={value:.6g}dB"
+                for seam, value in sorted(level_drift.items())
+            )
+            print(
+                f"reference-case: {actual['wav']} max={maximum:.6g} "
+                f"rms={rms:.6g} seam-max={case_level:.6g}dB "
+                f"band-max={case_band:.6g}dB {seam_summary} bands="
+                + ",".join(
+                    f"{band}:{value:.6g}dB"
+                    for band, value in band_drift.items()
+                )
+            )
+            if (
+                maximum > ABSOLUTE_TOLERANCE
+                or rms > RMS_TOLERANCE
+                or case_level > LEVEL_TOLERANCE_DB
+            ):
+                violations.append(actual["wav"])
 
         current_detuning = detuning(binary)
         frozen_detuning = frozen_manifest["detuning"]["values_on_freeze_toolchain"]
         detuning_status = "exact" if current_detuning == frozen_detuning else "different standard-library mapping"
-        print(
-            f"reference: 30 renders passed; {exact}/30 byte exact; "
-            f"worst max error {worst_max:.3g}, rms error {worst_rms:.3g}; "
-            f"detuning {detuning_status}; compiler {compiler}"
+        detuning_delta = max(
+            abs(current - frozen)
+            for family, values in frozen_detuning.items()
+            for current, frozen in zip(current_detuning[family], values)
         )
+        print(
+            f"reference: 30 renders compared; {exact}/30 byte exact; "
+            f"worst max error {worst_max:.3g}, rms error {worst_rms:.3g}; "
+            f"worst seam level {worst_level:.3g} dB, band level "
+            f"{worst_band:.3g} dB; detuning {detuning_status} "
+            f"(max delta {detuning_delta:.3g}); compiler {compiler}"
+        )
+        if current_detuning != frozen_detuning:
+            print("reference-detuning-current: " + json.dumps(current_detuning, sort_keys=True))
+        if violations:
+            raise RuntimeError(
+                f"{len(violations)}/30 renders exceeded portability tolerances: "
+                + ", ".join(violations)
+            )
 
 
 def main() -> None:
