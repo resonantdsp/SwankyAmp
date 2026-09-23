@@ -1560,9 +1560,10 @@ fn render_iss(
     // (set above as the `AppName`); only the .exe filename changes.
     let _ = write!(
         setup,
-        "OutputBaseFilename={}-{}-windows\r\n",
+        "OutputBaseFilename={}-{}-windows{}\r\n",
         iss_escape_directive(&p.crate_name),
         iss_escape_directive(version),
+        scope.dist_suffix(),
     );
     setup.push_str("Compression=lzma2\r\n");
     setup.push_str("SolidCompression=yes\r\n");
@@ -2026,9 +2027,10 @@ fn write_suite_setup_section(
     let _ = write!(setup, "OutputDir={}\r\n", iss_escape_path(dist_dir));
     let _ = write!(
         setup,
-        "OutputBaseFilename={}-{}-windows\r\n",
+        "OutputBaseFilename={}-{}-windows{}\r\n",
         iss_escape_directive(&suite.def.bundle_id),
         iss_escape_directive(version),
+        scope.dist_suffix(),
     );
     setup.push_str("Compression=lzma2\r\n");
     setup.push_str("SolidCompression=yes\r\n");
