@@ -20,5 +20,7 @@ factory preset bank and signed candidate qualification are still in progress.
 - Added automation to build, sign and qualify macOS and Windows candidates,
   attempt a qualified Linux bundle, and promote only the accepted candidate
   bytes.
-- Added the bounded, cached release-notice service. The header connection and
-  website's static current-release document remain release prerequisites.
+- Added a bounded, cached release notice: a header action that turns into an
+  orange download arrow when a newer stable release is published and opens the
+  fixed catalogue page on an explicit press. The website's static
+  current-release document remains a release prerequisite.

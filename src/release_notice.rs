@@ -19,6 +19,22 @@ pub struct Notice {
     pub url: &'static str,
 }
 
+impl Notice {
+    /// Opens the fixed catalogue page in the default browser. The launcher is
+    /// never awaited and a failure is ignored: the press is a convenience and
+    /// the editor must not block or report on the user's desktop setup.
+    pub fn open(&self) {
+        let launcher = if cfg!(target_os = "macos") {
+            "open"
+        } else if cfg!(target_os = "windows") {
+            "explorer"
+        } else {
+            "xdg-open"
+        };
+        let _ = std::process::Command::new(launcher).arg(self.url).spawn();
+    }
+}
+
 /// A process-shared view of the release notice. Each editor opening schedules
 /// a refresh if another worker is not already running; reading the latest
 /// result never performs I/O.
@@ -58,12 +74,15 @@ impl Service {
         service
     }
 
+    /// The notice to show now. The worker holds the lock only to swap in a
+    /// finished answer, never across I/O, so waiting for it cannot stall the
+    /// editor, and a reader never sees a spurious gap mid-refresh.
     pub fn current(&self) -> Option<Notice> {
         self.shared
             .state
-            .try_read()
+            .read()
             .ok()
-            .and_then(|state| notice(state.current_version.as_deref()))
+            .and_then(|state| notice_for(state.current_version.as_deref()))
     }
 
     #[cfg(test)]
@@ -132,7 +151,9 @@ fn refresh(cache_path: &Path, endpoint: &str, now: SystemTime, shared: &RwLock<S
     let now = now
         .duration_since(UNIX_EPOCH)
         .map_or(0, |duration| duration.as_secs());
-    let memory = shared.read().map_or_else(|_| State::default(), |state| state.clone());
+    let memory = shared
+        .read()
+        .map_or_else(|_| State::default(), |state| state.clone());
     let disk = read_cache(cache_path);
     let previous = match (memory.checked_at, disk) {
         (Some(memory_time), Some(disk)) if disk.checked_at > memory_time => State {
@@ -148,9 +169,10 @@ fn refresh(cache_path: &Path, endpoint: &str, now: SystemTime, shared: &RwLock<S
     };
     replace_state(shared, previous.clone());
 
-    if previous.checked_at.is_some_and(|checked_at| {
-        checked_at <= now && now - checked_at < CACHE_INTERVAL.as_secs()
-    }) {
+    if previous
+        .checked_at
+        .is_some_and(|checked_at| checked_at <= now && now - checked_at < CACHE_INTERVAL.as_secs())
+    {
         return;
     }
 
@@ -169,19 +191,24 @@ fn refresh(cache_path: &Path, endpoint: &str, now: SystemTime, shared: &RwLock<S
         None => previous.current_version,
     };
 
+    // Store before publishing so an answer the editor can see is already
+    // durable, where the cache is writable, for the next process to reuse.
+    write_cache(
+        cache_path,
+        &Cache {
+            schema_version: 1,
+            product_id: PRODUCT_ID.into(),
+            checked_at: now,
+            current_version: retained.clone(),
+        },
+    );
     replace_state(
         shared,
         State {
             checked_at: Some(now),
-            current_version: retained.clone(),
+            current_version: retained,
         },
     );
-    write_cache(cache_path, &Cache {
-        schema_version: 1,
-        product_id: PRODUCT_ID.into(),
-        checked_at: now,
-        current_version: retained,
-    });
 }
 
 fn fetch(endpoint: &str) -> Option<Document> {
@@ -267,11 +294,9 @@ fn write_cache(path: &Path, cache: &Cache) {
             file.write_all(&bytes)?;
             file.sync_all()
         });
-    if written.is_ok() {
-        if std::fs::rename(&temporary, path).is_err() {
-            let _ = std::fs::remove_file(path);
-            let _ = std::fs::rename(&temporary, path);
-        }
+    if written.is_ok() && std::fs::rename(&temporary, path).is_err() {
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::rename(&temporary, path);
     }
     let _ = std::fs::remove_file(temporary);
 }
@@ -282,7 +307,9 @@ fn replace_state(shared: &RwLock<State>, state: State) {
     }
 }
 
-fn notice(version: Option<&str>) -> Option<Notice> {
+/// The notice a reported current version earns: one only when it is a stable
+/// release newer than this build.
+pub(crate) fn notice_for(version: Option<&str>) -> Option<Notice> {
     version
         .filter(|candidate| supersedes(candidate, env!("CARGO_PKG_VERSION")))
         .map(|version| Notice {
@@ -606,6 +633,22 @@ mod tests {
         assert!(!request.contains("2.0.0"));
         assert!(!request.contains("?"));
         assert!(!request.to_ascii_lowercase().contains("user-agent:"));
+    }
+
+    #[test]
+    fn only_a_numerically_newer_stable_version_supersedes_the_running_one() {
+        assert!(supersedes("2.0.1", "2.0.0"));
+        assert!(supersedes("2.10.0", "2.9.9"));
+        assert!(supersedes("3.0.0", "2.99.99"));
+        assert!(!supersedes("2.0.0", "2.0.0"));
+        assert!(!supersedes("1.9.9", "2.0.0"));
+        assert!(!supersedes("2.0.10", "2.1.0"));
+        for malformed in ["2.1", "2.1.0.0", "v2.1.0", "2.1.0-rc.1", "", "2..1"] {
+            assert!(
+                !supersedes(malformed, "2.0.0"),
+                "{malformed} must not supersede"
+            );
+        }
     }
 
     #[test]

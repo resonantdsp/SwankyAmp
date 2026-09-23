@@ -6,7 +6,7 @@ use iced_core::{
 };
 use truce_iced::{Message, ParamMessage};
 
-pub type Msg = Message<()>;
+pub type Msg = Message<crate::ui::Action>;
 
 pub trait FreeRenderer:
     iced_core::text::Renderer<Font = Font> + iced_wgpu::primitive::Renderer
@@ -269,6 +269,97 @@ impl<R: FreeRenderer> Widget<Msg, Theme, R> for Knob {
 impl<'a, R: FreeRenderer + 'a> From<Knob> for Element<'a, Msg, Theme, R> {
     fn from(knob: Knob) -> Self {
         Element::new(knob)
+    }
+}
+
+/// The release-notice mark: an information sign at rest, a download arrow
+/// when a newer release is known. It is drawn from round-capped strokes so
+/// it needs neither an image asset nor arrow coverage in the interface font.
+pub struct NoticeGlyph {
+    pub download: bool,
+    pub color: Color,
+}
+
+const GLYPH_STROKE: f32 = 0.75;
+
+impl<R: iced_core::Renderer> Widget<Msg, Theme, R> for NoticeGlyph {
+    fn size(&self) -> Size<Length> {
+        Size::new(Length::Fill, Length::Fill)
+    }
+
+    fn layout(&mut self, _: &mut Tree, _: &R, limits: &layout::Limits) -> layout::Node {
+        layout::atomic(limits, Length::Fill, Length::Fill)
+    }
+
+    fn draw(
+        &self,
+        _: &Tree,
+        renderer: &mut R,
+        _: &Theme,
+        _: &renderer::Style,
+        layout: layout::Layout<'_>,
+        _: mouse::Cursor,
+        _: &Rectangle,
+    ) {
+        let c = layout.bounds().center();
+        let at = |dx: f32, dy: f32| Point::new(c.x + dx, c.y + dy);
+        if self.download {
+            stroke(renderer, &[at(0.0, -6.5), at(0.0, 2.5)], self.color);
+            stroke(
+                renderer,
+                &[at(-3.75, -1.25), at(0.0, 2.5), at(3.75, -1.25)],
+                self.color,
+            );
+            stroke(
+                renderer,
+                &[at(-5.5, 3.75), at(-5.5, 6.0), at(5.5, 6.0), at(5.5, 3.75)],
+                self.color,
+            );
+        } else {
+            let radius = 7.0;
+            renderer.fill_quad(
+                renderer::Quad {
+                    bounds: Rectangle::new(
+                        at(-radius, -radius),
+                        Size::new(radius * 2.0, radius * 2.0),
+                    ),
+                    border: iced_core::Border {
+                        color: self.color,
+                        width: 1.25,
+                        radius: radius.into(),
+                    },
+                    ..Default::default()
+                },
+                Color::TRANSPARENT,
+            );
+            disk(renderer, at(0.0, -3.25), 1.0, self.color);
+            stroke(renderer, &[at(0.0, -0.75), at(0.0, 3.75)], self.color);
+        }
+    }
+}
+
+impl<'a, R: iced_core::Renderer + 'a> From<NoticeGlyph> for Element<'a, Msg, Theme, R> {
+    fn from(glyph: NoticeGlyph) -> Self {
+        Element::new(glyph)
+    }
+}
+
+fn stroke<R: iced_core::Renderer + ?Sized>(renderer: &mut R, points: &[Point], color: Color) {
+    for pair in points.windows(2) {
+        let (start, end) = (pair[0], pair[1]);
+        let steps = (start.distance(end) / 0.35).ceil().max(1.0) as usize;
+        for step in 0..=steps {
+            let amount = step as f32 / steps as f32;
+            disk(
+                renderer,
+                Point::new(
+                    start.x + (end.x - start.x) * amount,
+                    start.y + (end.y - start.y) * amount,
+                ),
+                GLYPH_STROKE,
+                color,
+            );
+        }
     }
 }
 

@@ -203,12 +203,15 @@ the website change that generates it from the promoted release catalogue is a
 separate deployment. A missing endpoint, an offline computer, an invalid
 document and a timeout are all silent.
 
-The service accepts only a strict stable `major.minor.patch` version and exposes
-a newer version to the header integration. Once that integration lands, it will
-change the ordinary information action to an orange download action. An
-explicit press will open the fixed tagged catalogue URL
-`https://resonantdsp.com/products/swanky-amp/?utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=release-notice`;
-the downloaded document cannot choose a link.
+The plugin accepts only a strict stable `major.minor.patch` version and
+compares it numerically, component by component, with the running version.
+The header carries a small outlined information action to the left of the
+preset bar. When the document names a strictly newer version, that action
+turns into an orange download arrow, and an explicit press on it opens the
+fixed tagged catalogue URL
+`https://resonantdsp.com/products/swanky-amp/?utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=release-notice`
+in the default browser; the downloaded document cannot choose a link. At rest
+the action does nothing when pressed.
 
 The check has a three-second total timeout, follows no redirects and retains its
 last valid answer and last attempt time in the process. It also stores them
@@ -219,7 +222,7 @@ when the cache cannot be written. Invalid or future cache timestamps trigger a
 check instead of suppressing one indefinitely. All filesystem and network work
 stays on the notice worker, outside audio processing.
 
-The request is a bodyless `GET` to the exact URL above. It sends no query,
+The request is a bodyless `GET` to the exact document URL above. It sends no query,
 custom User-Agent, running version, product key, machine identifier or user
 telemetry. As with any HTTPS request, the website or its delivery provider
 receives the public IP address and ordinary connection, TLS, HTTP-header and
