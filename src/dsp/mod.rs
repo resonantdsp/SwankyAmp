@@ -4,5 +4,6 @@ pub mod diagnostics;
 pub(crate) mod filters;
 pub(crate) mod mapping;
 pub(crate) mod oversample;
+pub mod refit;
 pub(crate) mod stage;
 pub(crate) mod tone_stack;

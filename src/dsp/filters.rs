@@ -131,11 +131,86 @@ impl Biquad {
         self.s2 = 0.;
     }
 
+    /// The steady-state complex gain at `omega` radians per sample, so offline
+    /// tools can measure a configured filter without running audio through it.
+    pub(crate) fn response(&self, omega: f64) -> Complex {
+        let z1 = Complex::polar(-omega);
+        let z2 = z1 * z1;
+        let numerator =
+            Complex::real(self.b0.into()) + z1 * f64::from(self.b1) + z2 * f64::from(self.b2);
+        let denominator = Complex::real(1.) + z1 * f64::from(self.a1) + z2 * f64::from(self.a2);
+        numerator / denominator
+    }
+
     pub(crate) fn settle(&mut self, input: f32) -> f32 {
         let output = (self.b0 + self.b1 + self.b2) * input / (1. + self.a1 + self.a2);
         self.s1 = output - self.b0 * input;
         self.s2 = self.b2 * input - self.a2 * output;
         output
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub(crate) struct Complex {
+    pub re: f64,
+    pub im: f64,
+}
+
+impl Complex {
+    pub(crate) fn real(re: f64) -> Self {
+        Self { re, im: 0. }
+    }
+
+    pub(crate) fn polar(angle: f64) -> Self {
+        Self {
+            re: angle.cos(),
+            im: angle.sin(),
+        }
+    }
+
+    pub(crate) fn norm_squared(self) -> f64 {
+        self.re * self.re + self.im * self.im
+    }
+}
+
+impl std::ops::Add for Complex {
+    type Output = Self;
+    fn add(self, other: Self) -> Self {
+        Self {
+            re: self.re + other.re,
+            im: self.im + other.im,
+        }
+    }
+}
+
+impl std::ops::Mul for Complex {
+    type Output = Self;
+    fn mul(self, other: Self) -> Self {
+        Self {
+            re: self.re * other.re - self.im * other.im,
+            im: self.re * other.im + self.im * other.re,
+        }
+    }
+}
+
+impl std::ops::Mul<f64> for Complex {
+    type Output = Self;
+    fn mul(self, scale: f64) -> Self {
+        Self {
+            re: self.re * scale,
+            im: self.im * scale,
+        }
+    }
+}
+
+impl std::ops::Div for Complex {
+    type Output = Self;
+    fn div(self, other: Self) -> Self {
+        let scale = 1. / other.norm_squared();
+        Self {
+            re: (self.re * other.re + self.im * other.im) * scale,
+            im: (self.im * other.re - self.re * other.im) * scale,
+        }
     }
 }
 

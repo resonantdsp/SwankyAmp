@@ -3,3 +3,6 @@
 
 # These files are a byte-for-byte extraction used as the released-tone oracle.
 verification/reference/released/** -text
+
+# Generated from the released bank byte for byte, CRLF line ends included.
+presets/*.xml -text

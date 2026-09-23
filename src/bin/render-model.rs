@@ -1,12 +1,12 @@
-use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-use swanky_amp::dsp::amp::{AmpControls, AmpPath, CorrectedPath, SeamOutput};
+use swanky_amp::dsp::amp::{AmpControls, AmpPath, CorrectedPath, SeamOutput, ToneMapping};
 use swanky_amp::dsp::diagnostics::reset_equilibrium;
 use swanky_amp::engine::doublings_for;
+use swanky_amp::presets;
 
 const BLOCK_SIZE: usize = 512;
 
@@ -145,54 +145,9 @@ fn io_error(error: io::Error) -> String {
     error.to_string()
 }
 
-fn attribute<'a>(line: &'a str, name: &str) -> Option<&'a str> {
-    let marker = format!("{name}=\"");
-    let start = line.find(&marker)? + marker.len();
-    let rest = &line[start..];
-    Some(&rest[..rest.find('"')?])
-}
-
 fn preset(path: &Path, name: &str) -> Result<AmpControls, String> {
     let xml = fs::read_to_string(path).map_err(|error| format!("{}: {error}", path.display()))?;
-    let marker = format!("<APVTSSwankyAmp presetName=\"{name}\">");
-    let start = xml
-        .find(&marker)
-        .ok_or_else(|| format!("unknown preset: {name}"))?;
-    let rest = &xml[start + marker.len()..];
-    let body = &rest[..rest
-        .find("</APVTSSwankyAmp>")
-        .ok_or("unterminated preset")?];
-    let values: HashMap<&str, f32> = body
-        .lines()
-        .filter_map(|line| {
-            Some((
-                attribute(line, "id")?,
-                attribute(line, "value")?.parse().ok()?,
-            ))
-        })
-        .collect();
-    let get = |id: &str, fallback: f32| values.get(id).copied().unwrap_or(fallback);
-    let mut controls = AmpControls::default();
-    controls.output = get("idOutputLevel", controls.output);
-    controls.low = get("idTsLow", controls.low);
-    controls.mid = get("idTsMid", controls.mid);
-    controls.high = get("idTsHigh", controls.high);
-    controls.presence = get("idTsPresence", controls.presence);
-    controls.tone_stack = get("idTsSelection", controls.tone_stack);
-    controls.stages = get("idGainStages", controls.stages);
-    controls.overhead = get("idGainOverhead", controls.overhead);
-    controls.low_cut = get("idLowCut", controls.low_cut);
-    controls.cabinet_brightness = get("idCabBrightness", controls.cabinet_brightness);
-    controls.cabinet_distance = get("idCabDistance", controls.cabinet_distance);
-    controls.cabinet_dynamic = get("idCabDynamic", controls.cabinet_dynamic);
-    controls.preamp_drive = get("idPreAmpDrive", controls.preamp_drive);
-    controls.preamp_tight = get("idPreAmpTight", controls.preamp_tight);
-    controls.preamp_grit = get("idPreAmpGrit", controls.preamp_grit);
-    controls.power_drive = get("idPowerAmpDrive", controls.power_drive);
-    controls.power_tight = get("idPowerAmpTight", controls.power_tight);
-    controls.power_sag = get("idPowerAmpSag", controls.power_sag);
-    controls.power_sag_ratio = get("idPowerAmpSagRatio", controls.power_sag_ratio);
-    Ok(controls)
+    presets::controls(&xml, name)
 }
 
 fn write_seams(
@@ -302,7 +257,21 @@ fn run() -> Result<(), String> {
             value => return Err(format!("unknown oversampling choice: {value}")),
         };
         let doublings = doublings_for(choice, f64::from(sample_rate));
-        let mut path = CorrectedPath::new(sample_rate as f32, BLOCK_SIZE, controls, doublings);
+        let tone_mapping = match optional_option("--tone-mapping")
+            .as_deref()
+            .unwrap_or("standard")
+        {
+            "standard" => ToneMapping::Standard,
+            "released" => ToneMapping::Released,
+            value => return Err(format!("unknown tone mapping: {value}")),
+        };
+        let mut path = CorrectedPath::new(
+            sample_rate as f32,
+            BLOCK_SIZE,
+            controls,
+            doublings,
+            tone_mapping,
+        );
         for block in rendered.chunks_mut(BLOCK_SIZE) {
             if seams.is_some() {
                 path.process_with_seams(block, &mut seam_output);

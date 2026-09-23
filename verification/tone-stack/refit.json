@@ -1,0 +1,396 @@
+{
+  "sample_rate": 48000,
+  "pluck_seed": 609253905,
+  "pluck_notes": [
+    40,
+    45,
+    50,
+    55,
+    59,
+    64,
+    71,
+    76
+  ],
+  "presets": [
+    {
+      "name": "clean",
+      "original": {
+        "low": 0.0,
+        "mid": -0.29999995,
+        "high": 0.4000001,
+        "power_drive": -1.0
+      },
+      "refit": {
+        "low": 0.01,
+        "mid": 0.2,
+        "high": -0.17,
+        "power_drive": -0.976
+      },
+      "unrefit": {
+        "tone_stack": {
+          "shape_db": 4.670878451238838,
+          "level_db": 2.9046609310579754
+        },
+        "drive_db": 2.9046609310579754,
+        "output": {
+          "shape_db": 4.617795298940201,
+          "level_db": 2.434759353984063
+        }
+      },
+      "refitted": {
+        "tone_stack": {
+          "shape_db": 2.6767851052744716,
+          "level_db": -0.803171868879204
+        },
+        "drive_db": -0.006221416424075699,
+        "output": {
+          "shape_db": 2.6568361912442273,
+          "level_db": -0.5556510835969277
+        }
+      },
+      "limits": []
+    },
+    {
+      "name": "bright",
+      "original": {
+        "low": -0.19799995,
+        "mid": 0.20000005,
+        "high": 0.0020000935,
+        "power_drive": -0.49399996
+      },
+      "refit": {
+        "low": -0.27,
+        "mid": 0.13,
+        "high": -0.15,
+        "power_drive": -0.49399996
+      },
+      "unrefit": {
+        "tone_stack": {
+          "shape_db": 0.5350483951696986,
+          "level_db": 0.5487026833795028
+        },
+        "drive_db": 0.5487026833795028,
+        "output": {
+          "shape_db": 0.5118895075362403,
+          "level_db": 0.3358559771617706
+        }
+      },
+      "refitted": {
+        "tone_stack": {
+          "shape_db": 0.31134123757557935,
+          "level_db": -0.04029415182797891
+        },
+        "drive_db": -0.04029415182797891,
+        "output": {
+          "shape_db": 0.3049584033219851,
+          "level_db": -0.04589426751728354
+        }
+      },
+      "limits": []
+    },
+    {
+      "name": "edge",
+      "original": {
+        "low": -0.19799995,
+        "mid": 0.0,
+        "high": 0.296,
+        "power_drive": -0.394
+      },
+      "refit": {
+        "low": -0.27,
+        "mid": 0.19,
+        "high": -0.19,
+        "power_drive": -0.394
+      },
+      "unrefit": {
+        "tone_stack": {
+          "shape_db": 2.7596742812793402,
+          "level_db": 2.675700188888456
+        },
+        "drive_db": 2.675700188888456,
+        "output": {
+          "shape_db": 2.445495578781644,
+          "level_db": 1.1555898917220304
+        }
+      },
+      "refitted": {
+        "tone_stack": {
+          "shape_db": 1.5742006610741208,
+          "level_db": -0.3220207360813845
+        },
+        "drive_db": -0.3220207360813845,
+        "output": {
+          "shape_db": 1.4853890866437587,
+          "level_db": -0.1070253110653141
+        }
+      },
+      "limits": []
+    },
+    {
+      "name": "distort",
+      "original": {
+        "low": 0.1960001,
+        "mid": 0.59000003,
+        "high": 0.19000006,
+        "power_drive": 0.19000006
+      },
+      "refit": {
+        "low": 0.19,
+        "mid": 0.65,
+        "high": -0.28,
+        "power_drive": 0.19000006
+      },
+      "unrefit": {
+        "tone_stack": {
+          "shape_db": 2.8084349561987714,
+          "level_db": 2.4655864764230273
+        },
+        "drive_db": 2.4655864764230273,
+        "output": {
+          "shape_db": 2.552862194549967,
+          "level_db": -1.2974691877587077
+        }
+      },
+      "refitted": {
+        "tone_stack": {
+          "shape_db": 1.5970296524321024,
+          "level_db": -0.4187678336681415
+        },
+        "drive_db": -0.4187678336681415,
+        "output": {
+          "shape_db": 1.377292982766322,
+          "level_db": -0.4977410775230595
+        }
+      },
+      "limits": []
+    },
+    {
+      "name": "dirty distort",
+      "original": {
+        "low": -0.19399995,
+        "mid": 0.3060001,
+        "high": 0.50600004,
+        "power_drive": 0.65400004
+      },
+      "refit": {
+        "low": -0.23,
+        "mid": 0.48,
+        "high": -0.07,
+        "power_drive": 0.65400004
+      },
+      "unrefit": {
+        "tone_stack": {
+          "shape_db": 2.8724460289222287,
+          "level_db": 3.065431675578253
+        },
+        "drive_db": 3.065431675578253,
+        "output": {
+          "shape_db": 4.345187621671588,
+          "level_db": -0.1103758320371071
+        }
+      },
+      "refitted": {
+        "tone_stack": {
+          "shape_db": 1.625839604073515,
+          "level_db": -0.24785507385398375
+        },
+        "drive_db": -0.24785507385398375,
+        "output": {
+          "shape_db": 2.453426874190771,
+          "level_db": 0.4245263159312813
+        }
+      },
+      "limits": []
+    },
+    {
+      "name": "pre drive",
+      "original": {
+        "low": -0.19999999,
+        "mid": 0.6,
+        "high": 0.19000006,
+        "power_drive": 0.0040000677
+      },
+      "refit": {
+        "low": -0.28,
+        "mid": 0.67,
+        "high": -0.27,
+        "power_drive": 0.0040000677
+      },
+      "unrefit": {
+        "tone_stack": {
+          "shape_db": 2.352003361200945,
+          "level_db": 2.7068627278251824
+        },
+        "drive_db": 2.7068627278251824,
+        "output": {
+          "shape_db": 2.398535346554454,
+          "level_db": -1.3888716621090822
+        }
+      },
+      "refitted": {
+        "tone_stack": {
+          "shape_db": 1.2963460649848721,
+          "level_db": -0.17103034169446119
+        },
+        "drive_db": -0.17103034169446119,
+        "output": {
+          "shape_db": 1.2594506054638062,
+          "level_db": -0.36308433235095094
+        }
+      },
+      "limits": []
+    },
+    {
+      "name": "power drive",
+      "original": {
+        "low": -0.19999999,
+        "mid": 0.6,
+        "high": 0.4740001,
+        "power_drive": 0.388
+      },
+      "refit": {
+        "low": -0.32,
+        "mid": 0.62,
+        "high": -0.03,
+        "power_drive": 0.388
+      },
+      "unrefit": {
+        "tone_stack": {
+          "shape_db": 1.9870783722778538,
+          "level_db": 2.385557993428904
+        },
+        "drive_db": 2.385557993428904,
+        "output": {
+          "shape_db": 2.3010816475539033,
+          "level_db": -1.0678398033549001
+        }
+      },
+      "refitted": {
+        "tone_stack": {
+          "shape_db": 1.1734948227098028,
+          "level_db": -0.05133545560083519
+        },
+        "drive_db": -0.05133545560083519,
+        "output": {
+          "shape_db": 1.184085665487052,
+          "level_db": -0.5915338762288087
+        }
+      },
+      "limits": []
+    },
+    {
+      "name": "full drive",
+      "original": {
+        "low": -0.31399995,
+        "mid": 0.39200008,
+        "high": 0.60600007,
+        "power_drive": 0.40400004
+      },
+      "refit": {
+        "low": -0.4,
+        "mid": 0.46,
+        "high": 0.06,
+        "power_drive": 0.40400004
+      },
+      "unrefit": {
+        "tone_stack": {
+          "shape_db": 2.101079872839932,
+          "level_db": 2.5767383222153626
+        },
+        "drive_db": 2.5767383222153626,
+        "output": {
+          "shape_db": 3.328132913793424,
+          "level_db": -2.1037445797329752
+        }
+      },
+      "refitted": {
+        "tone_stack": {
+          "shape_db": 1.2693371432814013,
+          "level_db": -0.07328251835028254
+        },
+        "drive_db": -0.07328251835028254,
+        "output": {
+          "shape_db": 1.595128537116271,
+          "level_db": -0.665778957717805
+        }
+      },
+      "limits": []
+    },
+    {
+      "name": "high gain",
+      "original": {
+        "low": 0.20000005,
+        "mid": 0.18600011,
+        "high": 0.6,
+        "power_drive": 0.61000013
+      },
+      "refit": {
+        "low": 0.19,
+        "mid": 0.32,
+        "high": -0.02,
+        "power_drive": 0.626
+      },
+      "unrefit": {
+        "tone_stack": {
+          "shape_db": 3.4734307093560854,
+          "level_db": 2.713619857289956
+        },
+        "drive_db": 2.713619857289956,
+        "output": {
+          "shape_db": 3.6762854323102454,
+          "level_db": -2.0900049784902563
+        }
+      },
+      "refitted": {
+        "tone_stack": {
+          "shape_db": 2.0258931953163453,
+          "level_db": -0.5540884986181425
+        },
+        "drive_db": -0.01208155521902654,
+        "output": {
+          "shape_db": 2.1298928807809094,
+          "level_db": -0.5948554099180257
+        }
+      },
+      "limits": []
+    },
+    {
+      "name": "level 11",
+      "original": {
+        "low": 0.40200007,
+        "mid": 1.0,
+        "high": 0.44000006,
+        "power_drive": 1.0
+      },
+      "refit": {
+        "low": 0.32,
+        "mid": 0.99,
+        "high": -0.06,
+        "power_drive": 1.0
+      },
+      "unrefit": {
+        "tone_stack": {
+          "shape_db": 2.561424274042308,
+          "level_db": 2.155011493721986
+        },
+        "drive_db": 2.155011493721986,
+        "output": {
+          "shape_db": 3.3822762392245034,
+          "level_db": 0.4358710844613114
+        }
+      },
+      "refitted": {
+        "tone_stack": {
+          "shape_db": 1.5614627968327843,
+          "level_db": -0.32908051732462695
+        },
+        "drive_db": -0.32908051732462695,
+        "output": {
+          "shape_db": 2.3426479830691194,
+          "level_db": 0.5314539689481634
+        }
+      },
+      "limits": []
+    }
+  ]
+}

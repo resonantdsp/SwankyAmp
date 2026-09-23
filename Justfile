@@ -58,6 +58,20 @@ dsp-report output="verification/dsp/oversampling-plate.json":
     python3 verification/dsp/report.py \
         target/debug/render-model target/debug/dsp-probe "{{ output }}"
 
+# Refit the factory presets to the standard tone-stack mapping and rewrite the
+# version 2 bank and its residual report.
+refit:
+    cargo build --quiet --no-default-features --bin refit-tone
+    target/debug/refit-tone --presets verification/reference/released/Resources/presets.xml \
+        --report-dir verification/tone-stack --factory presets/factory-2.0.xml
+
+# Regenerates the refit and fails unless the committed bank and report match
+# it, which also proves the refit is reproducible.
+refit-check:
+    cargo build --quiet --no-default-features --bin refit-tone
+    target/debug/refit-tone --presets verification/reference/released/Resources/presets.xml \
+        --report-dir verification/tone-stack --factory presets/factory-2.0.xml --check
+
 # Render one released factory preset through the Rust baseline, including the
 # internal seam WAVs used to localize any model drift.
 render-model preset="clean" output="verification/model-output.wav":
@@ -85,7 +99,7 @@ validate-assets package="assets/artwork.pack" layers="assets/artwork":
 refresh-artwork layers="assets/artwork":
     cargo run --quiet --bin swanky-amp-2 -- refresh-artwork "{{ layers }}"
 
-check: fmt clippy test release-tests reference-check model-check validate-assets
+check: fmt clippy test release-tests reference-check model-check refit-check validate-assets
 
 build:
     bash scripts/truce.sh build

@@ -23,6 +23,10 @@ path = "src/bin/render-model.rs"
 name = "dsp-probe"
 path = "src/bin/dsp-probe.rs"
 
+[[bin]]
+name = "refit-tone"
+path = "src/bin/refit-tone.rs"
+
 [features]
 default = ["clap", "vst3", "standalone"]
 clap = ["dep:truce-clap", "dep:clap-sys"]

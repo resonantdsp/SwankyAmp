@@ -161,6 +161,10 @@ def render(
     ]
     if oversampling is not None:
         command.extend(("--oversampling", oversampling))
+    if model == "corrected":
+        # This report isolates oversampling and the plate filter, so it keeps
+        # the released tone mapping; the tone-stack refit has its own report.
+        command.extend(("--tone-mapping", "released"))
     if seams:
         command.extend(("--seams-dir", str(directory / f"{stem}-seams")))
     if cabinet_off:
