@@ -1,4 +1,4 @@
-use super::filters::Biquad;
+use super::filters::{Biquad, Complex};
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub(crate) struct ToneControls {
@@ -7,6 +7,27 @@ pub(crate) struct ToneControls {
     pub treble: f32,
     pub presence: f32,
     pub model: f32,
+}
+
+/// How the tone circuits' analogue transfer functions become digital filters.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToneMapping {
+    /// The 1.4.0 Faust constant `c = SR`, which voices every feature an
+    /// octave above the circuit. Kept for the legacy path that the model gate
+    /// compares with the frozen released renders.
+    Released,
+    /// The standard bilinear constant `c = 2·SR`, placing features where the
+    /// circuit has them. The shipping path uses it with refitted presets.
+    Standard,
+}
+
+impl ToneMapping {
+    fn bilinear_constant(self, sample_rate: f32) -> f64 {
+        match self {
+            Self::Released => f64::from(sample_rate),
+            Self::Standard => 2. * f64::from(sample_rate),
+        }
+    }
 }
 
 fn discretise(b: [f64; 3], a: [f64; 3], c: f64) -> ([f32; 3], [f32; 2]) {
@@ -58,6 +79,11 @@ impl Stack {
         self.mid_low.reset();
     }
 
+    fn response(&self, omega: f64) -> Complex {
+        self.treble.response(omega) * f64::from(self.treble_gain)
+            + self.mid_low.response(omega) * f64::from(self.mid_low_gain)
+    }
+
     fn settle(&mut self, input: f32) -> f32 {
         self.treble_gain * self.treble.settle(input)
             + self.mid_low_gain * self.mid_low.settle(input)
@@ -67,6 +93,7 @@ impl Stack {
 #[derive(Debug, Clone)]
 pub(crate) struct ToneStack {
     sample_rate: f32,
+    mapping: ToneMapping,
     controls: ToneControls,
     fender: Stack,
     marshall: Stack,
@@ -77,9 +104,10 @@ pub(crate) struct ToneStack {
 }
 
 impl ToneStack {
-    pub(crate) fn new(sample_rate: f32) -> Self {
+    pub(crate) fn new(sample_rate: f32, mapping: ToneMapping) -> Self {
         let mut stack = Self {
             sample_rate,
+            mapping,
             controls: ToneControls::default(),
             fender: Stack::default(),
             marshall: Stack::default(),
@@ -108,9 +136,7 @@ impl ToneStack {
 
     pub(crate) fn configure(&mut self, controls: ToneControls) {
         self.controls = controls;
-        // The 1.4.0 Faust graph used SR rather than 2*SR here. RD-245 replaces
-        // this octave-high mapping after the released baseline is proved.
-        let c = f64::from(self.sample_rate);
+        let c = self.mapping.bilinear_constant(self.sample_rate);
         let sample_rate = self.sample_rate;
         let treble = knob(controls.treble);
         let mids = knob(controls.mids);
@@ -246,6 +272,16 @@ impl ToneStack {
             .process(fender_weight * fender + marshall_weight * marshall + ac30_weight * ac30)
     }
 
+    /// The configured stack's steady-state complex gain at `frequency` Hz.
+    pub(crate) fn response(&self, frequency: f64) -> Complex {
+        let omega = std::f64::consts::TAU * frequency / f64::from(self.sample_rate);
+        let [fender_weight, marshall_weight, ac30_weight] = self.weights.map(f64::from);
+        let mixed = self.fender.response(omega) * fender_weight
+            + self.marshall.response(omega) * marshall_weight
+            + self.ac30_mids.response(omega) * self.ac30.response(omega) * ac30_weight;
+        self.presence.response(omega) * mixed
+    }
+
     pub(crate) fn settle(&mut self, input: f32) -> f32 {
         let fender = self.fender.settle(input);
         let marshall = self.marshall.settle(input);
@@ -253,5 +289,47 @@ impl ToneStack {
         let [fender_weight, marshall_weight, ac30_weight] = self.weights;
         self.presence
             .settle(fender_weight * fender + marshall_weight * marshall + ac30_weight * ac30)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Frequency of the deepest cut between 100 Hz and 5 kHz, measured from
+    /// the stack's impulse response.
+    fn mid_notch(mapping: ToneMapping) -> f64 {
+        const SAMPLE_RATE: f32 = 96_000.;
+        let mut stack = ToneStack::new(SAMPLE_RATE, mapping);
+        let impulse: Vec<f64> = (0..16_384)
+            .map(|index| f64::from(stack.process(if index == 0 { 1. } else { 0. })))
+            .collect();
+        (0..=270)
+            .map(|step| 100. * 2_f64.powf(f64::from(step) / 48.))
+            .map(|frequency| {
+                let omega = std::f64::consts::TAU * frequency / f64::from(SAMPLE_RATE);
+                let (real, imaginary) = impulse.iter().enumerate().fold(
+                    (0., 0.),
+                    |(real, imaginary), (index, sample)| {
+                        let (sin, cos) = (omega * index as f64).sin_cos();
+                        (real + sample * cos, imaginary - sample * sin)
+                    },
+                );
+                (frequency, real.hypot(imaginary))
+            })
+            .min_by(|left, right| left.1.total_cmp(&right.1))
+            .map(|(frequency, _)| frequency)
+            .unwrap()
+    }
+
+    #[test]
+    fn standard_mapping_places_the_mid_cut_an_octave_below_the_released_one() {
+        let released = mid_notch(ToneMapping::Released);
+        let standard = mid_notch(ToneMapping::Standard);
+        let octaves = (released / standard).log2();
+        assert!(
+            (octaves - 1.).abs() < 0.05,
+            "mid cut moved {octaves:.3} octaves: released {released:.0} Hz, standard {standard:.0} Hz"
+        );
     }
 }

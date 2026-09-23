@@ -1,6 +1,6 @@
 # Swanky Amp
 
-Swanky Amp is Resonant DSP's free guitar amplifier. Version 2 is a Rust rebuild with the released Free 1.4.0 amplifier model, an iced editor, a standalone app, and CLAP and VST3 formats. It accepts mono and stereo host layouts and processes stereo channels through independent amplifier paths.
+Swanky Amp is Resonant DSP's free guitar amplifier. Version 2 is a Rust rebuild of the released Free 1.4.0 amplifier model, with its tone stack corrected, an iced editor, a standalone app, and CLAP and VST3 formats. It accepts mono and stereo host layouts and processes stereo channels through independent amplifier paths.
 
 The released JUCE 1.4.0 source is preserved at the `juce-1.4.0` tag. Version 2 deliberately uses a new host and installation identity, `Swanky Amp 2` / `com.resonantdsp.swanky-amp-2`, so it installs beside the released `Swanky Amp` and does not take over old sessions.
 
@@ -12,7 +12,7 @@ Install Rust through [rustup](https://rustup.rs/) and install [just](https://git
 just
 ```
 
-The gate checks formatting, lints with and without the plugin-format features, runs the behavioral tests, verifies the [released reference renderer](verification/reference/README.md), and compares the Rust amplifier against all ten released factory presets at 44.1 kHz and 1x processing.
+The gate checks formatting, lints with and without the plugin-format features, runs the behavioral tests, verifies the [released reference renderer](verification/reference/README.md), compares the Rust amplifier's legacy path against all ten released factory presets at 44.1 kHz and 1x processing, and proves the committed [tone-stack refit](verification/tone-stack/refit-report.md) is current.
 
 Render one preset and its internal comparison seams with:
 
@@ -30,7 +30,33 @@ Regenerate the public factor, latency, seam-level, and aliasing measurements wit
 just dsp-report
 ```
 
-The report keeps the released knee and tone mapping in both paths, uses the explicit legacy renderer for the baseline, and measures active-reset equilibrium across all ten factory presets, control extremes, and supported rates. It does not establish factory-preset acceptance for the corrected sound.
+The report keeps the released knee and tone mapping in both paths (`render-model --model corrected --tone-mapping released`), uses the explicit legacy renderer for the baseline, and measures active-reset equilibrium across all ten factory presets, control extremes, and supported rates. It does not establish factory-preset acceptance for the corrected sound.
+
+### Tone stack
+
+Swanky Amp 1.4.0 discretised its tone stack with the bilinear constant `SR`
+instead of the standard `2·SR`, which placed every tone-stack feature an octave
+above the circuit. Version 2 ships the standard mapping. The legacy path, which
+`just model-check` compares with the frozen 1.4.0 renders, keeps the released
+mapping so that comparison still proves the port. Anyone who wants the old
+voicing exactly can keep Swanky Amp 1.4.0 installed beside version 2.
+
+The factory presets were voiced on the octave-high stack, so their Low, Mid
+and High, and Power Drive where the level into the power stage needed it, are
+refitted to sound roughly as they did on a generated pluck. The fit balances
+spectral shape and level into the power stage and deliberately stops short of
+an exact match, which would push the controls to their limits; the report
+records each preset's residuals. Regenerate the version 2 bank and its report
+with:
+
+```sh
+just refit
+```
+
+`just refit-check`, part of `just`, fails if `presets/factory-2.0.xml` or
+`verification/tone-stack/` differ from what the code produces. The bank keeps
+the 1.x preset XML schema so one importer can read both 1.4 and 2.0 presets;
+the editor's preset bar does not load it yet.
 
 The versioned reference corpus captures the released cold startup, including its 1024-sample output mute. The Rust path settles its configured nonlinear state for one second before audio begins, and stages re-enter warm when the continuous stage-count control brings them back into the signal path. Model comparison therefore applies the same one-second silent pre-roll to the released chain and excludes it from the measured WAVs. The cold corpus and warmed comparison remain separate so the startup difference is explicit.
 
@@ -244,7 +270,7 @@ request-timing information needed to serve and operate the endpoint.
 
 ## Source and licences
 
-Swanky Amp is licensed under GPLv3 or later; see [LICENSE](LICENSE). The model authority is the exact Free 1.4.0 C++ wrapper and generated Faust headers preserved in `verification/reference/released` from the `juce-1.4.0` tag. The public legacy renderer retains the released control mappings, detuning, fitted constants, stage behavior, calibration tables, cubic knee, fixed digital plate filter, and old tone mapping. The shipping path currently adds tube-only oversampling and a rate-tracked 20 kHz plate filter; later corrected-model work remains subject to measurement and player audition. Small equation and filter primitives were selectively adapted from the separately implemented Pro code only where comparison proved that they express the released Free equations.
+Swanky Amp is licensed under GPLv3 or later; see [LICENSE](LICENSE). The model authority is the exact Free 1.4.0 C++ wrapper and generated Faust headers preserved in `verification/reference/released` from the `juce-1.4.0` tag. The public legacy renderer retains the released control mappings, detuning, fitted constants, stage behavior, calibration tables, cubic knee, fixed digital plate filter, and old tone mapping. The shipping path adds tube-only oversampling, a rate-tracked 20 kHz plate filter and the standard tone-stack mapping with refitted factory presets; later corrected-model work remains subject to measurement and player audition. Small equation and filter primitives were selectively adapted from the separately implemented Pro code only where comparison proved that they express the released Free equations.
 
 The editable artwork in `assets/artwork` is licensed under CC BY 4.0; see its
 `ARTWORK-LICENSE.txt`. The editor typography uses PT Sans under the SIL Open

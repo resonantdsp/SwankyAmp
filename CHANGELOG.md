@@ -8,8 +8,9 @@ signed build starts.
 
 ## 2.0.0 — in development
 
-Swanky Amp 2 preserves the released Free amplifier and cabinet sound in a new
-Rust host identity that will install beside Swanky Amp 1.4.0. The interface,
+Swanky Amp 2 preserves the released Free amplifier and cabinet sound, with the
+tone stack corrected, in a new Rust host identity that will install beside
+Swanky Amp 1.4.0. The interface,
 factory preset bank and signed candidate qualification are still in progress.
 
 - Ported the released amplifier and cabinet processing into mono and stereo
@@ -17,6 +18,11 @@ factory preset bank and signed candidate qualification are still in progress.
   identity.
 - Added frozen reference data and a model renderer covering ten released preset
   cases.
+- Corrected the tone stack's discretisation: 1.4.0 voiced every tone-stack
+  feature an octave above the circuit. The ten factory presets are refitted to
+  sound roughly as they did, with the residuals recorded in
+  `verification/tone-stack/refit-report.md`; Swanky Amp 1.4.0 remains
+  available for the original voicing.
 - Added automation to build, sign and qualify macOS and Windows candidates,
   attempt a qualified Linux bundle, and promote only the accepted candidate
   bytes.

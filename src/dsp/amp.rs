@@ -3,6 +3,7 @@ pub use super::mapping::AmpControls;
 use super::mapping::AmpVoicing;
 use super::oversample::Oversampler;
 use super::stage::{PlateFilter, STAGES, Tetrode, Triode};
+pub use super::tone_stack::ToneMapping;
 use super::tone_stack::ToneStack;
 
 pub(crate) const MAX_OVERSAMPLING: usize = 2;
@@ -86,7 +87,12 @@ struct TubePath {
 }
 
 impl TubePath {
-    fn new(sample_rate: f32, controls: AmpControls, plate_filter: PlateFilter) -> Self {
+    fn new(
+        sample_rate: f32,
+        controls: AmpControls,
+        plate_filter: PlateFilter,
+        tone_mapping: ToneMapping,
+    ) -> Self {
         let voicing = AmpVoicing::from_controls(controls);
         let triodes = std::array::from_fn(|stage| {
             Triode::new(stage, TRIODE_SCALE, sample_rate, plate_filter)
@@ -95,7 +101,7 @@ impl TubePath {
             sample_rate,
             voicing,
             triodes,
-            tone_stack: ToneStack::new(sample_rate),
+            tone_stack: ToneStack::new(sample_rate, tone_mapping),
             tetrode: Tetrode::new(sample_rate),
             post_tone_gain: 1.,
         };
@@ -186,19 +192,29 @@ pub struct AmpPath {
 
 impl AmpPath {
     pub fn new_legacy(sample_rate: f32, controls: AmpControls) -> Self {
-        let mut path = Self::new(sample_rate, controls, PlateFilter::Released44k1);
+        let mut path = Self::new(
+            sample_rate,
+            controls,
+            PlateFilter::Released44k1,
+            ToneMapping::Released,
+        );
         path.tubes.settle();
         path
     }
 
-    fn new_shipping(sample_rate: f32, controls: AmpControls) -> Self {
-        Self::new(sample_rate, controls, PlateFilter::Fixed20k)
+    fn new_shipping(sample_rate: f32, controls: AmpControls, tone_mapping: ToneMapping) -> Self {
+        Self::new(sample_rate, controls, PlateFilter::Fixed20k, tone_mapping)
     }
 
-    fn new(sample_rate: f32, controls: AmpControls, plate_filter: PlateFilter) -> Self {
+    fn new(
+        sample_rate: f32,
+        controls: AmpControls,
+        plate_filter: PlateFilter,
+        tone_mapping: ToneMapping,
+    ) -> Self {
         let voicing = AmpVoicing::from_controls(controls);
         let mut path = Self {
-            tubes: TubePath::new(sample_rate, controls, plate_filter),
+            tubes: TubePath::new(sample_rate, controls, plate_filter, tone_mapping),
             cabinet: Cabinet::new(sample_rate),
             voicing,
             output_gain: 1.,
@@ -287,14 +303,31 @@ impl AmpChannel {
         controls: AmpControls,
         doublings: usize,
     ) -> Self {
+        Self::with_tone_mapping(
+            sample_rate,
+            max_block,
+            controls,
+            doublings,
+            ToneMapping::Standard,
+        )
+    }
+
+    fn with_tone_mapping(
+        sample_rate: f32,
+        max_block: usize,
+        controls: AmpControls,
+        doublings: usize,
+        tone_mapping: ToneMapping,
+    ) -> Self {
         let prepared_doublings = crate::engine::doublings_cap(f64::from(sample_rate));
         let mut channel = Self {
-            host: AmpPath::new_shipping(sample_rate, controls),
+            host: AmpPath::new_shipping(sample_rate, controls, tone_mapping),
             oversampled: std::array::from_fn(|index| {
                 TubePath::new(
                     sample_rate * (2 << index) as f32,
                     controls,
                     PlateFilter::Fixed20k,
+                    tone_mapping,
                 )
             }),
             oversamplers: std::array::from_fn(|index| {
@@ -403,7 +436,9 @@ impl AmpChannel {
     }
 }
 
-/// Offline corrected-model path used by the public measurement command.
+/// Offline corrected-model path used by the public measurement commands.
+/// `ToneMapping::Standard` is the shipping sound; `Released` isolates the
+/// other corrections from the tone-stack change.
 pub struct CorrectedPath {
     channel: AmpChannel,
     doublings: usize,
@@ -415,10 +450,17 @@ impl CorrectedPath {
         max_block: usize,
         controls: AmpControls,
         doublings: usize,
+        tone_mapping: ToneMapping,
     ) -> Self {
         assert!(doublings <= crate::engine::doublings_cap(f64::from(sample_rate)));
         Self {
-            channel: AmpChannel::new(sample_rate, max_block, controls, doublings),
+            channel: AmpChannel::with_tone_mapping(
+                sample_rate,
+                max_block,
+                controls,
+                doublings,
+                tone_mapping,
+            ),
             doublings,
         }
     }

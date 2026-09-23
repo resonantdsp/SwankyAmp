@@ -701,393 +701,393 @@
     "cases": [
       {
         "factor": 2,
-        "max_error": 0.000274092,
+        "max_error": 0.000225693,
         "preset": "clean",
-        "rms_error": 8.4149e-05,
+        "rms_error": 7.4462e-05,
         "sample_rate": 44100,
-        "stale_max_error": 0.844348073
+        "stale_max_error": 0.997365832
       },
       {
         "factor": 2,
-        "max_error": 0.000246909,
+        "max_error": 0.000239873,
         "preset": "bright",
-        "rms_error": 6.0324e-05,
+        "rms_error": 6.357e-05,
         "sample_rate": 44100,
-        "stale_max_error": 0.364355117
+        "stale_max_error": 0.352400005
       },
       {
         "factor": 2,
-        "max_error": 0.000183269,
+        "max_error": 0.000212707,
         "preset": "edge",
-        "rms_error": 5.8306e-05,
+        "rms_error": 6.3826e-05,
         "sample_rate": 44100,
-        "stale_max_error": 0.251268506
+        "stale_max_error": 0.232081205
       },
       {
         "factor": 2,
-        "max_error": 0.000104077,
+        "max_error": 0.000105947,
         "preset": "distort",
-        "rms_error": 3.47e-05,
+        "rms_error": 3.1016e-05,
         "sample_rate": 44100,
-        "stale_max_error": 0.161763996
+        "stale_max_error": 0.170380354
       },
       {
         "factor": 2,
-        "max_error": 6.1372e-05,
+        "max_error": 6.8031e-05,
         "preset": "dirty distort",
-        "rms_error": 2.2679e-05,
+        "rms_error": 2.0581e-05,
         "sample_rate": 44100,
-        "stale_max_error": 0.107843056
+        "stale_max_error": 0.141448885
       },
       {
         "factor": 2,
-        "max_error": 7.318e-05,
+        "max_error": 8.443e-05,
         "preset": "pre drive",
-        "rms_error": 2.0745e-05,
+        "rms_error": 2.1377e-05,
         "sample_rate": 44100,
-        "stale_max_error": 0.102703691
+        "stale_max_error": 0.087865837
       },
       {
         "factor": 2,
-        "max_error": 8.782e-05,
+        "max_error": 9.9465e-05,
         "preset": "power drive",
-        "rms_error": 2.9273e-05,
+        "rms_error": 2.792e-05,
         "sample_rate": 44100,
-        "stale_max_error": 0.204385102
+        "stale_max_error": 0.247887447
       },
       {
         "factor": 2,
-        "max_error": 8.0613e-05,
+        "max_error": 8.8483e-05,
         "preset": "full drive",
-        "rms_error": 2.3703e-05,
+        "rms_error": 2.3327e-05,
         "sample_rate": 44100,
-        "stale_max_error": 0.135910779
+        "stale_max_error": 0.115261473
       },
       {
         "factor": 2,
-        "max_error": 7.7285e-05,
+        "max_error": 5.8271e-05,
         "preset": "high gain",
-        "rms_error": 2.1339e-05,
+        "rms_error": 1.8076e-05,
         "sample_rate": 44100,
-        "stale_max_error": 0.10236197
+        "stale_max_error": 0.09047015
       },
       {
         "factor": 2,
-        "max_error": 4.8019e-05,
+        "max_error": 4.1693e-05,
         "preset": "level 11",
-        "rms_error": 1.6951e-05,
+        "rms_error": 1.5001e-05,
         "sample_rate": 44100,
-        "stale_max_error": 0.097127393
+        "stale_max_error": 0.056255892
       },
       {
         "factor": 2,
-        "max_error": 0.000270501,
+        "max_error": 0.000254929,
         "preset": "clean",
-        "rms_error": 8.7082e-05,
+        "rms_error": 7.6232e-05,
         "sample_rate": 48000,
-        "stale_max_error": 0.700909197
+        "stale_max_error": 0.836629987
       },
       {
         "factor": 2,
-        "max_error": 0.000221953,
+        "max_error": 0.000260383,
         "preset": "bright",
-        "rms_error": 7.1416e-05,
+        "rms_error": 7.4039e-05,
         "sample_rate": 48000,
-        "stale_max_error": 0.326217324
+        "stale_max_error": 0.309965461
       },
       {
         "factor": 2,
-        "max_error": 0.000208959,
+        "max_error": 0.000253767,
         "preset": "edge",
-        "rms_error": 6.6069e-05,
+        "rms_error": 7.0535e-05,
         "sample_rate": 48000,
-        "stale_max_error": 0.242880225
+        "stale_max_error": 0.302638292
       },
       {
         "factor": 2,
-        "max_error": 0.000110313,
+        "max_error": 0.000114866,
         "preset": "distort",
-        "rms_error": 3.4141e-05,
+        "rms_error": 3.4829e-05,
         "sample_rate": 48000,
-        "stale_max_error": 0.155601144
+        "stale_max_error": 0.168303698
       },
       {
         "factor": 2,
-        "max_error": 7.3269e-05,
+        "max_error": 8.1364e-05,
         "preset": "dirty distort",
-        "rms_error": 2.6075e-05,
+        "rms_error": 2.4691e-05,
         "sample_rate": 48000,
-        "stale_max_error": 0.1061389
+        "stale_max_error": 0.135247499
       },
       {
         "factor": 2,
-        "max_error": 7.8335e-05,
+        "max_error": 9.3549e-05,
         "preset": "pre drive",
-        "rms_error": 2.5583e-05,
+        "rms_error": 2.4191e-05,
         "sample_rate": 48000,
-        "stale_max_error": 0.087984942
+        "stale_max_error": 0.08013764
       },
       {
         "factor": 2,
-        "max_error": 0.000106156,
+        "max_error": 0.00010962,
         "preset": "power drive",
-        "rms_error": 3.3499e-05,
+        "rms_error": 3.3917e-05,
         "sample_rate": 48000,
-        "stale_max_error": 0.174887031
+        "stale_max_error": 0.229585335
       },
       {
         "factor": 2,
-        "max_error": 8.7029e-05,
+        "max_error": 8.4206e-05,
         "preset": "full drive",
-        "rms_error": 2.6597e-05,
+        "rms_error": 2.7274e-05,
         "sample_rate": 48000,
-        "stale_max_error": 0.1253369
+        "stale_max_error": 0.093245052
       },
       {
         "factor": 2,
-        "max_error": 7.9827e-05,
+        "max_error": 6.845e-05,
         "preset": "high gain",
-        "rms_error": 2.2156e-05,
+        "rms_error": 2.2584e-05,
         "sample_rate": 48000,
-        "stale_max_error": 0.10017433
+        "stale_max_error": 0.080676012
       },
       {
         "factor": 2,
-        "max_error": 5.2527e-05,
+        "max_error": 5.2556e-05,
         "preset": "level 11",
-        "rms_error": 1.9173e-05,
+        "rms_error": 1.7554e-05,
         "sample_rate": 48000,
-        "stale_max_error": 0.085136682
+        "stale_max_error": 0.063385732
       },
       {
         "factor": 1,
-        "max_error": 0.000401407,
+        "max_error": 0.000771403,
         "preset": "clean",
-        "rms_error": 0.000108631,
+        "rms_error": 0.000216824,
         "sample_rate": 88200,
-        "stale_max_error": 1.208218098
+        "stale_max_error": 0.881110609
       },
       {
         "factor": 1,
-        "max_error": 0.000380158,
+        "max_error": 0.000340179,
         "preset": "bright",
-        "rms_error": 0.000119036,
+        "rms_error": 0.000121461,
         "sample_rate": 88200,
-        "stale_max_error": 0.426083833
+        "stale_max_error": 0.423727602
       },
       {
         "factor": 1,
-        "max_error": 0.000291335,
+        "max_error": 0.000314489,
         "preset": "edge",
-        "rms_error": 9.0477e-05,
+        "rms_error": 9.695e-05,
         "sample_rate": 88200,
-        "stale_max_error": 0.340215564
+        "stale_max_error": 0.322963566
       },
       {
         "factor": 1,
-        "max_error": 0.00022237,
+        "max_error": 0.000192314,
         "preset": "distort",
-        "rms_error": 5.6839e-05,
+        "rms_error": 5.4206e-05,
         "sample_rate": 88200,
-        "stale_max_error": 0.178249538
+        "stale_max_error": 0.240305334
       },
       {
         "factor": 1,
-        "max_error": 0.000145093,
+        "max_error": 0.000132531,
         "preset": "dirty distort",
-        "rms_error": 4.0223e-05,
+        "rms_error": 3.9538e-05,
         "sample_rate": 88200,
-        "stale_max_error": 0.143189609
+        "stale_max_error": 0.154634848
       },
       {
         "factor": 1,
-        "max_error": 0.000127863,
+        "max_error": 0.000126936,
         "preset": "pre drive",
-        "rms_error": 3.7303e-05,
+        "rms_error": 3.9014e-05,
         "sample_rate": 88200,
-        "stale_max_error": 0.094418854
+        "stale_max_error": 0.064748921
       },
       {
         "factor": 1,
-        "max_error": 0.00013151,
+        "max_error": 0.000130001,
         "preset": "power drive",
-        "rms_error": 4.7041e-05,
+        "rms_error": 4.553e-05,
         "sample_rate": 88200,
-        "stale_max_error": 0.182325855
+        "stale_max_error": 0.182923689
       },
       {
         "factor": 1,
-        "max_error": 0.000112984,
+        "max_error": 0.000125527,
         "preset": "full drive",
-        "rms_error": 3.8495e-05,
+        "rms_error": 3.8102e-05,
         "sample_rate": 88200,
-        "stale_max_error": 0.080273882
+        "stale_max_error": 0.096112788
       },
       {
         "factor": 1,
-        "max_error": 8.5726e-05,
+        "max_error": 7.8574e-05,
         "preset": "high gain",
-        "rms_error": 2.7328e-05,
+        "rms_error": 2.684e-05,
         "sample_rate": 88200,
-        "stale_max_error": 0.077081025
+        "stale_max_error": 0.078166977
       },
       {
         "factor": 1,
-        "max_error": 0.000103147,
+        "max_error": 0.000111192,
         "preset": "level 11",
-        "rms_error": 2.8871e-05,
+        "rms_error": 2.9301e-05,
         "sample_rate": 88200,
-        "stale_max_error": 0.062968075
+        "stale_max_error": 0.066781387
       },
       {
         "factor": 1,
-        "max_error": 0.000423014,
+        "max_error": 0.000918001,
         "preset": "clean",
-        "rms_error": 0.000136936,
+        "rms_error": 0.000280907,
         "sample_rate": 96000,
-        "stale_max_error": 0.66554606
+        "stale_max_error": 0.774381399
       },
       {
         "factor": 1,
-        "max_error": 0.000465712,
+        "max_error": 0.000468731,
         "preset": "bright",
-        "rms_error": 0.000150316,
+        "rms_error": 0.000150927,
         "sample_rate": 96000,
-        "stale_max_error": 0.326740324
+        "stale_max_error": 0.335579216
       },
       {
         "factor": 1,
-        "max_error": 0.000347927,
+        "max_error": 0.000359252,
         "preset": "edge",
-        "rms_error": 0.000108856,
+        "rms_error": 0.000112452,
         "sample_rate": 96000,
-        "stale_max_error": 0.297738701
+        "stale_max_error": 0.297708184
       },
       {
         "factor": 1,
-        "max_error": 0.000208206,
+        "max_error": 0.000154957,
         "preset": "distort",
-        "rms_error": 6.5008e-05,
+        "rms_error": 6.0504e-05,
         "sample_rate": 96000,
-        "stale_max_error": 0.162586823
+        "stale_max_error": 0.192805558
       },
       {
         "factor": 1,
-        "max_error": 0.000135895,
+        "max_error": 0.000139084,
         "preset": "dirty distort",
-        "rms_error": 3.973e-05,
+        "rms_error": 4.2524e-05,
         "sample_rate": 96000,
-        "stale_max_error": 0.132068828
+        "stale_max_error": 0.14386645
       },
       {
         "factor": 1,
-        "max_error": 0.000127524,
+        "max_error": 0.00013531,
         "preset": "pre drive",
-        "rms_error": 4.8091e-05,
+        "rms_error": 5.0133e-05,
         "sample_rate": 96000,
-        "stale_max_error": 0.071554169
+        "stale_max_error": 0.061690532
       },
       {
         "factor": 1,
-        "max_error": 0.00014823,
+        "max_error": 0.000196789,
         "preset": "power drive",
-        "rms_error": 5.0244e-05,
+        "rms_error": 5.3949e-05,
         "sample_rate": 96000,
-        "stale_max_error": 0.164290652
+        "stale_max_error": 0.164197668
       },
       {
         "factor": 1,
-        "max_error": 0.000131674,
+        "max_error": 0.000135921,
         "preset": "full drive",
-        "rms_error": 4.5399e-05,
+        "rms_error": 4.5501e-05,
         "sample_rate": 96000,
-        "stale_max_error": 0.07540825
+        "stale_max_error": 0.087241039
       },
       {
         "factor": 1,
-        "max_error": 9.883e-05,
+        "max_error": 8.4497e-05,
         "preset": "high gain",
-        "rms_error": 3.2238e-05,
+        "rms_error": 3.1922e-05,
         "sample_rate": 96000,
-        "stale_max_error": 0.07238961
+        "stale_max_error": 0.070863269
       },
       {
         "factor": 1,
-        "max_error": 0.000121914,
+        "max_error": 8.9106e-05,
         "preset": "level 11",
-        "rms_error": 3.2398e-05,
+        "rms_error": 3.0309e-05,
         "sample_rate": 96000,
-        "stale_max_error": 0.068112902
+        "stale_max_error": 0.066936463
       }
     ],
-    "smallest_stale_max_error": 0.062968075,
-    "worst_max_error": 0.000465712,
-    "worst_rms_error": 0.000150316
+    "smallest_stale_max_error": 0.056255892,
+    "worst_max_error": 0.000918001,
+    "worst_rms_error": 0.000280907
   },
   "reset_control_extremes": [
     {
       "factor": 2,
-      "max_error": 1.43e-07,
+      "max_error": 2.05e-07,
       "name": "minimum",
-      "rms_error": 6.7e-08,
+      "rms_error": 1.07e-07,
       "sample_rate": 44100,
-      "stale_max_error": 1.6489e-05
+      "stale_max_error": 2.905e-05
     },
     {
       "factor": 2,
-      "max_error": 0.000203556,
+      "max_error": 0.00051029,
       "name": "maximum",
-      "rms_error": 9.5867e-05,
+      "rms_error": 0.000224545,
       "sample_rate": 44100,
-      "stale_max_error": 0.300915331
+      "stale_max_error": 0.362266779
     },
     {
       "factor": 2,
-      "max_error": 1.08e-07,
+      "max_error": 1.82e-07,
       "name": "minimum",
-      "rms_error": 5.3e-08,
+      "rms_error": 8.3e-08,
       "sample_rate": 48000,
-      "stale_max_error": 1.3057e-05
+      "stale_max_error": 2.2979e-05
     },
     {
       "factor": 2,
-      "max_error": 0.000803702,
+      "max_error": 0.000640167,
       "name": "maximum",
-      "rms_error": 0.00038155,
+      "rms_error": 0.000313144,
       "sample_rate": 48000,
-      "stale_max_error": 0.278073072
+      "stale_max_error": 0.329741389
     },
     {
       "factor": 1,
-      "max_error": 1.01e-07,
+      "max_error": 1.62e-07,
       "name": "minimum",
-      "rms_error": 4.4e-08,
+      "rms_error": 7.6e-08,
       "sample_rate": 88200,
-      "stale_max_error": 2.8005e-05
+      "stale_max_error": 4.2555e-05
     },
     {
       "factor": 1,
-      "max_error": 0.000254388,
+      "max_error": 0.000341104,
       "name": "maximum",
-      "rms_error": 0.000122585,
+      "rms_error": 0.00015183,
       "sample_rate": 88200,
-      "stale_max_error": 0.275416613
+      "stale_max_error": 0.30946213
     },
     {
       "factor": 1,
-      "max_error": 9.5e-08,
+      "max_error": 1.61e-07,
       "name": "minimum",
-      "rms_error": 3.8e-08,
+      "rms_error": 6.5e-08,
       "sample_rate": 96000,
-      "stale_max_error": 1.9079e-05
+      "stale_max_error": 2.9524e-05
     },
     {
       "factor": 1,
-      "max_error": 0.000634145,
+      "max_error": 0.000868827,
       "name": "maximum",
-      "rms_error": 0.000365068,
+      "rms_error": 0.000445908,
       "sample_rate": 96000,
-      "stale_max_error": 0.263748497
+      "stale_max_error": 0.301702023
     }
   ],
   "scope": "oversampling and 20 kHz plate filter only; released knee and tone mapping retained"
