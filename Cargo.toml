@@ -31,6 +31,10 @@ path = "src/bin/refit-tone.rs"
 name = "soak"
 path = "src/bin/soak.rs"
 
+[[bin]]
+name = "calibrate"
+path = "src/bin/calibrate.rs"
+
 [features]
 default = ["clap", "vst3", "standalone"]
 clap = ["dep:truce-clap", "dep:clap-sys"]

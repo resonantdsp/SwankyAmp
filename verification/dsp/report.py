@@ -163,9 +163,11 @@ def render(
         command.extend(("--oversampling", oversampling))
     if model == "corrected":
         # This report isolates oversampling and the plate filter, so it keeps
-        # the released tone mapping and knee; the tone-stack refit and the knee
-        # have their own reports.
-        command.extend(("--tone-mapping", "released", "--knee", "released"))
+        # the released tone mapping, knee and level compensation; the other
+        # corrections have their own reports.
+        command.extend(
+            ("--tone-mapping", "released", "--knee", "released", "--tables", "released")
+        )
     if seams:
         command.extend(("--seams-dir", str(directory / f"{stem}-seams")))
     if cabinet_off:
@@ -244,8 +246,8 @@ def run(render_binary: Path, probe_binary: Path, destination: Path) -> None:
     results: dict[str, object] = {
         "scope": (
             "seam and alias measurements isolate oversampling and the 20 kHz plate "
-            "filter with the released knee and tone mapping; reset audits use the "
-            "shipping path"
+            "filter with the released knee, tone mapping and level compensation; "
+            "reset audits use the shipping path"
         ),
         "policy": probe["policy"],
         "latency_impulses": probe["impulses"],

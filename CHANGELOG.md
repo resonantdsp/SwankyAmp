@@ -28,9 +28,13 @@ install beside Swanky Amp 1.4.0. The interface, factory preset bank and signed c
   released seam levels over the ten factory presets, keeping every seam at 0 dB
   input within 0.6 dB of 1.4.0 (tone stack 1.05 dB, output 0.5 dB). The
   tetrode keeps the released curve, which sets its bias and gain rather than a
-  knee. The preamp and power level tables still hold the released values
-  pending calibration against the final voicing, and the preset refit is
-  measured with the new knee.
+  knee. The preset refit is measured with the new knee.
+- Recalibrated the level compensation for the corrected amplifier: the
+  preamp and power tables and the tone-stack scale are measured against the
+  released path by `just calibrate`, so Drive and Power Drive move loudness
+  as 1.4.0 did and the factory defaults land on 1.4.0's level into the power
+  stage and at the output with the cabinet off. The factory presets' output
+  sits within 1.0 dB of 1.4.0, from up to 2.5 dB below.
 - Added a multi-hour soak (`just soak`, `just soak-check`), rerun on each
   release candidate, that gates level drift, tremolo-band modulation and
   non-finite output on low-level input. It reproduced the 1.2 report of a

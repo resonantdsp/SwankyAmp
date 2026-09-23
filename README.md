@@ -12,7 +12,7 @@ Install Rust through [rustup](https://rustup.rs/) and install [just](https://git
 just
 ```
 
-The gate checks formatting, lints with and without the plugin-format features, runs the behavioral tests, verifies the [released reference renderer](verification/reference/README.md), compares the Rust amplifier's legacy path against all ten released factory presets at 44.1 kHz and 1x processing, and proves the committed [tone-stack refit](verification/tone-stack/refit-report.md) is current.
+The gate checks formatting, lints with and without the plugin-format features, runs the behavioral tests, verifies the [released reference renderer](verification/reference/README.md), compares the Rust amplifier's legacy path against all ten released factory presets at 44.1 kHz and 1x processing, proves the committed [tone-stack refit](verification/tone-stack/refit-report.md) is current, and proves the committed level calibration reproduces.
 
 Render one preset and its internal comparison seams with:
 
@@ -30,7 +30,7 @@ Regenerate the public factor, latency, seam-level, and aliasing measurements wit
 just dsp-report
 ```
 
-The report's seam and aliasing measurements keep the released knee and tone mapping in the corrected path (`render-model --model corrected --tone-mapping released --knee released`) so they isolate oversampling and the plate filter, use the explicit legacy renderer for the baseline, and measure the shipping path's active-reset equilibrium across all ten factory presets, control extremes, and supported rates. It does not establish factory-preset acceptance for the corrected sound.
+The report's seam and aliasing measurements keep the released knee, tone mapping and level compensation in the corrected path (`render-model --model corrected --tone-mapping released --knee released --tables released`) so they isolate oversampling and the plate filter, use the explicit legacy renderer for the baseline, and measure the shipping path's active-reset equilibrium across all ten factory presets, control extremes, and supported rates. It does not establish factory-preset acceptance for the corrected sound.
 
 ### Tone stack
 
@@ -68,9 +68,23 @@ Regenerate the knee measurements with:
 just knee-report
 ```
 
-It renders every factory preset at 44.1 kHz and 1x with the DI scaled by -12, -6, 0 and +6 dB, through the corrected path with the released tone mapping and the released and the unit knee, and records each seam's RMS ratio and crest-factor change in `verification/dsp/knee.json`. At 0 dB input it requires every triode seam within 0.6 dB of the released level, the tone stack within 1.05 dB, and the power amp, cabinet and output within 0.5 dB. The widest preamp residuals come from presets whose stages move in opposite directions (pre drive +0.43 dB and level 11 -0.60 dB after the fifth triode), which one gain per stage cannot separate; the power stage compresses them.
+It renders every factory preset at 44.1 kHz and 1x with the DI scaled by -12, -6, 0 and +6 dB, through the corrected path with the released tone mapping and level compensation and the released and the unit knee, and records each seam's RMS ratio and crest-factor change in `verification/dsp/knee.json`. At 0 dB input it requires every triode seam within 0.6 dB of the released level, the tone stack within 1.05 dB, and the power amp, cabinet and output within 0.5 dB. The widest preamp residuals come from presets whose stages move in opposite directions (pre drive +0.43 dB and level 11 -0.60 dB after the fifth triode), which one gain per stage cannot separate; the power stage compresses them.
 
-The `PREAMP_SWEEP` and `POWER_SWEEP` level tables still hold the released 1.4.0 values. They will be measured once against the final voicing, so the knee's makeup lives in the stages and no table is regenerated yet.
+### Level calibration
+
+As in 1.4.0, the amplifier levels itself with two tables and fixed scales. The preamp table normalises the last active triode's output against Drive, the tone-stack scale normalises the stack's gain at the factory defaults, the power table normalises the power amp's output against Power Drive, and the cabinet keeps its own fixed scale. Grit and Stages stay uncompensated, which is part of how the amplifier plays. The legacy path keeps the released values.
+
+Oversampling, the unit-slope knee and the standard tone-stack mapping change the level reaching each of these, so the shipping path's values are measured against the released path, which `just model-check` holds to the frozen 1.4.0 renders. `calibrate` renders the single-coil DI at 44.1 kHz with Auto oversampling from a settled amplifier, every control but the swept one at its default, and multiplies each released value by the RMS ratio of the released seam to the shipping seam: Drive over the eleven table points at the last active triode, then the tone-stack scale on the power stage input at the defaults, then Power Drive over its eleven points at the power amp, each with the values found so far in place. Every table point therefore lands on the released level, and Drive and Power Drive move loudness as 1.4.0 did. The preamp table moves by -0.32 to +0.27 dB and the power table by -0.13 to +0.66 dB. The tone-stack scale is the one fixed value that moves, by +2.14 dB: the standard mapping's stack is quieter at its default settings on the DI, which no Drive table can correct.
+
+At the factory defaults the power stage input lands on 1.4.0's level and the output with the cabinet off within 0.1 dB, which a test holds. With the cabinet on the default output is 1.26 dB quieter, because the cabinet responds to the default tone controls' changed voicing. The cabinet scale stays as released: the refitted factory presets keep the released stack's shape, and raising it would make each of them louder than 1.4.0. Across the ten factory presets the output moves from 0.08 to 2.49 dB below 1.4.0 before calibration to within 1.0 dB after, and the mean distance from 0.97 to 0.46 dB.
+
+Regenerate the values in `src/dsp/calibration_data.rs` with:
+
+```sh
+just calibrate
+```
+
+`just calibrate-check`, part of `just`, fails if a fresh measurement moves any committed value by more than 0.05 dB.
 
 ### Soak
 
@@ -314,7 +328,7 @@ request-timing information needed to serve and operate the endpoint.
 
 ## Source and licences
 
-Swanky Amp is licensed under GPLv3 or later; see [LICENSE](LICENSE). The model authority is the exact Free 1.4.0 C++ wrapper and generated Faust headers preserved in `verification/reference/released` from the `juce-1.4.0` tag. The public legacy renderer retains the released control mappings, detuning, fitted constants, stage behavior, calibration tables, cubic knee, fixed digital plate filter, and old tone mapping. The shipping path adds tube-only oversampling, a rate-tracked 20 kHz plate filter, a unit-slope triode knee and the standard tone-stack mapping with refitted factory presets; later corrected-model work remains subject to measurement and player audition. Small equation and filter primitives were selectively adapted from the separately implemented Pro code only where comparison proved that they express the released Free equations.
+Swanky Amp is licensed under GPLv3 or later; see [LICENSE](LICENSE). The model authority is the exact Free 1.4.0 C++ wrapper and generated Faust headers preserved in `verification/reference/released` from the `juce-1.4.0` tag. The public legacy renderer retains the released control mappings, detuning, fitted constants, stage behavior, calibration tables, cubic knee, fixed digital plate filter, and old tone mapping. The shipping path adds tube-only oversampling, a rate-tracked 20 kHz plate filter, a unit-slope triode knee, the standard tone-stack mapping with refitted factory presets and level compensation recalibrated against the released path; later corrected-model work remains subject to measurement and player audition. Small equation and filter primitives were selectively adapted from the separately implemented Pro code only where comparison proved that they express the released Free equations.
 
 The editable artwork in `assets/artwork` is licensed under CC BY 4.0; see its
 `ARTWORK-LICENSE.txt`. The editor typography uses PT Sans under the SIL Open

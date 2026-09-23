@@ -4,7 +4,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use swanky_amp::dsp::amp::{
-    AmpControls, AmpPath, ClipKnee, CorrectedPath, SeamOutput, ToneMapping,
+    AmpControls, AmpPath, ClipKnee, CorrectedPath, LevelTables, SeamOutput, ToneMapping,
 };
 use swanky_amp::dsp::diagnostics::reset_equilibrium;
 use swanky_amp::engine::doublings_for;
@@ -281,6 +281,14 @@ fn run() -> Result<(), String> {
             "released" => ClipKnee::Released,
             value => return Err(format!("unknown knee: {value}")),
         };
+        let tables = match optional_option("--tables")
+            .as_deref()
+            .unwrap_or("calibrated")
+        {
+            "calibrated" => LevelTables::CALIBRATED,
+            "released" => LevelTables::RELEASED,
+            value => return Err(format!("unknown level tables: {value}")),
+        };
         let mut path = CorrectedPath::new(
             sample_rate as f32,
             BLOCK_SIZE,
@@ -288,6 +296,7 @@ fn run() -> Result<(), String> {
             doublings,
             tone_mapping,
             knee,
+            tables,
         );
         for block in rendered.chunks_mut(BLOCK_SIZE) {
             if seams.is_some() {
