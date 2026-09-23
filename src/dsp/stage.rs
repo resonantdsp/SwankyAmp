@@ -6,7 +6,8 @@
 //! Voicing controls move the unit-space input; fixed constants use zero.
 
 use super::filters::{
-    Charge, Divisor, OnePole, Smoother, charge_rate, soft_clip_down, soft_clip_up, tau_to_pole,
+    Charge, ClipKnee, Divisor, OnePole, Smoother, charge_rate, soft_clip_down, soft_clip_up,
+    tau_to_pole,
 };
 
 /// Maps a unit-space value in -1..1 onto real units, linearly or
@@ -51,6 +52,20 @@ impl Fitted {
 
 /// Number of triode stages in the preamp.
 pub const STAGES: usize = 5;
+
+/// Per-stage output gain that returns the unit knee's seam levels to the
+/// released ones, fitted as the mean dB residual over the ten factory presets
+/// at 0 dB input (`verification/dsp/knee.py` records the residuals). Each
+/// stage is corrected at its own output so the next stage is driven as hard as
+/// 1.4.0 drove it; a linear gain after the clip keeps the knee smooth.
+const UNIT_KNEE_MAKEUP: [f32; STAGES] = [1.0153, 1.0052, 1.0155, 1.0176, 1.0117];
+
+fn triode_makeup(knee: ClipKnee, stage: usize) -> f32 {
+    match knee {
+        ClipKnee::Released => 1.,
+        ClipKnee::UnitSlope => UNIT_KNEE_MAKEUP[stage],
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum PlateFilter {
@@ -229,17 +244,24 @@ pub struct Triode {
     comp_corner: Divisor,
     plate_lp: OnePole,
     plate_filter: PlateFilter,
+    span: Divisor,
 }
 
 impl Triode {
     /// `unscale` removes the stage's nominal gain so stages cascade at a
     /// constant level; it is the preamp's calibrated stage gain.
-    pub fn new(stage: usize, unscale: f32, sample_rate: f32, plate_filter: PlateFilter) -> Self {
+    pub fn new(
+        stage: usize,
+        unscale: f32,
+        sample_rate: f32,
+        plate_filter: PlateFilter,
+        knee: ClipKnee,
+    ) -> Self {
         let mut triode = Self {
             stage,
             sample_rate,
             controls: TriodeControls::default(),
-            unscale_inv: 1. / unscale,
+            unscale_inv: triode_makeup(knee, stage) / unscale,
             overhead_inv: 1.,
             grid_hp: OnePole::default(),
             grid_level: 0.,
@@ -268,6 +290,7 @@ impl Triode {
             comp_corner: Divisor::default(),
             plate_lp: OnePole::default(),
             plate_filter,
+            span: knee.span(),
         };
         triode.configure(TriodeControls::default());
         triode
@@ -297,9 +320,9 @@ impl Triode {
             self.grid_charge
                 .settle_capped(excess, self.grid_rise, self.grid_fall, self.grid_cap);
         let g = h - self.grid_smooth.settle(charge);
-        let g = soft_clip_up(g, self.grid_corner, self.grid_clip);
-        let p = soft_clip_down(g * self.scale, self.bias_corner, self.bias);
-        let p = soft_clip_down(-p, self.plate_corner, self.plate_clip);
+        let g = soft_clip_up(g, self.grid_corner, self.grid_clip, self.span);
+        let p = soft_clip_down(g * self.scale, self.bias_corner, self.bias, self.span);
+        let p = soft_clip_down(-p, self.plate_corner, self.plate_clip, self.span);
         let drift = self
             .drift_smooth
             .settle(p.max(self.drift_level) - self.drift_level);
@@ -310,7 +333,7 @@ impl Triode {
                 .settle_capped(excess, self.comp_rise, self.comp_fall, self.comp_cap)
                 * self.comp_depth
                 + self.comp_offset;
-        let p = soft_clip_up(p, self.comp_corner, ceiling);
+        let p = soft_clip_up(p, self.comp_corner, ceiling, self.span);
         let p = -self.plate_lp.settle(p);
         c.mix * (p * c.overhead * self.unscale_inv) + (1. - c.mix) * x
     }
@@ -376,9 +399,9 @@ impl Triode {
             self.grid_charge
                 .step_capped(excess, self.grid_rise, self.grid_fall, self.grid_cap);
         let g = h - self.grid_smooth.process(charge);
-        let g = soft_clip_up(g, self.grid_corner, self.grid_clip);
-        let p = soft_clip_down(g * self.scale, self.bias_corner, self.bias);
-        let p = soft_clip_down(-p, self.plate_corner, self.plate_clip);
+        let g = soft_clip_up(g, self.grid_corner, self.grid_clip, self.span);
+        let p = soft_clip_down(g * self.scale, self.bias_corner, self.bias, self.span);
+        let p = soft_clip_down(-p, self.plate_corner, self.plate_clip, self.span);
         let drift = self
             .drift_smooth
             .process(p.max(self.drift_level) - self.drift_level);
@@ -389,7 +412,7 @@ impl Triode {
                 .step_capped(excess, self.comp_rise, self.comp_fall, self.comp_cap)
                 * self.comp_depth
                 + self.comp_offset;
-        let p = soft_clip_up(p, self.comp_corner, ceiling);
+        let p = soft_clip_up(p, self.comp_corner, ceiling, self.span);
         let p = -self.plate_lp.process(p);
         c.mix * (p * c.overhead * self.unscale_inv) + (1. - c.mix) * x
     }
@@ -452,6 +475,7 @@ struct SideVoicing {
     clip_corner: Divisor,
     comp_depth: f32,
     cross_corner: Divisor,
+    span: Divisor,
 }
 
 /// One side of the push-pull pair: bias drift, an envelope-limited clip and
@@ -469,8 +493,8 @@ impl Side {
         let v = v - drift * p.drift_depth;
         let load = self.comp.process((v * p.clip.inv()).abs().min(1.));
         let ceiling = p.clip.value() / (1. + load * p.comp_depth);
-        let v = soft_clip_up(v, p.clip_corner, ceiling);
-        soft_clip_down(v, p.cross_corner, 0.)
+        let v = soft_clip_up(v, p.clip_corner, ceiling, p.span);
+        soft_clip_down(v, p.cross_corner, 0., p.span)
     }
     fn reset(&mut self) {
         self.drift.reset();
@@ -482,8 +506,8 @@ impl Side {
         let v = v - drift * p.drift_depth;
         let load = self.comp.settle((v * p.clip.inv()).abs().min(1.));
         let ceiling = p.clip.value() / (1. + load * p.comp_depth);
-        let v = soft_clip_up(v, p.clip_corner, ceiling);
-        soft_clip_down(v, p.cross_corner, 0.)
+        let v = soft_clip_up(v, p.clip_corner, ceiling, p.span);
+        soft_clip_down(v, p.cross_corner, 0., p.span)
     }
 }
 
@@ -625,6 +649,13 @@ impl Tetrode {
             clip_corner: Divisor::new(CLIP_CORNER.fixed()),
             comp_depth: COMP_DEPTH.at(controls.comp_depth),
             cross_corner: Divisor::new(CROSS_CORNER.fixed()),
+            // The side clips keep the released span. Their corners are wider
+            // than the signal's distance to the knee, so ordinary playing sits
+            // inside the cubic and the span sets the stage's bias and gain
+            // rather than the shape of a knee: the unit span moved the power
+            // seam by -0.4 to -3.0 dB depending on power drive, which no
+            // single makeup gain can return to the released levels.
+            span: ClipKnee::Released.span(),
         };
         for side in [&mut self.positive, &mut self.negative] {
             side.drift.set_pole(drift_pole);

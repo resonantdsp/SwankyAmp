@@ -30,7 +30,7 @@ Regenerate the public factor, latency, seam-level, and aliasing measurements wit
 just dsp-report
 ```
 
-The report keeps the released knee and tone mapping in both paths (`render-model --model corrected --tone-mapping released`), uses the explicit legacy renderer for the baseline, and measures active-reset equilibrium across all ten factory presets, control extremes, and supported rates. It does not establish factory-preset acceptance for the corrected sound.
+The report's seam and aliasing measurements keep the released knee and tone mapping in the corrected path (`render-model --model corrected --tone-mapping released --knee released`) so they isolate oversampling and the plate filter, use the explicit legacy renderer for the baseline, and measure the shipping path's active-reset equilibrium across all ten factory presets, control extremes, and supported rates. It does not establish factory-preset acceptance for the corrected sound.
 
 ### Tone stack
 
@@ -43,7 +43,7 @@ voicing exactly can keep Swanky Amp 1.4.0 installed beside version 2.
 
 The factory presets were voiced on the octave-high stack, so their Low, Mid
 and High, and Power Drive where the level into the power stage needed it, are
-refitted to sound roughly as they did on a generated pluck. The fit balances
+refitted to sound roughly as they did on a generated pluck, measured through the shipping path including the unit-slope knee below. The fit balances
 spectral shape and level into the power stage and deliberately stops short of
 an exact match, which would push the controls to their limits; the report
 records each preset's residuals. Regenerate the version 2 bank and its report
@@ -57,6 +57,20 @@ just refit
 `verification/tone-stack/` differ from what the code produces. The bank keeps
 the 1.x preset XML schema so one importer can read both 1.4 and 2.0 presets;
 the editor's preset bar does not load it yet.
+
+### Soft-clip knee
+
+The triode soft clips (grid, bias, plate and compression) use a unit-slope knee. The released Faust model scaled its cubic clip input by 1/3.4, so the curve left each knee with slope 4/3.4 against the linear side's 1, a corner at every clip. Scaling by 1/4 joins the knee smoothly at the cost of slightly less gain between knee and ceiling. Because all five preamp stages compress, the loss compounds, so each triode carries a fixed output makeup gain (+0.13, +0.05, +0.13, +0.15 and +0.10 dB for stages 1 to 5), fitted as the mean seam residual over the ten factory presets at 0 dB input. Correcting each stage at its own output drives the next one as hard as 1.4.0 did. The tetrode's push-pull clips keep the released curve: their corners are wider than the signal's distance to the knee, so ordinary playing sits inside the cubic and the knee span sets the power stage's bias and gain instead of shaping a knee. The unit span moved the power seam by -0.4 to -3.0 dB depending on power drive, which no single makeup gain can undo.
+
+Regenerate the knee measurements with:
+
+```sh
+just knee-report
+```
+
+It renders every factory preset at 44.1 kHz and 1x with the DI scaled by -12, -6, 0 and +6 dB, through the corrected path with the released tone mapping and the released and the unit knee, and records each seam's RMS ratio and crest-factor change in `verification/dsp/knee.json`. At 0 dB input it requires every triode seam within 0.6 dB of the released level, the tone stack within 1.05 dB, and the power amp, cabinet and output within 0.5 dB. The widest preamp residuals come from presets whose stages move in opposite directions (pre drive +0.43 dB and level 11 -0.60 dB after the fifth triode), which one gain per stage cannot separate; the power stage compresses them.
+
+The `PREAMP_SWEEP` and `POWER_SWEEP` level tables still hold the released 1.4.0 values. They will be measured once against the final voicing, so the knee's makeup lives in the stages and no table is regenerated yet.
 
 The versioned reference corpus captures the released cold startup, including its 1024-sample output mute. The Rust path settles its configured nonlinear state for one second before audio begins, and stages re-enter warm when the continuous stage-count control brings them back into the signal path. Model comparison therefore applies the same one-second silent pre-roll to the released chain and excludes it from the measured WAVs. The cold corpus and warmed comparison remain separate so the startup difference is explicit.
 
@@ -274,7 +288,7 @@ request-timing information needed to serve and operate the endpoint.
 
 ## Source and licences
 
-Swanky Amp is licensed under GPLv3 or later; see [LICENSE](LICENSE). The model authority is the exact Free 1.4.0 C++ wrapper and generated Faust headers preserved in `verification/reference/released` from the `juce-1.4.0` tag. The public legacy renderer retains the released control mappings, detuning, fitted constants, stage behavior, calibration tables, cubic knee, fixed digital plate filter, and old tone mapping. The shipping path adds tube-only oversampling, a rate-tracked 20 kHz plate filter and the standard tone-stack mapping with refitted factory presets; later corrected-model work remains subject to measurement and player audition. Small equation and filter primitives were selectively adapted from the separately implemented Pro code only where comparison proved that they express the released Free equations.
+Swanky Amp is licensed under GPLv3 or later; see [LICENSE](LICENSE). The model authority is the exact Free 1.4.0 C++ wrapper and generated Faust headers preserved in `verification/reference/released` from the `juce-1.4.0` tag. The public legacy renderer retains the released control mappings, detuning, fitted constants, stage behavior, calibration tables, cubic knee, fixed digital plate filter, and old tone mapping. The shipping path adds tube-only oversampling, a rate-tracked 20 kHz plate filter, a unit-slope triode knee and the standard tone-stack mapping with refitted factory presets; later corrected-model work remains subject to measurement and player audition. Small equation and filter primitives were selectively adapted from the separately implemented Pro code only where comparison proved that they express the released Free equations.
 
 The editable artwork in `assets/artwork` is licensed under CC BY 4.0; see its
 `ARTWORK-LICENSE.txt`. The editor typography uses PT Sans under the SIL Open

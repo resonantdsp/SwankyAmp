@@ -164,7 +164,7 @@
     <PARAM id="idPreAmpTight" value="0.0"/>
     <PARAM id="idTsHigh" value="-0.03"/>
     <PARAM id="idTsLow" value="-0.32"/>
-    <PARAM id="idTsMid" value="0.62"/>
+    <PARAM id="idTsMid" value="0.61"/>
     <PARAM id="idTsPresence" value="-0.2099999785423279"/>
     <PARAM id="idTsSelection" value="0.5020000338554382"/>
   </APVTSSwankyAmp>
@@ -202,7 +202,7 @@
     <PARAM id="idGainStages" value="5.0"/>
     <PARAM id="idLowCut" value="-1.0"/>
     <PARAM id="idOutputLevel" value="-0.05599993467330933"/>
-    <PARAM id="idPowerAmpDrive" value="0.626"/>
+    <PARAM id="idPowerAmpDrive" value="0.627"/>
     <PARAM id="idPowerAmpGrit" value="0.0"/>
     <PARAM id="idPowerAmpSag" value="-0.3999999761581421"/>
     <PARAM id="idPowerAmpSagRatio" value="0.0"/>

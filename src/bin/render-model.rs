@@ -3,7 +3,9 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-use swanky_amp::dsp::amp::{AmpControls, AmpPath, CorrectedPath, SeamOutput, ToneMapping};
+use swanky_amp::dsp::amp::{
+    AmpControls, AmpPath, ClipKnee, CorrectedPath, SeamOutput, ToneMapping,
+};
 use swanky_amp::dsp::diagnostics::reset_equilibrium;
 use swanky_amp::engine::doublings_for;
 use swanky_amp::presets;
@@ -233,6 +235,15 @@ fn run() -> Result<(), String> {
     }
     let (input_rate, source) = read_wav(&input)?;
     let mut rendered = resample(&source, input_rate, sample_rate);
+    if let Some(gain_db) = optional_option("--input-gain-db") {
+        let gain_db: f32 = gain_db
+            .parse()
+            .map_err(|_| "input gain must be a number of decibels")?;
+        let gain = 10_f32.powf(gain_db / 20.);
+        for sample in &mut rendered {
+            *sample *= gain;
+        }
+    }
     let mut seam_output = SeamOutput::with_capacity(rendered.len());
     let model = optional_option("--model").unwrap_or_else(|| "legacy".into());
     let (factor, latency) = if model == "legacy" {
@@ -265,12 +276,18 @@ fn run() -> Result<(), String> {
             "released" => ToneMapping::Released,
             value => return Err(format!("unknown tone mapping: {value}")),
         };
+        let knee = match optional_option("--knee").as_deref().unwrap_or("unit") {
+            "unit" => ClipKnee::UnitSlope,
+            "released" => ClipKnee::Released,
+            value => return Err(format!("unknown knee: {value}")),
+        };
         let mut path = CorrectedPath::new(
             sample_rate as f32,
             BLOCK_SIZE,
             controls,
             doublings,
             tone_mapping,
+            knee,
         );
         for block in rendered.chunks_mut(BLOCK_SIZE) {
             if seams.is_some() {

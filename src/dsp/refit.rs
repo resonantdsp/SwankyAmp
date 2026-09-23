@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::amp::{AmpControls, CorrectedPath, SeamOutput, ToneMapping};
+use super::amp::{AmpControls, ClipKnee, CorrectedPath, SeamOutput, ToneMapping};
 use super::mapping::AmpVoicing;
 use super::tone_stack::ToneStack;
 use crate::engine::doublings_for;
@@ -345,7 +345,14 @@ struct Render {
 
 fn render(controls: AmpControls, tone_mapping: ToneMapping, input: &[f32]) -> Render {
     let doublings = doublings_for(0, f64::from(SAMPLE_RATE));
-    let mut path = CorrectedPath::new(SAMPLE_RATE as f32, BLOCK, controls, doublings, tone_mapping);
+    let mut path = CorrectedPath::new(
+        SAMPLE_RATE as f32,
+        BLOCK,
+        controls,
+        doublings,
+        tone_mapping,
+        ClipKnee::UnitSlope,
+    );
     let mut seams = SeamOutput::with_capacity(input.len() << doublings);
     let mut output = input.to_vec();
     for block in output.chunks_mut(BLOCK) {

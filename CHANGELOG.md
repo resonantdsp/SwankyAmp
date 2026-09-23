@@ -9,9 +9,8 @@ signed build starts.
 ## 2.0.0 — in development
 
 Swanky Amp 2 preserves the released Free amplifier and cabinet sound, with the
-tone stack corrected, in a new Rust host identity that will install beside
-Swanky Amp 1.4.0. The interface,
-factory preset bank and signed candidate qualification are still in progress.
+tone stack and soft-clip knees corrected, in a new Rust host identity that will
+install beside Swanky Amp 1.4.0. The interface, factory preset bank and signed candidate qualification are still in progress.
 
 - Ported the released amplifier and cabinet processing into mono and stereo
   paths under the `SwankyAmp2` / `com.resonantdsp.swanky-amp-2` / `SwA2`
@@ -23,6 +22,15 @@ factory preset bank and signed candidate qualification are still in progress.
   sound roughly as they did, with the residuals recorded in
   `verification/tone-stack/refit-report.md`; Swanky Amp 1.4.0 remains
   available for the original voicing.
+- Joined the triode soft clips' knees smoothly: the released cubic left each
+  knee with slope 4/3.4, a corner at every grid, bias, plate and compression
+  clip. Each triode stage carries a fixed makeup gain fitted against the
+  released seam levels over the ten factory presets, keeping every seam at 0 dB
+  input within 0.6 dB of 1.4.0 (tone stack 1.05 dB, output 0.5 dB). The
+  tetrode keeps the released curve, which sets its bias and gain rather than a
+  knee. The preamp and power level tables still hold the released values
+  pending calibration against the final voicing, and the preset refit is
+  measured with the new knee.
 - Added automation to build, sign and qualify macOS and Windows candidates,
   attempt a qualified Linux bundle, and promote only the accepted candidate
   bytes.

@@ -1,0 +1,1981 @@
+{
+  "input_levels": {
+    "+0": {
+      "bright": {
+        "cabinet": {
+          "crest_change_db": -0.0298,
+          "released_crest_db": 14.4784,
+          "released_rms_dbfs": -5.2242,
+          "rms_ratio_db": -0.3686
+        },
+        "power_amp": {
+          "crest_change_db": 0.2611,
+          "released_crest_db": 13.554,
+          "released_rms_dbfs": 15.75,
+          "rms_ratio_db": -0.352
+        },
+        "raw_output": {
+          "crest_change_db": -0.0298,
+          "released_crest_db": 14.4784,
+          "released_rms_dbfs": -22.1991,
+          "rms_ratio_db": -0.3686
+        },
+        "tone_stack": {
+          "crest_change_db": 0.1906,
+          "released_crest_db": 14.7576,
+          "released_rms_dbfs": -0.2941,
+          "rms_ratio_db": -0.386
+        },
+        "triode_1": {
+          "crest_change_db": -0.5864,
+          "released_crest_db": 12.6772,
+          "released_rms_dbfs": -23.4466,
+          "rms_ratio_db": -0.3539
+        },
+        "triode_2": {
+          "crest_change_db": -0.4132,
+          "released_crest_db": 12.6102,
+          "released_rms_dbfs": -25.384,
+          "rms_ratio_db": -0.1916
+        }
+      },
+      "clean": {
+        "cabinet": {
+          "crest_change_db": 0.0011,
+          "released_crest_db": 13.5447,
+          "released_rms_dbfs": -12.5489,
+          "rms_ratio_db": 0.1227
+        },
+        "power_amp": {
+          "crest_change_db": 0.0065,
+          "released_crest_db": 13.9289,
+          "released_rms_dbfs": 7.8284,
+          "rms_ratio_db": 0.1201
+        },
+        "raw_output": {
+          "crest_change_db": 0.0011,
+          "released_crest_db": 13.5447,
+          "released_rms_dbfs": -19.8953,
+          "rms_ratio_db": 0.1227
+        },
+        "tone_stack": {
+          "crest_change_db": 0.0001,
+          "released_crest_db": 15.1773,
+          "released_rms_dbfs": -10.9047,
+          "rms_ratio_db": 0.1357
+        },
+        "triode_1": {
+          "crest_change_db": -0.0,
+          "released_crest_db": 7.9107,
+          "released_rms_dbfs": -27.201,
+          "rms_ratio_db": 0.1319
+        },
+        "triode_2": {
+          "crest_change_db": 0.0041,
+          "released_crest_db": 8.0987,
+          "released_rms_dbfs": -27.665,
+          "rms_ratio_db": 0.1287
+        }
+      },
+      "dirty distort": {
+        "cabinet": {
+          "crest_change_db": -0.2113,
+          "released_crest_db": 10.1382,
+          "released_rms_dbfs": 6.299,
+          "rms_ratio_db": 0.1969
+        },
+        "power_amp": {
+          "crest_change_db": -0.1124,
+          "released_crest_db": 6.3532,
+          "released_rms_dbfs": 25.4301,
+          "rms_ratio_db": 0.1467
+        },
+        "raw_output": {
+          "crest_change_db": -0.2113,
+          "released_crest_db": 10.1382,
+          "released_rms_dbfs": -23.0033,
+          "rms_ratio_db": 0.1969
+        },
+        "tone_stack": {
+          "crest_change_db": -0.4451,
+          "released_crest_db": 17.2217,
+          "released_rms_dbfs": 19.263,
+          "rms_ratio_db": -0.4674
+        },
+        "triode_1": {
+          "crest_change_db": 0.1041,
+          "released_crest_db": 5.2753,
+          "released_rms_dbfs": 8.166,
+          "rms_ratio_db": -0.0018
+        },
+        "triode_2": {
+          "crest_change_db": 0.0615,
+          "released_crest_db": 2.9816,
+          "released_rms_dbfs": 1.4695,
+          "rms_ratio_db": -0.1447
+        },
+        "triode_3": {
+          "crest_change_db": 0.1673,
+          "released_crest_db": 3.6632,
+          "released_rms_dbfs": -1.7665,
+          "rms_ratio_db": -0.2732
+        },
+        "triode_4": {
+          "crest_change_db": 0.2923,
+          "released_crest_db": 4.1252,
+          "released_rms_dbfs": -3.7209,
+          "rms_ratio_db": -0.4363
+        }
+      },
+      "distort": {
+        "cabinet": {
+          "crest_change_db": 0.0632,
+          "released_crest_db": 9.3914,
+          "released_rms_dbfs": 7.1528,
+          "rms_ratio_db": -0.0154
+        },
+        "power_amp": {
+          "crest_change_db": 0.0304,
+          "released_crest_db": 4.526,
+          "released_rms_dbfs": 25.812,
+          "rms_ratio_db": -0.0108
+        },
+        "raw_output": {
+          "crest_change_db": 0.0632,
+          "released_crest_db": 9.3914,
+          "released_rms_dbfs": -18.8665,
+          "rms_ratio_db": -0.0154
+        },
+        "tone_stack": {
+          "crest_change_db": 0.3207,
+          "released_crest_db": 12.0347,
+          "released_rms_dbfs": 29.7398,
+          "rms_ratio_db": -0.1017
+        },
+        "triode_1": {
+          "crest_change_db": 0.1538,
+          "released_crest_db": 9.5612,
+          "released_rms_dbfs": 5.0206,
+          "rms_ratio_db": -0.0954
+        },
+        "triode_2": {
+          "crest_change_db": 0.0944,
+          "released_crest_db": 9.6736,
+          "released_rms_dbfs": 2.8708,
+          "rms_ratio_db": -0.1179
+        },
+        "triode_3": {
+          "crest_change_db": 0.1906,
+          "released_crest_db": 9.4868,
+          "released_rms_dbfs": 1.3703,
+          "rms_ratio_db": -0.0917
+        }
+      },
+      "edge": {
+        "cabinet": {
+          "crest_change_db": -0.004,
+          "released_crest_db": 13.4053,
+          "released_rms_dbfs": -2.2363,
+          "rms_ratio_db": 0.1744
+        },
+        "power_amp": {
+          "crest_change_db": -0.1203,
+          "released_crest_db": 12.1024,
+          "released_rms_dbfs": 17.7803,
+          "rms_ratio_db": 0.1507
+        },
+        "raw_output": {
+          "crest_change_db": -0.004,
+          "released_crest_db": 13.4053,
+          "released_rms_dbfs": -21.7998,
+          "rms_ratio_db": 0.1744
+        },
+        "tone_stack": {
+          "crest_change_db": -0.0004,
+          "released_crest_db": 15.305,
+          "released_rms_dbfs": -0.5716,
+          "rms_ratio_db": 0.1779
+        },
+        "triode_1": {
+          "crest_change_db": -0.0,
+          "released_crest_db": 12.8455,
+          "released_rms_dbfs": -23.6518,
+          "rms_ratio_db": 0.1319
+        },
+        "triode_2": {
+          "crest_change_db": 0.0281,
+          "released_crest_db": 13.6193,
+          "released_rms_dbfs": -26.4473,
+          "rms_ratio_db": 0.1591
+        }
+      },
+      "full drive": {
+        "cabinet": {
+          "crest_change_db": 0.0026,
+          "released_crest_db": 9.7377,
+          "released_rms_dbfs": 9.5426,
+          "rms_ratio_db": -0.0025
+        },
+        "power_amp": {
+          "crest_change_db": -0.0087,
+          "released_crest_db": 2.4983,
+          "released_rms_dbfs": 28.3828,
+          "rms_ratio_db": -0.0038
+        },
+        "raw_output": {
+          "crest_change_db": 0.0026,
+          "released_crest_db": 9.7377,
+          "released_rms_dbfs": -20.2779,
+          "rms_ratio_db": -0.0025
+        },
+        "tone_stack": {
+          "crest_change_db": -0.1454,
+          "released_crest_db": 12.7952,
+          "released_rms_dbfs": 39.6238,
+          "rms_ratio_db": 0.0706
+        },
+        "triode_1": {
+          "crest_change_db": 0.0161,
+          "released_crest_db": 4.8426,
+          "released_rms_dbfs": 12.64,
+          "rms_ratio_db": 0.0712
+        },
+        "triode_2": {
+          "crest_change_db": -0.003,
+          "released_crest_db": 5.1002,
+          "released_rms_dbfs": 12.3742,
+          "rms_ratio_db": 0.0713
+        }
+      },
+      "high gain": {
+        "cabinet": {
+          "crest_change_db": -0.0096,
+          "released_crest_db": 9.2058,
+          "released_rms_dbfs": 10.0567,
+          "rms_ratio_db": 0.0317
+        },
+        "power_amp": {
+          "crest_change_db": -0.0951,
+          "released_crest_db": 2.9964,
+          "released_rms_dbfs": 28.2588,
+          "rms_ratio_db": 0.0336
+        },
+        "raw_output": {
+          "crest_change_db": -0.0096,
+          "released_crest_db": 9.2058,
+          "released_rms_dbfs": -21.9525,
+          "rms_ratio_db": 0.0317
+        },
+        "tone_stack": {
+          "crest_change_db": -0.1452,
+          "released_crest_db": 13.8883,
+          "released_rms_dbfs": 26.2486,
+          "rms_ratio_db": 0.1834
+        },
+        "triode_1": {
+          "crest_change_db": 0.0391,
+          "released_crest_db": 4.8556,
+          "released_rms_dbfs": 12.9184,
+          "rms_ratio_db": 0.075
+        },
+        "triode_2": {
+          "crest_change_db": -0.012,
+          "released_crest_db": 4.8063,
+          "released_rms_dbfs": 2.9334,
+          "rms_ratio_db": 0.0415
+        },
+        "triode_3": {
+          "crest_change_db": -0.1168,
+          "released_crest_db": 6.2685,
+          "released_rms_dbfs": 0.8016,
+          "rms_ratio_db": 0.1016
+        },
+        "triode_4": {
+          "crest_change_db": -0.1457,
+          "released_crest_db": 7.2038,
+          "released_rms_dbfs": -1.093,
+          "rms_ratio_db": 0.1381
+        },
+        "triode_5": {
+          "crest_change_db": -0.2452,
+          "released_crest_db": 7.8341,
+          "released_rms_dbfs": -1.9862,
+          "rms_ratio_db": 0.1692
+        }
+      },
+      "level 11": {
+        "cabinet": {
+          "crest_change_db": 0.0436,
+          "released_crest_db": 11.9076,
+          "released_rms_dbfs": 6.0514,
+          "rms_ratio_db": 0.1138
+        },
+        "power_amp": {
+          "crest_change_db": 0.034,
+          "released_crest_db": 6.0503,
+          "released_rms_dbfs": 25.842,
+          "rms_ratio_db": 0.0529
+        },
+        "raw_output": {
+          "crest_change_db": 0.0436,
+          "released_crest_db": 11.9076,
+          "released_rms_dbfs": -25.9577,
+          "rms_ratio_db": 0.1138
+        },
+        "tone_stack": {
+          "crest_change_db": -0.0011,
+          "released_crest_db": 13.5244,
+          "released_rms_dbfs": 16.3794,
+          "rms_ratio_db": -1.0026
+        },
+        "triode_1": {
+          "crest_change_db": -0.0248,
+          "released_crest_db": 3.1569,
+          "released_rms_dbfs": 11.2288,
+          "rms_ratio_db": 0.1136
+        },
+        "triode_2": {
+          "crest_change_db": -0.067,
+          "released_crest_db": 3.4851,
+          "released_rms_dbfs": 0.2033,
+          "rms_ratio_db": 0.0335
+        },
+        "triode_3": {
+          "crest_change_db": -0.2901,
+          "released_crest_db": 5.4373,
+          "released_rms_dbfs": -5.311,
+          "rms_ratio_db": 0.0411
+        },
+        "triode_4": {
+          "crest_change_db": -0.1234,
+          "released_crest_db": 5.6515,
+          "released_rms_dbfs": -8.6002,
+          "rms_ratio_db": -0.0353
+        },
+        "triode_5": {
+          "crest_change_db": 0.0421,
+          "released_crest_db": 5.5702,
+          "released_rms_dbfs": -11.2181,
+          "rms_ratio_db": -0.5959
+        }
+      },
+      "power drive": {
+        "cabinet": {
+          "crest_change_db": -0.0303,
+          "released_crest_db": 8.9581,
+          "released_rms_dbfs": 8.8513,
+          "rms_ratio_db": 0.0314
+        },
+        "power_amp": {
+          "crest_change_db": -0.026,
+          "released_crest_db": 3.9502,
+          "released_rms_dbfs": 27.0958,
+          "rms_ratio_db": 0.0281
+        },
+        "raw_output": {
+          "crest_change_db": -0.0303,
+          "released_crest_db": 8.9581,
+          "released_rms_dbfs": -19.0225,
+          "rms_ratio_db": 0.0314
+        },
+        "tone_stack": {
+          "crest_change_db": 0.1141,
+          "released_crest_db": 15.4947,
+          "released_rms_dbfs": 18.6117,
+          "rms_ratio_db": -0.0711
+        },
+        "triode_1": {
+          "crest_change_db": 0.2547,
+          "released_crest_db": 14.4692,
+          "released_rms_dbfs": -7.0183,
+          "rms_ratio_db": -0.1228
+        },
+        "triode_2": {
+          "crest_change_db": 0.1516,
+          "released_crest_db": 14.7956,
+          "released_rms_dbfs": -9.1903,
+          "rms_ratio_db": -0.0743
+        }
+      },
+      "pre drive": {
+        "cabinet": {
+          "crest_change_db": -0.0129,
+          "released_crest_db": 9.1492,
+          "released_rms_dbfs": 5.835,
+          "rms_ratio_db": 0.1713
+        },
+        "power_amp": {
+          "crest_change_db": -0.1239,
+          "released_crest_db": 6.2235,
+          "released_rms_dbfs": 24.4007,
+          "rms_ratio_db": 0.1416
+        },
+        "raw_output": {
+          "crest_change_db": -0.0129,
+          "released_crest_db": 9.1492,
+          "released_rms_dbfs": -20.3361,
+          "rms_ratio_db": 0.1713
+        },
+        "tone_stack": {
+          "crest_change_db": 0.0716,
+          "released_crest_db": 14.0231,
+          "released_rms_dbfs": 34.4084,
+          "rms_ratio_db": 0.4233
+        },
+        "triode_1": {
+          "crest_change_db": 0.0307,
+          "released_crest_db": 5.3692,
+          "released_rms_dbfs": 11.458,
+          "rms_ratio_db": 0.0525
+        },
+        "triode_2": {
+          "crest_change_db": -0.0725,
+          "released_crest_db": 8.1654,
+          "released_rms_dbfs": 10.1276,
+          "rms_ratio_db": 0.098
+        },
+        "triode_3": {
+          "crest_change_db": -0.1359,
+          "released_crest_db": 10.2223,
+          "released_rms_dbfs": 9.0175,
+          "rms_ratio_db": 0.2226
+        },
+        "triode_4": {
+          "crest_change_db": -0.3223,
+          "released_crest_db": 11.1249,
+          "released_rms_dbfs": 7.8422,
+          "rms_ratio_db": 0.3353
+        },
+        "triode_5": {
+          "crest_change_db": -0.3,
+          "released_crest_db": 11.2705,
+          "released_rms_dbfs": 7.2855,
+          "rms_ratio_db": 0.4268
+        }
+      }
+    },
+    "+6": {
+      "bright": {
+        "cabinet": {
+          "crest_change_db": 0.3139,
+          "released_crest_db": 13.0812,
+          "released_rms_dbfs": 0.0592,
+          "rms_ratio_db": -0.346
+        },
+        "power_amp": {
+          "crest_change_db": 0.1767,
+          "released_crest_db": 9.8125,
+          "released_rms_dbfs": 20.5185,
+          "rms_ratio_db": -0.303
+        },
+        "raw_output": {
+          "crest_change_db": 0.3139,
+          "released_crest_db": 13.0812,
+          "released_rms_dbfs": -16.9157,
+          "rms_ratio_db": -0.346
+        },
+        "tone_stack": {
+          "crest_change_db": 0.2789,
+          "released_crest_db": 14.8637,
+          "released_rms_dbfs": 5.6767,
+          "rms_ratio_db": -0.4664
+        },
+        "triode_1": {
+          "crest_change_db": 0.2441,
+          "released_crest_db": 13.4243,
+          "released_rms_dbfs": -18.9534,
+          "rms_ratio_db": -0.5561
+        },
+        "triode_2": {
+          "crest_change_db": -0.0711,
+          "released_crest_db": 13.6836,
+          "released_rms_dbfs": -21.1787,
+          "rms_ratio_db": -0.3809
+        }
+      },
+      "clean": {
+        "cabinet": {
+          "crest_change_db": 0.0011,
+          "released_crest_db": 13.5213,
+          "released_rms_dbfs": -7.029,
+          "rms_ratio_db": 0.1294
+        },
+        "power_amp": {
+          "crest_change_db": -0.0128,
+          "released_crest_db": 14.306,
+          "released_rms_dbfs": 13.1619,
+          "rms_ratio_db": 0.1225
+        },
+        "raw_output": {
+          "crest_change_db": 0.0011,
+          "released_crest_db": 13.5213,
+          "released_rms_dbfs": -14.3754,
+          "rms_ratio_db": 0.1294
+        },
+        "tone_stack": {
+          "crest_change_db": -0.0002,
+          "released_crest_db": 15.1774,
+          "released_rms_dbfs": -4.9047,
+          "rms_ratio_db": 0.1357
+        },
+        "triode_1": {
+          "crest_change_db": 0.0,
+          "released_crest_db": 10.9595,
+          "released_rms_dbfs": -26.085,
+          "rms_ratio_db": 0.1319
+        },
+        "triode_2": {
+          "crest_change_db": 0.0036,
+          "released_crest_db": 11.1206,
+          "released_rms_dbfs": -26.4697,
+          "rms_ratio_db": 0.1304
+        }
+      },
+      "dirty distort": {
+        "cabinet": {
+          "crest_change_db": -0.2492,
+          "released_crest_db": 10.8894,
+          "released_rms_dbfs": 4.5445,
+          "rms_ratio_db": 0.2439
+        },
+        "power_amp": {
+          "crest_change_db": -0.2718,
+          "released_crest_db": 8.7869,
+          "released_rms_dbfs": 24.1373,
+          "rms_ratio_db": 0.1937
+        },
+        "raw_output": {
+          "crest_change_db": -0.2492,
+          "released_crest_db": 10.8894,
+          "released_rms_dbfs": -24.7578,
+          "rms_ratio_db": 0.2439
+        },
+        "tone_stack": {
+          "crest_change_db": -0.2509,
+          "released_crest_db": 17.6588,
+          "released_rms_dbfs": 19.5871,
+          "rms_ratio_db": -0.3787
+        },
+        "triode_1": {
+          "crest_change_db": 0.0597,
+          "released_crest_db": 2.9231,
+          "released_rms_dbfs": 10.6382,
+          "rms_ratio_db": 0.0298
+        },
+        "triode_2": {
+          "crest_change_db": 0.0861,
+          "released_crest_db": 2.0762,
+          "released_rms_dbfs": 2.59,
+          "rms_ratio_db": -0.0386
+        },
+        "triode_3": {
+          "crest_change_db": -0.0633,
+          "released_crest_db": 2.7103,
+          "released_rms_dbfs": -0.5152,
+          "rms_ratio_db": -0.1678
+        },
+        "triode_4": {
+          "crest_change_db": 0.1876,
+          "released_crest_db": 3.3275,
+          "released_rms_dbfs": -2.4709,
+          "rms_ratio_db": -0.3026
+        }
+      },
+      "distort": {
+        "cabinet": {
+          "crest_change_db": 0.0476,
+          "released_crest_db": 9.1664,
+          "released_rms_dbfs": 7.4858,
+          "rms_ratio_db": 0.0114
+        },
+        "power_amp": {
+          "crest_change_db": -0.0362,
+          "released_crest_db": 4.1377,
+          "released_rms_dbfs": 26.1987,
+          "rms_ratio_db": 0.0079
+        },
+        "raw_output": {
+          "crest_change_db": 0.0476,
+          "released_crest_db": 9.1664,
+          "released_rms_dbfs": -18.5335,
+          "rms_ratio_db": 0.0114
+        },
+        "tone_stack": {
+          "crest_change_db": 0.2238,
+          "released_crest_db": 12.9278,
+          "released_rms_dbfs": 31.91,
+          "rms_ratio_db": -0.1075
+        },
+        "triode_1": {
+          "crest_change_db": 0.168,
+          "released_crest_db": 6.5684,
+          "released_rms_dbfs": 8.5617,
+          "rms_ratio_db": -0.0683
+        },
+        "triode_2": {
+          "crest_change_db": 0.0907,
+          "released_crest_db": 7.6682,
+          "released_rms_dbfs": 5.5967,
+          "rms_ratio_db": -0.1192
+        },
+        "triode_3": {
+          "crest_change_db": 0.1864,
+          "released_crest_db": 7.8657,
+          "released_rms_dbfs": 3.5719,
+          "rms_ratio_db": -0.0907
+        }
+      },
+      "edge": {
+        "cabinet": {
+          "crest_change_db": -0.0835,
+          "released_crest_db": 12.1432,
+          "released_rms_dbfs": 2.8864,
+          "rms_ratio_db": 0.1164
+        },
+        "power_amp": {
+          "crest_change_db": -0.0956,
+          "released_crest_db": 8.4135,
+          "released_rms_dbfs": 22.124,
+          "rms_ratio_db": 0.0988
+        },
+        "raw_output": {
+          "crest_change_db": -0.0835,
+          "released_crest_db": 12.1432,
+          "released_rms_dbfs": -16.6771,
+          "rms_ratio_db": 0.1164
+        },
+        "tone_stack": {
+          "crest_change_db": -0.0009,
+          "released_crest_db": 15.2609,
+          "released_rms_dbfs": 5.534,
+          "rms_ratio_db": 0.1791
+        },
+        "triode_1": {
+          "crest_change_db": 0.0,
+          "released_crest_db": 13.9266,
+          "released_rms_dbfs": -19.1602,
+          "rms_ratio_db": 0.1319
+        },
+        "triode_2": {
+          "crest_change_db": 0.0078,
+          "released_crest_db": 14.356,
+          "released_rms_dbfs": -20.8373,
+          "rms_ratio_db": 0.174
+        }
+      },
+      "full drive": {
+        "cabinet": {
+          "crest_change_db": 0.0302,
+          "released_crest_db": 9.0529,
+          "released_rms_dbfs": 9.6546,
+          "rms_ratio_db": -0.0106
+        },
+        "power_amp": {
+          "crest_change_db": -0.0172,
+          "released_crest_db": 2.4401,
+          "released_rms_dbfs": 28.4697,
+          "rms_ratio_db": -0.0105
+        },
+        "raw_output": {
+          "crest_change_db": 0.0302,
+          "released_crest_db": 9.0529,
+          "released_rms_dbfs": -20.1659,
+          "rms_ratio_db": -0.0106
+        },
+        "tone_stack": {
+          "crest_change_db": -0.0386,
+          "released_crest_db": 12.657,
+          "released_rms_dbfs": 40.6789,
+          "rms_ratio_db": 0.0927
+        },
+        "triode_1": {
+          "crest_change_db": -0.0068,
+          "released_crest_db": 4.2691,
+          "released_rms_dbfs": 13.6057,
+          "rms_ratio_db": 0.0995
+        },
+        "triode_2": {
+          "crest_change_db": -0.0261,
+          "released_crest_db": 4.6299,
+          "released_rms_dbfs": 13.3204,
+          "rms_ratio_db": 0.0984
+        }
+      },
+      "high gain": {
+        "cabinet": {
+          "crest_change_db": 0.0208,
+          "released_crest_db": 9.3857,
+          "released_rms_dbfs": 9.8897,
+          "rms_ratio_db": 0.0366
+        },
+        "power_amp": {
+          "crest_change_db": -0.0029,
+          "released_crest_db": 3.0367,
+          "released_rms_dbfs": 28.1426,
+          "rms_ratio_db": 0.0353
+        },
+        "raw_output": {
+          "crest_change_db": 0.0208,
+          "released_crest_db": 9.3857,
+          "released_rms_dbfs": -22.1195,
+          "rms_ratio_db": 0.0366
+        },
+        "tone_stack": {
+          "crest_change_db": -0.3558,
+          "released_crest_db": 13.7766,
+          "released_rms_dbfs": 26.2961,
+          "rms_ratio_db": 0.1854
+        },
+        "triode_1": {
+          "crest_change_db": -0.0086,
+          "released_crest_db": 4.654,
+          "released_rms_dbfs": 13.8708,
+          "rms_ratio_db": 0.1013
+        },
+        "triode_2": {
+          "crest_change_db": 0.004,
+          "released_crest_db": 4.4631,
+          "released_rms_dbfs": 3.2964,
+          "rms_ratio_db": 0.041
+        },
+        "triode_3": {
+          "crest_change_db": -0.1422,
+          "released_crest_db": 6.2987,
+          "released_rms_dbfs": 0.8766,
+          "rms_ratio_db": 0.112
+        },
+        "triode_4": {
+          "crest_change_db": -0.1606,
+          "released_crest_db": 7.4001,
+          "released_rms_dbfs": -1.1656,
+          "rms_ratio_db": 0.153
+        },
+        "triode_5": {
+          "crest_change_db": -0.2585,
+          "released_crest_db": 8.1796,
+          "released_rms_dbfs": -2.1251,
+          "rms_ratio_db": 0.1765
+        }
+      },
+      "level 11": {
+        "cabinet": {
+          "crest_change_db": 0.0567,
+          "released_crest_db": 11.6134,
+          "released_rms_dbfs": 5.5228,
+          "rms_ratio_db": 0.1393
+        },
+        "power_amp": {
+          "crest_change_db": 0.0904,
+          "released_crest_db": 6.4968,
+          "released_rms_dbfs": 25.6874,
+          "rms_ratio_db": 0.0629
+        },
+        "raw_output": {
+          "crest_change_db": 0.0567,
+          "released_crest_db": 11.6134,
+          "released_rms_dbfs": -26.4863,
+          "rms_ratio_db": 0.1393
+        },
+        "tone_stack": {
+          "crest_change_db": 0.0783,
+          "released_crest_db": 13.7448,
+          "released_rms_dbfs": 16.3346,
+          "rms_ratio_db": -1.0088
+        },
+        "triode_1": {
+          "crest_change_db": 0.0047,
+          "released_crest_db": 3.432,
+          "released_rms_dbfs": 11.0743,
+          "rms_ratio_db": 0.123
+        },
+        "triode_2": {
+          "crest_change_db": -0.0865,
+          "released_crest_db": 3.7437,
+          "released_rms_dbfs": -0.0497,
+          "rms_ratio_db": 0.032
+        },
+        "triode_3": {
+          "crest_change_db": -0.1226,
+          "released_crest_db": 4.923,
+          "released_rms_dbfs": -5.345,
+          "rms_ratio_db": 0.0457
+        },
+        "triode_4": {
+          "crest_change_db": -0.0365,
+          "released_crest_db": 5.328,
+          "released_rms_dbfs": -8.5561,
+          "rms_ratio_db": -0.028
+        },
+        "triode_5": {
+          "crest_change_db": 0.2027,
+          "released_crest_db": 5.4807,
+          "released_rms_dbfs": -11.1481,
+          "rms_ratio_db": -0.5749
+        }
+      },
+      "power drive": {
+        "cabinet": {
+          "crest_change_db": -0.0666,
+          "released_crest_db": 9.3097,
+          "released_rms_dbfs": 8.7765,
+          "rms_ratio_db": 0.027
+        },
+        "power_amp": {
+          "crest_change_db": -0.0713,
+          "released_crest_db": 3.7605,
+          "released_rms_dbfs": 27.0944,
+          "rms_ratio_db": 0.0179
+        },
+        "raw_output": {
+          "crest_change_db": -0.0666,
+          "released_crest_db": 9.3097,
+          "released_rms_dbfs": -19.0973,
+          "rms_ratio_db": 0.027
+        },
+        "tone_stack": {
+          "crest_change_db": 0.01,
+          "released_crest_db": 14.2832,
+          "released_rms_dbfs": 24.2689,
+          "rms_ratio_db": -0.0977
+        },
+        "triode_1": {
+          "crest_change_db": 0.1769,
+          "released_crest_db": 13.8467,
+          "released_rms_dbfs": -1.3756,
+          "rms_ratio_db": -0.115
+        },
+        "triode_2": {
+          "crest_change_db": 0.0999,
+          "released_crest_db": 14.3754,
+          "released_rms_dbfs": -3.5817,
+          "rms_ratio_db": -0.0964
+        }
+      },
+      "pre drive": {
+        "cabinet": {
+          "crest_change_db": -0.0762,
+          "released_crest_db": 8.9176,
+          "released_rms_dbfs": 5.9465,
+          "rms_ratio_db": 0.1417
+        },
+        "power_amp": {
+          "crest_change_db": -0.0802,
+          "released_crest_db": 6.3502,
+          "released_rms_dbfs": 24.6044,
+          "rms_ratio_db": 0.1137
+        },
+        "raw_output": {
+          "crest_change_db": -0.0762,
+          "released_crest_db": 8.9176,
+          "released_rms_dbfs": -20.2247,
+          "rms_ratio_db": 0.1417
+        },
+        "tone_stack": {
+          "crest_change_db": -0.1413,
+          "released_crest_db": 15.234,
+          "released_rms_dbfs": 35.558,
+          "rms_ratio_db": 0.413
+        },
+        "triode_1": {
+          "crest_change_db": -0.0036,
+          "released_crest_db": 4.0959,
+          "released_rms_dbfs": 12.909,
+          "rms_ratio_db": 0.0834
+        },
+        "triode_2": {
+          "crest_change_db": -0.0231,
+          "released_crest_db": 7.1697,
+          "released_rms_dbfs": 11.4729,
+          "rms_ratio_db": 0.1214
+        },
+        "triode_3": {
+          "crest_change_db": -0.1623,
+          "released_crest_db": 9.5029,
+          "released_rms_dbfs": 10.294,
+          "rms_ratio_db": 0.2402
+        },
+        "triode_4": {
+          "crest_change_db": -0.3574,
+          "released_crest_db": 10.6336,
+          "released_rms_dbfs": 8.9416,
+          "rms_ratio_db": 0.3367
+        },
+        "triode_5": {
+          "crest_change_db": -0.4218,
+          "released_crest_db": 11.0091,
+          "released_rms_dbfs": 8.3727,
+          "rms_ratio_db": 0.4212
+        }
+      }
+    },
+    "-12": {
+      "bright": {
+        "cabinet": {
+          "crest_change_db": -0.1403,
+          "released_crest_db": 14.6148,
+          "released_rms_dbfs": -16.6036,
+          "rms_ratio_db": -0.0198
+        },
+        "power_amp": {
+          "crest_change_db": -0.0158,
+          "released_crest_db": 14.4551,
+          "released_rms_dbfs": 4.6624,
+          "rms_ratio_db": -0.0296
+        },
+        "raw_output": {
+          "crest_change_db": -0.1403,
+          "released_crest_db": 14.6148,
+          "released_rms_dbfs": -33.5785,
+          "rms_ratio_db": -0.0198
+        },
+        "tone_stack": {
+          "crest_change_db": -0.4302,
+          "released_crest_db": 13.9701,
+          "released_rms_dbfs": -11.6269,
+          "rms_ratio_db": -0.0277
+        },
+        "triode_1": {
+          "crest_change_db": -0.5649,
+          "released_crest_db": 7.575,
+          "released_rms_dbfs": -27.2533,
+          "rms_ratio_db": 0.0939
+        },
+        "triode_2": {
+          "crest_change_db": -0.3009,
+          "released_crest_db": 7.0225,
+          "released_rms_dbfs": -28.5012,
+          "rms_ratio_db": 0.0411
+        }
+      },
+      "clean": {
+        "cabinet": {
+          "crest_change_db": -0.0022,
+          "released_crest_db": 13.6389,
+          "released_rms_dbfs": -23.7808,
+          "rms_ratio_db": 0.1312
+        },
+        "power_amp": {
+          "crest_change_db": -0.0058,
+          "released_crest_db": 14.5084,
+          "released_rms_dbfs": -3.2879,
+          "rms_ratio_db": 0.1305
+        },
+        "raw_output": {
+          "crest_change_db": -0.0022,
+          "released_crest_db": 13.6389,
+          "released_rms_dbfs": -31.1272,
+          "rms_ratio_db": 0.1312
+        },
+        "tone_stack": {
+          "crest_change_db": -0.0002,
+          "released_crest_db": 15.1771,
+          "released_rms_dbfs": -22.9047,
+          "rms_ratio_db": 0.1358
+        },
+        "triode_1": {
+          "crest_change_db": -0.0,
+          "released_crest_db": 2.9332,
+          "released_rms_dbfs": -27.6223,
+          "rms_ratio_db": 0.1319
+        },
+        "triode_2": {
+          "crest_change_db": 0.0023,
+          "released_crest_db": 3.0372,
+          "released_rms_dbfs": -28.1224,
+          "rms_ratio_db": 0.1279
+        }
+      },
+      "dirty distort": {
+        "cabinet": {
+          "crest_change_db": 1.1313,
+          "released_crest_db": 9.5394,
+          "released_rms_dbfs": 6.8452,
+          "rms_ratio_db": -0.8109
+        },
+        "power_amp": {
+          "crest_change_db": 0.4178,
+          "released_crest_db": 5.3987,
+          "released_rms_dbfs": 25.6383,
+          "rms_ratio_db": -0.6943
+        },
+        "raw_output": {
+          "crest_change_db": 1.1313,
+          "released_crest_db": 9.5394,
+          "released_rms_dbfs": -22.4571,
+          "rms_ratio_db": -0.8109
+        },
+        "tone_stack": {
+          "crest_change_db": -0.2976,
+          "released_crest_db": 14.7494,
+          "released_rms_dbfs": 15.8389,
+          "rms_ratio_db": -1.3045
+        },
+        "triode_1": {
+          "crest_change_db": 0.0477,
+          "released_crest_db": 13.224,
+          "released_rms_dbfs": -2.3971,
+          "rms_ratio_db": -0.0424
+        },
+        "triode_2": {
+          "crest_change_db": 0.5107,
+          "released_crest_db": 8.385,
+          "released_rms_dbfs": -4.7203,
+          "rms_ratio_db": -0.6279
+        },
+        "triode_3": {
+          "crest_change_db": 0.5805,
+          "released_crest_db": 8.1259,
+          "released_rms_dbfs": -7.798,
+          "rms_ratio_db": -0.8419
+        },
+        "triode_4": {
+          "crest_change_db": 0.8778,
+          "released_crest_db": 8.1943,
+          "released_rms_dbfs": -9.6283,
+          "rms_ratio_db": -1.2183
+        }
+      },
+      "distort": {
+        "cabinet": {
+          "crest_change_db": 0.0181,
+          "released_crest_db": 11.5365,
+          "released_rms_dbfs": 2.7423,
+          "rms_ratio_db": 0.0153
+        },
+        "power_amp": {
+          "crest_change_db": -0.03,
+          "released_crest_db": 8.506,
+          "released_rms_dbfs": 21.9724,
+          "rms_ratio_db": 0.0173
+        },
+        "raw_output": {
+          "crest_change_db": 0.0181,
+          "released_crest_db": 11.5365,
+          "released_rms_dbfs": -23.2769,
+          "rms_ratio_db": 0.0153
+        },
+        "tone_stack": {
+          "crest_change_db": 0.1701,
+          "released_crest_db": 14.6373,
+          "released_rms_dbfs": 21.9967,
+          "rms_ratio_db": -0.0573
+        },
+        "triode_1": {
+          "crest_change_db": 0.3113,
+          "released_crest_db": 14.6223,
+          "released_rms_dbfs": -4.2371,
+          "rms_ratio_db": -0.1794
+        },
+        "triode_2": {
+          "crest_change_db": 0.1431,
+          "released_crest_db": 14.447,
+          "released_rms_dbfs": -5.5175,
+          "rms_ratio_db": -0.1381
+        },
+        "triode_3": {
+          "crest_change_db": 0.1623,
+          "released_crest_db": 14.0683,
+          "released_rms_dbfs": -6.4097,
+          "rms_ratio_db": -0.0616
+        }
+      },
+      "edge": {
+        "cabinet": {
+          "crest_change_db": -0.0033,
+          "released_crest_db": 13.1932,
+          "released_rms_dbfs": -13.6273,
+          "rms_ratio_db": 0.1609
+        },
+        "power_amp": {
+          "crest_change_db": 0.0188,
+          "released_crest_db": 14.2658,
+          "released_rms_dbfs": 7.0377,
+          "rms_ratio_db": 0.1577
+        },
+        "raw_output": {
+          "crest_change_db": -0.0033,
+          "released_crest_db": 13.1932,
+          "released_rms_dbfs": -33.1908,
+          "rms_ratio_db": 0.1609
+        },
+        "tone_stack": {
+          "crest_change_db": 0.0001,
+          "released_crest_db": 15.3091,
+          "released_rms_dbfs": -12.5862,
+          "rms_ratio_db": 0.1769
+        },
+        "triode_1": {
+          "crest_change_db": -0.0,
+          "released_crest_db": 7.5468,
+          "released_rms_dbfs": -27.2549,
+          "rms_ratio_db": 0.1319
+        },
+        "triode_2": {
+          "crest_change_db": 0.0612,
+          "released_crest_db": 10.1959,
+          "released_rms_dbfs": -33.4623,
+          "rms_ratio_db": 0.0811
+        }
+      },
+      "full drive": {
+        "cabinet": {
+          "crest_change_db": -0.0039,
+          "released_crest_db": 9.7206,
+          "released_rms_dbfs": 8.9413,
+          "rms_ratio_db": 0.0136
+        },
+        "power_amp": {
+          "crest_change_db": -0.0142,
+          "released_crest_db": 3.3885,
+          "released_rms_dbfs": 27.7595,
+          "rms_ratio_db": 0.0133
+        },
+        "raw_output": {
+          "crest_change_db": -0.0039,
+          "released_crest_db": 9.7206,
+          "released_rms_dbfs": -20.8792,
+          "rms_ratio_db": 0.0136
+        },
+        "tone_stack": {
+          "crest_change_db": -0.1301,
+          "released_crest_db": 13.0612,
+          "released_rms_dbfs": 34.417,
+          "rms_ratio_db": 0.0854
+        },
+        "triode_1": {
+          "crest_change_db": -0.0059,
+          "released_crest_db": 9.3393,
+          "released_rms_dbfs": 7.3834,
+          "rms_ratio_db": 0.0826
+        },
+        "triode_2": {
+          "crest_change_db": -0.0402,
+          "released_crest_db": 9.5588,
+          "released_rms_dbfs": 7.1766,
+          "rms_ratio_db": 0.0851
+        }
+      },
+      "high gain": {
+        "cabinet": {
+          "crest_change_db": -0.1179,
+          "released_crest_db": 9.3688,
+          "released_rms_dbfs": 9.9858,
+          "rms_ratio_db": 0.0447
+        },
+        "power_amp": {
+          "crest_change_db": -0.0622,
+          "released_crest_db": 3.0682,
+          "released_rms_dbfs": 28.0754,
+          "rms_ratio_db": 0.0465
+        },
+        "raw_output": {
+          "crest_change_db": -0.1179,
+          "released_crest_db": 9.3688,
+          "released_rms_dbfs": -22.0233,
+          "rms_ratio_db": 0.0447
+        },
+        "tone_stack": {
+          "crest_change_db": -0.2143,
+          "released_crest_db": 13.9657,
+          "released_rms_dbfs": 25.2781,
+          "rms_ratio_db": 0.2145
+        },
+        "triode_1": {
+          "crest_change_db": -0.0262,
+          "released_crest_db": 9.4885,
+          "released_rms_dbfs": 7.6487,
+          "rms_ratio_db": 0.0867
+        },
+        "triode_2": {
+          "crest_change_db": -0.0353,
+          "released_crest_db": 5.5442,
+          "released_rms_dbfs": 1.162,
+          "rms_ratio_db": 0.0314
+        },
+        "triode_3": {
+          "crest_change_db": -0.2248,
+          "released_crest_db": 6.5592,
+          "released_rms_dbfs": -0.467,
+          "rms_ratio_db": 0.1051
+        },
+        "triode_4": {
+          "crest_change_db": -0.2801,
+          "released_crest_db": 7.389,
+          "released_rms_dbfs": -2.0119,
+          "rms_ratio_db": 0.1519
+        },
+        "triode_5": {
+          "crest_change_db": -0.3605,
+          "released_crest_db": 7.949,
+          "released_rms_dbfs": -2.7333,
+          "rms_ratio_db": 0.2047
+        }
+      },
+      "level 11": {
+        "cabinet": {
+          "crest_change_db": -0.1293,
+          "released_crest_db": 11.1,
+          "released_rms_dbfs": 6.3388,
+          "rms_ratio_db": 0.0581
+        },
+        "power_amp": {
+          "crest_change_db": 0.0349,
+          "released_crest_db": 6.2277,
+          "released_rms_dbfs": 25.9056,
+          "rms_ratio_db": 0.0362
+        },
+        "raw_output": {
+          "crest_change_db": -0.1293,
+          "released_crest_db": 11.1,
+          "released_rms_dbfs": -25.6703,
+          "rms_ratio_db": 0.0581
+        },
+        "tone_stack": {
+          "crest_change_db": 0.2651,
+          "released_crest_db": 14.2827,
+          "released_rms_dbfs": 15.7944,
+          "rms_ratio_db": -1.1257
+        },
+        "triode_1": {
+          "crest_change_db": 0.0005,
+          "released_crest_db": 3.3244,
+          "released_rms_dbfs": 10.5207,
+          "rms_ratio_db": 0.0711
+        },
+        "triode_2": {
+          "crest_change_db": -0.0586,
+          "released_crest_db": 2.9051,
+          "released_rms_dbfs": 0.0872,
+          "rms_ratio_db": 0.0037
+        },
+        "triode_3": {
+          "crest_change_db": -0.1047,
+          "released_crest_db": 5.0446,
+          "released_rms_dbfs": -5.6157,
+          "rms_ratio_db": -0.0138
+        },
+        "triode_4": {
+          "crest_change_db": -0.0067,
+          "released_crest_db": 6.0496,
+          "released_rms_dbfs": -9.1492,
+          "rms_ratio_db": -0.1547
+        },
+        "triode_5": {
+          "crest_change_db": 0.4987,
+          "released_crest_db": 5.9823,
+          "released_rms_dbfs": -11.9689,
+          "rms_ratio_db": -0.8102
+        }
+      },
+      "power drive": {
+        "cabinet": {
+          "crest_change_db": -0.0893,
+          "released_crest_db": 10.7677,
+          "released_rms_dbfs": 5.342,
+          "rms_ratio_db": 0.1043
+        },
+        "power_amp": {
+          "crest_change_db": -0.0838,
+          "released_crest_db": 6.9337,
+          "released_rms_dbfs": 23.9988,
+          "rms_ratio_db": 0.0889
+        },
+        "raw_output": {
+          "crest_change_db": -0.0893,
+          "released_crest_db": 10.7677,
+          "released_rms_dbfs": -22.5318,
+          "rms_ratio_db": 0.1043
+        },
+        "tone_stack": {
+          "crest_change_db": 0.0007,
+          "released_crest_db": 15.5871,
+          "released_rms_dbfs": 6.2072,
+          "rms_ratio_db": 0.1767
+        },
+        "triode_1": {
+          "crest_change_db": 0.0009,
+          "released_crest_db": 13.7306,
+          "released_rms_dbfs": -18.7403,
+          "rms_ratio_db": 0.131
+        },
+        "triode_2": {
+          "crest_change_db": 0.0221,
+          "released_crest_db": 14.1575,
+          "released_rms_dbfs": -21.1447,
+          "rms_ratio_db": 0.1631
+        }
+      },
+      "pre drive": {
+        "cabinet": {
+          "crest_change_db": -0.1638,
+          "released_crest_db": 11.5392,
+          "released_rms_dbfs": 1.2162,
+          "rms_ratio_db": 0.4461
+        },
+        "power_amp": {
+          "crest_change_db": -0.3209,
+          "released_crest_db": 9.9616,
+          "released_rms_dbfs": 20.3881,
+          "rms_ratio_db": 0.3847
+        },
+        "raw_output": {
+          "crest_change_db": -0.1638,
+          "released_crest_db": 11.5392,
+          "released_rms_dbfs": -24.9549,
+          "rms_ratio_db": 0.4461
+        },
+        "tone_stack": {
+          "crest_change_db": -0.2356,
+          "released_crest_db": 14.8371,
+          "released_rms_dbfs": 28.0821,
+          "rms_ratio_db": 0.5262
+        },
+        "triode_1": {
+          "crest_change_db": -0.1404,
+          "released_crest_db": 11.4096,
+          "released_rms_dbfs": 4.6345,
+          "rms_ratio_db": 0.1055
+        },
+        "triode_2": {
+          "crest_change_db": -0.1683,
+          "released_crest_db": 13.2394,
+          "released_rms_dbfs": 3.389,
+          "rms_ratio_db": 0.151
+        },
+        "triode_3": {
+          "crest_change_db": -0.1738,
+          "released_crest_db": 13.9455,
+          "released_rms_dbfs": 2.404,
+          "rms_ratio_db": 0.2825
+        },
+        "triode_4": {
+          "crest_change_db": -0.1823,
+          "released_crest_db": 13.6836,
+          "released_rms_dbfs": 1.5596,
+          "rms_ratio_db": 0.4285
+        },
+        "triode_5": {
+          "crest_change_db": -0.0851,
+          "released_crest_db": 13.2553,
+          "released_rms_dbfs": 1.0205,
+          "rms_ratio_db": 0.5263
+        }
+      }
+    },
+    "-6": {
+      "bright": {
+        "cabinet": {
+          "crest_change_db": -0.0619,
+          "released_crest_db": 14.4058,
+          "released_rms_dbfs": -10.9659,
+          "rms_ratio_db": -0.2076
+        },
+        "power_amp": {
+          "crest_change_db": 0.0219,
+          "released_crest_db": 14.7248,
+          "released_rms_dbfs": 10.2118,
+          "rms_ratio_db": -0.2129
+        },
+        "raw_output": {
+          "crest_change_db": -0.0619,
+          "released_crest_db": 14.4058,
+          "released_rms_dbfs": -27.9408,
+          "rms_ratio_db": -0.2076
+        },
+        "tone_stack": {
+          "crest_change_db": 0.0623,
+          "released_crest_db": 14.4427,
+          "released_rms_dbfs": -6.1929,
+          "rms_ratio_db": -0.2389
+        },
+        "triode_1": {
+          "crest_change_db": -0.689,
+          "released_crest_db": 10.634,
+          "released_rms_dbfs": -26.1705,
+          "rms_ratio_db": -0.0673
+        },
+        "triode_2": {
+          "crest_change_db": -0.4471,
+          "released_crest_db": 10.1943,
+          "released_rms_dbfs": -27.6804,
+          "rms_ratio_db": -0.0221
+        }
+      },
+      "clean": {
+        "cabinet": {
+          "crest_change_db": -0.0005,
+          "released_crest_db": 13.6067,
+          "released_rms_dbfs": -18.0615,
+          "rms_ratio_db": 0.1273
+        },
+        "power_amp": {
+          "crest_change_db": -0.0103,
+          "released_crest_db": 14.1429,
+          "released_rms_dbfs": 2.394,
+          "rms_ratio_db": 0.126
+        },
+        "raw_output": {
+          "crest_change_db": -0.0005,
+          "released_crest_db": 13.6067,
+          "released_rms_dbfs": -25.4079,
+          "rms_ratio_db": 0.1273
+        },
+        "tone_stack": {
+          "crest_change_db": -0.0005,
+          "released_crest_db": 15.1775,
+          "released_rms_dbfs": -16.9047,
+          "rms_ratio_db": 0.1358
+        },
+        "triode_1": {
+          "crest_change_db": 0.0,
+          "released_crest_db": 5.0414,
+          "released_rms_dbfs": -27.534,
+          "rms_ratio_db": 0.1319
+        },
+        "triode_2": {
+          "crest_change_db": 0.0034,
+          "released_crest_db": 5.1957,
+          "released_rms_dbfs": -28.0262,
+          "rms_ratio_db": 0.1281
+        }
+      },
+      "dirty distort": {
+        "cabinet": {
+          "crest_change_db": 0.4061,
+          "released_crest_db": 9.2989,
+          "released_rms_dbfs": 7.2487,
+          "rms_ratio_db": -0.1422
+        },
+        "power_amp": {
+          "crest_change_db": 0.1505,
+          "released_crest_db": 5.5901,
+          "released_rms_dbfs": 26.0577,
+          "rms_ratio_db": -0.1174
+        },
+        "raw_output": {
+          "crest_change_db": 0.4061,
+          "released_crest_db": 9.2989,
+          "released_rms_dbfs": -22.0536,
+          "rms_ratio_db": -0.1422
+        },
+        "tone_stack": {
+          "crest_change_db": -0.0002,
+          "released_crest_db": 15.5658,
+          "released_rms_dbfs": 18.2503,
+          "rms_ratio_db": -0.7441
+        },
+        "triode_1": {
+          "crest_change_db": 0.0374,
+          "released_crest_db": 9.0589,
+          "released_rms_dbfs": 3.9018,
+          "rms_ratio_db": -0.0167
+        },
+        "triode_2": {
+          "crest_change_db": 0.2681,
+          "released_crest_db": 4.9016,
+          "released_rms_dbfs": -0.7566,
+          "rms_ratio_db": -0.3348
+        },
+        "triode_3": {
+          "crest_change_db": 0.2665,
+          "released_crest_db": 5.3804,
+          "released_rms_dbfs": -4.0582,
+          "rms_ratio_db": -0.4638
+        },
+        "triode_4": {
+          "crest_change_db": 0.4705,
+          "released_crest_db": 5.7667,
+          "released_rms_dbfs": -5.9848,
+          "rms_ratio_db": -0.6954
+        }
+      },
+      "distort": {
+        "cabinet": {
+          "crest_change_db": 0.0836,
+          "released_crest_db": 9.679,
+          "released_rms_dbfs": 5.8795,
+          "rms_ratio_db": -0.0179
+        },
+        "power_amp": {
+          "crest_change_db": 0.1295,
+          "released_crest_db": 5.5888,
+          "released_rms_dbfs": 24.6707,
+          "rms_ratio_db": -0.0133
+        },
+        "raw_output": {
+          "crest_change_db": 0.0836,
+          "released_crest_db": 9.679,
+          "released_rms_dbfs": -20.1397,
+          "rms_ratio_db": -0.0179
+        },
+        "tone_stack": {
+          "crest_change_db": 0.2353,
+          "released_crest_db": 12.6148,
+          "released_rms_dbfs": 26.4916,
+          "rms_ratio_db": -0.1004
+        },
+        "triode_1": {
+          "crest_change_db": 0.2299,
+          "released_crest_db": 12.4081,
+          "released_rms_dbfs": 0.6452,
+          "rms_ratio_db": -0.1501
+        },
+        "triode_2": {
+          "crest_change_db": 0.1406,
+          "released_crest_db": 12.061,
+          "released_rms_dbfs": -0.8498,
+          "rms_ratio_db": -0.1312
+        },
+        "triode_3": {
+          "crest_change_db": 0.212,
+          "released_crest_db": 11.6075,
+          "released_rms_dbfs": -1.9257,
+          "rms_ratio_db": -0.0953
+        }
+      },
+      "edge": {
+        "cabinet": {
+          "crest_change_db": 0.0115,
+          "released_crest_db": 13.3772,
+          "released_rms_dbfs": -8.1287,
+          "rms_ratio_db": 0.1674
+        },
+        "power_amp": {
+          "crest_change_db": -0.0078,
+          "released_crest_db": 14.8113,
+          "released_rms_dbfs": 12.3746,
+          "rms_ratio_db": 0.1598
+        },
+        "raw_output": {
+          "crest_change_db": 0.0115,
+          "released_crest_db": 13.3772,
+          "released_rms_dbfs": -27.6922,
+          "rms_ratio_db": 0.1674
+        },
+        "tone_stack": {
+          "crest_change_db": 0.0,
+          "released_crest_db": 15.3091,
+          "released_rms_dbfs": -6.5862,
+          "rms_ratio_db": 0.1769
+        },
+        "triode_1": {
+          "crest_change_db": 0.0,
+          "released_crest_db": 10.6073,
+          "released_rms_dbfs": -26.252,
+          "rms_ratio_db": 0.1319
+        },
+        "triode_2": {
+          "crest_change_db": 0.0329,
+          "released_crest_db": 12.4036,
+          "released_rms_dbfs": -30.897,
+          "rms_ratio_db": 0.1241
+        }
+      },
+      "full drive": {
+        "cabinet": {
+          "crest_change_db": -0.0653,
+          "released_crest_db": 10.1154,
+          "released_rms_dbfs": 9.2647,
+          "rms_ratio_db": 0.0121
+        },
+        "power_amp": {
+          "crest_change_db": -0.0188,
+          "released_crest_db": 2.8464,
+          "released_rms_dbfs": 28.1165,
+          "rms_ratio_db": 0.009
+        },
+        "raw_output": {
+          "crest_change_db": -0.0653,
+          "released_crest_db": 10.1154,
+          "released_rms_dbfs": -20.5558,
+          "rms_ratio_db": 0.0121
+        },
+        "tone_stack": {
+          "crest_change_db": -0.1568,
+          "released_crest_db": 13.339,
+          "released_rms_dbfs": 37.678,
+          "rms_ratio_db": 0.0598
+        },
+        "triode_1": {
+          "crest_change_db": -0.0451,
+          "released_crest_db": 6.4616,
+          "released_rms_dbfs": 10.6819,
+          "rms_ratio_db": 0.0567
+        },
+        "triode_2": {
+          "crest_change_db": -0.0516,
+          "released_crest_db": 6.686,
+          "released_rms_dbfs": 10.4453,
+          "rms_ratio_db": 0.0584
+        }
+      },
+      "high gain": {
+        "cabinet": {
+          "crest_change_db": -0.0491,
+          "released_crest_db": 9.128,
+          "released_rms_dbfs": 10.1317,
+          "rms_ratio_db": 0.03
+        },
+        "power_amp": {
+          "crest_change_db": -0.0133,
+          "released_crest_db": 2.9195,
+          "released_rms_dbfs": 28.2648,
+          "rms_ratio_db": 0.0333
+        },
+        "raw_output": {
+          "crest_change_db": -0.0491,
+          "released_crest_db": 9.128,
+          "released_rms_dbfs": -21.8775,
+          "rms_ratio_db": 0.03
+        },
+        "tone_stack": {
+          "crest_change_db": -0.2389,
+          "released_crest_db": 13.481,
+          "released_rms_dbfs": 25.9908,
+          "rms_ratio_db": 0.188
+        },
+        "triode_1": {
+          "crest_change_db": 0.0351,
+          "released_crest_db": 6.3865,
+          "released_rms_dbfs": 10.9726,
+          "rms_ratio_db": 0.0587
+        },
+        "triode_2": {
+          "crest_change_db": 0.0047,
+          "released_crest_db": 4.9516,
+          "released_rms_dbfs": 2.3302,
+          "rms_ratio_db": 0.0392
+        },
+        "triode_3": {
+          "crest_change_db": -0.1651,
+          "released_crest_db": 6.2557,
+          "released_rms_dbfs": 0.4541,
+          "rms_ratio_db": 0.0966
+        },
+        "triode_4": {
+          "crest_change_db": -0.1978,
+          "released_crest_db": 7.1516,
+          "released_rms_dbfs": -1.2815,
+          "rms_ratio_db": 0.1332
+        },
+        "triode_5": {
+          "crest_change_db": -0.297,
+          "released_crest_db": 7.7614,
+          "released_rms_dbfs": -2.0971,
+          "rms_ratio_db": 0.1738
+        }
+      },
+      "level 11": {
+        "cabinet": {
+          "crest_change_db": 0.0031,
+          "released_crest_db": 11.7733,
+          "released_rms_dbfs": 6.3336,
+          "rms_ratio_db": 0.1041
+        },
+        "power_amp": {
+          "crest_change_db": 0.1018,
+          "released_crest_db": 6.0924,
+          "released_rms_dbfs": 25.9118,
+          "rms_ratio_db": 0.0554
+        },
+        "raw_output": {
+          "crest_change_db": 0.0031,
+          "released_crest_db": 11.7733,
+          "released_rms_dbfs": -25.6755,
+          "rms_ratio_db": 0.1041
+        },
+        "tone_stack": {
+          "crest_change_db": 0.0369,
+          "released_crest_db": 14.1935,
+          "released_rms_dbfs": 16.3101,
+          "rms_ratio_db": -1.0428
+        },
+        "triode_1": {
+          "crest_change_db": -0.0228,
+          "released_crest_db": 3.1606,
+          "released_rms_dbfs": 11.1189,
+          "rms_ratio_db": 0.0966
+        },
+        "triode_2": {
+          "crest_change_db": -0.0164,
+          "released_crest_db": 3.0616,
+          "released_rms_dbfs": 0.3021,
+          "rms_ratio_db": 0.0277
+        },
+        "triode_3": {
+          "crest_change_db": -0.1231,
+          "released_crest_db": 4.9735,
+          "released_rms_dbfs": -5.3405,
+          "rms_ratio_db": 0.0206
+        },
+        "triode_4": {
+          "crest_change_db": -0.007,
+          "released_crest_db": 5.7581,
+          "released_rms_dbfs": -8.7287,
+          "rms_ratio_db": -0.0941
+        },
+        "triode_5": {
+          "crest_change_db": 0.4232,
+          "released_crest_db": 5.4527,
+          "released_rms_dbfs": -11.4326,
+          "rms_ratio_db": -0.6882
+        }
+      },
+      "power drive": {
+        "cabinet": {
+          "crest_change_db": -0.0268,
+          "released_crest_db": 9.1815,
+          "released_rms_dbfs": 7.9271,
+          "rms_ratio_db": 0.0525
+        },
+        "power_amp": {
+          "crest_change_db": -0.0476,
+          "released_crest_db": 4.8531,
+          "released_rms_dbfs": 26.2266,
+          "rms_ratio_db": 0.0474
+        },
+        "raw_output": {
+          "crest_change_db": -0.0268,
+          "released_crest_db": 9.1815,
+          "released_rms_dbfs": -19.9467,
+          "rms_ratio_db": 0.0525
+        },
+        "tone_stack": {
+          "crest_change_db": 0.0584,
+          "released_crest_db": 15.5332,
+          "released_rms_dbfs": 12.4362,
+          "rms_ratio_db": 0.0838
+        },
+        "triode_1": {
+          "crest_change_db": 0.0956,
+          "released_crest_db": 14.3003,
+          "released_rms_dbfs": -12.9988,
+          "rms_ratio_db": 0.0363
+        },
+        "triode_2": {
+          "crest_change_db": 0.0757,
+          "released_crest_db": 14.656,
+          "released_rms_dbfs": -15.2653,
+          "rms_ratio_db": 0.0793
+        }
+      },
+      "pre drive": {
+        "cabinet": {
+          "crest_change_db": -0.0969,
+          "released_crest_db": 9.8482,
+          "released_rms_dbfs": 4.4516,
+          "rms_ratio_db": 0.2953
+        },
+        "power_amp": {
+          "crest_change_db": -0.2928,
+          "released_crest_db": 7.5469,
+          "released_rms_dbfs": 23.1808,
+          "rms_ratio_db": 0.2442
+        },
+        "raw_output": {
+          "crest_change_db": -0.0969,
+          "released_crest_db": 9.8482,
+          "released_rms_dbfs": -21.7195,
+          "rms_ratio_db": 0.2953
+        },
+        "tone_stack": {
+          "crest_change_db": -0.0904,
+          "released_crest_db": 13.6816,
+          "released_rms_dbfs": 32.0187,
+          "rms_ratio_db": 0.4708
+        },
+        "triode_1": {
+          "crest_change_db": -0.0011,
+          "released_crest_db": 7.7492,
+          "released_rms_dbfs": 8.745,
+          "rms_ratio_db": 0.0659
+        },
+        "triode_2": {
+          "crest_change_db": -0.0778,
+          "released_crest_db": 9.822,
+          "released_rms_dbfs": 7.4863,
+          "rms_ratio_db": 0.1133
+        },
+        "triode_3": {
+          "crest_change_db": -0.0734,
+          "released_crest_db": 11.186,
+          "released_rms_dbfs": 6.4491,
+          "rms_ratio_db": 0.2426
+        },
+        "triode_4": {
+          "crest_change_db": -0.2254,
+          "released_crest_db": 12.2008,
+          "released_rms_dbfs": 5.478,
+          "rms_ratio_db": 0.374
+        },
+        "triode_5": {
+          "crest_change_db": -0.2217,
+          "released_crest_db": 12.4238,
+          "released_rms_dbfs": 4.928,
+          "rms_ratio_db": 0.4706
+        }
+      }
+    }
+  },
+  "measure": "rms_ratio_db is unit minus released seam RMS; crest_change_db is unit minus released peak-to-RMS; 1024 samples trimmed at each end",
+  "scope": "corrected path at 44.1 kHz and 1x with the released tone mapping, unit-slope triode knee with its makeup against the released knee; tetrode and calibration tables released",
+  "tolerance_db_at_0db_input": {
+    "power_amp_cabinet_output": 0.5,
+    "tone_stack": 1.05,
+    "triodes": 0.6
+  },
+  "worst_by_input_level": {
+    "+0": {
+      "cabinet": {
+        "crest_change_db": -0.2113,
+        "rms_ratio_db": -0.3686
+      },
+      "power_amp": {
+        "crest_change_db": 0.2611,
+        "rms_ratio_db": -0.352
+      },
+      "raw_output": {
+        "crest_change_db": -0.2113,
+        "rms_ratio_db": -0.3686
+      },
+      "tone_stack": {
+        "crest_change_db": -0.4451,
+        "rms_ratio_db": -1.0026
+      },
+      "triode_1": {
+        "crest_change_db": -0.5864,
+        "rms_ratio_db": -0.3539
+      },
+      "triode_2": {
+        "crest_change_db": -0.4132,
+        "rms_ratio_db": -0.1916
+      },
+      "triode_3": {
+        "crest_change_db": -0.2901,
+        "rms_ratio_db": -0.2732
+      },
+      "triode_4": {
+        "crest_change_db": -0.3223,
+        "rms_ratio_db": -0.4363
+      },
+      "triode_5": {
+        "crest_change_db": -0.3,
+        "rms_ratio_db": -0.5959
+      }
+    },
+    "+6": {
+      "cabinet": {
+        "crest_change_db": 0.3139,
+        "rms_ratio_db": -0.346
+      },
+      "power_amp": {
+        "crest_change_db": -0.2718,
+        "rms_ratio_db": -0.303
+      },
+      "raw_output": {
+        "crest_change_db": 0.3139,
+        "rms_ratio_db": -0.346
+      },
+      "tone_stack": {
+        "crest_change_db": -0.3558,
+        "rms_ratio_db": -1.0088
+      },
+      "triode_1": {
+        "crest_change_db": 0.2441,
+        "rms_ratio_db": -0.5561
+      },
+      "triode_2": {
+        "crest_change_db": 0.0999,
+        "rms_ratio_db": -0.3809
+      },
+      "triode_3": {
+        "crest_change_db": 0.1864,
+        "rms_ratio_db": 0.2402
+      },
+      "triode_4": {
+        "crest_change_db": -0.3574,
+        "rms_ratio_db": 0.3367
+      },
+      "triode_5": {
+        "crest_change_db": -0.4218,
+        "rms_ratio_db": -0.5749
+      }
+    },
+    "-12": {
+      "cabinet": {
+        "crest_change_db": 1.1313,
+        "rms_ratio_db": -0.8109
+      },
+      "power_amp": {
+        "crest_change_db": 0.4178,
+        "rms_ratio_db": -0.6943
+      },
+      "raw_output": {
+        "crest_change_db": 1.1313,
+        "rms_ratio_db": -0.8109
+      },
+      "tone_stack": {
+        "crest_change_db": -0.4302,
+        "rms_ratio_db": -1.3045
+      },
+      "triode_1": {
+        "crest_change_db": -0.5649,
+        "rms_ratio_db": -0.1794
+      },
+      "triode_2": {
+        "crest_change_db": 0.5107,
+        "rms_ratio_db": -0.6279
+      },
+      "triode_3": {
+        "crest_change_db": 0.5805,
+        "rms_ratio_db": -0.8419
+      },
+      "triode_4": {
+        "crest_change_db": 0.8778,
+        "rms_ratio_db": -1.2183
+      },
+      "triode_5": {
+        "crest_change_db": 0.4987,
+        "rms_ratio_db": -0.8102
+      }
+    },
+    "-6": {
+      "cabinet": {
+        "crest_change_db": 0.4061,
+        "rms_ratio_db": 0.2953
+      },
+      "power_amp": {
+        "crest_change_db": -0.2928,
+        "rms_ratio_db": 0.2442
+      },
+      "raw_output": {
+        "crest_change_db": 0.4061,
+        "rms_ratio_db": 0.2953
+      },
+      "tone_stack": {
+        "crest_change_db": -0.2389,
+        "rms_ratio_db": -1.0428
+      },
+      "triode_1": {
+        "crest_change_db": -0.689,
+        "rms_ratio_db": -0.1501
+      },
+      "triode_2": {
+        "crest_change_db": -0.4471,
+        "rms_ratio_db": -0.3348
+      },
+      "triode_3": {
+        "crest_change_db": 0.2665,
+        "rms_ratio_db": -0.4638
+      },
+      "triode_4": {
+        "crest_change_db": 0.4705,
+        "rms_ratio_db": -0.6954
+      },
+      "triode_5": {
+        "crest_change_db": 0.4232,
+        "rms_ratio_db": -0.6882
+      }
+    }
+  }
+}
