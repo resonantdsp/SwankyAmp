@@ -1,4 +1,5 @@
 use super::cabinet::Cabinet;
+pub use super::filters::ClipKnee;
 pub use super::mapping::AmpControls;
 use super::mapping::AmpVoicing;
 use super::oversample::Oversampler;
@@ -92,10 +93,11 @@ impl TubePath {
         controls: AmpControls,
         plate_filter: PlateFilter,
         tone_mapping: ToneMapping,
+        knee: ClipKnee,
     ) -> Self {
         let voicing = AmpVoicing::from_controls(controls);
         let triodes = std::array::from_fn(|stage| {
-            Triode::new(stage, TRIODE_SCALE, sample_rate, plate_filter)
+            Triode::new(stage, TRIODE_SCALE, sample_rate, plate_filter, knee)
         });
         let mut path = Self {
             sample_rate,
@@ -197,13 +199,25 @@ impl AmpPath {
             controls,
             PlateFilter::Released44k1,
             ToneMapping::Released,
+            ClipKnee::Released,
         );
         path.tubes.settle();
         path
     }
 
-    fn new_shipping(sample_rate: f32, controls: AmpControls, tone_mapping: ToneMapping) -> Self {
-        Self::new(sample_rate, controls, PlateFilter::Fixed20k, tone_mapping)
+    fn new_shipping(
+        sample_rate: f32,
+        controls: AmpControls,
+        tone_mapping: ToneMapping,
+        knee: ClipKnee,
+    ) -> Self {
+        Self::new(
+            sample_rate,
+            controls,
+            PlateFilter::Fixed20k,
+            tone_mapping,
+            knee,
+        )
     }
 
     fn new(
@@ -211,10 +225,11 @@ impl AmpPath {
         controls: AmpControls,
         plate_filter: PlateFilter,
         tone_mapping: ToneMapping,
+        knee: ClipKnee,
     ) -> Self {
         let voicing = AmpVoicing::from_controls(controls);
         let mut path = Self {
-            tubes: TubePath::new(sample_rate, controls, plate_filter, tone_mapping),
+            tubes: TubePath::new(sample_rate, controls, plate_filter, tone_mapping, knee),
             cabinet: Cabinet::new(sample_rate),
             voicing,
             output_gain: 1.,
@@ -303,31 +318,34 @@ impl AmpChannel {
         controls: AmpControls,
         doublings: usize,
     ) -> Self {
-        Self::with_tone_mapping(
+        Self::with_corrections(
             sample_rate,
             max_block,
             controls,
             doublings,
             ToneMapping::Standard,
+            ClipKnee::UnitSlope,
         )
     }
 
-    fn with_tone_mapping(
+    fn with_corrections(
         sample_rate: f32,
         max_block: usize,
         controls: AmpControls,
         doublings: usize,
         tone_mapping: ToneMapping,
+        knee: ClipKnee,
     ) -> Self {
         let prepared_doublings = crate::engine::doublings_cap(f64::from(sample_rate));
         let mut channel = Self {
-            host: AmpPath::new_shipping(sample_rate, controls, tone_mapping),
+            host: AmpPath::new_shipping(sample_rate, controls, tone_mapping, knee),
             oversampled: std::array::from_fn(|index| {
                 TubePath::new(
                     sample_rate * (2 << index) as f32,
                     controls,
                     PlateFilter::Fixed20k,
                     tone_mapping,
+                    knee,
                 )
             }),
             oversamplers: std::array::from_fn(|index| {
@@ -437,8 +455,8 @@ impl AmpChannel {
 }
 
 /// Offline corrected-model path used by the public measurement commands.
-/// `ToneMapping::Standard` is the shipping sound; `Released` isolates the
-/// other corrections from the tone-stack change.
+/// `ToneMapping::Standard` with `ClipKnee::UnitSlope` is the shipping sound;
+/// the released choices isolate the other corrections in measurements.
 pub struct CorrectedPath {
     channel: AmpChannel,
     doublings: usize,
@@ -451,15 +469,17 @@ impl CorrectedPath {
         controls: AmpControls,
         doublings: usize,
         tone_mapping: ToneMapping,
+        knee: ClipKnee,
     ) -> Self {
         assert!(doublings <= crate::engine::doublings_cap(f64::from(sample_rate)));
         Self {
-            channel: AmpChannel::with_tone_mapping(
+            channel: AmpChannel::with_corrections(
                 sample_rate,
                 max_block,
                 controls,
                 doublings,
                 tone_mapping,
+                knee,
             ),
             doublings,
         }
@@ -480,5 +500,92 @@ impl CorrectedPath {
 
     pub fn factor(&self) -> usize {
         1 << self.doublings
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const RATE: f32 = 44_100.;
+    const BLOCK: usize = 512;
+    const TRIM: usize = 1_024;
+
+    /// The released-tone DI, 24-bit mono PCM; its own rate does not matter
+    /// for a level comparison between two paths fed the same samples.
+    fn guitar() -> Vec<f32> {
+        let bytes = include_bytes!("../../verification/reference/input/single-coil.wav");
+        let data = bytes
+            .windows(4)
+            .position(|window| window == b"data")
+            .expect("DI has a data chunk");
+        bytes[data + 8..]
+            .chunks_exact(3)
+            .map(|sample| {
+                let value = i32::from_le_bytes([0, sample[0], sample[1], sample[2]]) >> 8;
+                value as f32 / 8_388_608.
+            })
+            .collect()
+    }
+
+    fn level_db(samples: &[f32]) -> f32 {
+        let samples = &samples[TRIM..samples.len() - TRIM];
+        let power =
+            samples.iter().map(|sample| sample * sample).sum::<f32>() / samples.len() as f32;
+        10. * power.log10()
+    }
+
+    fn seams(render: impl FnMut(&mut [f32], &mut SeamOutput)) -> Vec<(String, f32)> {
+        let mut render = render;
+        let mut audio = guitar();
+        let mut seams = SeamOutput::with_capacity(audio.len());
+        for block in audio.chunks_mut(BLOCK) {
+            render(block, &mut seams);
+        }
+        let triodes = seams
+            .triodes
+            .iter()
+            .enumerate()
+            .filter(|(_, samples)| !samples.is_empty())
+            .map(|(stage, samples)| (format!("triode {}", stage + 1), level_db(samples)));
+        let rest = [
+            ("tone stack", &seams.tone_stack),
+            ("power amp", &seams.power_amp),
+            ("cabinet", &seams.cabinet),
+            ("output", &seams.raw_output),
+        ]
+        .map(|(name, samples)| (name.to_owned(), level_db(samples)));
+        triodes.chain(rest).collect()
+    }
+
+    #[test]
+    fn unit_knee_keeps_released_seam_levels_at_factory_defaults() {
+        let controls = AmpControls::default();
+        let mut released = AmpPath::new_legacy(RATE, controls);
+        let released = seams(|block, seams| released.process_with_seams(block, seams));
+        let mut unit = CorrectedPath::new(
+            RATE,
+            BLOCK,
+            controls,
+            0,
+            ToneMapping::Released,
+            ClipKnee::UnitSlope,
+        );
+        let unit = seams(|block, seams| unit.process_with_seams(block, seams));
+        assert_eq!(released.len(), unit.len());
+        for ((seam, expected), (_, actual)) in released.iter().zip(&unit) {
+            // The tolerances verification/dsp/knee.py holds every factory
+            // preset to at 0 dB input.
+            let tolerance = match seam.as_str() {
+                "tone stack" => 1.05,
+                name if name.starts_with("triode") => 0.6,
+                _ => 0.5,
+            };
+            let residual = actual - expected;
+            assert!(
+                residual.abs() <= tolerance,
+                "{seam} is {residual:+.3} dB from the released level (tolerance {tolerance} dB)"
+            );
+        }
     }
 }

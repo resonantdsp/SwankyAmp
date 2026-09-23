@@ -72,6 +72,11 @@ refit-check:
     target/debug/refit-tone --presets verification/reference/released/Resources/presets.xml \
         --report-dir verification/tone-stack --factory presets/factory-2.0.xml --check
 
+# Regenerate the unit-knee seam residuals per factory preset and input level.
+knee-report output="verification/dsp/knee.json":
+    cargo build --quiet --no-default-features --bin render-model
+    python3 verification/dsp/knee.py target/debug/render-model "{{ output }}"
+
 # Render one released factory preset through the Rust baseline, including the
 # internal seam WAVs used to localize any model drift.
 render-model preset="clean" output="verification/model-output.wav":

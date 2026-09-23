@@ -335,28 +335,92 @@ impl Charge {
     }
 }
 
-/// The released Faust model scaled its cubic clip input by 1/3.4.
+/// The curve a soft clip follows between its knee and its ceiling.
+///
+/// The released Faust model scaled its cubic clip input by 1/3.4, so the
+/// curve leaves the knee with slope 4/3.4 while the linear side arrives with
+/// slope 1: every clip has a small corner. Scaling by 1/4 gives the cubic unit
+/// slope at the knee, joining it smoothly, at the cost of slightly less gain
+/// between the knee and the ceiling, which the triode stages make up.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClipKnee {
+    Released,
+    UnitSlope,
+}
+
+impl ClipKnee {
+    /// Input span, in corner units, over which the cubic reaches its ceiling.
+    pub(crate) fn span(self) -> Divisor {
+        match self {
+            Self::Released => Divisor::new(3.4),
+            Self::UnitSlope => Divisor::new(4.),
+        }
+    }
+}
+
 #[inline]
-fn saturate(value: f32) -> f32 {
-    let first = (value / 3.4).clamp(-1., 1.);
+fn saturate(value: f32, span: Divisor) -> f32 {
+    // Dividing, as the released model did, keeps its path bit-identical;
+    // the unit span of 4 divides exactly.
+    let first = (value / span.value()).clamp(-1., 1.);
     let second = (first.abs() - 2.) * first;
     (second.abs() - 2.) * second
 }
 
 #[inline]
-pub(crate) fn soft_clip_up(input: f32, scale: Divisor, level: f32) -> f32 {
+pub(crate) fn soft_clip_up(input: f32, scale: Divisor, level: f32, span: Divisor) -> f32 {
     let knee = level - scale.value();
     let delta = input - knee;
-    delta.min(0.) + saturate(delta.max(0.) * scale.inverse()) * scale.value() + knee
+    delta.min(0.) + saturate(delta.max(0.) * scale.inverse(), span) * scale.value() + knee
 }
 
 #[inline]
-pub(crate) fn soft_clip_down(input: f32, scale: Divisor, level: f32) -> f32 {
+pub(crate) fn soft_clip_down(input: f32, scale: Divisor, level: f32, span: Divisor) -> f32 {
     let knee = level + scale.value();
     let delta = input - knee;
-    saturate(delta.min(0.) * scale.inverse()) * scale.value() + delta.max(0.) + knee
+    saturate(delta.min(0.) * scale.inverse(), span) * scale.value() + delta.max(0.) + knee
 }
 
 pub(crate) fn db_to_gain(db: f32) -> f32 {
     10_f32.powf(db / 20.)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn slopes_either_side_of_knee(span: Divisor) -> [(f32, f32); 2] {
+        const STEP: f32 = 1e-3;
+        let (scale, level) = (Divisor::new(0.5), 1.);
+        let up = |x| soft_clip_up(x, scale, level, span);
+        let down = |x| soft_clip_down(x, scale, -level, span);
+        let (up_knee, down_knee) = (level - scale.value(), -level + scale.value());
+        [
+            (
+                (up(up_knee) - up(up_knee - STEP)) / STEP,
+                (up(up_knee + STEP) - up(up_knee)) / STEP,
+            ),
+            (
+                (down(down_knee) - down(down_knee - STEP)) / STEP,
+                (down(down_knee + STEP) - down(down_knee)) / STEP,
+            ),
+        ]
+    }
+
+    #[test]
+    fn unit_slope_knee_has_no_corner() {
+        for (below, above) in slopes_either_side_of_knee(ClipKnee::UnitSlope.span()) {
+            assert!(
+                (below - above).abs() < 0.01,
+                "unit knee slope jumps from {below} to {above} at the knee"
+            );
+        }
+        // The same probe resolves the released corner, so it can detect one.
+        for (below, above) in slopes_either_side_of_knee(ClipKnee::Released.span()) {
+            assert!(
+                (below - above).abs() > 0.1,
+                "probe did not resolve the released corner ({below} to {above})"
+            );
+        }
+    }
 }
