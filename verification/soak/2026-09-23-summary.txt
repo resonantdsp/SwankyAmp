@@ -1,0 +1,15 @@
+# 12-hour soak of the shipping path after PR #62 (tone-stack Nyquist pole removed)
+# Built from 2756bed (the free-v2-tone-stack-stability branch; squash-merged to master as 579521c with identical content).
+# Run 2026-09-23 on the development Mac, three runs in parallel, noise and pluck inputs.
+# Verdict: all PASS. The same level 11 at 2x run had failed after ~10 h before the fix (see 2026-09-22 summary and README).
+
+corrected init 2x (finished, target/soak-fix/corrected-init.csv; 43200 of 43200 s audio; first minute took 5.7 s wall)
+  noise nonfinite=0 subnormal=16 rms_drift_30min_db=-0.0019 rms_drift_1h_db=-0.0001 max_modulation=0.0669@23370s baseline_modulation=0.0615 modulation_limit=0.0818 max_peak_modulation=0.0203@2.30Hz,12140s slowest_window_vs_median=3.75 verdict=PASS
+  pluck nonfinite=0 subnormal=8 rms_drift_30min_db=-0.0016 rms_drift_1h_db=-0.0013 max_modulation=0.3514@10150s baseline_modulation=0.3464 modulation_limit=0.4381 max_peak_modulation=0.2109@0.50Hz,14170s slowest_window_vs_median=3.75 verdict=PASS
+corrected level 11 4x (finished, target/soak-fix/corrected-level-11-4x.csv; 43200 of 43200 s audio; first minute took 10.8 s wall)
+  noise nonfinite=0 subnormal=0 rms_drift_30min_db=+0.0019 rms_drift_1h_db=+0.0005 max_modulation=0.0646@19390s baseline_modulation=0.0580 modulation_limit=0.0775 max_peak_modulation=0.0198@12.10Hz,34440s slowest_window_vs_median=3.62 verdict=PASS
+  pluck nonfinite=0 subnormal=0 rms_drift_30min_db=-0.0025 rms_drift_1h_db=-0.0001 max_modulation=0.4243@1840s baseline_modulation=0.4158 modulation_limit=0.5247 max_peak_modulation=0.2832@0.50Hz,1840s slowest_window_vs_median=3.62 verdict=PASS
+corrected level 11 2x (finished, target/soak-fix/corrected-level-11.csv; 43200 of 43200 s audio; first minute took 5.7 s wall)
+  noise nonfinite=0 subnormal=0 rms_drift_30min_db=-0.0007 rms_drift_1h_db=-0.0006 max_modulation=0.0717@25830s baseline_modulation=0.0665 modulation_limit=0.0881 max_peak_modulation=0.0231@11.90Hz,3110s slowest_window_vs_median=3.75 verdict=PASS
+  pluck nonfinite=0 subnormal=0 rms_drift_30min_db=-0.0019 rms_drift_1h_db=-0.0019 max_modulation=0.3559@17800s baseline_modulation=0.3445 modulation_limit=0.4356 max_peak_modulation=0.2290@0.50Hz,15840s slowest_window_vs_median=3.75 verdict=PASS
+
