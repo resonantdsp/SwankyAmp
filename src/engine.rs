@@ -64,6 +64,7 @@ impl Engine {
         self.oversampling_choice = params.oversampling_choice();
         self.doublings = doublings_for(self.oversampling_choice, f64::from(self.sample_rate));
         self.requested_doublings = self.doublings;
+        params.resolved_oversampling.publish(self.doublings);
         for path in &mut self.paths {
             path.prepare(self.sample_rate, max_block, self.controls, self.doublings);
         }

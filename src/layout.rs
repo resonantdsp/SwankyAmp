@@ -60,25 +60,25 @@ impl ControlSpec {
 
 /// One inventory is used by the UI, host bindings, and exported artwork geometry.
 pub const CONTROLS: [ControlSpec; 20] = [
-    ControlSpec::knob(0, "INPUT", "LEVELS", [182.0, 148.0], true),
-    ControlSpec::knob(1, "OUTPUT", "LEVELS", [391.0, 148.0], true),
-    ControlSpec::knob(11, "BRIGHT", "CABINET", [611.0, 148.0], false),
-    ControlSpec::knob(12, "DISTANCE", "CABINET", [787.0, 148.0], false),
-    ControlSpec::knob(13, "DYNAMIC", "CABINET", [963.0, 148.0], false),
+    ControlSpec::knob(0, "INPUT", "LEVELS", [176.0, 148.0], true),
+    ControlSpec::knob(1, "OUTPUT", "LEVELS", [378.0, 148.0], true),
+    ControlSpec::knob(11, "BRIGHT", "CABINET", [641.0, 148.0], false),
+    ControlSpec::knob(12, "DISTANCE", "CABINET", [777.0, 148.0], false),
+    ControlSpec::knob(13, "DYNAMIC", "CABINET", [913.0, 148.0], false),
     ControlSpec::toggle(10, "ON", "CABINET", [1022.0, 97.0]),
-    ControlSpec::knob(14, "DRIVE", "PREAMP", [99.0, 324.0], true),
-    ControlSpec::knob(15, "TIGHT", "PREAMP", [239.0, 324.0], false),
-    ControlSpec::knob(16, "GRIT", "PREAMP", [379.0, 324.0], false),
-    ControlSpec::knob(7, "STAGES", "STAGING", [561.0, 324.0], false),
-    ControlSpec::knob(8, "OVERHEAD", "STAGING", [701.0, 324.0], false),
-    ControlSpec::knob(9, "LOW CUT", "STAGING", [841.0, 324.0], false),
+    ControlSpec::knob(14, "DRIVE", "PREAMP", [101.0, 324.0], true),
+    ControlSpec::knob(15, "TIGHT", "PREAMP", [245.0, 324.0], false),
+    ControlSpec::knob(16, "GRIT", "PREAMP", [389.0, 324.0], false),
+    ControlSpec::knob(7, "STAGES", "STAGING", [573.0, 324.0], false),
+    ControlSpec::knob(8, "OVERHEAD", "STAGING", [709.0, 324.0], false),
+    ControlSpec::knob(9, "LOW CUT", "STAGING", [845.0, 324.0], false),
     ControlSpec::knob(6, "TONE STACK", "STAGING", [981.0, 324.0], false),
-    ControlSpec::knob(17, "DRIVE", "POWER AMP", [99.0, 500.0], true),
-    ControlSpec::knob(18, "TIGHT", "POWER AMP", [239.0, 500.0], false),
-    ControlSpec::knob(19, "SAG", "POWER AMP", [379.0, 500.0], false),
-    ControlSpec::knob(2, "LOW", "TONE", [561.0, 500.0], false),
-    ControlSpec::knob(3, "MID", "TONE", [701.0, 500.0], false),
-    ControlSpec::knob(4, "HIGH", "TONE", [841.0, 500.0], false),
+    ControlSpec::knob(17, "DRIVE", "POWER AMP", [101.0, 500.0], true),
+    ControlSpec::knob(18, "TIGHT", "POWER AMP", [245.0, 500.0], false),
+    ControlSpec::knob(19, "SAG", "POWER AMP", [389.0, 500.0], false),
+    ControlSpec::knob(2, "LOW", "TONE", [573.0, 500.0], false),
+    ControlSpec::knob(3, "MID", "TONE", [709.0, 500.0], false),
+    ControlSpec::knob(4, "HIGH", "TONE", [845.0, 500.0], false),
     ControlSpec::knob(5, "PRESENCE", "TONE", [981.0, 500.0], false),
 ];
 
@@ -143,14 +143,15 @@ pub const PANELS: [SurfaceSpec; 3] = [
 
 /// The six Free groups as separate rounded boxes, after 1.4.0: a gap of
 /// graphite between them, each traced by its own groove, so no group has to
-/// share an edge with another.
+/// share an edge with another. The two columns share their edges so the
+/// boxes read as one grid; each row spaces its knobs evenly within its box.
 pub const SECTIONS: [SurfaceSpec; 6] = [
-    SurfaceSpec::section("section.levels", "levels", [14.0, 78.0, 482.0, 164.0]),
-    SurfaceSpec::section("section.cabinet", "cabinet", [508.0, 78.0, 558.0, 164.0]),
-    SurfaceSpec::section("section.preamp", "preamp", [14.0, 254.0, 450.0, 164.0]),
-    SurfaceSpec::section("section.staging", "staging", [476.0, 254.0, 590.0, 164.0]),
-    SurfaceSpec::section("section.power", "power-amp", [14.0, 430.0, 450.0, 164.0]),
-    SurfaceSpec::section("section.tone", "tone", [476.0, 430.0, 590.0, 164.0]),
+    SurfaceSpec::section("section.levels", "levels", [14.0, 78.0, 462.0, 164.0]),
+    SurfaceSpec::section("section.cabinet", "cabinet", [488.0, 78.0, 578.0, 164.0]),
+    SurfaceSpec::section("section.preamp", "preamp", [14.0, 254.0, 462.0, 164.0]),
+    SurfaceSpec::section("section.staging", "staging", [488.0, 254.0, 578.0, 164.0]),
+    SurfaceSpec::section("section.power", "power-amp", [14.0, 430.0, 462.0, 164.0]),
+    SurfaceSpec::section("section.tone", "tone", [488.0, 430.0, 578.0, 164.0]),
 ];
 
 /// Pro's meter columns: 20 px wide, 4 px apart, rising from the top of the
@@ -160,25 +161,25 @@ pub const METERS: [SurfaceSpec; 4] = [
         "meter.input.left",
         "meter",
         "input-left",
-        [78.0, 108.0, 20.0, 104.0],
+        [72.0, 108.0, 20.0, 104.0],
     ),
     SurfaceSpec::plain(
         "meter.input.right",
         "meter",
         "input-right",
-        [102.0, 108.0, 20.0, 104.0],
+        [96.0, 108.0, 20.0, 104.0],
     ),
     SurfaceSpec::plain(
         "meter.output.left",
         "meter",
         "output-left",
-        [287.0, 108.0, 20.0, 104.0],
+        [274.0, 108.0, 20.0, 104.0],
     ),
     SurfaceSpec::plain(
         "meter.output.right",
         "meter",
         "output-right",
-        [311.0, 108.0, 20.0, 104.0],
+        [298.0, 108.0, 20.0, 104.0],
     ),
 ];
 
