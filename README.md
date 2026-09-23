@@ -187,7 +187,7 @@ just calibrate
 
 ### Soak
 
-Issue #34 reported that 1.2 started sounding like a tremolo after hours of running. The soak is rerun on each release candidate:
+Issue #34 reported that 1.2 started sounding like a tremolo after hours of running. The soak is a diagnostic, run on demand when a long-run defect is suspected; it is not a step in releasing a candidate. The pre-release checks are the `just` gate and `just tone-stack-soak`, described below.
 
 ```sh
 just soak 4        # hours of audio per run, started in the background
@@ -205,8 +205,11 @@ failure there: `level 11` at Auto (2x) collapsed after about ten hours of noise
 (tone-stack seam +43 dB, output -131 dB), while `level 11` at 1x and Init at 1x
 and 2x held within 0.002 dB. The cause was the tone stack's spurious Nyquist
 pole described under Tone stack, which also accounts for the legacy failure
-above. Because that growth is a few parts in 10⁹ per sample, a pre-release
-check drives the shipping tone stack alone for 24 hours of samples in minutes:
+above. After the fix, 12-hour runs of Init at 2x and `level 11` at 2x and 4x
+passed, recorded in
+[`verification/soak/2026-09-23-summary.txt`](verification/soak/2026-09-23-summary.txt).
+Because that growth is a few parts in 10⁹ per sample, the pre-release check
+drives the shipping tone stack alone for 24 hours of samples in minutes:
 
 ```sh
 just tone-stack-soak

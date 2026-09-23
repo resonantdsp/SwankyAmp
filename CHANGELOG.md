@@ -56,9 +56,9 @@ install beside Swanky Amp 1.4.0. The interface, factory preset bank and signed c
   compressor's threshold past the stage's plate signal, collapsing the
   stage's output to a constant (-52 dB in 1.4.0, -100 dB after the knee
   correction). The threshold now stops just short of that point.
-- Added a multi-hour soak (`just soak`, `just soak-check`), rerun on each
-  release candidate, that gates level drift, tremolo-band modulation and
-  non-finite output on low-level input. It reproduced the 1.2 report of a
+- Added a multi-hour soak diagnostic (`just soak`, `just soak-check`) that
+  checks level drift, tremolo-band modulation and non-finite output on
+  low-level input. It reproduced the 1.2 report of a
   tremolo developing over hours (issue #34) on the legacy path after about 3.7
   hours, localized to the released tone stack; the shipping path passed four
   hours.
