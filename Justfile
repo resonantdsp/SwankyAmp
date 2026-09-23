@@ -58,19 +58,21 @@ dsp-report output="verification/dsp/oversampling-plate.json":
     python3 verification/dsp/report.py \
         target/debug/render-model target/debug/dsp-probe "{{ output }}"
 
-# Refit the factory presets to the standard tone-stack mapping and rewrite the
-# version 2 bank and its residual report.
+# Refit the factory presets to the standard tone-stack mapping, apply the
+# factory loudness balance and rewrite the version 2 bank and its report.
 refit:
     cargo build --quiet --no-default-features --bin refit-tone
     target/debug/refit-tone --presets verification/reference/released/Resources/presets.xml \
-        --report-dir verification/tone-stack --factory presets/factory-2.0.xml
+        --report-dir verification/tone-stack --factory presets/factory-2.0.xml \
+        --clip verification/reference/input/single-coil.wav
 
 # Regenerates the refit and fails unless the committed bank and report match
 # it, which also proves the refit is reproducible.
 refit-check:
     cargo build --quiet --no-default-features --bin refit-tone
     target/debug/refit-tone --presets verification/reference/released/Resources/presets.xml \
-        --report-dir verification/tone-stack --factory presets/factory-2.0.xml --check
+        --report-dir verification/tone-stack --factory presets/factory-2.0.xml \
+        --clip verification/reference/input/single-coil.wav --check
 
 # Measure the shipping path's preamp and output level tables against the
 # released path and rewrite them as source.

@@ -586,6 +586,35 @@ pub fn refit(name: &str, controls: AmpControls, input: &[f32]) -> PresetRefit {
     }
 }
 
+/// The host rate the factory balance is measured at, as the listening kit
+/// that it was chosen on plays it.
+pub const BALANCE_SAMPLE_RATE: u32 = super::calibration::SAMPLE_RATE;
+/// Silence before the clip, so the level is a settled amplifier's as a player
+/// hears it mid-session, and the decay kept after it.
+const BALANCE_SETTLE_SECONDS: f64 = 1.;
+const BALANCE_TAIL_SECONDS: f64 = 0.5;
+
+/// A preset's output RMS in dBFS on `clip`, sampled at `BALANCE_SAMPLE_RATE`,
+/// through the shipping path with Auto oversampling.
+pub fn output_rms_db(controls: AmpControls, clip: &[f32]) -> f64 {
+    let rate = f64::from(BALANCE_SAMPLE_RATE);
+    let mut path = CorrectedPath::shipping(rate as f32, BLOCK, controls, doublings_for(0, rate));
+    let settle = (BALANCE_SETTLE_SECONDS * rate) as usize;
+    let heard = clip.len() + (BALANCE_TAIL_SECONDS * rate) as usize;
+    let start = settle + path.latency();
+    let mut buffer = vec![0.; settle];
+    buffer.extend_from_slice(clip);
+    buffer.resize(start + heard, 0.);
+    for block in buffer.chunks_mut(BLOCK) {
+        path.process(block);
+    }
+    let energy: f64 = buffer[start..]
+        .iter()
+        .map(|sample| f64::from(*sample).powi(2))
+        .sum();
+    10. * (energy / heard as f64).max(1e-30).log10()
+}
+
 /// Measures candidate settings for a preset against the preset on the
 /// released mapping, by the same residuals the refit reports.
 pub fn measure_candidates(

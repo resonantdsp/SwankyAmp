@@ -22,6 +22,10 @@ install beside Swanky Amp 1.4.0. The interface, factory preset bank and signed c
   sound roughly as they did, with the residuals recorded in
   `verification/tone-stack/refit-report.md`; Swanky Amp 1.4.0 remains
   available for the original voicing.
+- Balanced the factory presets to equal loudness, which 1.4.0's never were:
+  each preset's Output moves by -2.2 to +5.4 dB so that all ten play the
+  single-coil DI within 0.14 dB RMS of each other. Imported 1.x presets are
+  not rebalanced.
 - Fixed a slow tone-stack instability that silenced high-gain presets after
   hours of continuous play. The first-order treble sections were discretised
   as biquads with a spurious pole at Nyquist, which f32 rounding placed just
@@ -40,7 +44,8 @@ install beside Swanky Amp 1.4.0. The interface, factory preset bank and signed c
   released path by `just calibrate`, so Drive and Power Drive move loudness
   as 1.4.0 did and the factory defaults land on 1.4.0's level into the power
   stage and at the output with the cabinet off. The factory presets' output
-  sits within 1.0 dB of 1.4.0, from up to 2.5 dB below.
+  sat within 1.0 dB of 1.4.0, from up to 2.5 dB below, before the
+  factory balance.
 - Added a multi-hour soak (`just soak`, `just soak-check`), rerun on each
   release candidate, that gates level drift, tremolo-band modulation and
   non-finite output on low-level input. It reproduced the 1.2 report of a

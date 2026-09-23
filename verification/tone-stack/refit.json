@@ -392,5 +392,77 @@
       },
       "limits": []
     }
+  ],
+  "balance": [
+    {
+      "name": "clean",
+      "change_db": -0.3,
+      "output_before": -0.2,
+      "output_after": -0.208571,
+      "rms_dbfs": -22.374641702152672
+    },
+    {
+      "name": "bright",
+      "change_db": 0.3,
+      "output_before": -0.1,
+      "output_after": -0.091429,
+      "rms_dbfs": -22.28084342544362
+    },
+    {
+      "name": "edge",
+      "change_db": 0.8,
+      "output_before": -0.1,
+      "output_after": -0.077143,
+      "rms_dbfs": -22.249310096741233
+    },
+    {
+      "name": "distort",
+      "change_db": -2.2,
+      "output_before": 0.05400002,
+      "output_after": -0.008857,
+      "rms_dbfs": -22.269571515126522
+    },
+    {
+      "name": "dirty distort",
+      "change_db": 2.8,
+      "output_before": 0.0,
+      "output_after": 0.08,
+      "rms_dbfs": -22.34110367718522
+    },
+    {
+      "name": "pre drive",
+      "change_db": -1.0,
+      "output_before": 0.0,
+      "output_after": -0.028571,
+      "rms_dbfs": -22.23013651438899
+    },
+    {
+      "name": "power drive",
+      "change_db": -2.2,
+      "output_before": 0.0,
+      "output_after": -0.062857,
+      "rms_dbfs": -22.350150826280945
+    },
+    {
+      "name": "full drive",
+      "change_db": -0.8,
+      "output_before": 0.0,
+      "output_after": -0.022857,
+      "rms_dbfs": -22.33788419417475
+    },
+    {
+      "name": "high gain",
+      "change_db": 1.5,
+      "output_before": -0.055999935,
+      "output_after": -0.013143,
+      "rms_dbfs": -22.236748010903618
+    },
+    {
+      "name": "level 11",
+      "change_db": 5.4,
+      "output_before": 0.0,
+      "output_after": 0.154286,
+      "rms_dbfs": -22.230873798495658
+    }
   ]
 }

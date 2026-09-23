@@ -37,6 +37,33 @@ the power stage: the seam level plus Power Drive's gain change.
 | high gain | +0.20 / +0.19 / +0.60 / +0.610 | +0.19 / +0.32 / -0.02 / +0.627 | 3.47 / +2.70 | 2.03 / -0.56 | +0.01 | 4.12 / -2.43 | 2.18 / -0.71 | none |
 | level 11 | +0.40 / +1.00 / +0.44 / +1.000 | +0.32 / +0.99 / -0.06 / +1.000 | 2.56 / +2.15 | 1.56 / -0.33 | -0.33 | 3.47 / +0.30 | 2.44 / +0.41 | none |
 
+## Factory balance
+
+Swanky Amp 1.4.0's factory presets were never balanced for loudness.
+Version 2 moves each preset's Output by the change below, chosen by ear
+on the single-coil clip on September 23, 2026 to equalise the presets'
+RMS. Output stores -1..+1 for -35..+35 dB. RMS is the output on the
+single-coil DI through the shipping path at 44100 Hz with Auto
+oversampling, from an amplifier settled on a second of silence, over the
+clip and half a second of tail. The balance holds for this clip: on the
+sparser pluck the drive presets, which compress it harder, measure
+quieter than the clean ones.
+
+| Preset | Output change dB | Output before → after dB | RMS dBFS |
+|---|---|---|---|
+| clean | -0.3 | -7.00 → -7.30 | -22.37 |
+| bright | +0.3 | -3.50 → -3.20 | -22.28 |
+| edge | +0.8 | -3.50 → -2.70 | -22.25 |
+| distort | -2.2 | +1.89 → -0.31 | -22.27 |
+| dirty distort | +2.8 | +0.00 → +2.80 | -22.34 |
+| pre drive | -1.0 | +0.00 → -1.00 | -22.23 |
+| power drive | -2.2 | +0.00 → -2.20 | -22.35 |
+| full drive | -0.8 | +0.00 → -0.80 | -22.34 |
+| high gain | +1.5 | -1.96 → -0.46 | -22.24 |
+| level 11 | +5.4 | +0.00 → +5.40 | -22.23 |
+
+Spread: 0.14 dB, from -22.37 to -22.23 dBFS.
+
 ## Summary
 
 - Worst seam shape residual: 2.68 dB RMS (clean).
