@@ -11,6 +11,9 @@ struct Controls {
     polar: vec4<f32>,
     extent: vec4<f32>,
     disc: vec4<f32>,
+    meter_style: vec4<f32>,
+    meter_colors: array<vec4<f32>, 2>,
+    meters: array<Control, 4>,
     controls: array<Control, 32>,
 }
 
@@ -142,6 +145,56 @@ fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
         let bevel = 1.0 - smoothstep(0.2, 0.2 + aa, abs(distance - width - 0.3));
         radiance += vec3(0.14) * bevel * max(dot(outward, normalize(vec2(0.15, 1.0))), 0.0) * (1.0 - inside);
         radiance *= 1.0 - 0.14 * bevel * max(-outward.y, 0.0) * (1.0 - inside);
+    }
+
+    // Each lit cell adds its baked response in the column's colour: the cell
+    // at the level's fractional edge stays dark inside and only its spill
+    // fades in, as in Pro, so a cell never shows half lit.
+    for (var meter_index = 0u; meter_index < 4u; meter_index++) {
+        if f32(meter_index) >= controls.meter_style.w {
+            break;
+        }
+        let meter = controls.meters[meter_index];
+        let count = controls.meter_style.x;
+        let pitch = meter.geometry.w / count;
+        let size = vec2(meter.geometry.z, pitch * (1.0 - controls.meter_style.y));
+        let extent = controls.meter_style.z;
+        let position = clamp(meter.state.x, 0.0, 1.0) * count;
+        if any(point < meter.geometry.xy - vec2(extent))
+            || any(point > meter.geometry.xy + meter.geometry.zw + vec2(extent)) {
+            continue;
+        }
+        let color = controls.meter_colors[select(0u, 1u, meter.state.z > 0.5)].rgb;
+        for (var bar = 0u; bar < 32u; bar++) {
+            if f32(bar) >= count || f32(bar) > position {
+                break;
+            }
+            let center = meter.geometry.xy
+                + vec2(size.x * 0.5, meter.geometry.w - pitch * (f32(bar) + 0.5));
+            let local = point - center;
+            let uv = local / (size + vec2(extent * 2.0)) + 0.5;
+            if all(uv >= vec2(0.0)) && all(uv <= vec2(1.0)) {
+                let tail = 1.0 - smoothstep(
+                    0.85,
+                    1.0,
+                    max(abs(uv.x - 0.5), abs(uv.y - 0.5)) * 2.0,
+                );
+                let response = textureSampleLevel(
+                    responses,
+                    linear_sampler,
+                    uv,
+                    i32(meter.state.y),
+                    0.0,
+                ).rgb;
+                let inside = all(abs(local) <= size * 0.5);
+                let activation = select(
+                    clamp(position - f32(bar), 0.0, 1.0),
+                    select(0.0, 1.0, f32(bar) < floor(position)),
+                    inside,
+                );
+                light += response * color * activation * tail;
+            }
+        }
     }
 
     if on_disc {

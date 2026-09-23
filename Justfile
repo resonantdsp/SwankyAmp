@@ -102,6 +102,10 @@ export-layout output="assets/layout":
 capture output="verification/interface":
     cargo run --quiet --bin swanky-amp-2 -- capture "{{ output }}"
 
+# Capture after a deterministic stereo note so the meters are lit.
+capture-live output="verification/interface-live":
+    cargo run --quiet --bin swanky-amp-2 -- capture "{{ output }}" live
+
 pack-artwork layers package="assets/artwork.pack":
     cargo run --quiet --bin swanky-amp-2 -- pack-artwork "{{ layers }}" "{{ package }}"
 
