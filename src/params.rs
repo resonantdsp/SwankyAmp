@@ -1,5 +1,5 @@
 use crate::dsp::mapping::AmpControls;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use truce::prelude::*;
 use truce_params::FloatParamReadF32;
 
@@ -75,6 +75,10 @@ pub struct SwankyAmpParams {
     /// instance's editor. Session state, never host state.
     #[skip]
     pub meter_state: std::sync::Arc<crate::meters::MeterState>,
+    /// The selected preset's key, so a restored session names its preset
+    /// again.
+    #[persist]
+    pub preset: HostText,
     #[meter]
     pub input_meter_left: MeterSlot,
     #[meter]
@@ -110,6 +114,45 @@ impl ResolvedOversampling {
             UNRESOLVED => None,
             doublings => Some(doublings as usize),
         }
+    }
+}
+
+/// A persisted string that counts its writes. A host restores it without
+/// the editor asking, so an idle editor watches the count to notice.
+#[derive(Debug, Default)]
+pub struct HostText {
+    value: std::sync::RwLock<String>,
+    revision: AtomicU64,
+}
+
+impl HostText {
+    pub fn read(&self) -> String {
+        self.value
+            .read()
+            .map(|value| value.clone())
+            .unwrap_or_default()
+    }
+
+    pub fn set(&self, value: String) {
+        if let Ok(mut current) = self.value.write() {
+            *current = value;
+        }
+        self.revision.fetch_add(1, Ordering::Release);
+    }
+
+    pub fn revision(&self) -> u64 {
+        self.revision.load(Ordering::Acquire)
+    }
+}
+
+impl truce::core::custom_state::PersistField for HostText {
+    fn persist_write(&self, buf: &mut Vec<u8>) {
+        truce::core::custom_state::PersistField::persist_write(&self.value, buf);
+    }
+
+    fn persist_read(&self, cursor: &mut truce::core::custom_state::StateCursor) {
+        truce::core::custom_state::PersistField::persist_read(&self.value, cursor);
+        self.revision.fetch_add(1, Ordering::Release);
     }
 }
 

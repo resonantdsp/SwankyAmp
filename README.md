@@ -54,9 +54,54 @@ just refit
 ```
 
 `just refit-check`, part of `just`, fails if `presets/factory-2.0.xml` or
-`verification/tone-stack/` differ from what the code produces. The bank keeps
-the 1.x preset XML schema so one importer can read both 1.4 and 2.0 presets;
-the editor's preset bar does not load it yet.
+`verification/tone-stack/` differ from what the code produces. The plugin
+embeds that file as its factory bank at build time.
+
+### Presets
+
+The header's preset field shows the current preset's name between `‹` and
+`›`, which step through the factory presets and then the user's own. A press
+on the name opens the menu: Init, the ten factory presets, the user presets,
+then Save (a changed user preset), Save as…, Remove (user presets only),
+Import 1.x presets and Open folder. Init restores every preset control to its
+default; there is no Reset button. Choosing a preset sets its controls
+through the host, so automation and undo see the change, and the selected
+preset is part of the plugin state, so a reopened session shows its name
+again. A dot after the name marks a preset changed since it was chosen.
+
+As in 1.4.0, Input and the cabinet switch belong to the session: a preset
+stores them, but choosing one leaves them as they are and changing them does
+not mark the preset changed. Oversampling is not part of a preset.
+
+User presets live in:
+
+| Platform | Version 2 | Swanky Amp 1.4.0 |
+|---|---|---|
+| macOS | `~/Library/Audio/Presets/Resonant DSP/Swanky Amp 2` | `~/Library/Audio/Presets/Resonant DSP/Swanky Amp` |
+| Windows | `%APPDATA%\Resonant DSP\Swanky Amp 2` | `%APPDATA%\Resonant DSP\Swanky Amp` |
+| Linux | `$XDG_DATA_HOME/Resonant DSP/Swanky Amp 2` (default `~/.local/share`) | `~/.config/Resonant DSP/Swanky Amp` |
+
+The version 2 folder is created on the first save or import. Each preset is
+one `<name>.xml` file in the 1.x schema, an `APVTSSwankyAmp` element listing
+`<PARAM id value/>` entries under the 1.x parameter ids, so 1.x and 2.0 presets
+stay one format: version 2 reads 1.4.0 files, including the version
+migrations 1.4.0 applied to presets from earlier releases, and 1.4.0 can load
+a version 2 file. A file that is not well-formed or is not a Swanky Amp preset
+is left out of the menu and named in the footer.
+
+The first time version 2 runs without a preset folder, and on Import 1.x
+presets, it copies the user's presets from the 1.4.0 folder, which it never
+modifies. Each imported preset keeps its name and every control except Low,
+Mid, High and Power Drive, which are refitted by the same objective as the
+factory set above: rendered on the released octave-high tone stack and fitted
+on the corrected one to match its spectral shape and level into the power
+stage, with Power Drive moving at most 0.15 and only when the level would
+otherwise change by more than 0.5 dB. The result is an approximation, closest
+on moderate tone settings and furthest where a preset relied on extreme
+Low, Mid or High; the file records `importedFrom` and `refit` attributes. A
+name already taken in the version 2 folder is kept as it is, and unchanged
+copies of the 1.4.0 factory presets, which 1.4.0 wrote into its folder, are not
+copied because the refitted factory set already carries them.
 
 ### Soft-clip knee
 
@@ -130,7 +175,9 @@ just export-layout /tmp/swanky-layout
 just capture /tmp/swanky-capture
 ```
 
-`capture` needs a working GPU adapter. The layout export remains available when
+`just capture-preset "high gain" /tmp/swanky-capture` draws the editor with
+that factory preset applied and named in the header. `capture` needs a
+working GPU adapter. The layout export remains available when
 the artwork package is missing or stale so a new bake can be produced from
 changed widget geometry.
 

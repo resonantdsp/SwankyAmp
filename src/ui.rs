@@ -2,6 +2,7 @@ use crate::{
     layout::{self, Component, ControlKind, SurfaceSpec},
     meters::MeterState,
     params::SwankyAmpParams,
+    preset_bar::{PresetBar, PresetMsg},
     release_notice::{self, Notice},
     style,
     widgets::{FreeRenderer, Knob, Msg, NoticeGlyph, Target},
@@ -10,7 +11,7 @@ use iced_core::{Element, Length, Padding, Theme, mouse, text::LineHeight};
 use std::sync::Arc;
 use truce::prelude::Params;
 use truce_iced::iced::widget::{Column, Space, column, container, mouse_area, row, stack, text};
-use truce_iced::iced::{Alignment, Border, Color, Subscription, Task, event, window};
+use truce_iced::iced::{Alignment, Border, Color, Subscription, Task, event, keyboard, window};
 use truce_iced::{IcedPlugin, Message, ParamCache, ParamMessage, PluginContext};
 
 const INK: Color = style::INK;
@@ -32,6 +33,7 @@ const KNOB_ROW_HEIGHT: f32 = 84.0;
 #[derive(Debug, Clone)]
 pub enum Action {
     OpenReleaseNotice,
+    Preset(PresetMsg),
     Focus(bool),
     Pointer(bool),
 }
@@ -44,6 +46,8 @@ pub struct FreeUi {
     meter_revision: u64,
     focused: bool,
     hovered: bool,
+    presets: PresetBar,
+    owner: Option<Arc<SwankyAmpParams>>,
 }
 
 impl FreeUi {
@@ -58,6 +62,8 @@ impl FreeUi {
             meter_revision: 0,
             focused: true,
             hovered: false,
+            presets: PresetBar::offline(),
+            owner: None,
         }
     }
 
@@ -123,7 +129,7 @@ impl FreeUi {
                     .color(INK),
             ));
         }
-        layers.extend(header(self.notice.as_ref(), params));
+        layers.extend(header(self.notice.as_ref(), &self.presets, params));
         layers.extend(levels_meters(self.meter_levels));
         for control in layout::CONTROLS {
             layers.push(match control.kind {
@@ -133,14 +139,20 @@ impl FreeUi {
         }
         layers.push(place(
             [18.0, 614.0, 680.0, 16.0],
-            text("DRAG TO TURN   ·   SHIFT FOR FINE CONTROL   ·   RIGHT-CLICK TO RESET")
-                .size(10)
-                .color(DIM),
+            match self.presets.status() {
+                Some(status) => text(status.to_owned()).size(10).color(INK),
+                None => {
+                    text("DRAG TO TURN   ·   SHIFT FOR FINE CONTROL   ·   RIGHT-CLICK TO RESET")
+                        .size(10)
+                        .color(DIM)
+                }
+            },
         ));
         layers.push(place(
             [938.0, 614.0, 124.0, 16.0],
             text("RESONANT DSP").size(10).color(DIM),
         ));
+        layers.extend(self.presets.menu(PRESET_FIELD, params));
         stack(layers)
             .width(style::WIDTH)
             .height(style::HEIGHT)
@@ -155,6 +167,8 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
         let mut ui = Self {
             releases: Some(release_notice::Service::start()),
             meters: Some(Arc::clone(&params.meter_state)),
+            presets: PresetBar::live(&params),
+            owner: Some(Arc::clone(&params)),
             // Some hosts never send focus to an embedded editor, so it
             // starts live until a focus or pointer event says otherwise.
             ..Self::resting()
@@ -170,6 +184,10 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
                 iced_core::Event::Window(window::Event::Unfocused) => Action::Focus(false),
                 iced_core::Event::Mouse(mouse::Event::CursorMoved { .. }) => Action::Pointer(true),
                 iced_core::Event::Mouse(mouse::Event::CursorLeft) => Action::Pointer(false),
+                iced_core::Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(keyboard::key::Named::Escape),
+                    ..
+                }) => Action::Preset(PresetMsg::Close),
                 _ => return None,
             };
             Some(Message::Plugin(action))
@@ -179,13 +197,18 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
     fn update(
         &mut self,
         message: Msg,
-        _: &ParamCache<SwankyAmpParams>,
-        _: &PluginContext<SwankyAmpParams>,
+        params: &ParamCache<SwankyAmpParams>,
+        ctx: &PluginContext<SwankyAmpParams>,
     ) -> Task<Msg> {
         match message {
             Message::Tick => {
                 self.notice = self.latest_notice();
                 self.sync_meters();
+                self.presets.sync(params.params());
+                self.presets.poll(params);
+            }
+            Message::Plugin(Action::Preset(message)) => {
+                self.presets.update(message, params, ctx);
             }
             Message::Plugin(Action::OpenReleaseNotice) => {
                 if let Some(notice) = &self.notice {
@@ -216,7 +239,11 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
                 .meters
                 .as_ref()
                 .is_some_and(|meters| meters.revision() != self.meter_revision);
-        notice || meters
+        let presets = self
+            .owner
+            .as_ref()
+            .is_some_and(|params| self.presets.needs_redraw(params));
+        notice || meters || presets
     }
 
     fn title(&self) -> String {
@@ -260,7 +287,7 @@ fn surface<'a, R: FreeRenderer + 'a>(
     )
 }
 
-fn place<'a, R: iced_core::Renderer + 'a>(
+pub(crate) fn place<'a, R: iced_core::Renderer + 'a>(
     bounds: [f32; 4],
     content: impl Into<Element<'a, Msg, Theme, R>>,
 ) -> Element<'a, Msg, Theme, R> {
@@ -285,8 +312,19 @@ fn place<'a, R: iced_core::Renderer + 'a>(
     .into()
 }
 
+/// Where the preset field sits: right to left from the boxes' edge, one
+/// group gap between header actions.
+const OVERSAMPLING_FIELD: [f32; 2] = [1066.0 - 72.0, 72.0];
+const PRESET_FIELD: [f32; 4] = [
+    OVERSAMPLING_FIELD[0] - HEADER_GROUP_GAP - 150.0,
+    HEADER_CONTROL[0],
+    150.0,
+    HEADER_CONTROL[1],
+];
+
 fn header<'a, R: FreeRenderer + 'a>(
     notice: Option<&Notice>,
+    presets: &PresetBar,
     params: &ParamCache<SwankyAmpParams>,
 ) -> Vec<Element<'a, Msg, Theme, R>> {
     let [top, height] = HEADER_CONTROL;
@@ -298,10 +336,8 @@ fn header<'a, R: FreeRenderer + 'a>(
     ]
     .spacing(8)
     .align_y(Alignment::Center);
-    // Right to left from the boxes' edge, one group gap between actions.
-    let oversampling = [1066.0 - 72.0, 72.0];
-    let preset = [oversampling[0] - HEADER_GROUP_GAP - 150.0, 150.0];
-    let notice_x = preset[0] - HEADER_GROUP_GAP - height;
+    let oversampling = OVERSAMPLING_FIELD;
+    let notice_x = PRESET_FIELD[0] - HEADER_GROUP_GAP - height;
     vec![
         place(
             [22.0, 0.0, 400.0, style::HEADER_HEIGHT],
@@ -311,7 +347,7 @@ fn header<'a, R: FreeRenderer + 'a>(
             [notice_x, top, height, height],
             notice_control(notice_action(notice)),
         ),
-        place([preset[0], top, preset[1], height], preset_bar()),
+        place(PRESET_FIELD, presets.field(params)),
         place(
             [oversampling[0], top, oversampling[1], height],
             oversampling_toggle(params),
@@ -360,32 +396,6 @@ fn oversampling_toggle<'a, R: FreeRenderer + 'a>(
         ParamMessage::EndEdit(OVERSAMPLING_ID),
     ])))
     .interaction(mouse::Interaction::Pointer)
-    .into()
-}
-
-/// The factory preset stepper as one outlined field; the chevrons sit inside
-/// it so the preset name reads as the thing they step through.
-fn preset_bar<'a, R: FreeRenderer + 'a>() -> Element<'a, Msg, Theme, R> {
-    let chevron = |glyph| {
-        container(text(glyph).size(20).color(DIM))
-            .width(28)
-            .height(Length::Fill)
-            .center(Length::Fill)
-    };
-    container(
-        row![
-            chevron("‹"),
-            container(text("INIT").size(14).color(INK))
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .center(Length::Fill),
-            chevron("›"),
-        ]
-        .height(Length::Fill),
-    )
-    .width(Length::Fill)
-    .height(Length::Fill)
-    .style(|_| style::outlined(false))
     .into()
 }
 

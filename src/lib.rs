@@ -9,6 +9,7 @@ pub mod engine;
 pub mod layout;
 pub mod meters;
 pub mod params;
+pub mod preset_bar;
 pub mod presets;
 pub mod release_notice;
 pub mod style;
@@ -141,6 +142,17 @@ mod tests {
         truce_test::assert_bus_config_effect::<Plugin>();
         truce_test::assert_has_editor::<Plugin>();
         truce_test::assert_state_round_trip::<Plugin>();
+    }
+
+    #[test]
+    fn a_restored_session_names_its_preset_again() {
+        use truce::core::PluginExport;
+        let plugin = Plugin::create();
+        plugin.params().preset.set("factory:edge".into());
+        let blob = truce::core::state::snapshot_plugin(&plugin);
+        let mut restored = Plugin::create();
+        truce::core::state::restore_plugin(&mut restored, &blob).expect("state did not restore");
+        assert_eq!(restored.params().preset.read(), "factory:edge");
     }
 
     #[test]

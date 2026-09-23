@@ -552,16 +552,27 @@ fn limits(refit: ToneSettings, power_drive: Option<String>) -> Vec<String> {
         .collect()
 }
 
-/// Fits one preset and measures it before and after through the full amp.
-pub fn refit(name: &str, controls: AmpControls, input: &[f32]) -> PresetRefit {
-    let reference = render(controls, ToneMapping::Released, input);
-    let unrefit = render(controls, ToneMapping::Standard, input);
+fn fit_to(reference: &Render, controls: AmpControls) -> (AmpControls, Option<String>) {
     let internal_rate = SAMPLE_RATE as f32 * (1 << doublings_for(0, f64::from(SAMPLE_RATE))) as f32;
     let target = reference.tone_stack.profile();
     let predictor = Predictor::new(reference.tone_stack.clone(), controls, internal_rate);
     let toned = fit_tone(&predictor, &target, controls);
     let level_change = predictor.predict(toned).profile().against(&target).level_db;
-    let (fitted, power_drive_limit) = fit_power_drive(toned, level_change);
+    fit_power_drive(toned, level_change)
+}
+
+/// A preset voiced on the released mapping, refitted to sound roughly as it
+/// did on the standard one: Low, Mid, High and, where the level into the
+/// power stage needs it, Power Drive move; every other control is kept.
+pub fn fit(controls: AmpControls, input: &[f32]) -> AmpControls {
+    fit_to(&render(controls, ToneMapping::Released, input), controls).0
+}
+
+/// Fits one preset and measures it before and after through the full amp.
+pub fn refit(name: &str, controls: AmpControls, input: &[f32]) -> PresetRefit {
+    let reference = render(controls, ToneMapping::Released, input);
+    let unrefit = render(controls, ToneMapping::Standard, input);
+    let (fitted, power_drive_limit) = fit_to(&reference, controls);
     let refitted = render(fitted, ToneMapping::Standard, input);
     let original = ToneSettings::of(controls);
     let refit = ToneSettings::of(fitted);

@@ -61,6 +61,8 @@ iced_runtime = "0.14"
 iced_widget = { version = "0.14", features = ["wgpu"] }
 iced_wgpu = "0.14"
 dirs = "5"
+rfd = "=0.15.4"
+roxmltree = "0.20"
 ureq = { version = "3", default-features = false, features = [
   "rustls-no-provider",
   "platform-verifier",
