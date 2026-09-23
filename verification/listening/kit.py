@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Render a blind A/B listening kit: every factory preset as released in 1.4.0
-against the version 2 shipping path with the refitted bank."""
+"""Render a blind listening kit: every factory preset as released in 1.4.0
+against the version 2 shipping path with the refitted bank and, optionally,
+that bank with High moved."""
 
 from __future__ import annotations
 
@@ -130,17 +131,19 @@ def released(renderer: Path, work: Path, input_path: Path, preset: str) -> Path:
     return output
 
 
-def version_2(render_model: Path, work: Path, input_path: Path, preset: str) -> tuple[Path, int]:
+def version_2(
+    render_model: Path, work: Path, input_path: Path, preset: str, high: float | None
+) -> tuple[Path, int]:
     output, report = work / "version-2.wav", work / "version-2.json"
-    subprocess.run(
-        [
-            str(render_model), "--model", "shipping", "--oversampling", "auto",
-            "--input", str(input_path), "--presets", str(VERSION_2_BANK),
-            "--preset", preset, "--sample-rate", str(SAMPLE_RATE),
-            "--output", str(output), "--report", str(report),
-        ],
-        check=True, cwd=ROOT,
-    )
+    command = [
+        str(render_model), "--model", "shipping", "--oversampling", "auto",
+        "--input", str(input_path), "--presets", str(VERSION_2_BANK),
+        "--preset", preset, "--sample-rate", str(SAMPLE_RATE),
+        "--output", str(output), "--report", str(report),
+    ]
+    if high is not None:
+        command += ["--high", repr(high)]
+    subprocess.run(command, check=True, cwd=ROOT)
     return output, json.loads(report.read_text())["latency_samples"]
 
 
@@ -153,9 +156,33 @@ def moved_controls(refit: dict) -> str:
     return ", ".join(moves) or "none"
 
 
-def build(render_model: Path, output: Path) -> None:
+def high_variants(refit_tone: Path, steps: str) -> dict[str, list[dict]]:
+    """Each preset's variants with their High and tone-stack residuals, as the
+    refit measures them against the released mapping."""
+    result = subprocess.run(
+        [
+            str(refit_tone), "--presets", str(RELEASED_BANK),
+            "--factory", str(VERSION_2_BANK), "--high-steps", steps,
+        ],
+        check=True, cwd=ROOT, text=True, stdout=subprocess.PIPE,
+    )
+    return {preset["name"]: preset["variants"] for preset in json.loads(result.stdout)}
+
+
+def variant_label(step: str) -> str:
+    if step == "as-is":
+        return "version 2"
+    if step == "orig":
+        return "original High"
+    return f"High {float(step):+.1f}"
+
+
+def build(
+    render_model: Path, output: Path, inputs: list[str], refit_tone: Path | None, steps: str
+) -> None:
     output.mkdir(parents=True, exist_ok=True)
     refits = {preset["name"]: preset for preset in json.loads(REFIT.read_text())["presets"]}
+    variants = high_variants(refit_tone, steps) if steps else None
     shuffle = random.Random(SHUFFLE_SEED)
     rows = []
     with tempfile.TemporaryDirectory(prefix="swanky-listening-") as temporary:
@@ -163,58 +190,78 @@ def build(render_model: Path, output: Path) -> None:
         renderer, _, _ = reference.build_renderer(work)
         pluck = work / "pluck-source.wav"
         subprocess.run([str(render_model), "--write-pluck", str(pluck)], check=True)
-        inputs = {}
-        for name, source in (("single-coil", SINGLE_COIL), ("pluck", pluck)):
-            inputs[name] = (work / f"{name}.wav", padded_input(source, work / f"{name}.wav"))
+        sources = {"single-coil": SINGLE_COIL, "pluck": pluck}
+        padded = {
+            name: (work / f"{name}.wav", padded_input(sources[name], work / f"{name}.wav"))
+            for name in inputs
+        }
         for index, preset in enumerate(reference.PRESET_NAMES, start=1):
-            for input_name, (input_path, frames) in inputs.items():
-                a = aligned(released(renderer, work, input_path, preset), 0, frames)
-                b_path, latency = version_2(render_model, work, input_path, preset)
-                b = aligned(b_path, latency, frames)
-                trim_db = db(rms(a) / rms(b))
-                b = [x * 10 ** (trim_db / 20) for x in b]
-                peak = max(max(map(abs, a)), max(map(abs, b)))
+            sides = (
+                [(variant_label(v["variant"]), v["high"], v) for v in variants[preset]]
+                if variants
+                else [("version 2", None, None)]
+            )
+            for input_name, (input_path, frames) in padded.items():
+                reference_audio = aligned(released(renderer, work, input_path, preset), 0, frames)
+                target = rms(reference_audio)
+                group = [{"side": "1.4.0", "audio": reference_audio, "trim_db": 0.0}]
+                for label, high, measured in sides:
+                    path, latency = version_2(render_model, work, input_path, preset, high)
+                    audio = aligned(path, latency, frames)
+                    trim_db = db(target / rms(audio))
+                    group.append(
+                        {
+                            "side": label, "high": high, "measured": measured,
+                            "trim_db": trim_db,
+                            "audio": [x * 10 ** (trim_db / 20) for x in audio],
+                        }
+                    )
+                peak = max(max(map(abs, side["audio"])) for side in group)
                 headroom_db = min(0.0, PEAK_CEILING_DB - db(peak))
                 gain = 10 ** (headroom_db / 20)
-                a, b = [x * gain for x in a], [x * gain for x in b]
-                for samples in (a, b):
-                    if not all(math.isfinite(x) for x in samples):
-                        raise RuntimeError(f"{preset} {input_name}: non-finite audio")
-                if a == b:
-                    raise RuntimeError(f"{preset} {input_name}: the two sides are identical")
-                letters = ["X", "Y"]
+                for side in group:
+                    side["audio"] = [x * gain for x in side["audio"]]
+                    if not all(math.isfinite(x) for x in side["audio"]):
+                        raise RuntimeError(f"{preset} {input_name} {side['side']}: non-finite audio")
+                for first, second in zip(group, group[1:]):
+                    if first["audio"] == second["audio"]:
+                        raise RuntimeError(
+                            f"{preset} {input_name}: {first['side']} and {second['side']} are identical"
+                        )
+                letters = list("XY" if len(group) == 2 else "ABCDEFGHIJ"[: len(group)])
                 shuffle.shuffle(letters)
                 stem = f"{index:02d}-{preset.replace(' ', '-')}-{input_name}"
-                write_pcm24(output / f"{stem}-{letters[0]}.wav", SAMPLE_RATE, a)
-                write_pcm24(output / f"{stem}-{letters[1]}.wav", SAMPLE_RATE, b)
+                for letter, side in zip(letters, group):
+                    write_pcm24(output / f"{stem}-{letter}.wav", SAMPLE_RATE, side.pop("audio"))
+                    side["letter"] = letter
                 rows.append(
                     {
                         "stem": stem, "preset": preset, "input": input_name,
-                        "released": letters[0], "version_2": letters[1],
-                        "trim_db": trim_db, "headroom_db": headroom_db,
-                        "peak_db": db(peak) + headroom_db,
+                        "sides": group, "headroom_db": headroom_db,
                         "moved": moved_controls(refits[preset]),
                     }
                 )
     write_key(output / "KEY.txt", rows)
-    write_table(output / "pairs.md", rows)
+    if variants:
+        write_groups(output / "groups.md", rows)
+    else:
+        write_table(output / "pairs.md", rows)
 
 
 def write_key(path: Path, rows: list[dict]) -> None:
     lines = [
         "Swanky Amp 1.4.0 against version 2: answer key. Read after listening.",
         "",
-        "Trim is the gain applied to version 2 to match the released RMS over",
-        "the whole clip; it is the residual output level difference. Headroom",
-        f"is a common gain applied to both files when either peaked above {PEAK_CEILING_DB:g} dBFS.",
+        "Trim is the gain applied to each version 2 file to match the 1.4.0 RMS",
+        "over the whole clip; it is the residual output level difference.",
+        "Headroom is a common gain applied to a whole group when any file",
+        f"peaked above {PEAK_CEILING_DB:g} dBFS.",
         "",
-        f"{'pair':32} released  version 2  trim dB  headroom dB",
     ]
     for row in rows:
-        lines.append(
-            f"{row['stem']:32} {row['released']:9} {row['version_2']:10} "
-            f"{row['trim_db']:+7.2f}  {row['headroom_db']:+11.2f}"
-        )
+        lines.append(f"{row['stem']}  headroom {row['headroom_db']:+.2f} dB")
+        for side in sorted(row["sides"], key=lambda side: side["letter"]):
+            lines.append(f"  {side['letter']}  {side['side']:14} trim {side['trim_db']:+.2f} dB")
     path.write_text("\n".join(lines) + "\n")
 
 
@@ -234,17 +281,76 @@ def write_table(path: Path, rows: list[dict]) -> None:
     for row in rows:
         lines.append(
             f"| {row['preset']} | {row['input']} | {row['moved']} | "
-            f"{-row['trim_db']:+.2f} | {row['headroom_db']:+.2f} |"
+            f"{-row['sides'][1]['trim_db']:+.2f} | {row['headroom_db']:+.2f} |"
         )
     path.write_text("\n".join(lines) + "\n")
+
+
+def write_groups(path: Path, rows: list[dict]) -> None:
+    lines = [
+        "# Listening groups, unblinded",
+        "",
+        "Each group is Swanky Amp 1.4.0 from the C++ reference renderer with the",
+        "released bank, then the version 2 shipping path with Auto oversampling",
+        "and `presets/factory-2.0.xml` as refitted and with only High changed,",
+        "all at 44.1 kHz from a settled amplifier. The level residual is each",
+        "variant's output level relative to 1.4.0 (the negative of its trim).",
+        "Seam shape and level are the refit's tone-stack residuals against the",
+        "preset on the released mapping, measured on the pluck at 48 kHz.",
+        "",
+        "| Preset | Input | Variant | Letter | High | Seam shape dB RMS | Seam level dB | Level residual dB |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    for row in rows:
+        for side in row["sides"]:
+            if side["side"] == "1.4.0":
+                lines.append(
+                    f"| {row['preset']} | {row['input']} | 1.4.0 | {side['letter']} | "
+                    f"{refit_original_high(row):+.2f} | | | |"
+                )
+                continue
+            seam = side["measured"]["measurement"]["tone_stack"]
+            lines.append(
+                f"| {row['preset']} | {row['input']} | {side['side']} | {side['letter']} | "
+                f"{side['high']:+.2f} | {seam['shape_db']:.2f} | {seam['level_db']:+.2f} | "
+                f"{-side['trim_db']:+.2f} |"
+            )
+    lines += ["", f"Headroom applied: " + (", ".join(
+        f"{row['stem']} {row['headroom_db']:+.2f} dB" for row in rows if row["headroom_db"]
+    ) or "none") + "."]
+    path.write_text("\n".join(lines) + "\n")
+
+
+def refit_original_high(row: dict) -> float:
+    return next(
+        side["high"] for side in row["sides"] if side["side"] == "original High"
+    )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("render_model", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument(
+        "--inputs", default="single-coil,pluck",
+        help="comma-separated inputs from single-coil and pluck",
+    )
+    parser.add_argument(
+        "--high-steps", default="",
+        help="comma-separated changes to the refitted High, or orig for the 1.4.0 value",
+    )
+    parser.add_argument("--refit-tone", type=Path, help="needed with --high-steps")
     arguments = parser.parse_args()
-    build(arguments.render_model.resolve(), arguments.output.resolve())
+    inputs = [name.strip() for name in arguments.inputs.split(",") if name.strip()]
+    if not inputs or any(name not in ("single-coil", "pluck") for name in inputs):
+        parser.error("--inputs takes single-coil and/or pluck")
+    if arguments.high_steps and arguments.refit_tone is None:
+        parser.error("--high-steps needs --refit-tone")
+    build(
+        arguments.render_model.resolve(), arguments.output.resolve(), inputs,
+        arguments.refit_tone.resolve() if arguments.refit_tone else None,
+        arguments.high_steps,
+    )
 
 
 if __name__ == "__main__":
