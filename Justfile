@@ -99,6 +99,12 @@ render-model preset="clean" output="verification/model-output.wav":
         --preset "{{ preset }}" --sample-rate 44100 \
         --output "{{ output }}" --seams-dir "{{ output }}-seams"
 
+# Render the blind A/B kit comparing each factory preset as released in 1.4.0
+# with version 2, level matched, plus its answer key. Output is not committed.
+listening-kit output:
+    cargo build --quiet --no-default-features --bin render-model
+    python3 verification/listening/kit.py target/debug/render-model "{{ output }}"
+
 # Pre-release: drive the shipping tone stack alone for 24 hours of samples at
 # 44.1, 88.2 and 176.4 kHz and fail on any drift. Minutes in a release build.
 tone-stack-soak hours="24":

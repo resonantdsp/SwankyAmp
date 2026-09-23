@@ -57,6 +57,24 @@ just refit
 `verification/tone-stack/` differ from what the code produces. The plugin
 embeds that file as its factory bank at build time.
 
+The refit is accepted by ear, so a blind listening kit renders every factory
+preset both ways:
+
+```sh
+just listening-kit /path/outside/the/repository
+```
+
+For the single-coil DI and the refit's pluck it writes a pair of 24-bit
+44.1 kHz WAVs per preset: Swanky Amp 1.4.0 from the C++ reference renderer
+with the released bank, and the version 2 shipping path with Auto
+oversampling and the refitted bank, both from a settled amplifier and aligned
+for the oversampler's latency. Version 2 is trimmed to the released RMS so
+loudness does not identify it, and a pair shares one headroom trim if either
+would peak above -1.1 dBFS. Each pair's files are named `X` and `Y` in a
+seeded random order; `KEY.txt` says which is which and lists the trims, which
+are the remaining output level differences, and `pairs.md` adds the controls
+the refit moved. The kit is review material and is never committed.
+
 The three treble sections are first-order circuits, but 1.4.0 discretised
 them as biquads with the second-order terms set to zero. That multiplies
 numerator and denominator by `1 + z⁻¹`, leaving a pole on the unit circle at

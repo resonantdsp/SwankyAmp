@@ -7,6 +7,7 @@ use swanky_amp::dsp::amp::{
     AmpControls, AmpPath, ClipKnee, CorrectedPath, LevelTables, SeamOutput, ToneMapping,
 };
 use swanky_amp::dsp::diagnostics::reset_equilibrium;
+use swanky_amp::dsp::refit;
 use swanky_amp::engine::doublings_for;
 use swanky_amp::presets;
 
@@ -143,6 +144,31 @@ fn write_wav(path: &Path, sample_rate: u32, samples: &[f32]) -> Result<(), Strin
     Ok(())
 }
 
+fn write_pcm24_wav(path: &Path, sample_rate: u32, samples: &[f32]) -> Result<(), String> {
+    let size = u32::try_from(samples.len() * 3).map_err(|_| "output WAV is too large")?;
+    let mut bytes = Vec::with_capacity(44 + samples.len() * 3);
+    bytes.extend_from_slice(b"RIFF");
+    bytes.extend_from_slice(&(36 + size + (size & 1)).to_le_bytes());
+    bytes.extend_from_slice(b"WAVEfmt ");
+    bytes.extend_from_slice(&16_u32.to_le_bytes());
+    bytes.extend_from_slice(&1_u16.to_le_bytes());
+    bytes.extend_from_slice(&1_u16.to_le_bytes());
+    bytes.extend_from_slice(&sample_rate.to_le_bytes());
+    bytes.extend_from_slice(&(sample_rate * 3).to_le_bytes());
+    bytes.extend_from_slice(&3_u16.to_le_bytes());
+    bytes.extend_from_slice(&24_u16.to_le_bytes());
+    bytes.extend_from_slice(b"data");
+    bytes.extend_from_slice(&size.to_le_bytes());
+    for sample in samples {
+        let value = (f64::from(*sample) * 8_388_608.).round() as i32;
+        bytes.extend_from_slice(&value.clamp(-8_388_608, 8_388_607).to_le_bytes()[..3]);
+    }
+    if size & 1 == 1 {
+        bytes.push(0);
+    }
+    fs::write(path, bytes).map_err(|error| format!("{}: {error}", path.display()))
+}
+
 fn io_error(error: io::Error) -> String {
     error.to_string()
 }
@@ -188,6 +214,12 @@ fn write_seams(
 }
 
 fn run() -> Result<(), String> {
+    // The refit's pluck as a 24-bit file, so the C++ reference renderer and
+    // listening comparisons can play the same input the refit measured.
+    if let Some(path) = optional_option("--write-pluck") {
+        let path = PathBuf::from(path);
+        return write_pcm24_wav(&path, refit::SAMPLE_RATE, &refit::pluck(refit::SAMPLE_RATE));
+    }
     let input = PathBuf::from(option("--input")?);
     let presets = PathBuf::from(option("--presets")?);
     let preset_name = option("--preset")?;
@@ -246,6 +278,16 @@ fn run() -> Result<(), String> {
     }
     let mut seam_output = SeamOutput::with_capacity(rendered.len());
     let model = optional_option("--model").unwrap_or_else(|| "legacy".into());
+    let oversampling = || match optional_option("--oversampling")
+        .as_deref()
+        .unwrap_or("auto")
+    {
+        "auto" => Ok(0),
+        "1x" => Ok(1),
+        "2x" => Ok(2),
+        "4x" => Ok(3),
+        value => Err(format!("unknown oversampling choice: {value}")),
+    };
     let (factor, latency) = if model == "legacy" {
         let mut path = AmpPath::new_legacy(sample_rate as f32, controls);
         for block in rendered.chunks_mut(BLOCK_SIZE) {
@@ -256,18 +298,19 @@ fn run() -> Result<(), String> {
             }
         }
         (1, 0)
+    } else if model == "shipping" {
+        let doublings = doublings_for(oversampling()?, f64::from(sample_rate));
+        let mut path = CorrectedPath::shipping(sample_rate as f32, BLOCK_SIZE, controls, doublings);
+        for block in rendered.chunks_mut(BLOCK_SIZE) {
+            if seams.is_some() {
+                path.process_with_seams(block, &mut seam_output);
+            } else {
+                path.process(block);
+            }
+        }
+        (path.factor(), path.latency())
     } else if model == "corrected" {
-        let choice = match optional_option("--oversampling")
-            .as_deref()
-            .unwrap_or("auto")
-        {
-            "auto" => 0,
-            "1x" => 1,
-            "2x" => 2,
-            "4x" => 3,
-            value => return Err(format!("unknown oversampling choice: {value}")),
-        };
-        let doublings = doublings_for(choice, f64::from(sample_rate));
+        let doublings = doublings_for(oversampling()?, f64::from(sample_rate));
         let tone_mapping = match optional_option("--tone-mapping")
             .as_deref()
             .unwrap_or("standard")
