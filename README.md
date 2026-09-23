@@ -41,10 +41,14 @@ just run
 ```
 
 The editor uses one iced widget tree for the live controls and the artwork
-layout contract. Its six sections preserve the Free signal-flow groups, while
-the bundled CC BY 4.0 material layers provide the graphite, brushed metal,
-shadows, and response lighting. Export the exact resolved geometry or capture
-the editor at 1x and 2x with:
+layout contract. As in 1.4, the six Free signal-flow groups (Levels, Cabinet,
+Preamp, Staging, Power Amp and Tone) are separate rounded boxes with graphite
+between them, each outlined by its own V groove. Pro's material language
+carries over with 1.4's rose highlight as Free's accent on the lit rings,
+the selected outlines and the output meter. The bundled CC BY 4.0 material
+layers provide the graphite, brushed metal, shadows, and response lighting.
+Export the exact resolved geometry (layout manifest schema 2, which gives each
+section its outline radius) or capture the editor at 1x and 2x with:
 
 ```sh
 just export-layout /tmp/swanky-layout
@@ -217,7 +221,7 @@ The plugin accepts only a strict stable `major.minor.patch` version and
 compares it numerically, component by component, with the running version.
 The header carries a small outlined information action to the left of the
 preset bar. When the document names a strictly newer version, that action
-turns into an orange download arrow, and an explicit press on it opens the
+turns into a highlighted download arrow, and an explicit press on it opens the
 fixed tagged catalogue URL
 `https://resonantdsp.com/products/swanky-amp/?utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=release-notice`
 in the default browser; the downloaded document cannot choose a link. At rest

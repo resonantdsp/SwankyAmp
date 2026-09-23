@@ -679,7 +679,7 @@ pub fn unpack(package_path: &Path, destination: &Path) -> Result<PackageHeader, 
     let receipt = Receipt {
         schema: 1,
         manifest: ReceiptManifest {
-            schema: 1,
+            schema: layout::SCHEMA,
             view: header.view.clone(),
             content_sha256: header.layout_content_sha256.clone(),
             physical_sha256: header.physical_sha256.clone(),
@@ -803,8 +803,14 @@ fn build_package(directory: &Path) -> Result<Vec<u8>, String> {
 fn validate_receipt(receipt: &Receipt) -> Result<(), String> {
     let current = layout::manifest();
     layout::validate(&current)?;
-    if receipt.schema != 1 || receipt.manifest.schema != 1 || receipt.manifest.view != "amp" {
-        return Err("receipt must describe the schema-1 amp view".into());
+    if receipt.schema != 1
+        || receipt.manifest.schema != layout::SCHEMA
+        || receipt.manifest.view != "amp"
+    {
+        return Err(format!(
+            "receipt must describe the schema-{} amp view",
+            layout::SCHEMA
+        ));
     }
     let logical = receipt.manifest.logical_size;
     if !logical.into_iter().all(f32::is_finite)

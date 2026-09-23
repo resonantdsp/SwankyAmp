@@ -14,14 +14,16 @@ use truce_iced::iced::widget::{
 use truce_iced::iced::{Alignment, Border, Color, Task};
 use truce_iced::{IcedPlugin, Message, ParamCache, ParamMessage, PluginContext};
 
-const INK: Color = Color::from_rgb(0.86, 0.88, 0.89);
+const INK: Color = style::INK;
 const DIM: Color = Color::from_rgb(0.49, 0.53, 0.56);
 const PANEL: Color = Color::from_rgb(0.014, 0.020, 0.026);
 const HEADER: Color = Color::from_rgb(0.007, 0.010, 0.013);
+/// Without a bake the groove leaves no mark, so each section rules its
+/// outline in the groove floor's colour to keep the grouping legible.
 const GROOVE: Color = Color::from_rgb(0.002, 0.004, 0.006);
-const BLUE: Color = Color::from_rgb(0.06, 0.54, 0.96);
-/// The colour a lit header action takes; one name so the accent can change.
-const ACCENT: Color = style::ORANGE;
+const ACCENT: Color = style::ACCENT;
+/// Every header action shares one height and one centre line.
+const HEADER_CONTROL: [f32; 2] = [17.0, 30.0];
 const CONTROL_WIDTH: f32 = 104.0;
 const KNOB_ROW_HEIGHT: f32 = 84.0;
 
@@ -68,10 +70,7 @@ impl FreeUi {
             layers.push(surface(panel, color));
         }
         for section in layout::SECTIONS {
-            layers.push(surface(section, (!baked).then_some(PANEL)));
-        }
-        for groove in layout::GROOVES {
-            layers.push(surface(groove, (!baked).then_some(GROOVE)));
+            layers.push(surface(section, None));
         }
         if baked && let Some(backdrop) = crate::artwork::backdrop::<R>(params) {
             layers.push(backdrop);
@@ -166,7 +165,11 @@ fn surface<'a, R: FreeRenderer + 'a>(
     spec: SurfaceSpec,
     color: Option<Color>,
 ) -> Element<'a, Msg, Theme, R> {
-    let component = Component::new(spec.id, spec.kind, spec.appearance);
+    let mut component = Component::new(spec.id, spec.kind, spec.appearance);
+    component.radius = spec.radius;
+    let outline = (!R::LOAD_ARTWORK || !crate::artwork::loaded())
+        .then_some(spec.radius)
+        .flatten();
     place(
         spec.bounds,
         layout::mark(
@@ -176,6 +179,11 @@ fn surface<'a, R: FreeRenderer + 'a>(
                 .height(Length::Fill)
                 .style(move |_| truce_iced::iced::widget::container::Style {
                     background: color.map(Into::into),
+                    border: outline.map_or_else(Border::default, |radius| Border {
+                        color: GROOVE,
+                        width: 2.0,
+                        radius: radius.into(),
+                    }),
                     ..Default::default()
                 }),
         ),
@@ -208,48 +216,64 @@ fn place<'a, R: iced_core::Renderer + 'a>(
 }
 
 fn header<'a, R: FreeRenderer + 'a>(notice: Option<&Notice>) -> Vec<Element<'a, Msg, Theme, R>> {
+    let [top, height] = HEADER_CONTROL;
     vec![
         place(
             [22.0, 7.0, 250.0, 50.0],
             column![
                 text("SWANKY AMP").size(24).font(style::BOLD).color(INK),
-                text("FREE 2.0")
-                    .size(10)
-                    .font(style::BOLD)
-                    .color(style::ORANGE),
+                text("FREE 2.0").size(10).font(style::BOLD).color(ACCENT),
             ]
             .spacing(1),
         ),
         place(
-            [812.0, 17.0, 32.0, 28.0],
+            [716.0, top, height, height],
             notice_control(notice_action(notice)),
         ),
-        place([851.0, 17.0, 32.0, 28.0], header_control("‹")),
-        place([890.0, 17.0, 48.0, 28.0], header_control("INIT")),
-        place([945.0, 17.0, 32.0, 28.0], header_control("›")),
+        place([756.0, top, 150.0, height], preset_bar()),
         place(
-            [990.0, 4.0, 72.0, 52.0],
-            column![
-                text("OVERSAMPLING").size(8).color(DIM),
-                container(text("AUTO").size(11).color(DIM))
-                    .width(Length::Fill)
-                    .height(28)
-                    .center(Length::Fill)
-                    .style(outline),
-            ]
-            .spacing(2)
-            .align_x(Alignment::Center),
+            [918.0, top, 80.0, height],
+            container(text("OVERSAMPLING").size(10).color(DIM))
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .align_x(Alignment::End)
+                .center_y(Length::Fill),
+        ),
+        place(
+            [1006.0, top, 60.0, height],
+            container(text("AUTO").size(12).font(style::BOLD).color(INK))
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .center(Length::Fill)
+                .style(|_| style::outlined(true)),
         ),
     ]
 }
 
-fn header_control<'a, R: FreeRenderer + 'a>(label: &'static str) -> Element<'a, Msg, Theme, R> {
-    container(text(label).size(11).color(INK))
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .center(Length::Fill)
-        .style(outline)
-        .into()
+/// The factory preset stepper as one outlined field; the chevrons sit inside
+/// it so the preset name reads as the thing they step through.
+fn preset_bar<'a, R: FreeRenderer + 'a>() -> Element<'a, Msg, Theme, R> {
+    let chevron = |glyph| {
+        container(text(glyph).size(20).color(DIM))
+            .width(28)
+            .height(Length::Fill)
+            .center(Length::Fill)
+    };
+    container(
+        row![
+            chevron("‹"),
+            container(text("INIT").size(12).font(style::BOLD).color(INK))
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .center(Length::Fill),
+            chevron("›"),
+        ]
+        .height(Length::Fill),
+    )
+    .width(Length::Fill)
+    .height(Length::Fill)
+    .style(|_| style::outlined(false))
+    .into()
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -274,13 +298,7 @@ fn notice_control<'a, R: FreeRenderer + 'a>(action: NoticeAction) -> Element<'a,
     })
     .width(Length::Fill)
     .height(Length::Fill)
-    .style(move |theme| {
-        let mut style = outline(theme);
-        if download {
-            style.border.color = ACCENT;
-        }
-        style
-    });
+    .style(move |_| style::outlined(download));
     if download {
         mouse_area(body)
             .on_press(Message::Plugin(Action::OpenReleaseNotice))
@@ -288,17 +306,6 @@ fn notice_control<'a, R: FreeRenderer + 'a>(action: NoticeAction) -> Element<'a,
             .into()
     } else {
         body.into()
-    }
-}
-
-fn outline(_: &Theme) -> truce_iced::iced::widget::container::Style {
-    truce_iced::iced::widget::container::Style {
-        border: Border {
-            color: DIM.scale_alpha(0.55),
-            width: 1.0,
-            radius: 4.0.into(),
-        },
-        ..Default::default()
     }
 }
 
@@ -378,7 +385,25 @@ fn cabinet_toggle<'a, R: FreeRenderer + 'a>(
                 ParamMessage::EndEdit(id),
             ]))
         })
-        .size(18.0);
+        .size(18.0)
+        .style(|_, status| {
+            // A toggler that has not seen an event yet reports itself
+            // disabled; only the switch position decides the colour.
+            let (toggler::Status::Active { is_toggled: on }
+            | toggler::Status::Hovered { is_toggled: on }
+            | toggler::Status::Disabled { is_toggled: on }) = status;
+            toggler::Style {
+                background: if on { ACCENT } else { DIM.scale_alpha(0.35) }.into(),
+                background_border_width: 0.0,
+                background_border_color: Color::TRANSPARENT,
+                foreground: INK.into(),
+                foreground_border_width: 0.0,
+                foreground_border_color: Color::TRANSPARENT,
+                text_color: None,
+                border_radius: None,
+                padding_ratio: 0.1,
+            }
+        });
     let mut component = Component::new(format!("parameter.{id}.toggle"), "toggle", "native");
     component.parameter = Some(id);
     place(
@@ -393,42 +418,44 @@ fn cabinet_toggle<'a, R: FreeRenderer + 'a>(
 }
 
 fn levels_meters<'a, R: FreeRenderer + 'a>() -> Vec<Element<'a, Msg, Theme, R>> {
-    let mut layers = vec![
-        place([26.0, 92.0, 62.0, 14.0], text("INPUT").size(10).color(DIM)),
-        place(
-            [236.0, 92.0, 70.0, 14.0],
-            text("OUTPUT").size(10).color(DIM),
-        ),
-        place([49.0, 207.0, 34.0, 13.0], text("L    R").size(9).color(DIM)),
-        place(
-            [259.0, 207.0, 34.0, 13.0],
-            text("L    R").size(9).color(DIM),
-        ),
-        place([31.0, 142.0, 10.0, 12.0], text("H").size(9).color(DIM)),
-        place([31.0, 176.0, 10.0, 12.0], text("S").size(9).color(DIM)),
-        place([298.0, 130.0, 22.0, 12.0], text("-5").size(8).color(DIM)),
-        place([298.0, 157.0, 22.0, 12.0], text("-15").size(8).color(DIM)),
-        place([298.0, 184.0, 22.0, 12.0], text("-25").size(8).color(DIM)),
-    ];
+    let mut layers = Vec::new();
     for meter in layout::METERS {
         let color = if meter.appearance.starts_with("output") {
-            style::ORANGE
+            style::METER_OUTPUT
         } else {
-            BLUE
+            style::METER_INPUT
         };
         let component = Component::new(meter.id, meter.kind, meter.appearance);
+        let [x, y, width, height] = meter.bounds;
         layers.push(place(
             meter.bounds,
-            layout::mark(component, meter_column(color, meter.bounds[3])),
+            layout::mark(component, meter_column(color, height)),
+        ));
+        // The caption shares the knob readout's line, as in Pro.
+        let caption = if meter.appearance.ends_with("left") {
+            "L"
+        } else {
+            "R"
+        };
+        layers.push(place(
+            [x - 4.0, y + height + 4.0, width + 8.0, 20.0],
+            text(caption)
+                .size(11)
+                .font(style::BOLD)
+                .line_height(LineHeight::Absolute(20.0.into()))
+                .width(Length::Fill)
+                .align_x(iced_core::text::Alignment::Center)
+                .color(DIM),
         ));
     }
     layers
 }
 
 fn meter_column<'a, R: FreeRenderer + 'a>(color: Color, height: f32) -> Element<'a, Msg, Theme, R> {
-    let gap = 3.0;
-    let bar_height = (height - gap * 9.0) / 10.0;
-    let bars: Vec<Element<'a, Msg, Theme, R>> = (0..10)
+    let pitch = height / style::METER_BARS as f32;
+    let gap = pitch * style::METER_GAP;
+    let bar_height = pitch - gap;
+    let bars: Vec<Element<'a, Msg, Theme, R>> = (0..style::METER_BARS)
         .map(|_| {
             let alpha = if R::LOAD_ARTWORK && crate::artwork::loaded() {
                 0.0
@@ -450,7 +477,10 @@ fn meter_column<'a, R: FreeRenderer + 'a>(color: Color, height: f32) -> Element<
                 .into()
         })
         .collect();
-    Column::with_children(bars).spacing(gap).into()
+    Column::with_children(bars)
+        .spacing(gap)
+        .padding([gap / 2.0, 0.0])
+        .into()
 }
 
 #[cfg(test)]

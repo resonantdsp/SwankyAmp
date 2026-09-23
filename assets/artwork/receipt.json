@@ -1,16 +1,15 @@
 {
   "schema": 1,
   "manifest": {
-    "schema": 1,
+    "schema": 2,
     "view": "amp",
-    "content_sha256": "3309523163782fd1a0e4819c87c1004232f43cc437ea7bd800c0752aed894c79",
-    "physical_sha256": "fdb9458b619fe747291693ec34df62728b34aafd2459a2aee40e806398c9b798",
+    "content_sha256": "55c366466abedce13e92b7fd673296f964a72cac1a5cefd9aec77ccdacf4de6d",
+    "physical_sha256": "02cde6b0b7e23ff261246cb87dc085f734b6810e5d1e789296b0f934105e8dbe",
     "logical_size": [
       1080.0,
       640.0
     ],
     "surface_counts": {
-      "groove": 6,
       "knob": 19,
       "meter": 4,
       "panel": 3,
@@ -18,14 +17,14 @@
     }
   },
   "producer": {
-    "revision": "79a28dcd64c404c9b61fb78f6dfc3007f3a9a6ec",
-    "source_sha256": "1e0b1a5c7c90e64c96ee28617e32f4f490431f10bb41aff6a673a585a3bd2b21",
-    "product_revision": "interface-working-tree"
+    "revision": "2142232b6b13ef1cafaed06a8fe5149dc9c831f4",
+    "source_sha256": "35a9366e761c5c9883afd041db7dbd1ec3403590b7a8d4e26159bfd83d378af5",
+    "product_revision": "1fc67f053865c16d75760c71b9a4cb190a942c48+working-tree"
   },
   "render": {
     "blender": "5.2.1 LTS",
     "engine": "CYCLES",
-    "samples": 8,
+    "samples": 128,
     "seed": 2718,
     "max_bounces": 8,
     "base_denoised": true,
@@ -38,8 +37,8 @@
     "ring_steps": 12,
     "meter_sizes": [
       [
-        14.0,
-        6.15
+        20.0,
+        7.799999
       ]
     ],
     "resolution": [
@@ -56,7 +55,7 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "b2d6ffc4ce9e50cf96fd4c2db73c200289bb954c9c0f94a7a8a8bd5ac26140fc"
+      "sha256": "9ce6b9030d743b5e68087d9bb02b9679feb70fa65d6ea9b2818aac6554aad755"
     },
     {
       "role": "shadow",
@@ -66,7 +65,7 @@
       "channels": "RGB",
       "semantics": "display-linear-multiplicative",
       "row_origin": "top-left",
-      "sha256": "d5bfc154d04dcbb43f49cdaddd83b4fd971fb41dfc29664ba51969b07e14aaca"
+      "sha256": "0c407a1b0438007e58aae1c75165e19fe3f9b0962e35537060250429ed3dee6b"
     },
     {
       "role": "ring-response",
@@ -76,12 +75,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "c054e7ed8ec2ffe75d41655ddbcf1bbf548631129c34ff1ff8b43cab2f6fa662",
+      "sha256": "a67627db859ae88d688acf25197248e47b27f4db79935a640a66fa2e5ecf28d7",
       "family": 0,
       "radius": 32.0,
       "step": 1,
       "value": 0.08333333333333333,
-      "peak": 0.12342967550687121
+      "peak": 0.0792783531170627
     },
     {
       "role": "ring-response",
@@ -91,12 +90,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "3c93c99782e3d95e8d807e39236fcedbc4cb429269eab0daa31270436cb66bdb",
+      "sha256": "343bc5b414de51f949a6ecad943f6f4c614d19b193cb13b69c4d095d408b206c",
       "family": 0,
       "radius": 32.0,
       "step": 2,
       "value": 0.16666666666666666,
-      "peak": 0.1244713724814796
+      "peak": 0.07937570296875902
     },
     {
       "role": "ring-response",
@@ -106,12 +105,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "f72a96bb935d8d3a3b6095b6c110662f466a1029dab02d8f232758187c31641f",
+      "sha256": "d910f4b52a2ecac93eaacd1369290cf73000fc488da0517b2d2dbc14d5b7b7a9",
       "family": 0,
       "radius": 32.0,
       "step": 3,
       "value": 0.25,
-      "peak": 0.12474856448245461
+      "peak": 0.07939402941521406
     },
     {
       "role": "ring-response",
@@ -121,12 +120,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "082749f2ecf2e22bcaed5925358397c73d2d42b6ba907ca71df7ebe38e2dd1ef",
+      "sha256": "76fdfadda49e18ee6ed68bf90a696ef17aaff56e0dfc22dd78448883c5e332d9",
       "family": 0,
       "radius": 32.0,
       "step": 4,
       "value": 0.3333333333333333,
-      "peak": 0.12558174282353263
+      "peak": 0.07931210971339947
     },
     {
       "role": "ring-response",
@@ -136,12 +135,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "589cdf75124378a0bb6f268fa21c68e5b18bd9af6f0f4503c409af39f9a8e98a",
+      "sha256": "cb4cf3efbf6cda041255c8e6024b29bbe23eef74aed6ba22160e6ba85273a969",
       "family": 0,
       "radius": 32.0,
       "step": 5,
       "value": 0.4166666666666667,
-      "peak": 0.12599390733306143
+      "peak": 0.0799158029638859
     },
     {
       "role": "ring-response",
@@ -151,12 +150,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "b26d275e87494297bbde0da4f25892c346c0efb91ad91720eed4edb5d590d2e9",
+      "sha256": "2b7db9892f19228faa1a34ab23983ba80ab5a92a218af47eb2c11459efda5e4a",
       "family": 0,
       "radius": 32.0,
       "step": 6,
       "value": 0.5,
-      "peak": 0.1352143266747144
+      "peak": 0.07979075746932639
     },
     {
       "role": "ring-response",
@@ -166,12 +165,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "d0b6f79f48bca87d63880e53a6fc9155c8153e0a1b78c48577d2f7bdf832b5a1",
+      "sha256": "eb9a1fd34eab974ab1148409775beeb36b8b7a2179b37f5646fb02c1d2286854",
       "family": 0,
       "radius": 32.0,
       "step": 7,
       "value": 0.5833333333333334,
-      "peak": 0.1371483849276749
+      "peak": 0.07973196166242814
     },
     {
       "role": "ring-response",
@@ -181,12 +180,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "e501f3142798c4b4889f040cbf242e5b96f4c7564779572f5b5192329976fe78",
+      "sha256": "db3ffea03f9f03d6698aa897f1a6d80d03e321ffa74c8750a89a676044b3cdc3",
       "family": 0,
       "radius": 32.0,
       "step": 8,
       "value": 0.6666666666666666,
-      "peak": 0.14120706516452136
+      "peak": 0.07948326735717447
     },
     {
       "role": "ring-response",
@@ -196,12 +195,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "20ef54a678d4cf1e652ae9a104b55e79433a336f838ba80e61aa7d6c19b463cb",
+      "sha256": "7f2c327f15782112c43ea6a25c18e71e4d5347319a5f43995b28d9a9028a414a",
       "family": 0,
       "radius": 32.0,
       "step": 9,
       "value": 0.75,
-      "peak": 0.1704189201187657
+      "peak": 0.07996935365187427
     },
     {
       "role": "ring-response",
@@ -211,12 +210,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "32c3194bf96104a4eae8901611285688aa05f298dfc4700f1a0cd59e53c87a0a",
+      "sha256": "c14e93d7fcf9a3e5af3ba69da291eb13332e488f4133e2179214875098a95775",
       "family": 0,
       "radius": 32.0,
       "step": 10,
       "value": 0.8333333333333334,
-      "peak": 0.15760063966665883
+      "peak": 0.07963285888640814
     },
     {
       "role": "ring-response",
@@ -226,12 +225,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "50fed7d22dcfef882888689d46c319cd1c1a19cee9d2f2869b2dbd511172fb04",
+      "sha256": "c98c869394c54395d09a74948ed4de7d09a776a83502d868be64f889144b944f",
       "family": 0,
       "radius": 32.0,
       "step": 11,
       "value": 0.9166666666666666,
-      "peak": 0.23442714547677185
+      "peak": 0.07947122175631074
     },
     {
       "role": "ring-response",
@@ -241,12 +240,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "ff63c6d1184ee1021deffb8f624f36623834d3a3a5483188e6fd4bc0ac4dd3e9",
+      "sha256": "33c57658dc023c6a88a0dbb96002830c790cd07a02a5ef2d234e148d0d466235",
       "family": 0,
       "radius": 32.0,
       "step": 12,
       "value": 1.0,
-      "peak": 0.1434381349027388
+      "peak": 0.0795240370118446
     },
     {
       "role": "meter-response",
@@ -256,13 +255,13 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "65823a2f5b99126ecded5903cd8110f29a1d011c122cf8c62b784558f524ec4d",
+      "sha256": "cad9682627d3d241cb091490cf821ee593f256a5a4f0b2f8f77ddde968377160",
       "family": 0,
       "size": [
-        14.0,
-        6.15
+        20.0,
+        7.799999
       ],
-      "peak": 0.6468250155448914
+      "peak": 0.6468480825424194
     }
   ]
 }
