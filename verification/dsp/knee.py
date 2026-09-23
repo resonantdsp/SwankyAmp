@@ -61,6 +61,8 @@ def render(binary: Path, directory: Path, preset: str, gain_db: int, knee: str) 
         "released",
         "--knee",
         knee,
+        "--tables",
+        "released",
         "--input-gain-db",
         str(gain_db),
     ]

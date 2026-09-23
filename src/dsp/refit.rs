@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::amp::{AmpControls, ClipKnee, CorrectedPath, SeamOutput, ToneMapping};
+use super::amp::{AmpControls, ClipKnee, CorrectedPath, LevelTables, SeamOutput, ToneMapping};
 use super::mapping::AmpVoicing;
 use super::tone_stack::ToneStack;
 use crate::engine::doublings_for;
@@ -352,6 +352,7 @@ fn render(controls: AmpControls, tone_mapping: ToneMapping, input: &[f32]) -> Re
         doublings,
         tone_mapping,
         ClipKnee::UnitSlope,
+        LevelTables::CALIBRATED,
     );
     let mut seams = SeamOutput::with_capacity(input.len() << doublings);
     let mut output = input.to_vec();

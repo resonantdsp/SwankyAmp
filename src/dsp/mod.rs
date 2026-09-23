@@ -1,5 +1,7 @@
 pub mod amp;
 pub(crate) mod cabinet;
+pub mod calibration;
+mod calibration_data;
 pub mod diagnostics;
 pub(crate) mod filters;
 pub(crate) mod mapping;

@@ -29,6 +29,28 @@ fn dense(value: f32, centre: f32, scale: f32) -> f32 {
     (shaped - low) / (high - low) * 2. - 1.
 }
 
+/// Inverse of `dense`: the control setting whose shaped value is `shaped`.
+#[inline]
+fn undense(shaped: f32, centre: f32, scale: f32) -> f32 {
+    let low = ((-1. - centre) * scale).sinh();
+    let high = ((1. - centre) * scale).sinh();
+    ((shaped + 1.) * 0.5 * (high - low) + low).asinh() / scale + centre
+}
+
+/// Centre and scale of Drive's and Power Drive's control shaping.
+const DRIVE_SHAPE: (f32, f32) = (0.5, 1.);
+const POWER_DRIVE_SHAPE: (f32, f32) = (-0.2, 1.);
+
+/// The Drive setting whose shaped value, the level tables' axis, is `shaped`.
+pub(crate) fn drive_setting(shaped: f32) -> f32 {
+    undense(shaped, DRIVE_SHAPE.0, DRIVE_SHAPE.1)
+}
+
+/// The Power Drive setting whose shaped value is `shaped`.
+pub(crate) fn power_drive_setting(shaped: f32) -> f32 {
+    undense(shaped, POWER_DRIVE_SHAPE.0, POWER_DRIVE_SHAPE.1)
+}
+
 const PREAMP_DRIVE: Range = Range::Log(0.1, 2e3);
 const PREAMP_OVERHEAD: Range = Range::Log(0.1, 10.);
 const POWER_DRIVE: Range = Range::Log(30., 3e4);
@@ -106,8 +128,12 @@ pub(crate) struct AmpVoicing {
 
 impl AmpVoicing {
     pub(crate) fn from_controls(controls: AmpControls) -> Self {
-        let preamp_drive = dense(controls.preamp_drive, 0.5, 1.);
-        let power_drive = dense(controls.power_drive, -0.2, 1.);
+        let preamp_drive = dense(controls.preamp_drive, DRIVE_SHAPE.0, DRIVE_SHAPE.1);
+        let power_drive = dense(
+            controls.power_drive,
+            POWER_DRIVE_SHAPE.0,
+            POWER_DRIVE_SHAPE.1,
+        );
         let sag = dense(controls.power_sag, 0., 1.);
         let low_cut = dense(map(controls.low_cut, -1., 1., 0., 1.23), 0.5, 1.);
         let minimum_tight = map(preamp_drive, -0.5, 1., -1., 0.);

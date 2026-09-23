@@ -12,11 +12,10 @@ pub(crate) const MAX_OVERSAMPLING: usize = 2;
 const SETTLE_SECONDS: f32 = 1.;
 const TRIODE_SCALE: f32 = 35.013_34;
 const PREAMP_TARGET: f32 = 32.288_06;
-const TONE_STACK_SCALE: f32 = 1. / 0.530_222;
 const CABINET_SCALE: f32 = 1. / 2.821_151;
 
 #[allow(clippy::excessive_precision)] // Released calibration values are kept verbatim.
-const PREAMP_SWEEP: [f32; 11] = [
+const RELEASED_PREAMP_SWEEP: [f32; 11] = [
     4.487_723e-3,
     3.323_652e-3,
     1.606_984e-3,
@@ -31,7 +30,7 @@ const PREAMP_SWEEP: [f32; 11] = [
 ];
 
 #[allow(clippy::excessive_precision)] // Released calibration values are kept verbatim.
-const POWER_SWEEP: [f32; 11] = [
+const RELEASED_POWER_SWEEP: [f32; 11] = [
     8.572_513e-1,
     4.489_064e-1,
     2.412_848e-1,
@@ -45,7 +44,35 @@ const POWER_SWEEP: [f32; 11] = [
     3.162_063e-2,
 ];
 
-fn interpolate(value: f32, table: &[f32; 11]) -> f32 {
+/// The level compensation: the preamp scale against Drive and the output
+/// scale against Power Drive, each at 11 evenly spaced points of the shaped
+/// control from -1 to 1, and the tone stack's gain compensation.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LevelTables {
+    pub preamp: [f32; TABLE_POINTS],
+    pub tone_stack: f32,
+    pub power: [f32; TABLE_POINTS],
+}
+
+impl LevelTables {
+    /// The 1.4.0 values, which the legacy path keeps.
+    pub const RELEASED: Self = Self {
+        preamp: RELEASED_PREAMP_SWEEP,
+        tone_stack: 1. / 0.530_222,
+        power: RELEASED_POWER_SWEEP,
+    };
+
+    /// The values `calibrate` measured for the shipping path.
+    pub const CALIBRATED: Self = Self {
+        preamp: super::calibration_data::PREAMP_SWEEP,
+        tone_stack: super::calibration_data::TONE_STACK_SCALE,
+        power: super::calibration_data::POWER_SWEEP,
+    };
+}
+
+pub const TABLE_POINTS: usize = 11;
+
+pub(crate) fn interpolate(value: f32, table: &[f32; TABLE_POINTS]) -> f32 {
     let bin = (value + 1.) * 5.;
     let index = if bin >= 10. {
         9
@@ -84,6 +111,7 @@ struct TubePath {
     triodes: [Triode; STAGES],
     tone_stack: ToneStack,
     tetrode: Tetrode,
+    tables: LevelTables,
     post_tone_gain: f32,
 }
 
@@ -94,6 +122,7 @@ impl TubePath {
         plate_filter: PlateFilter,
         tone_mapping: ToneMapping,
         knee: ClipKnee,
+        tables: LevelTables,
     ) -> Self {
         let voicing = AmpVoicing::from_controls(controls);
         let triodes = std::array::from_fn(|stage| {
@@ -105,6 +134,7 @@ impl TubePath {
             triodes,
             tone_stack: ToneStack::new(sample_rate, tone_mapping),
             tetrode: Tetrode::new(sample_rate),
+            tables,
             post_tone_gain: 1.,
         };
         path.apply_voicing(voicing);
@@ -134,8 +164,9 @@ impl TubePath {
         }
         self.tone_stack.configure(voicing.tone);
         self.tetrode.configure(voicing.tetrode);
-        self.post_tone_gain =
-            TONE_STACK_SCALE * interpolate(voicing.preamp_drive, &PREAMP_SWEEP) * PREAMP_TARGET;
+        self.post_tone_gain = self.tables.tone_stack
+            * interpolate(voicing.preamp_drive, &self.tables.preamp)
+            * PREAMP_TARGET;
         self.voicing = voicing;
     }
 
@@ -189,6 +220,7 @@ pub struct AmpPath {
     tubes: TubePath,
     cabinet: Cabinet,
     voicing: AmpVoicing,
+    power_sweep: [f32; TABLE_POINTS],
     output_gain: f32,
 }
 
@@ -200,6 +232,7 @@ impl AmpPath {
             PlateFilter::Released44k1,
             ToneMapping::Released,
             ClipKnee::Released,
+            LevelTables::RELEASED,
         );
         path.tubes.settle();
         path
@@ -210,6 +243,7 @@ impl AmpPath {
         controls: AmpControls,
         tone_mapping: ToneMapping,
         knee: ClipKnee,
+        tables: LevelTables,
     ) -> Self {
         Self::new(
             sample_rate,
@@ -217,6 +251,7 @@ impl AmpPath {
             PlateFilter::Fixed20k,
             tone_mapping,
             knee,
+            tables,
         )
     }
 
@@ -226,12 +261,21 @@ impl AmpPath {
         plate_filter: PlateFilter,
         tone_mapping: ToneMapping,
         knee: ClipKnee,
+        tables: LevelTables,
     ) -> Self {
         let voicing = AmpVoicing::from_controls(controls);
         let mut path = Self {
-            tubes: TubePath::new(sample_rate, controls, plate_filter, tone_mapping, knee),
+            tubes: TubePath::new(
+                sample_rate,
+                controls,
+                plate_filter,
+                tone_mapping,
+                knee,
+                tables,
+            ),
             cabinet: Cabinet::new(sample_rate),
             voicing,
+            power_sweep: tables.power,
             output_gain: 1.,
         };
         path.apply_voicing(voicing);
@@ -261,7 +305,8 @@ impl AmpPath {
         self.cabinet.set_dynamic(voicing.cabinet_dynamic);
         self.cabinet
             .set_dynamic_level(voicing.cabinet_dynamic_level);
-        self.output_gain = interpolate(voicing.power_drive, &POWER_SWEEP) * voicing.output_gain;
+        self.output_gain =
+            interpolate(voicing.power_drive, &self.power_sweep) * voicing.output_gain;
         self.voicing = voicing;
     }
 
@@ -325,6 +370,7 @@ impl AmpChannel {
             doublings,
             ToneMapping::Standard,
             ClipKnee::UnitSlope,
+            LevelTables::CALIBRATED,
         )
     }
 
@@ -335,10 +381,11 @@ impl AmpChannel {
         doublings: usize,
         tone_mapping: ToneMapping,
         knee: ClipKnee,
+        tables: LevelTables,
     ) -> Self {
         let prepared_doublings = crate::engine::doublings_cap(f64::from(sample_rate));
         let mut channel = Self {
-            host: AmpPath::new_shipping(sample_rate, controls, tone_mapping, knee),
+            host: AmpPath::new_shipping(sample_rate, controls, tone_mapping, knee, tables),
             oversampled: std::array::from_fn(|index| {
                 TubePath::new(
                     sample_rate * (2 << index) as f32,
@@ -346,6 +393,7 @@ impl AmpChannel {
                     PlateFilter::Fixed20k,
                     tone_mapping,
                     knee,
+                    tables,
                 )
             }),
             oversamplers: std::array::from_fn(|index| {
@@ -455,8 +503,9 @@ impl AmpChannel {
 }
 
 /// Offline corrected-model path used by the public measurement commands.
-/// `ToneMapping::Standard` with `ClipKnee::UnitSlope` is the shipping sound;
-/// the released choices isolate the other corrections in measurements.
+/// `ToneMapping::Standard` with `ClipKnee::UnitSlope` and
+/// `LevelTables::CALIBRATED` is the shipping sound; the released choices
+/// isolate the other corrections in measurements.
 pub struct CorrectedPath {
     channel: AmpChannel,
     doublings: usize,
@@ -485,6 +534,7 @@ impl CorrectedPath {
         doublings: usize,
         tone_mapping: ToneMapping,
         knee: ClipKnee,
+        tables: LevelTables,
     ) -> Self {
         assert!(doublings <= crate::engine::doublings_cap(f64::from(sample_rate)));
         Self {
@@ -495,6 +545,7 @@ impl CorrectedPath {
                 doublings,
                 tone_mapping,
                 knee,
+                tables,
             ),
             doublings,
         }
@@ -585,6 +636,7 @@ mod tests {
             0,
             ToneMapping::Released,
             ClipKnee::UnitSlope,
+            LevelTables::RELEASED,
         );
         let unit = seams(|block, seams| unit.process_with_seams(block, seams));
         assert_eq!(released.len(), unit.len());

@@ -15,7 +15,10 @@ fn corrected_init_soak_reports_finite_unmodulated_output() {
     let csv = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("soak-init.csv");
     let output = Command::new(env!("CARGO_BIN_EXE_soak"))
         .args(["run", "--preset", "init", "--path", "corrected"])
-        .args(["--seconds", "6", "--window", "2", "--signal", "noise"])
+        // The baseline is the first third of the run. Three windows of it keep
+        // the estimator's window-to-window scatter on stationary noise (0.04
+        // to 0.07) from deciding the verdict, as one window did.
+        .args(["--seconds", "18", "--window", "2", "--signal", "noise"])
         .arg("--csv")
         .arg(&csv)
         .output()

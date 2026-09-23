@@ -72,6 +72,19 @@ refit-check:
     target/debug/refit-tone --presets verification/reference/released/Resources/presets.xml \
         --report-dir verification/tone-stack --factory presets/factory-2.0.xml --check
 
+# Measure the shipping path's preamp and output level tables against the
+# released path and rewrite them as source.
+calibrate:
+    cargo build --quiet --no-default-features --bin calibrate
+    target/debug/calibrate --clip verification/reference/input/single-coil.wav \
+        --data src/dsp/calibration_data.rs
+
+# Fails unless a fresh measurement reproduces the committed level tables.
+calibrate-check:
+    cargo build --quiet --no-default-features --bin calibrate
+    target/debug/calibrate --clip verification/reference/input/single-coil.wav \
+        --data src/dsp/calibration_data.rs --check
+
 # Regenerate the unit-knee seam residuals per factory preset and input level.
 knee-report output="verification/dsp/knee.json":
     cargo build --quiet --no-default-features --bin render-model
@@ -118,7 +131,7 @@ validate-assets package="assets/artwork.pack" layers="assets/artwork":
 refresh-artwork layers="assets/artwork":
     cargo run --quiet --bin swanky-amp-2 -- refresh-artwork "{{ layers }}"
 
-check: fmt clippy test release-tests reference-check model-check refit-check validate-assets
+check: fmt clippy test release-tests reference-check model-check refit-check calibrate-check validate-assets
 
 build:
     bash scripts/truce.sh build
