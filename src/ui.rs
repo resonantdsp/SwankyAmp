@@ -1,15 +1,18 @@
 use crate::{
     layout::{self, Component, ControlKind, SurfaceSpec},
     params::SwankyAmpParams,
+    release_notice::{self, Notice},
     style,
-    widgets::{FreeRenderer, Knob, Msg, Target},
+    widgets::{FreeRenderer, Knob, Msg, NoticeGlyph, Target},
 };
-use iced_core::{Element, Length, Padding, Theme, text::LineHeight};
+use iced_core::{Element, Length, Padding, Theme, mouse, text::LineHeight};
 use std::sync::Arc;
 use truce::prelude::Params;
-use truce_iced::iced::widget::{Column, Space, column, container, row, stack, text, toggler};
-use truce_iced::iced::{Alignment, Border, Color};
-use truce_iced::{IcedPlugin, Message, ParamCache, ParamMessage};
+use truce_iced::iced::widget::{
+    Column, Space, column, container, mouse_area, row, stack, text, toggler,
+};
+use truce_iced::iced::{Alignment, Border, Color, Task};
+use truce_iced::{IcedPlugin, Message, ParamCache, ParamMessage, PluginContext};
 
 const INK: Color = Color::from_rgb(0.86, 0.88, 0.89);
 const DIM: Color = Color::from_rgb(0.49, 0.53, 0.56);
@@ -17,12 +20,37 @@ const PANEL: Color = Color::from_rgb(0.014, 0.020, 0.026);
 const HEADER: Color = Color::from_rgb(0.007, 0.010, 0.013);
 const GROOVE: Color = Color::from_rgb(0.002, 0.004, 0.006);
 const BLUE: Color = Color::from_rgb(0.06, 0.54, 0.96);
+/// The colour a lit header action takes; one name so the accent can change.
+const ACCENT: Color = style::ORANGE;
 const CONTROL_WIDTH: f32 = 104.0;
 const KNOB_ROW_HEIGHT: f32 = 84.0;
 
-pub struct FreeUi;
+#[derive(Debug, Clone)]
+pub enum Action {
+    OpenReleaseNotice,
+}
+
+pub struct FreeUi {
+    releases: Option<release_notice::Service>,
+    notice: Option<Notice>,
+}
 
 impl FreeUi {
+    /// The editor without a release check, as layout export and other
+    /// offline tools draw it.
+    pub fn resting() -> Self {
+        Self {
+            releases: None,
+            notice: None,
+        }
+    }
+
+    fn latest_notice(&self) -> Option<Notice> {
+        self.releases
+            .as_ref()
+            .map_or_else(|| self.notice.clone(), release_notice::Service::current)
+    }
+
     pub fn view_content<'a, R: FreeRenderer + 'a>(
         &'a self,
         params: &'a ParamCache<SwankyAmpParams>,
@@ -63,7 +91,7 @@ impl FreeUi {
                     .color(INK),
             ));
         }
-        layers.extend(header());
+        layers.extend(header(self.notice.as_ref()));
         layers.extend(levels_meters());
         for control in layout::CONTROLS {
             layers.push(match control.kind {
@@ -89,10 +117,37 @@ impl FreeUi {
 }
 
 impl IcedPlugin<SwankyAmpParams> for FreeUi {
-    type Message = ();
+    type Message = Action;
 
     fn new(_: Arc<SwankyAmpParams>) -> Self {
-        Self
+        Self {
+            releases: Some(release_notice::Service::start()),
+            notice: None,
+        }
+    }
+
+    fn update(
+        &mut self,
+        message: Msg,
+        _: &ParamCache<SwankyAmpParams>,
+        _: &PluginContext<SwankyAmpParams>,
+    ) -> Task<Msg> {
+        match message {
+            Message::Tick => self.notice = self.latest_notice(),
+            Message::Plugin(Action::OpenReleaseNotice) => {
+                if let Some(notice) = &self.notice {
+                    notice.open();
+                }
+            }
+            _ => {}
+        }
+        Task::none()
+    }
+
+    // A notice lands from the worker while the editor may be idle; asking
+    // for a frame lets the next tick pick it up.
+    fn needs_redraw(&self) -> bool {
+        self.releases.is_some() && self.latest_notice() != self.notice
     }
 
     fn title(&self) -> String {
@@ -152,7 +207,7 @@ fn place<'a, R: iced_core::Renderer + 'a>(
     .into()
 }
 
-fn header<'a, R: FreeRenderer + 'a>() -> Vec<Element<'a, Msg, Theme, R>> {
+fn header<'a, R: FreeRenderer + 'a>(notice: Option<&Notice>) -> Vec<Element<'a, Msg, Theme, R>> {
     vec![
         place(
             [22.0, 7.0, 250.0, 50.0],
@@ -164,6 +219,10 @@ fn header<'a, R: FreeRenderer + 'a>() -> Vec<Element<'a, Msg, Theme, R>> {
                     .color(style::ORANGE),
             ]
             .spacing(1),
+        ),
+        place(
+            [812.0, 17.0, 32.0, 28.0],
+            notice_control(notice_action(notice)),
         ),
         place([851.0, 17.0, 32.0, 28.0], header_control("‹")),
         place([890.0, 17.0, 48.0, 28.0], header_control("INIT")),
@@ -191,6 +250,45 @@ fn header_control<'a, R: FreeRenderer + 'a>(label: &'static str) -> Element<'a, 
         .center(Length::Fill)
         .style(outline)
         .into()
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum NoticeAction {
+    Information,
+    Download,
+}
+
+fn notice_action(notice: Option<&Notice>) -> NoticeAction {
+    if notice.is_some() {
+        NoticeAction::Download
+    } else {
+        NoticeAction::Information
+    }
+}
+
+fn notice_control<'a, R: FreeRenderer + 'a>(action: NoticeAction) -> Element<'a, Msg, Theme, R> {
+    let download = action == NoticeAction::Download;
+    let body = container(NoticeGlyph {
+        download,
+        color: if download { ACCENT } else { DIM },
+    })
+    .width(Length::Fill)
+    .height(Length::Fill)
+    .style(move |theme| {
+        let mut style = outline(theme);
+        if download {
+            style.border.color = ACCENT;
+        }
+        style
+    });
+    if download {
+        mouse_area(body)
+            .on_press(Message::Plugin(Action::OpenReleaseNotice))
+            .interaction(mouse::Interaction::Pointer)
+            .into()
+    } else {
+        body.into()
+    }
 }
 
 fn outline(_: &Theme) -> truce_iced::iced::widget::container::Style {
@@ -357,7 +455,8 @@ fn meter_column<'a, R: FreeRenderer + 'a>(color: Color, height: f32) -> Element<
 
 #[cfg(test)]
 mod tests {
-    use super::display_value;
+    use super::{NoticeAction, display_value, notice_action};
+    use crate::release_notice::notice_for;
 
     #[test]
     fn readouts_preserve_the_released_free_scale() {
@@ -366,5 +465,18 @@ mod tests {
         assert_eq!(display_value(0, 1.0), "+35 dB");
         assert_eq!(display_value(7, 0.5), "03");
         assert_eq!(display_value(14, 0.3), "03");
+    }
+
+    #[test]
+    fn the_header_offers_a_download_only_for_a_reported_newer_release() {
+        let action = |version| notice_action(notice_for(version).as_ref());
+        assert_eq!(action(Some("99.0.0")), NoticeAction::Download);
+        assert_eq!(
+            action(Some(env!("CARGO_PKG_VERSION"))),
+            NoticeAction::Information
+        );
+        assert_eq!(action(Some("1.4.0")), NoticeAction::Information);
+        assert_eq!(action(Some("99.0")), NoticeAction::Information);
+        assert_eq!(action(None), NoticeAction::Information);
     }
 }

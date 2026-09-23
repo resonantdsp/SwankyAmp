@@ -441,7 +441,7 @@ impl iced_wgpu::primitive::Renderer for Measure {
 pub fn manifest() -> Manifest {
     let params = Arc::new(SwankyAmpParams::default());
     let cache = truce_iced::ParamCache::new(params);
-    resolve(&crate::ui::FreeUi, &cache, &mut Measure)
+    resolve(&crate::ui::FreeUi::resting(), &cache, &mut Measure)
 }
 
 pub fn resolve<R: FreeRenderer>(
