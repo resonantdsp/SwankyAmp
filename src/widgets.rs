@@ -424,7 +424,7 @@ fn draw_knob<R: iced_core::Renderer + ?Sized>(
                 point,
                 radius * physical.ring_half_width,
                 if amount <= value {
-                    style::ORANGE
+                    style::ACCENT
                 } else {
                     Color::from_rgb(0.12, 0.14, 0.15)
                 },

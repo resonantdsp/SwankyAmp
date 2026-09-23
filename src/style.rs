@@ -8,7 +8,25 @@ pub const BOLD: Font = Font {
 };
 pub const FONT_BYTES: &[u8] = include_bytes!("../assets/fonts/PTSans-Regular.ttf");
 pub const BOLD_BYTES: &[u8] = include_bytes!("../assets/fonts/PTSans-Bold.ttf");
-pub const ORANGE: Color = Color::from_rgb(0.96, 0.45, 0.20);
+/// Swanky Amp 1.4's highlight (`colourHighlight`, HSV 0.98, 0.60, 0.75) stays
+/// Free's accent, so Free keeps its own identity inside Pro's material
+/// language: lit knob rings, the selected outline, the edition tag and the
+/// output meter all take it from here.
+pub const ACCENT: Color = Color::from_rgb(0.75, 0.30, 0.354);
+/// The input meter keeps Pro's blue; the output meter is the accent.
+pub const METER_INPUT: Color = Color::from_rgb(0.06, 0.54, 0.96);
+pub const METER_OUTPUT: Color = ACCENT;
+/// Peak emitted radiance of a lit meter cell's brightest channel.
+const METER_PEAK: f32 = 4.2;
+pub const INK: Color = Color::from_rgb(0.86, 0.88, 0.89);
+pub const MUTED: Color = Color::from_rgb(0.53, 0.59, 0.61);
+/// Corner radius shared by every outlined control.
+pub const CONTROL_RADIUS: f32 = 6.0;
+/// Corner radius of a group's groove outline.
+pub const SECTION_RADIUS: f32 = 10.0;
+/// How much brighter than the accent a lit ring reads, before the display
+/// compression in the compositor.
+const RING_GLOW: f32 = 1.25;
 
 pub fn load_fonts() {
     static ONCE: std::sync::Once = std::sync::Once::new();
@@ -92,7 +110,7 @@ impl Default for PhysicalStyle {
             ring_half_width: 0.046,
             ring_start: 225.0,
             ring_sweep: 270.0,
-            ring_radiance: [2.7, 0.42, 0.045],
+            ring_radiance: ring_radiance(ACCENT),
             reflection_extent: 4.0,
             reflection_radial_knots: vec![0.86, 1.28],
             reflection_radial_rows: vec![0.125, 0.875],
@@ -110,7 +128,49 @@ impl Default for PhysicalStyle {
             meter_bars: METER_BARS,
             meter_gap: METER_GAP,
             meter_reflection_extent: 20.0,
-            meter_radiance: [[0.084, 1.512, 4.2], [4.2, 0.546, 0.0924]],
+            meter_radiance: [[0.084, 1.512, METER_PEAK], meter_radiance(METER_OUTPUT)],
         }
+    }
+}
+
+/// The emitted radiance whose compressed display value is the accent, lifted
+/// by [`RING_GLOW`]. Deriving it keeps the baked spill light and the runtime
+/// ring on the one accent definition.
+fn ring_radiance(color: Color) -> [f32; 3] {
+    linear(color).map(|channel| {
+        let display = (channel * RING_GLOW).min(0.95);
+        display / (1.0 - display)
+    })
+}
+
+/// A lit cell's emitter in the colour's hue, as bright as the input meter.
+fn meter_radiance(color: Color) -> [f32; 3] {
+    let rgb = linear(color);
+    let peak = rgb.into_iter().fold(f32::MIN, f32::max);
+    rgb.map(|channel| channel / peak * METER_PEAK)
+}
+
+fn linear(color: Color) -> [f32; 3] {
+    [color.r, color.g, color.b].map(|channel| {
+        if channel <= 0.04045 {
+            channel / 12.92
+        } else {
+            ((channel + 0.055) / 1.055).powf(2.4)
+        }
+    })
+}
+
+/// One outline treatment for every header action, as Pro's buttons: the
+/// outline takes the accent when the action is lit and the text colour stays
+/// constant.
+pub fn outlined(lit: bool) -> iced_widget::container::Style {
+    iced_widget::container::Style {
+        text_color: Some(INK),
+        border: iced_core::Border {
+            color: if lit { ACCENT } else { MUTED.scale_alpha(0.5) },
+            width: 1.0,
+            radius: CONTROL_RADIUS.into(),
+        },
+        ..Default::default()
     }
 }

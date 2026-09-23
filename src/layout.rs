@@ -60,26 +60,26 @@ impl ControlSpec {
 
 /// One inventory is used by the UI, host bindings, and exported artwork geometry.
 pub const CONTROLS: [ControlSpec; 20] = [
-    ControlSpec::knob(0, "INPUT", "LEVELS", [140.0, 154.0], true),
-    ControlSpec::knob(1, "OUTPUT", "LEVELS", [350.0, 154.0], true),
-    ControlSpec::knob(11, "BRIGHT", "CABINET", [538.0, 154.0], false),
-    ControlSpec::knob(12, "DISTANCE", "CABINET", [755.0, 154.0], false),
-    ControlSpec::knob(13, "DYNAMIC", "CABINET", [972.0, 154.0], false),
-    ControlSpec::toggle(10, "ON", "CABINET", [1024.0, 83.0]),
-    ControlSpec::knob(14, "DRIVE", "PREAMP", [80.0, 334.0], true),
-    ControlSpec::knob(15, "TIGHT", "PREAMP", [220.0, 334.0], false),
-    ControlSpec::knob(16, "GRIT", "PREAMP", [360.0, 334.0], false),
-    ControlSpec::knob(7, "STAGES", "STAGING", [520.0, 334.0], false),
-    ControlSpec::knob(8, "OVERHEAD", "STAGING", [680.0, 334.0], false),
-    ControlSpec::knob(9, "LOW CUT", "STAGING", [840.0, 334.0], false),
-    ControlSpec::knob(6, "TONE STACK", "STAGING", [1000.0, 334.0], false),
-    ControlSpec::knob(17, "DRIVE", "POWER AMP", [80.0, 514.0], true),
-    ControlSpec::knob(18, "TIGHT", "POWER AMP", [220.0, 514.0], false),
-    ControlSpec::knob(19, "SAG", "POWER AMP", [360.0, 514.0], false),
-    ControlSpec::knob(2, "LOW", "TONE", [520.0, 514.0], false),
-    ControlSpec::knob(3, "MID", "TONE", [680.0, 514.0], false),
-    ControlSpec::knob(4, "HIGH", "TONE", [840.0, 514.0], false),
-    ControlSpec::knob(5, "PRESENCE", "TONE", [1000.0, 514.0], false),
+    ControlSpec::knob(0, "INPUT", "LEVELS", [182.0, 148.0], true),
+    ControlSpec::knob(1, "OUTPUT", "LEVELS", [391.0, 148.0], true),
+    ControlSpec::knob(11, "BRIGHT", "CABINET", [611.0, 148.0], false),
+    ControlSpec::knob(12, "DISTANCE", "CABINET", [787.0, 148.0], false),
+    ControlSpec::knob(13, "DYNAMIC", "CABINET", [963.0, 148.0], false),
+    ControlSpec::toggle(10, "ON", "CABINET", [1022.0, 97.0]),
+    ControlSpec::knob(14, "DRIVE", "PREAMP", [99.0, 324.0], true),
+    ControlSpec::knob(15, "TIGHT", "PREAMP", [239.0, 324.0], false),
+    ControlSpec::knob(16, "GRIT", "PREAMP", [379.0, 324.0], false),
+    ControlSpec::knob(7, "STAGES", "STAGING", [561.0, 324.0], false),
+    ControlSpec::knob(8, "OVERHEAD", "STAGING", [701.0, 324.0], false),
+    ControlSpec::knob(9, "LOW CUT", "STAGING", [841.0, 324.0], false),
+    ControlSpec::knob(6, "TONE STACK", "STAGING", [981.0, 324.0], false),
+    ControlSpec::knob(17, "DRIVE", "POWER AMP", [99.0, 500.0], true),
+    ControlSpec::knob(18, "TIGHT", "POWER AMP", [239.0, 500.0], false),
+    ControlSpec::knob(19, "SAG", "POWER AMP", [379.0, 500.0], false),
+    ControlSpec::knob(2, "LOW", "TONE", [561.0, 500.0], false),
+    ControlSpec::knob(3, "MID", "TONE", [701.0, 500.0], false),
+    ControlSpec::knob(4, "HIGH", "TONE", [841.0, 500.0], false),
+    ControlSpec::knob(5, "PRESENCE", "TONE", [981.0, 500.0], false),
 ];
 
 #[derive(Debug, Clone, Copy)]
@@ -88,132 +88,98 @@ pub struct SurfaceSpec {
     pub kind: &'static str,
     pub appearance: &'static str,
     pub bounds: [f32; 4],
+    /// Corner radius of the groove that outlines a section; other surfaces
+    /// carry none.
+    pub radius: Option<f32>,
+}
+
+impl SurfaceSpec {
+    const fn plain(
+        id: &'static str,
+        kind: &'static str,
+        appearance: &'static str,
+        bounds: [f32; 4],
+    ) -> Self {
+        Self {
+            id,
+            kind,
+            appearance,
+            bounds,
+            radius: None,
+        }
+    }
+
+    const fn section(id: &'static str, appearance: &'static str, bounds: [f32; 4]) -> Self {
+        Self {
+            id,
+            kind: "section",
+            appearance,
+            bounds,
+            radius: Some(style::SECTION_RADIUS),
+        }
+    }
 }
 
 pub const PANELS: [SurfaceSpec; 3] = [
-    SurfaceSpec {
-        id: "panel.header",
-        kind: "panel",
-        appearance: "graphite-header",
-        bounds: [0.0, 0.0, 1080.0, 64.0],
-    },
-    SurfaceSpec {
-        id: "panel.main",
-        kind: "panel",
-        appearance: "graphite",
-        bounds: [0.0, 64.0, 1080.0, 544.0],
-    },
-    SurfaceSpec {
-        id: "panel.footer",
-        kind: "panel",
-        appearance: "graphite-header",
-        bounds: [0.0, 608.0, 1080.0, 32.0],
-    },
+    SurfaceSpec::plain(
+        "panel.header",
+        "panel",
+        "graphite-header",
+        [0.0, 0.0, 1080.0, 64.0],
+    ),
+    SurfaceSpec::plain(
+        "panel.main",
+        "panel",
+        "graphite",
+        [0.0, 64.0, 1080.0, 544.0],
+    ),
+    SurfaceSpec::plain(
+        "panel.footer",
+        "panel",
+        "graphite-header",
+        [0.0, 608.0, 1080.0, 32.0],
+    ),
 ];
 
+/// The six Free groups as separate rounded boxes, after 1.4.0: a gap of
+/// graphite between them, each traced by its own groove, so no group has to
+/// share an edge with another.
 pub const SECTIONS: [SurfaceSpec; 6] = [
-    SurfaceSpec {
-        id: "section.levels",
-        kind: "section",
-        appearance: "levels",
-        bounds: [0.0, 64.0, 430.0, 180.0],
-    },
-    SurfaceSpec {
-        id: "section.cabinet",
-        kind: "section",
-        appearance: "cabinet",
-        bounds: [430.0, 64.0, 650.0, 180.0],
-    },
-    SurfaceSpec {
-        id: "section.preamp",
-        kind: "section",
-        appearance: "preamp",
-        bounds: [0.0, 244.0, 440.0, 180.0],
-    },
-    SurfaceSpec {
-        id: "section.staging",
-        kind: "section",
-        appearance: "staging",
-        bounds: [440.0, 244.0, 640.0, 180.0],
-    },
-    SurfaceSpec {
-        id: "section.power",
-        kind: "section",
-        appearance: "power-amp",
-        bounds: [0.0, 424.0, 440.0, 184.0],
-    },
-    SurfaceSpec {
-        id: "section.tone",
-        kind: "section",
-        appearance: "tone",
-        bounds: [440.0, 424.0, 640.0, 184.0],
-    },
+    SurfaceSpec::section("section.levels", "levels", [14.0, 78.0, 482.0, 164.0]),
+    SurfaceSpec::section("section.cabinet", "cabinet", [508.0, 78.0, 558.0, 164.0]),
+    SurfaceSpec::section("section.preamp", "preamp", [14.0, 254.0, 450.0, 164.0]),
+    SurfaceSpec::section("section.staging", "staging", [476.0, 254.0, 590.0, 164.0]),
+    SurfaceSpec::section("section.power", "power-amp", [14.0, 430.0, 450.0, 164.0]),
+    SurfaceSpec::section("section.tone", "tone", [476.0, 430.0, 590.0, 164.0]),
 ];
 
-pub const GROOVES: [SurfaceSpec; 6] = [
-    SurfaceSpec {
-        id: "groove.header",
-        kind: "groove",
-        appearance: "v-groove",
-        bounds: [0.0, 63.0, 1080.0, 2.0],
-    },
-    SurfaceSpec {
-        id: "groove.row1",
-        kind: "groove",
-        appearance: "v-groove",
-        bounds: [429.0, 64.0, 2.0, 180.0],
-    },
-    SurfaceSpec {
-        id: "groove.horizontal1",
-        kind: "groove",
-        appearance: "v-groove",
-        bounds: [0.0, 243.0, 1080.0, 2.0],
-    },
-    SurfaceSpec {
-        id: "groove.row2",
-        kind: "groove",
-        appearance: "v-groove",
-        bounds: [439.0, 244.0, 2.0, 180.0],
-    },
-    SurfaceSpec {
-        id: "groove.horizontal2",
-        kind: "groove",
-        appearance: "v-groove",
-        bounds: [0.0, 423.0, 1080.0, 2.0],
-    },
-    SurfaceSpec {
-        id: "groove.row3",
-        kind: "groove",
-        appearance: "v-groove",
-        bounds: [439.0, 424.0, 2.0, 184.0],
-    },
-];
-
+/// Pro's meter columns: 20 px wide, 4 px apart, rising from the top of the
+/// lit ring to the knob's label row so the L/R captions share the readout line.
 pub const METERS: [SurfaceSpec; 4] = [
-    SurfaceSpec {
-        id: "meter.input.left",
-        kind: "meter",
-        appearance: "input-left",
-        bounds: [48.0, 122.0, 14.0, 82.0],
-    },
-    SurfaceSpec {
-        id: "meter.input.right",
-        kind: "meter",
-        appearance: "input-right",
-        bounds: [68.0, 122.0, 14.0, 82.0],
-    },
-    SurfaceSpec {
-        id: "meter.output.left",
-        kind: "meter",
-        appearance: "output-left",
-        bounds: [258.0, 122.0, 14.0, 82.0],
-    },
-    SurfaceSpec {
-        id: "meter.output.right",
-        kind: "meter",
-        appearance: "output-right",
-        bounds: [278.0, 122.0, 14.0, 82.0],
-    },
+    SurfaceSpec::plain(
+        "meter.input.left",
+        "meter",
+        "input-left",
+        [78.0, 108.0, 20.0, 104.0],
+    ),
+    SurfaceSpec::plain(
+        "meter.input.right",
+        "meter",
+        "input-right",
+        [102.0, 108.0, 20.0, 104.0],
+    ),
+    SurfaceSpec::plain(
+        "meter.output.left",
+        "meter",
+        "output-left",
+        [287.0, 108.0, 20.0, 104.0],
+    ),
+    SurfaceSpec::plain(
+        "meter.output.right",
+        "meter",
+        "output-right",
+        [311.0, 108.0, 20.0, 104.0],
+    ),
 ];
 
 #[derive(Debug, Clone)]
@@ -223,6 +189,7 @@ pub struct Component {
     pub appearance: String,
     pub parameter: Option<u32>,
     pub bounds: [f32; 4],
+    pub radius: Option<f32>,
 }
 
 impl Component {
@@ -233,6 +200,7 @@ impl Component {
             appearance: appearance.into(),
             parameter: None,
             bounds: [0.0; 4],
+            radius: None,
         }
     }
 }
@@ -376,6 +344,8 @@ pub struct Surface {
     pub kind: String,
     pub appearance: String,
     pub bounds: [f32; 4],
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub radius: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -384,6 +354,10 @@ pub struct PhysicalLayout {
     pub profile: style::PhysicalStyle,
     pub surfaces: Vec<Surface>,
 }
+
+/// Schema 2 adds the section outline radius. An older producer would bake
+/// square outlines without noticing the field, so the number changes.
+pub const SCHEMA: u32 = 2;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Manifest {
@@ -468,13 +442,14 @@ pub fn resolve<R: FreeRenderer>(
             .filter(|component| {
                 matches!(
                     component.kind.as_str(),
-                    "panel" | "section" | "groove" | "knob" | "meter"
+                    "panel" | "section" | "knob" | "meter"
                 )
             })
             .map(|component| Surface {
                 kind: component.kind.clone(),
                 appearance: component.appearance.clone(),
                 bounds: component.bounds,
+                radius: component.radius,
             })
             .collect(),
     };
@@ -483,7 +458,7 @@ pub fn resolve<R: FreeRenderer>(
         Sha256::digest(serde_json::to_vec(&physical).expect("physical layout serializes"))
     );
     Manifest {
-        schema: 1,
+        schema: SCHEMA,
         view: "amp".into(),
         logical_size: [style::WIDTH, style::HEIGHT],
         physical_sha256,
@@ -498,8 +473,8 @@ pub fn content_sha256(manifest: &Manifest) -> String {
 }
 
 pub fn validate(manifest: &Manifest) -> Result<(), String> {
-    if manifest.schema != 1 || manifest.view != "amp" {
-        return Err("layout must be the schema-1 amp view".into());
+    if manifest.schema != SCHEMA || manifest.view != "amp" {
+        return Err(format!("layout must be the schema-{SCHEMA} amp view"));
     }
     if manifest.logical_size != [style::WIDTH, style::HEIGHT]
         || manifest.physical.size != manifest.logical_size
@@ -513,14 +488,13 @@ pub fn validate(manifest: &Manifest) -> Result<(), String> {
     if manifest.physical_sha256 != expected_hash {
         return Err("physical layout hash differs".into());
     }
-    let mut counts = [0usize; 5];
+    let mut counts = [0usize; 4];
     for surface in &manifest.physical.surfaces {
         let index = match surface.kind.as_str() {
             "panel" => 0,
             "section" => 1,
-            "groove" => 2,
-            "knob" => 3,
-            "meter" => 4,
+            "knob" => 2,
+            "meter" => 3,
             kind => return Err(format!("unsupported surface kind {kind}")),
         };
         counts[index] += 1;
@@ -539,9 +513,49 @@ pub fn validate(manifest: &Manifest) -> Result<(), String> {
                 surface.kind, surface.bounds
             ));
         }
+        let radius_valid = match (surface.kind.as_str(), surface.radius) {
+            ("section", Some(radius)) => {
+                radius.is_finite() && radius > 0.0 && radius <= width.min(height) / 2.0
+            }
+            ("section", None) => false,
+            (_, radius) => radius.is_none(),
+        };
+        if !radius_valid {
+            return Err(format!(
+                "{} surface has an invalid outline radius {:?}",
+                surface.kind, surface.radius
+            ));
+        }
     }
-    if counts != [3, 6, 6, 19, 4] {
+    if counts != [3, 6, 19, 4] {
         return Err(format!("unexpected physical surface counts: {counts:?}"));
+    }
+    separate_sections(manifest)
+}
+
+/// Each section's groove must stay its own outline: two boxes closer than a
+/// groove's width would merge their grooves into one channel.
+fn separate_sections(manifest: &Manifest) -> Result<(), String> {
+    let clearance = manifest.physical.profile.groove_width;
+    let sections: Vec<_> = manifest
+        .physical
+        .surfaces
+        .iter()
+        .filter(|surface| surface.kind == "section")
+        .collect();
+    for (index, a) in sections.iter().enumerate() {
+        for b in &sections[index + 1..] {
+            let [ax, ay, aw, ah] = a.bounds;
+            let [bx, by, bw, bh] = b.bounds;
+            let gap_x = (bx - (ax + aw)).max(ax - (bx + bw));
+            let gap_y = (by - (ay + ah)).max(ay - (by + bh));
+            if gap_x.max(gap_y) < clearance {
+                return Err(format!(
+                    "sections {} and {} are closer than a groove",
+                    a.appearance, b.appearance
+                ));
+            }
+        }
     }
     Ok(())
 }
