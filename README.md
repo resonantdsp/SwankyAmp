@@ -72,7 +72,8 @@ for the oversampler's latency. Version 2 is trimmed to the released RMS so
 loudness does not identify it, and a pair shares one headroom trim if either
 would peak above -1.1 dBFS. Each pair's files are named `X` and `Y` in a
 seeded random order; `KEY.txt` says which is which and lists the trims, which
-are the remaining output level differences, and `pairs.md` adds the controls
+are the remaining output level differences, the factory balance below
+included, and `pairs.md` adds the controls
 the refit moved. `--inputs pluck` limits it to one input, and
 `--high-steps 0.2,0.4,orig` adds variants of the refitted bank with High
 raised by each step or restored to its 1.4.0 value. Each preset then becomes a
@@ -106,6 +107,14 @@ default; there is no Reset button. Choosing a preset sets its controls
 through the host, so automation and undo see the change, and the selected
 preset is part of the plugin state, so a reopened session shows its name
 again. A dot after the name marks a preset changed since it was chosen.
+
+Version 2's factory presets are balanced to equal loudness: each one's
+Output is set so that all ten play the reference single-coil DI at the same
+RMS, within 0.14 dB, through the shipping path. Swanky Amp 1.4.0's factory
+presets were not balanced, and imported 1.x presets keep their Output as it
+was. `just refit` applies the balance when it writes the bank, and the
+[refit report](verification/tone-stack/refit-report.md) lists each preset's
+Output change and level.
 
 As in 1.4.0, Input and the cabinet switch belong to the session: a preset
 stores them, but choosing one leaves them as they are and changing them does
