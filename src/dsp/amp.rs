@@ -100,7 +100,6 @@ impl TubePath {
             post_tone_gain: 1.,
         };
         path.apply_voicing(voicing);
-        path.settle();
         path
     }
 
@@ -113,7 +112,6 @@ impl TubePath {
         self.tone_stack.prepare(sample_rate);
         self.tetrode.prepare(sample_rate);
         self.apply_voicing(self.voicing);
-        self.settle();
     }
 
     fn configure(&mut self, voicing: AmpVoicing) {
@@ -188,7 +186,9 @@ pub struct AmpPath {
 
 impl AmpPath {
     pub fn new_legacy(sample_rate: f32, controls: AmpControls) -> Self {
-        Self::new(sample_rate, controls, PlateFilter::Released44k1)
+        let mut path = Self::new(sample_rate, controls, PlateFilter::Released44k1);
+        path.tubes.settle();
+        path
     }
 
     fn new_shipping(sample_rate: f32, controls: AmpControls) -> Self {
@@ -207,6 +207,8 @@ impl AmpPath {
         path
     }
 
+    /// Leaves the tubes unsettled; the caller settles them only when this
+    /// path's tubes will carry audio.
     fn prepare(&mut self, sample_rate: f32, controls: AmpControls) {
         let voicing = AmpVoicing::from_controls(controls);
         self.tubes.prepare(sample_rate, controls);
@@ -279,9 +281,14 @@ pub(crate) struct AmpChannel {
 }
 
 impl AmpChannel {
-    pub(crate) fn new(sample_rate: f32, max_block: usize, controls: AmpControls) -> Self {
+    pub(crate) fn new(
+        sample_rate: f32,
+        max_block: usize,
+        controls: AmpControls,
+        doublings: usize,
+    ) -> Self {
         let prepared_doublings = crate::engine::doublings_cap(f64::from(sample_rate));
-        Self {
+        let mut channel = Self {
             host: AmpPath::new_shipping(sample_rate, controls),
             oversampled: std::array::from_fn(|index| {
                 TubePath::new(
@@ -295,10 +302,22 @@ impl AmpChannel {
             }),
             high_rate: vec![0.; max_block.max(1) << prepared_doublings],
             prepared_doublings,
-        }
+        };
+        channel.settle(doublings);
+        channel
     }
 
-    pub(crate) fn prepare(&mut self, sample_rate: f32, max_block: usize, controls: AmpControls) {
+    /// Prepares every path the rate allows but settles only the one serving
+    /// `doublings`, which changes only through another prepare. Each settle
+    /// renders a second of audio at its internal rate, and hosts re-prepare on
+    /// every latency change, so settling unused paths multiplied that cost.
+    pub(crate) fn prepare(
+        &mut self,
+        sample_rate: f32,
+        max_block: usize,
+        controls: AmpControls,
+        doublings: usize,
+    ) {
         self.prepared_doublings = crate::engine::doublings_cap(f64::from(sample_rate));
         self.host.prepare(sample_rate, controls);
         for (index, path) in self.oversampled[..self.prepared_doublings]
@@ -311,6 +330,15 @@ impl AmpChannel {
             std::array::from_fn(|index| Oversampler::new(index + 1, max_block.max(1)));
         self.high_rate
             .resize(max_block.max(1) << self.prepared_doublings, 0.);
+        self.settle(doublings);
+    }
+
+    fn settle(&mut self, doublings: usize) {
+        debug_assert!(doublings <= self.prepared_doublings);
+        match doublings {
+            0 => self.host.tubes.settle(),
+            doublings => self.oversampled[doublings - 1].settle(),
+        }
     }
 
     pub(crate) fn configure(&mut self, controls: AmpControls) {
@@ -390,7 +418,7 @@ impl CorrectedPath {
     ) -> Self {
         assert!(doublings <= crate::engine::doublings_cap(f64::from(sample_rate)));
         Self {
-            channel: AmpChannel::new(sample_rate, max_block, controls),
+            channel: AmpChannel::new(sample_rate, max_block, controls, doublings),
             doublings,
         }
     }

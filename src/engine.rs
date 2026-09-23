@@ -52,7 +52,7 @@ impl Engine {
             doublings,
             requested_doublings: doublings,
             paths: std::array::from_fn(|_| {
-                AmpChannel::new(sample_rate as f32, INITIAL_BLOCK, controls)
+                AmpChannel::new(sample_rate as f32, INITIAL_BLOCK, controls, doublings)
             }),
             scratch: std::array::from_fn(|_| vec![0.; INITIAL_BLOCK]),
         }
@@ -65,7 +65,7 @@ impl Engine {
         self.doublings = doublings_for(self.oversampling_choice, f64::from(self.sample_rate));
         self.requested_doublings = self.doublings;
         for path in &mut self.paths {
-            path.prepare(self.sample_rate, max_block, self.controls);
+            path.prepare(self.sample_rate, max_block, self.controls, self.doublings);
         }
         for scratch in &mut self.scratch {
             scratch.resize(max_block.max(1), 0.);

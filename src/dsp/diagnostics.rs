@@ -31,7 +31,7 @@ pub fn reset_equilibrium(
         }
     }
 
-    let mut channel = AmpChannel::new(sample_rate, BLOCK, controls);
+    let mut channel = AmpChannel::new(sample_rate, BLOCK, controls, doublings);
     let probe: Vec<f32> = (0..PROBE_FRAMES)
         .map(|frame| {
             let x = frame as f32;
