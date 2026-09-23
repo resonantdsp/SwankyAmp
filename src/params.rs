@@ -1,4 +1,5 @@
 use crate::dsp::mapping::AmpControls;
+use std::sync::atomic::{AtomicU32, Ordering};
 use truce::prelude::*;
 use truce_params::FloatParamReadF32;
 
@@ -65,6 +66,39 @@ pub struct SwankyAmpParams {
     /// 0 is Auto; 1, 2 and 3 request 1x, 2x and 4x processing.
     #[param(id = 21, name = "Oversampling", range = "discrete(0, 3)", default = 0)]
     pub oversampling: IntParam,
+    /// What the engine settled on, which under Auto depends on the host rate
+    /// and so is known only once audio has been prepared. Session state for
+    /// the editor, never host state.
+    #[skip]
+    pub resolved_oversampling: ResolvedOversampling,
+}
+
+/// Doublings of the host rate the engine is running, shared from the audio
+/// thread to the editor.
+pub struct ResolvedOversampling(AtomicU32);
+
+const UNRESOLVED: u32 = u32::MAX;
+
+impl Default for ResolvedOversampling {
+    fn default() -> Self {
+        Self(AtomicU32::new(UNRESOLVED))
+    }
+}
+
+impl ResolvedOversampling {
+    pub fn publish(&self, doublings: usize) {
+        self.0.store(
+            u32::try_from(doublings).unwrap_or(UNRESOLVED),
+            Ordering::Relaxed,
+        );
+    }
+
+    pub fn get(&self) -> Option<usize> {
+        match self.0.load(Ordering::Relaxed) {
+            UNRESOLVED => None,
+            doublings => Some(doublings as usize),
+        }
+    }
 }
 
 fn plain(param: &FloatParam) -> f32 {

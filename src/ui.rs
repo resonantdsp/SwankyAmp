@@ -24,6 +24,9 @@ const GROOVE: Color = Color::from_rgb(0.002, 0.004, 0.006);
 const ACCENT: Color = style::ACCENT;
 /// Every header action shares one height and one centre line.
 const HEADER_CONTROL: [f32; 2] = [17.0, 30.0];
+/// Pro's gap between header groups, wider than any gap inside a group.
+const HEADER_GROUP_GAP: f32 = 14.0;
+const OVERSAMPLING_ID: u32 = 21;
 const CONTROL_WIDTH: f32 = 104.0;
 const KNOB_ROW_HEIGHT: f32 = 84.0;
 
@@ -90,7 +93,7 @@ impl FreeUi {
                     .color(INK),
             ));
         }
-        layers.extend(header(self.notice.as_ref()));
+        layers.extend(header(self.notice.as_ref(), params));
         layers.extend(levels_meters());
         for control in layout::CONTROLS {
             layers.push(match control.kind {
@@ -215,39 +218,82 @@ fn place<'a, R: iced_core::Renderer + 'a>(
     .into()
 }
 
-fn header<'a, R: FreeRenderer + 'a>(notice: Option<&Notice>) -> Vec<Element<'a, Msg, Theme, R>> {
+fn header<'a, R: FreeRenderer + 'a>(
+    notice: Option<&Notice>,
+    params: &ParamCache<SwankyAmpParams>,
+) -> Vec<Element<'a, Msg, Theme, R>> {
     let [top, height] = HEADER_CONTROL;
+    // Pro's wordmark: the name in bold ink and the edition beside it at the
+    // same size, here in the accent rather than Pro's muted grey.
+    let wordmark = row![
+        text("SWANKY AMP").size(29).font(style::BOLD).color(INK),
+        text("FREE 2.0").size(29).font(style::FONT).color(ACCENT),
+    ]
+    .spacing(8)
+    .align_y(Alignment::Center);
+    // Right to left from the boxes' edge, one group gap between actions.
+    let oversampling = [1066.0 - 72.0, 72.0];
+    let preset = [oversampling[0] - HEADER_GROUP_GAP - 150.0, 150.0];
+    let notice_x = preset[0] - HEADER_GROUP_GAP - height;
     vec![
         place(
-            [22.0, 7.0, 250.0, 50.0],
-            column![
-                text("SWANKY AMP").size(24).font(style::BOLD).color(INK),
-                text("FREE 2.0").size(10).font(style::BOLD).color(ACCENT),
-            ]
-            .spacing(1),
+            [22.0, 0.0, 400.0, style::HEADER_HEIGHT],
+            container(wordmark).center_y(Length::Fill),
         ),
         place(
-            [716.0, top, height, height],
+            [notice_x, top, height, height],
             notice_control(notice_action(notice)),
         ),
-        place([756.0, top, 150.0, height], preset_bar()),
+        place([preset[0], top, preset[1], height], preset_bar()),
         place(
-            [918.0, top, 80.0, height],
-            container(text("OVERSAMPLING").size(10).color(DIM))
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .align_x(Alignment::End)
-                .center_y(Length::Fill),
-        ),
-        place(
-            [1006.0, top, 60.0, height],
-            container(text("AUTO").size(12).font(style::BOLD).color(INK))
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .center(Length::Fill)
-                .style(|_| style::outlined(true)),
+            [oversampling[0], top, oversampling[1], height],
+            oversampling_toggle(params),
         ),
     ]
+}
+
+/// Choices the Oversampling parameter steps through: Auto, then 1x, 2x, 4x.
+const OVERSAMPLING_CHOICES: usize = 4;
+
+/// The button reads as Pro's: the factor the engine runs when it is known,
+/// lit whenever it oversamples or is left to choose.
+fn oversampling_label(choice: usize, resolved: Option<usize>) -> (String, bool) {
+    let factor = resolved
+        .or_else(|| choice.checked_sub(1))
+        .map(|doublings| 1usize << doublings);
+    let label = match factor {
+        None => "Auto".to_string(),
+        Some(factor) if choice == 0 => format!("Auto {factor}×"),
+        Some(factor) => format!("{factor}×"),
+    };
+    (label, factor.is_none_or(|factor| factor > 1))
+}
+
+fn oversampling_toggle<'a, R: FreeRenderer + 'a>(
+    params: &ParamCache<SwankyAmpParams>,
+) -> Element<'a, Msg, Theme, R> {
+    let choice = (params.get(OVERSAMPLING_ID) * (OVERSAMPLING_CHOICES - 1) as f64)
+        .round()
+        .clamp(0.0, (OVERSAMPLING_CHOICES - 1) as f64) as usize;
+    let (label, lit) = oversampling_label(choice, params.params().resolved_oversampling.get());
+    let next = (choice + 1) % OVERSAMPLING_CHOICES;
+    mouse_area(
+        container(text(label).size(14).color(if lit { INK } else { DIM }))
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .center(Length::Fill)
+            .style(move |_| style::outlined(lit)),
+    )
+    .on_press(Message::Param(ParamMessage::Batch(vec![
+        ParamMessage::BeginEdit(OVERSAMPLING_ID),
+        ParamMessage::SetNormalized(
+            OVERSAMPLING_ID,
+            next as f64 / (OVERSAMPLING_CHOICES - 1) as f64,
+        ),
+        ParamMessage::EndEdit(OVERSAMPLING_ID),
+    ])))
+    .interaction(mouse::Interaction::Pointer)
+    .into()
 }
 
 /// The factory preset stepper as one outlined field; the chevrons sit inside
@@ -262,7 +308,7 @@ fn preset_bar<'a, R: FreeRenderer + 'a>() -> Element<'a, Msg, Theme, R> {
     container(
         row![
             chevron("‹"),
-            container(text("INIT").size(12).font(style::BOLD).color(INK))
+            container(text("INIT").size(14).color(INK))
                 .width(Length::Fill)
                 .height(Length::Fill)
                 .center(Length::Fill),
@@ -485,7 +531,7 @@ fn meter_column<'a, R: FreeRenderer + 'a>(color: Color, height: f32) -> Element<
 
 #[cfg(test)]
 mod tests {
-    use super::{NoticeAction, display_value, notice_action};
+    use super::{NoticeAction, display_value, notice_action, oversampling_label};
     use crate::release_notice::notice_for;
 
     #[test]
@@ -508,5 +554,27 @@ mod tests {
         assert_eq!(action(Some("1.4.0")), NoticeAction::Information);
         assert_eq!(action(Some("99.0")), NoticeAction::Information);
         assert_eq!(action(None), NoticeAction::Information);
+    }
+
+    #[test]
+    fn the_oversampling_button_names_the_running_factor_and_lights_when_it_oversamples() {
+        let cases = [
+            (0, None, "Auto", true),
+            (0, Some(0), "Auto 1×", false),
+            (0, Some(1), "Auto 2×", true),
+            (1, None, "1×", false),
+            (2, None, "2×", true),
+            (3, None, "4×", true),
+            // A fixed choice the host rate caps shows what actually runs.
+            (3, Some(1), "2×", true),
+            (2, Some(0), "1×", false),
+        ];
+        for (choice, resolved, label, lit) in cases {
+            assert_eq!(
+                oversampling_label(choice, resolved),
+                (label.to_string(), lit),
+                "choice {choice} with {resolved:?} resolved"
+            );
+        }
     }
 }

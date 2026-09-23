@@ -28,3 +28,7 @@ factory preset bank and signed candidate qualification are still in progress.
   V groove, with Pro's outlined header controls and uncluttered ten-cell
   meters. 1.4's rose highlight is the accent for lit rings, lit outlines, the
   edition tag and the output meter.
+- Aligned the six groups into two columns with shared edges, set the wordmark
+  as Pro's one-line "SWANKY AMP FREE 2.0", and replaced the static
+  oversampling label with Pro's button: it cycles Auto, 1x, 2x and 4x and
+  names the factor the engine resolved.
