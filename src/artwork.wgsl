@@ -10,6 +10,8 @@ struct Controls {
     marker: vec4<f32>,
     polar: vec4<f32>,
     extent: vec4<f32>,
+    cap: vec4<f32>,
+    cap_style: vec4<f32>,
     controls: array<Control, 32>,
 }
 
@@ -18,6 +20,7 @@ struct Controls {
 @group(0) @binding(2) var responses: texture_2d_array<f32>;
 @group(0) @binding(3) var<uniform> controls: Controls;
 @group(0) @binding(4) var linear_sampler: sampler;
+@group(0) @binding(5) var cap: texture_2d_array<f32>;
 
 struct VertexOut {
     @builtin(position) position: vec4<f32>,
@@ -83,7 +86,14 @@ fn divot_paint(outward: vec2<f32>, amount: f32, depth: f32) -> vec3<f32> {
 @fragment
 fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
     let point = input.uv * controls.scene.xy;
-    let multiplier = textureSampleLevel(shadow, linear_sampler, input.uv, 0.0).rgb;
+    var multiplier = textureSampleLevel(shadow, linear_sampler, input.uv, 0.0).rgb;
+    // The cap moves, so neither it nor the shadow it casts is in the view's
+    // bake: its sprite is stamped over the baked slot here.
+    let cap_uv = (point - controls.cap.xy) / controls.cap.zw;
+    let on_cap = controls.cap_style.y > 0.5 && all(cap_uv >= vec2(0.0)) && all(cap_uv <= vec2(1.0));
+    if on_cap {
+        multiplier *= textureSampleLevel(cap, linear_sampler, cap_uv, 1, 0.0).rgb;
+    }
     let aa = max(length(fwidth(point)) * 0.7071, 0.001);
     var radiance = textureSampleLevel(base, linear_sampler, input.uv, 0.0).rgb;
     var light = vec3(0.0);
@@ -130,6 +140,22 @@ fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
         let inside = 1.0 - smoothstep(width - aa * 0.5, width + aa * 0.5, distance);
         let amount = clamp(distance / width, 0.0, 1.0);
         radiance = mix(radiance, divot_paint(outward, amount, controls.marker.z), inside);
+        let bevel = 1.0 - smoothstep(0.2, 0.2 + aa, abs(distance - width - 0.3));
+        radiance += vec3(0.14) * bevel * max(dot(outward, normalize(vec2(0.15, 1.0))), 0.0) * (1.0 - inside);
+        radiance *= 1.0 - 0.14 * bevel * max(-outward.y, 0.0) * (1.0 - inside);
+    }
+
+    if on_cap {
+        let sprite = textureSampleLevel(cap, linear_sampler, cap_uv, 0, 0.0).rgb;
+        let cover = textureSampleLevel(cap, linear_sampler, cap_uv, 2, 0.0).r;
+        radiance = radiance * (1.0 - cover) + sprite;
+        // The knobs' glossy black divot, at the cap's centre.
+        let offset = point - (controls.cap.xy + controls.cap.zw * 0.5);
+        let distance = length(offset);
+        let outward = offset / max(distance, 0.001);
+        let width = controls.cap_style.x;
+        let inside = 1.0 - smoothstep(width - aa * 0.5, width + aa * 0.5, distance);
+        radiance = mix(radiance, divot_paint(outward, clamp(distance / width, 0.0, 1.0), controls.marker.z), inside);
         let bevel = 1.0 - smoothstep(0.2, 0.2 + aa, abs(distance - width - 0.3));
         radiance += vec3(0.14) * bevel * max(dot(outward, normalize(vec2(0.15, 1.0))), 0.0) * (1.0 - inside);
         radiance *= 1.0 - 0.14 * bevel * max(-outward.y, 0.0) * (1.0 - inside);
