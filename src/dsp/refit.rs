@@ -585,3 +585,20 @@ pub fn refit(name: &str, controls: AmpControls, input: &[f32]) -> PresetRefit {
         limits: limits(refit, power_drive_limit),
     }
 }
+
+/// Measures candidate settings for a preset against the preset on the
+/// released mapping, by the same residuals the refit reports.
+pub fn measure_candidates(
+    original: AmpControls,
+    candidates: &[AmpControls],
+    input: &[f32],
+) -> Vec<Measurement> {
+    let reference = render(original, ToneMapping::Released, input);
+    candidates
+        .iter()
+        .map(|candidate| {
+            let rendered = render(*candidate, ToneMapping::Standard, input);
+            measure(&reference, &rendered, original, *candidate)
+        })
+        .collect()
+}

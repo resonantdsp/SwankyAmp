@@ -73,7 +73,12 @@ loudness does not identify it, and a pair shares one headroom trim if either
 would peak above -1.1 dBFS. Each pair's files are named `X` and `Y` in a
 seeded random order; `KEY.txt` says which is which and lists the trims, which
 are the remaining output level differences, and `pairs.md` adds the controls
-the refit moved. The kit is review material and is never committed.
+the refit moved. `--inputs pluck` limits it to one input, and
+`--high-steps 0.2,0.4,orig` adds variants of the refitted bank with High
+raised by each step or restored to its 1.4.0 value. Each preset then becomes a
+group of files lettered A onwards, and `groups.md` lists each variant's
+tone-stack residuals as the refit measures them. The kit is review material
+and is never committed.
 
 The three treble sections are first-order circuits, but 1.4.0 discretised
 them as biquads with the second-order terms set to zero. That multiplies

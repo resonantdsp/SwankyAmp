@@ -1,6 +1,7 @@
 //! Refits the factory presets to the standard tone-stack mapping and writes
 //! the version 2 factory bank with its residual report. `--check` proves the
-//! committed files are what this tool produces.
+//! committed files are what this tool produces. `--high-steps` measures the
+//! committed bank with High moved, for listening comparisons.
 
 use std::env;
 use std::fs;
@@ -8,7 +9,8 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use swanky_amp::dsp::refit::{
-    self, DRIVE_DEADBAND_DB, POWER_DRIVE_LIMIT, PresetRefit, RESTRAINT, Residual, ToneSettings,
+    self, DRIVE_DEADBAND_DB, Measurement, POWER_DRIVE_LIMIT, PresetRefit, RESTRAINT, Residual,
+    ToneSettings,
 };
 use swanky_amp::presets;
 
@@ -267,7 +269,90 @@ fn compare(committed: &Report, fresh: &Report) -> Vec<String> {
     failures
 }
 
+#[derive(Serialize)]
+struct Variant {
+    variant: String,
+    high: f32,
+    measurement: Measurement,
+}
+
+#[derive(Serialize)]
+struct PresetVariants {
+    name: String,
+    variants: Vec<Variant>,
+}
+
+/// Each step is a signed change to the refitted High or `orig` for the
+/// released value; `as-is` always comes first.
+fn high_variants(released: &str, factory: &str, steps: &str) -> Result<String, String> {
+    let input = refit::pluck(refit::SAMPLE_RATE);
+    let steps: Vec<&str> = std::iter::once("as-is")
+        .chain(
+            steps
+                .split(',')
+                .map(str::trim)
+                .filter(|step| !step.is_empty()),
+        )
+        .collect();
+    let mut jobs = Vec::new();
+    for name in presets::names(released) {
+        let original = presets::controls(released, &name)?;
+        let fitted = presets::controls(factory, &name)?;
+        let highs = steps
+            .iter()
+            .map(|step| match *step {
+                "as-is" => Ok(fitted.high),
+                "orig" => Ok(original.high),
+                step => step
+                    .parse::<f32>()
+                    .map(|change| (fitted.high + change).clamp(-1., 1.))
+                    .map_err(|_| format!("unknown High step: {step}")),
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        jobs.push((name, original, fitted, highs));
+    }
+    let presets: Vec<PresetVariants> = std::thread::scope(|scope| {
+        let handles: Vec<_> = jobs
+            .iter()
+            .map(|(name, original, fitted, highs)| {
+                let (input, steps) = (&input, &steps);
+                scope.spawn(move || {
+                    let candidates: Vec<_> = highs
+                        .iter()
+                        .map(|&high| swanky_amp::dsp::amp::AmpControls { high, ..*fitted })
+                        .collect();
+                    let measurements = refit::measure_candidates(*original, &candidates, input);
+                    PresetVariants {
+                        name: name.clone(),
+                        variants: steps
+                            .iter()
+                            .zip(highs)
+                            .zip(measurements)
+                            .map(|((step, high), measurement)| Variant {
+                                variant: (*step).to_owned(),
+                                high: *high,
+                                measurement,
+                            })
+                            .collect(),
+                    }
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .map(|handle| handle.join().expect("measurement thread panicked"))
+            .collect()
+    });
+    serde_json::to_string_pretty(&presets).map_err(|error| error.to_string())
+}
+
 fn run() -> Result<(), String> {
+    if let Ok(steps) = option("--high-steps") {
+        let released = read(&PathBuf::from(option("--presets")?))?;
+        let factory = read(&PathBuf::from(option("--factory")?))?;
+        println!("{}", high_variants(&released, &factory, &steps)?);
+        return Ok(());
+    }
     let presets_path = PathBuf::from(option("--presets")?);
     let report_dir = PathBuf::from(option("--report-dir")?);
     let factory_path = PathBuf::from(option("--factory")?);

@@ -239,6 +239,12 @@ fn run() -> Result<(), String> {
     if flag("--cabinet-off") {
         controls.cabinet_on = false;
     }
+    if let Some(high) = optional_option("--high") {
+        controls.high = high
+            .parse::<f32>()
+            .map_err(|_| "High must be a number")?
+            .clamp(-1., 1.);
+    }
     if flag("--reset-audit") {
         let choice = match optional_option("--oversampling")
             .as_deref()
