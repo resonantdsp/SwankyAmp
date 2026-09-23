@@ -136,6 +136,76 @@ mod tests {
         );
     }
 
+    const GAIN_BLOCK: usize = 256;
+    const GAIN_CHANGE_AT: usize = 16 * GAIN_BLOCK;
+
+    /// Renders a low tone with the cabinet off, so a gain step shows as a jump
+    /// far larger than the waveform's own sample-to-sample movement. Returns
+    /// the render whose control rises from 0 to 0.3 at `GAIN_CHANGE_AT`, and
+    /// a render held at 0.3 throughout.
+    fn render_gain_change(control: fn(&SwankyAmpParams) -> &FloatParam) -> [Vec<f32>; 2] {
+        let tone: Vec<f32> = (0..4 * GAIN_CHANGE_AT)
+            .map(|frame| 0.1 * (std::f32::consts::TAU * 110. * frame as f32 / 44_100.).sin())
+            .collect();
+        let render_from = |value, change: Option<f64>| {
+            let params = SwankyAmpParams::default();
+            params.cabinet_on.set_value(false);
+            control(&params).set_value(value);
+            let mut engine = engine::Engine::new(&params);
+            engine.reset(&params, 44_100., GAIN_BLOCK);
+            let (before, after) = tone.split_at(GAIN_CHANGE_AT);
+            let mut output = render(&mut engine, &params, &[before.to_vec()], GAIN_BLOCK).remove(0);
+            if let Some(value) = change {
+                control(&params).set_value(value);
+            }
+            output.extend(render(&mut engine, &params, &[after.to_vec()], GAIN_BLOCK).remove(0));
+            output
+        };
+        [render_from(0., Some(0.3)), render_from(0.3, None)]
+    }
+
+    fn assert_change_glides(name: &str, changed: &[f32], steady: &[f32]) {
+        let sharpest_move = |samples: &[f32]| {
+            samples
+                .windows(2)
+                .map(|pair| (pair[1] - pair[0]).abs())
+                .fold(0., f32::max)
+        };
+        let change = GAIN_CHANGE_AT - 1..GAIN_CHANGE_AT + GAIN_BLOCK;
+        let jump = sharpest_move(&changed[change.clone()]);
+        let steady_move = sharpest_move(&steady[change]);
+        assert!(
+            jump <= 1.25 * steady_move,
+            "raising {name} mid-stream moved the output by {jump} in one sample; \
+             the steady render at the new setting never moves more than {steady_move} there"
+        );
+    }
+
+    #[test]
+    fn output_changes_glide_across_a_block_then_match_the_new_setting() {
+        let [changed, steady] = render_gain_change(|params| &params.output);
+        assert_change_glides("Output", &changed, &steady);
+        let landed = GAIN_CHANGE_AT + GAIN_BLOCK..;
+        assert_close(&changed[landed.clone()], &steady[landed], 0.);
+    }
+
+    #[test]
+    fn input_changes_glide_to_the_new_level() {
+        let [changed, steady] = render_gain_change(|params| &params.input);
+        assert_change_glides("Input", &changed, &steady);
+        let rms_db = |samples: &[f32]| {
+            let power =
+                samples.iter().map(|sample| sample * sample).sum::<f32>() / samples.len() as f32;
+            10. * power.log10()
+        };
+        let tail = changed.len() - GAIN_CHANGE_AT..;
+        let difference = rms_db(&changed[tail.clone()]) - rms_db(&steady[tail]);
+        assert!(
+            difference.abs() <= 0.05,
+            "after raising Input the output settled {difference:+.3} dB from the steady render at the new setting"
+        );
+    }
+
     #[test]
     fn host_contract_and_state_round_trip() {
         truce_test::assert_valid_info::<Plugin>();

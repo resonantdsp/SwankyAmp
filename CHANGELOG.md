@@ -52,6 +52,11 @@ install beside Swanky Amp 1.4.0. The interface, factory preset bank and signed c
   silenced the amplifier at its top. Output gains measured by `just calibrate`
   hold the loudness, averaged over a played DI and a pluck, within 0.6 dB of
   Init across each control, and Init is unchanged.
+- Input, Output and the level gains Drive and Power Drive derive now glide
+  linearly across the block in which they change instead of stepping, so
+  sweeping or automating them no longer clicks or zippers. The tube stages,
+  tone stack and cabinet still step, and a setting held still sounds exactly
+  as before.
 - Fixed Grit silencing the amplifier near its top: it raised a triode
   compressor's threshold past the stage's plate signal, collapsing the
   stage's output to a constant (-52 dB in 1.4.0, -100 dB after the knee

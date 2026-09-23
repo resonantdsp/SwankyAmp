@@ -104,6 +104,38 @@ pub(crate) fn interpolate(value: f32, table: &[f32; TABLE_POINTS]) -> f32 {
     table[index] + (table[index + 1] - table[index]) * (bin - index as f32)
 }
 
+/// A gain multiplier that glides linearly to its target across the next
+/// block, so a control change never steps. At rest every sample gets exactly
+/// the target, which keeps resting renders unchanged.
+#[derive(Debug, Clone, Copy)]
+struct Ramp {
+    current: f32,
+    target: f32,
+}
+
+impl Ramp {
+    fn new(value: f32) -> Self {
+        Self {
+            current: value,
+            target: value,
+        }
+    }
+
+    /// Lands on the target immediately, for a prepare or a state restore.
+    fn snap(&mut self) {
+        self.current = self.target;
+    }
+
+    fn block(&mut self, frames: usize) -> impl Iterator<Item = f32> + use<> {
+        let start = self.current;
+        let step = (self.target - start) / frames.max(1) as f32;
+        if frames > 0 {
+            self.current = self.target;
+        }
+        (1..=frames).map(move |frame| start + step * frame as f32)
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct SeamOutput {
     pub triodes: [Vec<f32>; STAGES],
@@ -132,7 +164,9 @@ struct TubePath {
     tone_stack: ToneStack,
     tetrode: Tetrode,
     tables: LevelTables,
-    post_tone_gain: f32,
+    input_gain: Ramp,
+    preamp_gain: Ramp,
+    power_gain: Ramp,
 }
 
 impl TubePath {
@@ -155,9 +189,12 @@ impl TubePath {
             tone_stack: ToneStack::new(sample_rate, tone_mapping),
             tetrode: Tetrode::new(sample_rate),
             tables,
-            post_tone_gain: 1.,
+            input_gain: Ramp::new(1.),
+            preamp_gain: Ramp::new(1.),
+            power_gain: Ramp::new(1.),
         };
         path.apply_voicing(voicing);
+        path.snap_gains();
         path
     }
 
@@ -170,6 +207,7 @@ impl TubePath {
         self.tone_stack.prepare(sample_rate);
         self.tetrode.prepare(sample_rate);
         self.apply_voicing(self.voicing);
+        self.snap_gains();
     }
 
     fn configure(&mut self, voicing: AmpVoicing) {
@@ -185,10 +223,19 @@ impl TubePath {
         }
         self.tone_stack.configure(voicing.tone);
         self.tetrode.configure(voicing.tetrode);
-        self.post_tone_gain = self.tables.tone_stack
+        let post_tone_gain = self.tables.tone_stack
             * interpolate(voicing.preamp_drive, &self.tables.preamp)
             * PREAMP_TARGET;
+        self.input_gain.target = voicing.input_gain;
+        self.preamp_gain.target = voicing.preamp_gain;
+        self.power_gain.target = post_tone_gain * voicing.power_gain;
         self.voicing = voicing;
+    }
+
+    fn snap_gains(&mut self) {
+        self.input_gain.snap();
+        self.preamp_gain.snap();
+        self.power_gain.snap();
     }
 
     fn settle(&mut self) {
@@ -201,19 +248,26 @@ impl TubePath {
     }
 
     fn settle_equilibrium(&mut self) {
+        self.snap_gains();
         let mut value = 0.;
         for triode in &mut self.triodes {
             value = triode.settle(value);
         }
         value *= TRIODE_SCALE;
         value = self.tone_stack.settle(value);
-        value *= self.post_tone_gain * self.voicing.power_gain;
+        value *= self.power_gain.target;
         self.tetrode.settle(value);
     }
 
     fn process(&mut self, buffer: &mut [f32], mut seams: Option<&mut SeamOutput>) {
-        for sample in buffer {
-            let mut value = *sample * self.voicing.input_gain * self.voicing.preamp_gain;
+        let frames = buffer.len();
+        let gains = self
+            .input_gain
+            .block(frames)
+            .zip(self.preamp_gain.block(frames))
+            .zip(self.power_gain.block(frames));
+        for (sample, ((input_gain, preamp_gain), power_gain)) in buffer.iter_mut().zip(gains) {
+            let mut value = *sample * input_gain * preamp_gain;
             for (stage, triode) in self.triodes.iter_mut().enumerate() {
                 value = triode.process(value);
                 if triode.controls().mix != 0.
@@ -227,7 +281,7 @@ impl TubePath {
             if let Some(output) = seams.as_deref_mut() {
                 output.tone_stack.push(value);
             }
-            value *= self.post_tone_gain * self.voicing.power_gain;
+            value *= power_gain;
             value = self.tetrode.process(value);
             if let Some(output) = seams.as_deref_mut() {
                 output.power_amp.push(value);
@@ -242,7 +296,7 @@ pub struct AmpPath {
     cabinet: Cabinet,
     voicing: AmpVoicing,
     tables: LevelTables,
-    output_gain: f32,
+    output_gain: Ramp,
 }
 
 impl AmpPath {
@@ -297,9 +351,10 @@ impl AmpPath {
             cabinet: Cabinet::new(sample_rate),
             voicing,
             tables,
-            output_gain: 1.,
+            output_gain: Ramp::new(1.),
         };
         path.apply_voicing(voicing);
+        path.output_gain.snap();
         path
     }
 
@@ -311,6 +366,7 @@ impl AmpPath {
         self.cabinet.prepare(sample_rate);
         self.cabinet.reset();
         self.apply_voicing(voicing);
+        self.output_gain.snap();
     }
 
     fn configure(&mut self, voicing: AmpVoicing) {
@@ -326,7 +382,7 @@ impl AmpPath {
         self.cabinet.set_dynamic(voicing.cabinet_dynamic);
         self.cabinet
             .set_dynamic_level(voicing.cabinet_dynamic_level);
-        self.output_gain = interpolate(voicing.power_drive, &self.tables.power)
+        self.output_gain.target = interpolate(voicing.power_drive, &self.tables.power)
             * interpolate(voicing.preamp_drive, &self.tables.drive)
             * interpolate(voicing.preamp_grit, &self.tables.grit)
             * voicing.output_gain;
@@ -346,9 +402,9 @@ impl AmpPath {
         } else {
             1.
         };
-        let gain = cabinet_gain * self.output_gain;
-        for sample in &mut *buffer {
-            *sample *= gain;
+        let gains = self.output_gain.block(buffer.len());
+        for (sample, output_gain) in buffer.iter_mut().zip(gains) {
+            *sample *= cabinet_gain * output_gain;
         }
         if let Some(output) = seams {
             output.raw_output.extend_from_slice(buffer);
@@ -356,6 +412,7 @@ impl AmpPath {
     }
 
     fn reset_realtime(&mut self) {
+        self.output_gain.snap();
         self.tubes.settle_equilibrium();
         self.cabinet.reset();
     }
