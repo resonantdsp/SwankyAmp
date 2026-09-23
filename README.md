@@ -57,6 +57,21 @@ just refit
 `verification/tone-stack/` differ from what the code produces. The plugin
 embeds that file as its factory bank at build time.
 
+The three treble sections are first-order circuits, but 1.4.0 discretised
+them as biquads with the second-order terms set to zero. That multiplies
+numerator and denominator by `1 + z⁻¹`, leaving a pole on the unit circle at
+Nyquist that only exact arithmetic cancels. Rounded to f32 the pole can sit a
+few parts in 10⁹ outside the circle, for example the Marshall treble at
+88.2 kHz (+3.9e-9) and the Fender treble at 176.4 kHz (+1.2e-8) and in the
+released mapping at 44.1 kHz (+2.0e-8). Rounding noise at Nyquist then grows
+exponentially until, after hours of continuous play, it swamps the signal and
+drives the power stage into cutoff. Keeping f32 coefficients and making the
+state f64 still fails, and in f64 the pole sits exactly on the circle, so
+precision alone does not fix it. The shipping mapping discretises the treble
+sections as true first-order filters, which removes the pole; the response is
+unchanged. The legacy path keeps the released form, so the model gate stays
+bit-identical and it still carries the defect.
+
 ### Presets
 
 The header's preset field shows the current preset's name between `‹` and
@@ -145,6 +160,28 @@ just soak-check    # verdict so far, or the final one
 A shipping-path run passes when no sample is non-finite, its output RMS over the last 30 minutes is within 0.1 dB of the first 30 minutes, and its band modulation never exceeds the largest value of the first 10 minutes by more than 25% plus 0.005. Stationary noise alone reads about 0.06 through the estimator, so the margin covers its scatter while a coherent tremolo of about 0.4 dB depth still fails. The legacy run is reported for context and is not gated. `soak-check` also reports first-to-last-hour and per-seam drift and the slowest window against the median. On an Apple M-series core four hours of audio take about 25 minutes per run.
 
 The first four-hour soak, [`verification/soak/2026-09-22-summary.txt`](verification/soak/2026-09-22-summary.txt), reproduced issue #34 on the legacy path. On `level 11`, after about 3.7 hours (13,290 to 13,640 s) the tone-stack seam rose by 23 to 26 dB while the power amp, cabinet and output fell by 15 to 26 dB, with modulation indices of 9 to 17 against a baseline under 0.7. Every triode seam stayed within 0.002 dB, which places the instability in the released tone stack at 44.1 kHz rather than in the stages' drift and compression envelopes. The shipping path of that commit, which already ran the tube stages and tone stack at 2x, passed four hours on all three presets with at most 0.005 dB of drift, modulation at its baseline and no non-finite samples.
+
+The 12-hour soak of the shipping path at commit 318c8b5 found the same
+failure there: `level 11` at Auto (2x) collapsed after about ten hours of noise
+(tone-stack seam +43 dB, output -131 dB), while `level 11` at 1x and Init at 1x
+and 2x held within 0.002 dB. The cause was the tone stack's spurious Nyquist
+pole described under Tone stack, which also accounts for the legacy failure
+above. Because that growth is a few parts in 10⁹ per sample, a pre-release
+check drives the shipping tone stack alone for 24 hours of samples in minutes:
+
+```sh
+just tone-stack-soak
+```
+
+It runs level 11 and each stack model with Low, Mid, High and Presence at both
+extremes, at 44.1, 88.2 and 176.4 kHz, with white noise at the level the stack
+sees at level 11 (9.7 RMS), and fails if any hour's level moves more than
+0.01 dB from the first or its mean exceeds 10⁻⁴ of its RMS. It takes about
+eight minutes on an Apple M-series machine. Before the fix it failed within the
+first hours at 176.4 kHz and at about eight hours at 88.2 kHz; after it, the
+worst hourly drift over all 21 cases is 0.005 dB. `just` includes a short test
+that the stack falls silent after its input stops at each of those rates,
+which the Nyquist pole prevents.
 
 The versioned reference corpus captures the released cold startup, including its 1024-sample output mute. The Rust path settles its configured nonlinear state for one second before audio begins, and stages re-enter warm when the continuous stage-count control brings them back into the signal path. Model comparison therefore applies the same one-second silent pre-roll to the released chain and excludes it from the measured WAVs. The cold corpus and warmed comparison remain separate so the startup difference is explicit.
 

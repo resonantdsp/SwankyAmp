@@ -99,6 +99,12 @@ render-model preset="clean" output="verification/model-output.wav":
         --preset "{{ preset }}" --sample-rate 44100 \
         --output "{{ output }}" --seams-dir "{{ output }}-seams"
 
+# Pre-release: drive the shipping tone stack alone for 24 hours of samples at
+# 44.1, 88.2 and 176.4 kHz and fail on any drift. Minutes in a release build.
+tone-stack-soak hours="24":
+    cargo build --release --quiet --no-default-features --bin tone-stack-soak
+    target/release/tone-stack-soak "{{ hours }}"
+
 # Start the release soak for issue #34 in the background: three presets on the
 # shipping path plus level 11 on the legacy path, logs under target/soak.
 soak hours="4":
