@@ -432,14 +432,15 @@ fn draw_knob<R: iced_core::Renderer + ?Sized>(
         }
     }
     let physical = style::PhysicalStyle::default();
+    let marker = style::MarkerStyle::default();
     let angle = (physical.ring_start - value.clamp(0.0, 1.0) * physical.ring_sweep).to_radians();
     disk(
         renderer,
         Point::new(
-            center.x + angle.cos() * radius * 0.58,
-            center.y - angle.sin() * radius * 0.58,
+            center.x + angle.cos() * radius * marker.radius,
+            center.y - angle.sin() * radius * marker.radius,
         ),
-        radius * 0.065,
+        radius * marker.half_width,
         Color::from_rgb(0.025, 0.03, 0.032),
     );
 }

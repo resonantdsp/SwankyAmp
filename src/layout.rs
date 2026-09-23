@@ -160,16 +160,16 @@ pub const SECTIONS: [SurfaceSpec; 6] = [
 /// The parameter the cabinet switch sets.
 pub const CABINET_SWITCH: u32 = 10;
 
-/// The cabinet switch's slot, centred on the knob row.
+/// The cabinet switch's track, centred on the knob row.
 pub const SWITCH: SurfaceSpec = SurfaceSpec::plain(
     "switch.cabinet",
     "switch",
     "v-slot",
     [
-        573.0 - style::SLOT_HALF,
-        148.0 - style::SWITCH_SLOT_LENGTH / 2.0,
-        2.0 * style::SLOT_HALF,
-        style::SWITCH_SLOT_LENGTH,
+        573.0 - style::SWITCH_DIAMETER / 2.0,
+        148.0 - style::SWITCH_DIAMETER,
+        style::SWITCH_DIAMETER,
+        2.0 * style::SWITCH_DIAMETER,
     ],
 );
 
@@ -375,10 +375,12 @@ pub struct PhysicalLayout {
     pub surfaces: Vec<Surface>,
 }
 
-/// Schema 2 added the section outline radius; schema 3 adds the switch slot
-/// family, whose moving cap an older producer would not bake. Either would
-/// be missed silently by a producer that ignored it, so the number changes.
-pub const SCHEMA: u32 = 3;
+/// Schema 2 added the section outline radius and schema 3 the switch family;
+/// schema 4 makes the switch a disc in a track exactly one disc wide and two
+/// tall, where schema 3 described a pill with travel. A producer reading one
+/// as the other would bake the wrong part without noticing, so the number
+/// changes each time.
+pub const SCHEMA: u32 = 4;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Manifest {
@@ -556,18 +558,17 @@ pub fn validate(manifest: &Manifest) -> Result<(), String> {
     separate_sections(manifest)
 }
 
-/// A slot must be exactly as wide as the cap's V and long enough for the cap
-/// to travel between its round ends, or the baked cap would not sit in it.
+/// A track must be exactly one disc wide and two discs tall, or the baked
+/// disc would not sit flush in its ends.
 fn switch_fits(manifest: &Manifest) -> Result<(), String> {
-    let profile = &manifest.physical.profile;
+    let diameter = manifest.physical.profile.switch_diameter;
     for surface in &manifest.physical.surfaces {
         if surface.kind == "switch"
-            && ((surface.bounds[2] - 2.0 * profile.slot_half).abs() > 0.01
-                || profile.switch_travel(surface.bounds[3]) < 4.0
-                || profile.cap_size[0] <= surface.bounds[2])
+            && ((surface.bounds[2] - diameter).abs() > 0.01
+                || (surface.bounds[3] - 2.0 * diameter).abs() > 0.01)
         {
             return Err(format!(
-                "switch slot {:?} does not fit its cap",
+                "switch track {:?} is not one disc wide and two tall",
                 surface.bounds
             ));
         }

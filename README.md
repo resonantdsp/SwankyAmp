@@ -73,11 +73,13 @@ between them, each outlined by its own V groove. Pro's material language
 carries over with 1.4's rose highlight as Free's accent on the lit rings,
 the selected outlines and the output meter. The bundled CC BY 4.0 material
 layers provide the graphite, brushed metal, shadows, and response lighting.
-The cabinet's on/off is a two-position vertical switch, a V slot baked into
-the faceplate with a brushed aluminium cap stamped at the top when on and the
-bottom when off; the cap is a baked sprite the compositor places from the
-parameter. Export the exact resolved geometry (layout manifest schema 3, which
-gives each section its outline radius and adds the switch slot) or capture
+The cabinet's on/off is a two-position vertical switch: a brushed aluminium
+disc in a V track baked into the faceplate, exactly one disc wide and two
+tall, the disc in the top half when on and the bottom half when off. The disc
+is a baked sprite the compositor places from the parameter. Knob markers are
+Pro's glossy black divots at the same proportions. Export the exact resolved
+geometry (layout manifest schema 4, which gives each section its outline
+radius and describes the switch track) or capture
 the editor at 1x and 2x with:
 
 ```sh

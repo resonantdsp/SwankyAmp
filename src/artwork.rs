@@ -22,34 +22,36 @@ const PACKAGE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/artwork.pack"))
 const MAX_HEADER_BYTES: usize = 4 * 1024 * 1024;
 const MAX_LAYERS: usize = 256;
 const MAX_DIMENSION: u32 = 16_384;
-/// Receipt and package schema 2 add the switch cap sprite after the response
-/// library; a schema-1 reader would pack it without knowing what it is.
-const RECEIPT_SCHEMA: u32 = 2;
-const PACKAGE_SCHEMA: u32 = 2;
-/// The cap sprite's three layers in package order: the cap's own premultiplied
-/// radiance, the shadow it casts, and the coverage that composites both.
-const CAP_LAYERS: [(&str, &str, &str); 3] = [
-    ("cap-color", "cap/color.exr", "scene-linear-radiance"),
+/// Receipt and package schema 2 added the switch sprite after the response
+/// library; schema 3 replaces schema 2's pill cap with the disc, whose layers
+/// a schema-2 reader would mistake for the cap.
+const RECEIPT_SCHEMA: u32 = 3;
+const PACKAGE_SCHEMA: u32 = 3;
+/// The disc sprite's three layers in package order: the disc's own
+/// premultiplied radiance, the shadow it casts, and the coverage that
+/// composites both.
+const DISC_LAYERS: [(&str, &str, &str); 3] = [
+    ("disc-color", "disc/color.exr", "scene-linear-radiance"),
     (
-        "cap-shadow",
-        "cap/shadow.exr",
+        "disc-shadow",
+        "disc/shadow.exr",
         "display-linear-multiplicative",
     ),
-    ("cap-coverage", "cap/coverage.exr", "coverage"),
+    ("disc-coverage", "disc/coverage.exr", "coverage"),
 ];
 
 /// Roles whose values are fractions: a factor or a coverage above one would
 /// brighten what it is meant to darken or cover.
 fn bounded(role: &str) -> bool {
-    matches!(role, "shadow" | "cap-shadow" | "cap-coverage")
+    matches!(role, "shadow" | "disc-shadow" | "disc-coverage")
 }
 
-/// The cap sprite's plan size in interface pixels and in texels.
-fn cap_sprite() -> ([f32; 2], [u32; 2]) {
-    let sprite = style::PhysicalStyle::default().cap_sprite();
+/// The disc sprite's plan size in interface pixels and in texels.
+fn disc_sprite() -> ([f32; 2], [u32; 2]) {
+    let sprite = style::PhysicalStyle::default().disc_sprite();
     (
         sprite,
-        sprite.map(|side| side as u32 * style::CAP_SUPERSAMPLE),
+        sprite.map(|side| side as u32 * style::DISC_SUPERSAMPLE),
     )
 }
 
@@ -194,7 +196,7 @@ struct RuntimeScene {
     shadow: PackedLayer,
     ring_responses: Vec<PackedLayer>,
     ring_steps: u32,
-    cap: Vec<PackedLayer>,
+    disc: Vec<PackedLayer>,
 }
 
 fn runtime_scene() -> Option<&'static RuntimeScene> {
@@ -221,7 +223,7 @@ fn load_runtime_scene() -> Option<RuntimeScene> {
         .filter(|layer| layer.role == "ring-response")
         .cloned()
         .collect();
-    let cap: Vec<_> = CAP_LAYERS
+    let disc: Vec<_> = DISC_LAYERS
         .iter()
         .map(|(role, ..)| {
             header
@@ -241,7 +243,7 @@ fn load_runtime_scene() -> Option<RuntimeScene> {
         shadow,
         ring_responses,
         ring_steps: header.response_library.ring_steps,
-        cap,
+        disc,
     })
 }
 
@@ -281,16 +283,15 @@ struct Uniform {
     marker: [f32; 4],
     polar: [f32; 4],
     extent: [f32; 4],
-    /// The cap sprite's top-left corner and size, in interface pixels.
-    cap: [f32; 4],
-    /// The cap's divot radius, and 1 once the cap has been placed.
-    cap_style: [f32; 4],
+    /// The disc sprite's top-left corner and size, in interface pixels.
+    disc: [f32; 4],
     controls: [Control; 32],
 }
 
 impl Uniform {
     fn new(params: &truce_iced::ParamCache<SwankyAmpParams>, ring_steps: u32) -> Self {
         let physical = style::PhysicalStyle::default();
+        let marker = style::MarkerStyle::default();
         let mut result = Self {
             scene: [style::WIDTH, style::HEIGHT, 0.0, ring_steps as f32],
             ring: [
@@ -305,7 +306,7 @@ impl Uniform {
                 physical.ring_radiance[2],
                 0.0,
             ],
-            marker: [0.58, 0.065, 1.0, 0.0],
+            marker: [marker.radius, marker.half_width, marker.depth, 0.0],
             polar: [
                 physical.reflection_radial_knots[0],
                 physical.reflection_radial_knots[1],
@@ -318,11 +319,10 @@ impl Uniform {
                 0.0,
                 0.0,
             ],
-            cap: style::cap_sprite_bounds(
+            disc: style::disc_sprite_bounds(
                 layout::SWITCH.bounds,
                 params.get(layout::CABINET_SWITCH) >= 0.5,
             ),
-            cap_style: [physical.cap_divot, 1.0, 0.0, 0.0],
             controls: [Control {
                 geometry: [0.0; 4],
                 state: [0.0; 4],
@@ -495,7 +495,7 @@ impl Primitive for ScenePrimitive {
             let base = upload_layer(device, queue, self.scene, &self.scene.base);
             let shadow = upload_layer(device, queue, self.scene, &self.scene.shadow);
             let responses = upload_array(device, queue, self.scene, &self.scene.ring_responses);
-            let cap = upload_array(device, queue, self.scene, &self.scene.cap);
+            let disc = upload_array(device, queue, self.scene, &self.scene.disc);
             let binding = device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("Free artwork binding"),
                 layout: &pipeline.layout,
@@ -522,7 +522,7 @@ impl Primitive for ScenePrimitive {
                     },
                     wgpu::BindGroupEntry {
                         binding: 5,
-                        resource: wgpu::BindingResource::TextureView(&cap),
+                        resource: wgpu::BindingResource::TextureView(&disc),
                     },
                 ],
             });
@@ -930,7 +930,7 @@ fn validate_receipt(receipt: &Receipt) -> Result<(), String> {
                 .checked_mul(library.ring_steps as usize)
                 .ok_or("response layer count overflow")?,
         )
-        .and_then(|count| count.checked_add(library.meter_sizes.len() + CAP_LAYERS.len()))
+        .and_then(|count| count.checked_add(library.meter_sizes.len() + DISC_LAYERS.len()))
         .ok_or("response layer count overflow")?;
     if receipt.layers.len() != expected_layers || receipt.layers.len() > MAX_LAYERS {
         return Err("receipt response layer count is invalid".into());
@@ -996,8 +996,8 @@ fn validate_receipt(receipt: &Receipt) -> Result<(), String> {
         }
         index += 1;
     }
-    let (sprite, texels) = cap_sprite();
-    for (role, file, semantics) in CAP_LAYERS {
+    let (sprite, texels) = disc_sprite();
+    for (role, file, semantics) in DISC_LAYERS {
         let layer = &receipt.layers[index];
         validate_receipt_layer(layer, role, file, texels, semantics)?;
         if layer.size != Some(sprite)
@@ -1007,7 +1007,7 @@ fn validate_receipt(receipt: &Receipt) -> Result<(), String> {
             || layer.value.is_some()
             || layer.peak.is_some()
         {
-            return Err(format!("{file} metadata does not describe the cap sprite"));
+            return Err(format!("{file} metadata does not describe the disc sprite"));
         }
         index += 1;
     }
@@ -1143,7 +1143,7 @@ fn validate_packed_order(header: &PackageHeader) -> Result<(), String> {
             header.response_library.ring_radii.len() * header.response_library.ring_steps as usize,
         )
         .and_then(|count| {
-            count.checked_add(header.response_library.meter_sizes.len() + CAP_LAYERS.len())
+            count.checked_add(header.response_library.meter_sizes.len() + DISC_LAYERS.len())
         })
         .ok_or("packed response count overflow")?;
     if header.layers.len() != expected
@@ -1191,9 +1191,9 @@ fn validate_packed_order(header: &PackageHeader) -> Result<(), String> {
         index += 1;
     }
     // The compositor stamps the sprite at a size it computes from the physical
-    // profile, so a sprite of any other size would draw the wrong cap.
-    let (sprite, texels) = cap_sprite();
-    for (role, file, semantics) in CAP_LAYERS {
+    // profile, so a sprite of any other size would draw the wrong disc.
+    let (sprite, texels) = disc_sprite();
+    for (role, file, semantics) in DISC_LAYERS {
         let layer = &header.layers[index];
         if layer.role != role
             || layer.file != file
@@ -1201,7 +1201,7 @@ fn validate_packed_order(header: &PackageHeader) -> Result<(), String> {
             || [layer.width, layer.height] != texels
             || layer.size != Some(sprite)
         {
-            return Err("packed switch cap sprite is invalid".into());
+            return Err("packed switch disc sprite is invalid".into());
         }
         index += 1;
     }
@@ -1409,9 +1409,9 @@ mod tests {
     #[test]
     fn bundled_artwork_rejects_corrupt_and_unreferenced_payload_bytes() {
         let header = validate_package_bytes(PACKAGE, true).unwrap();
-        // The bundle carries the switch cap the compositor stamps.
+        // The bundle carries the switch disc the compositor stamps.
         assert!(
-            CAP_LAYERS
+            DISC_LAYERS
                 .iter()
                 .all(|(role, ..)| header.layers.iter().any(|layer| layer.role == *role))
         );
