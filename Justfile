@@ -102,6 +102,10 @@ export-layout output="assets/layout":
 capture output="verification/interface":
     cargo run --quiet --bin swanky-amp-2 -- capture "{{ output }}"
 
+# Capture with a factory preset applied, its name in the header.
+capture-preset name="high gain" output="verification/interface-preset":
+    cargo run --quiet --bin swanky-amp-2 -- capture "{{ output }}" preset "{{ name }}"
+
 # Capture after a deterministic stereo note so the meters are lit.
 capture-live output="verification/interface-live":
     cargo run --quiet --bin swanky-amp-2 -- capture "{{ output }}" live

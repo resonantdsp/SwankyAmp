@@ -61,3 +61,15 @@ install beside Swanky Amp 1.4.0. The interface, factory preset bank and signed c
   control on the released -26 to +8 dB scale, output after the cabinet and
   Output control on -30 to 0 dB, with instant attack and a half-second
   release. Hosts that show plugin meters receive the same four levels.
+- Made the header's preset field live: `‹` and `›` step through the refitted
+  factory presets and the user's own, and the name opens a menu with Init,
+  every preset, Save, Save as…, Remove, Import 1.x presets and Open folder.
+  Presets apply through the host, the selection survives a session reload, and
+  a dot marks a changed preset. Input and the cabinet switch stay with the
+  session, as in 1.4.0.
+- Kept presets in the 1.x XML format, one file per preset under
+  `Resonant DSP/Swanky Amp 2`, and applied 1.4.0's migrations for presets from
+  earlier releases. Unreadable files are skipped and named.
+- Imported 1.4.0 user presets on first run and on request, refitting each one's
+  Low, Mid, High and Power Drive to the corrected tone stack like the factory
+  set, without overwriting a version 2 preset or touching the 1.4.0 files.

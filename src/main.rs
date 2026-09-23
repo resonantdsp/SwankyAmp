@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use swanky_amp::{Plugin, artwork, layout};
+use swanky_amp::{Plugin, artwork, layout, presets};
 use truce::core::{
     AudioBuffer, AudioConfig, EventList, PluginExport, PluginRuntime, ProcessContext,
 };
@@ -23,11 +23,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .map(String::as_str)
                 .unwrap_or("verification/interface"),
         );
-        let live = arguments.get(2).map(String::as_str) == Some("live");
+        let fixture = arguments.get(2).map(String::as_str);
+        let preset = match fixture {
+            Some("preset") => Some(arguments.get(3).ok_or("capture <dir> preset <name>")?),
+            _ => None,
+        };
         std::fs::create_dir_all(&destination)?;
         for scale in [1.0, 2.0] {
-            let (pixels, width, height) = if live {
+            let (pixels, width, height) = if fixture == Some("live") {
                 truce::core::screenshot::render_pixels_for_at_scale(&mut playing(), scale)
+            } else if let Some(name) = preset {
+                let mut plugin = Plugin::create();
+                plugin.init();
+                presets::apply_offline(
+                    &presets::Library::with_user_root(None),
+                    &format!("factory:{name}"),
+                    plugin.params(),
+                )?;
+                truce::core::screenshot::render_pixels_for_at_scale(&mut plugin, scale)
             } else {
                 truce::core::screenshot::render_with_state_at_scale::<Plugin>(None, scale)
             };
