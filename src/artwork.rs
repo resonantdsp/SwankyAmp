@@ -22,6 +22,36 @@ const PACKAGE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/artwork.pack"))
 const MAX_HEADER_BYTES: usize = 4 * 1024 * 1024;
 const MAX_LAYERS: usize = 256;
 const MAX_DIMENSION: u32 = 16_384;
+/// Receipt and package schema 2 add the switch cap sprite after the response
+/// library; a schema-1 reader would pack it without knowing what it is.
+const RECEIPT_SCHEMA: u32 = 2;
+const PACKAGE_SCHEMA: u32 = 2;
+/// The cap sprite's three layers in package order: the cap's own premultiplied
+/// radiance, the shadow it casts, and the coverage that composites both.
+const CAP_LAYERS: [(&str, &str, &str); 3] = [
+    ("cap-color", "cap/color.exr", "scene-linear-radiance"),
+    (
+        "cap-shadow",
+        "cap/shadow.exr",
+        "display-linear-multiplicative",
+    ),
+    ("cap-coverage", "cap/coverage.exr", "coverage"),
+];
+
+/// Roles whose values are fractions: a factor or a coverage above one would
+/// brighten what it is meant to darken or cover.
+fn bounded(role: &str) -> bool {
+    matches!(role, "shadow" | "cap-shadow" | "cap-coverage")
+}
+
+/// The cap sprite's plan size in interface pixels and in texels.
+fn cap_sprite() -> ([f32; 2], [u32; 2]) {
+    let sprite = style::PhysicalStyle::default().cap_sprite();
+    (
+        sprite,
+        sprite.map(|side| side as u32 * style::CAP_SUPERSAMPLE),
+    )
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Receipt {
@@ -164,6 +194,7 @@ struct RuntimeScene {
     shadow: PackedLayer,
     ring_responses: Vec<PackedLayer>,
     ring_steps: u32,
+    cap: Vec<PackedLayer>,
 }
 
 fn runtime_scene() -> Option<&'static RuntimeScene> {
@@ -190,6 +221,16 @@ fn load_runtime_scene() -> Option<RuntimeScene> {
         .filter(|layer| layer.role == "ring-response")
         .cloned()
         .collect();
+    let cap: Vec<_> = CAP_LAYERS
+        .iter()
+        .map(|(role, ..)| {
+            header
+                .layers
+                .iter()
+                .find(|layer| layer.role == *role)
+                .cloned()
+        })
+        .collect::<Option<_>>()?;
     if [base.width, base.height] != [shadow.width, shadow.height] {
         return None;
     }
@@ -200,6 +241,7 @@ fn load_runtime_scene() -> Option<RuntimeScene> {
         shadow,
         ring_responses,
         ring_steps: header.response_library.ring_steps,
+        cap,
     })
 }
 
@@ -239,6 +281,10 @@ struct Uniform {
     marker: [f32; 4],
     polar: [f32; 4],
     extent: [f32; 4],
+    /// The cap sprite's top-left corner and size, in interface pixels.
+    cap: [f32; 4],
+    /// The cap's divot radius, and 1 once the cap has been placed.
+    cap_style: [f32; 4],
     controls: [Control; 32],
 }
 
@@ -272,6 +318,11 @@ impl Uniform {
                 0.0,
                 0.0,
             ],
+            cap: style::cap_sprite_bounds(
+                layout::SWITCH.bounds,
+                params.get(layout::CABINET_SWITCH) >= 0.5,
+            ),
+            cap_style: [physical.cap_divot, 1.0, 0.0, 0.0],
             controls: [Control {
                 geometry: [0.0; 4],
                 state: [0.0; 4],
@@ -352,6 +403,7 @@ impl Pipeline for ScenePipeline {
                 texture_entry(0, wgpu::TextureViewDimension::D2),
                 texture_entry(1, wgpu::TextureViewDimension::D2),
                 texture_entry(2, wgpu::TextureViewDimension::D2Array),
+                texture_entry(5, wgpu::TextureViewDimension::D2Array),
                 wgpu::BindGroupLayoutEntry {
                     binding: 3,
                     visibility: wgpu::ShaderStages::FRAGMENT,
@@ -443,6 +495,7 @@ impl Primitive for ScenePrimitive {
             let base = upload_layer(device, queue, self.scene, &self.scene.base);
             let shadow = upload_layer(device, queue, self.scene, &self.scene.shadow);
             let responses = upload_array(device, queue, self.scene, &self.scene.ring_responses);
+            let cap = upload_array(device, queue, self.scene, &self.scene.cap);
             let binding = device.create_bind_group(&wgpu::BindGroupDescriptor {
                 label: Some("Free artwork binding"),
                 layout: &pipeline.layout,
@@ -466,6 +519,10 @@ impl Primitive for ScenePrimitive {
                     wgpu::BindGroupEntry {
                         binding: 4,
                         resource: wgpu::BindingResource::Sampler(&pipeline.sampler),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 5,
+                        resource: wgpu::BindingResource::TextureView(&cap),
                     },
                 ],
             });
@@ -677,7 +734,7 @@ pub fn unpack(package_path: &Path, destination: &Path) -> Result<PackageHeader, 
         });
     }
     let receipt = Receipt {
-        schema: 1,
+        schema: RECEIPT_SCHEMA,
         manifest: ReceiptManifest {
             schema: layout::SCHEMA,
             view: header.view.clone(),
@@ -736,12 +793,15 @@ fn build_package(directory: &Path) -> Result<Vec<u8>, String> {
         for pixel in decoded.pixels {
             let word = encode_rgb9e5(pixel)
                 .map_err(|error| format!("{} contains {error}", source.file))?;
-            if source.role == "shadow"
+            if bounded(&source.role)
                 && decode_rgb9e5(word)
                     .into_iter()
                     .any(|channel| channel > 1.001)
             {
-                return Err("shadow values must stay between zero and one".into());
+                return Err(format!(
+                    "{} values must stay between zero and one",
+                    source.role
+                ));
             }
             payload.extend_from_slice(&word.to_le_bytes());
         }
@@ -765,7 +825,7 @@ fn build_package(directory: &Path) -> Result<Vec<u8>, String> {
         });
     }
     let header = PackageHeader {
-        schema: 1,
+        schema: PACKAGE_SCHEMA,
         view: receipt.manifest.view,
         logical_size: [
             receipt.manifest.logical_size[0] as u32,
@@ -803,7 +863,7 @@ fn build_package(directory: &Path) -> Result<Vec<u8>, String> {
 fn validate_receipt(receipt: &Receipt) -> Result<(), String> {
     let current = layout::manifest();
     layout::validate(&current)?;
-    if receipt.schema != 1
+    if receipt.schema != RECEIPT_SCHEMA
         || receipt.manifest.schema != layout::SCHEMA
         || receipt.manifest.view != "amp"
     {
@@ -870,7 +930,7 @@ fn validate_receipt(receipt: &Receipt) -> Result<(), String> {
                 .checked_mul(library.ring_steps as usize)
                 .ok_or("response layer count overflow")?,
         )
-        .and_then(|count| count.checked_add(library.meter_sizes.len()))
+        .and_then(|count| count.checked_add(library.meter_sizes.len() + CAP_LAYERS.len()))
         .ok_or("response layer count overflow")?;
     if receipt.layers.len() != expected_layers || receipt.layers.len() > MAX_LAYERS {
         return Err("receipt response layer count is invalid".into());
@@ -936,6 +996,21 @@ fn validate_receipt(receipt: &Receipt) -> Result<(), String> {
         }
         index += 1;
     }
+    let (sprite, texels) = cap_sprite();
+    for (role, file, semantics) in CAP_LAYERS {
+        let layer = &receipt.layers[index];
+        validate_receipt_layer(layer, role, file, texels, semantics)?;
+        if layer.size != Some(sprite)
+            || layer.family.is_some()
+            || layer.radius.is_some()
+            || layer.step.is_some()
+            || layer.value.is_some()
+            || layer.peak.is_some()
+        {
+            return Err(format!("{file} metadata does not describe the cap sprite"));
+        }
+        index += 1;
+    }
     Ok(())
 }
 
@@ -988,7 +1063,7 @@ fn validate_package_bytes(
             .ok_or("truncated artwork header")?,
     )
     .map_err(|error| format!("invalid artwork header: {error}"))?;
-    if header.schema != 1
+    if header.schema != PACKAGE_SCHEMA
         || header.view != "amp"
         || header.layers.is_empty()
         || header.layers.len() > MAX_LAYERS
@@ -1045,7 +1120,7 @@ fn validate_package_bytes(
             if decoded
                 .into_iter()
                 .any(|channel| !channel.is_finite() || channel > 65_408.0)
-                || (layer.role == "shadow" && decoded.into_iter().any(|channel| channel > 1.001))
+                || (bounded(&layer.role) && decoded.into_iter().any(|channel| channel > 1.001))
             {
                 return Err(format!(
                     "packed {} layer contains invalid values",
@@ -1067,7 +1142,9 @@ fn validate_packed_order(header: &PackageHeader) -> Result<(), String> {
         .checked_add(
             header.response_library.ring_radii.len() * header.response_library.ring_steps as usize,
         )
-        .and_then(|count| count.checked_add(header.response_library.meter_sizes.len()))
+        .and_then(|count| {
+            count.checked_add(header.response_library.meter_sizes.len() + CAP_LAYERS.len())
+        })
         .ok_or("packed response count overflow")?;
     if header.layers.len() != expected
         || header.layers[0].role != "base"
@@ -1110,6 +1187,21 @@ fn validate_packed_order(header: &PackageHeader) -> Result<(), String> {
             || layer.size != Some(size)
         {
             return Err("packed meter response order is invalid".into());
+        }
+        index += 1;
+    }
+    // The compositor stamps the sprite at a size it computes from the physical
+    // profile, so a sprite of any other size would draw the wrong cap.
+    let (sprite, texels) = cap_sprite();
+    for (role, file, semantics) in CAP_LAYERS {
+        let layer = &header.layers[index];
+        if layer.role != role
+            || layer.file != file
+            || layer.semantics != semantics
+            || [layer.width, layer.height] != texels
+            || layer.size != Some(sprite)
+        {
+            return Err("packed switch cap sprite is invalid".into());
         }
         index += 1;
     }
@@ -1317,7 +1409,12 @@ mod tests {
     #[test]
     fn bundled_artwork_rejects_corrupt_and_unreferenced_payload_bytes() {
         let header = validate_package_bytes(PACKAGE, true).unwrap();
-        assert_eq!(header.layers.len(), 15);
+        // The bundle carries the switch cap the compositor stamps.
+        assert!(
+            CAP_LAYERS
+                .iter()
+                .all(|(role, ..)| header.layers.iter().any(|layer| layer.role == *role))
+        );
 
         let mut corrupt = PACKAGE.to_vec();
         let header_length = u32::from_le_bytes(corrupt[8..12].try_into().unwrap()) as usize;

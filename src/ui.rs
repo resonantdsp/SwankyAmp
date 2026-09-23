@@ -8,9 +8,7 @@ use crate::{
 use iced_core::{Element, Length, Padding, Theme, mouse, text::LineHeight};
 use std::sync::Arc;
 use truce::prelude::Params;
-use truce_iced::iced::widget::{
-    Column, Space, column, container, mouse_area, row, stack, text, toggler,
-};
+use truce_iced::iced::widget::{Column, Space, column, container, mouse_area, row, stack, text};
 use truce_iced::iced::{Alignment, Border, Color, Task};
 use truce_iced::{IcedPlugin, Message, ParamCache, ParamMessage, PluginContext};
 
@@ -75,6 +73,7 @@ impl FreeUi {
         for section in layout::SECTIONS {
             layers.push(surface(section, None));
         }
+        layers.push(surface(layout::SWITCH, None));
         if baked && let Some(backdrop) = crate::artwork::backdrop::<R>(params) {
             layers.push(backdrop);
         }
@@ -98,7 +97,7 @@ impl FreeUi {
         for control in layout::CONTROLS {
             layers.push(match control.kind {
                 ControlKind::Knob => control_column(control, params),
-                ControlKind::Toggle => cabinet_toggle(control, params),
+                ControlKind::Toggle => cabinet_switch(control, params),
             });
         }
         layers.push(place(
@@ -418,49 +417,110 @@ fn display_value(id: u32, normalized: f32) -> String {
     }
 }
 
-fn cabinet_toggle<'a, R: FreeRenderer + 'a>(
+/// The cabinet switch: Pro's slider slot and cap stood on end with two
+/// positions, up for on. A press anywhere on its column flips it and a
+/// right-click restores the default, as the knobs reset.
+fn cabinet_switch<'a, R: FreeRenderer + 'a>(
     spec: layout::ControlSpec,
     params: &'a ParamCache<SwankyAmpParams>,
 ) -> Element<'a, Msg, Theme, R> {
     let id = spec.id;
-    let toggle = toggler(params.get(id) >= 0.5)
-        .on_toggle(move |on| {
-            Message::Param(ParamMessage::Batch(vec![
-                ParamMessage::BeginEdit(id),
-                ParamMessage::SetNormalized(id, if on { 1.0 } else { 0.0 }),
-                ParamMessage::EndEdit(id),
-            ]))
-        })
-        .size(18.0)
-        .style(|_, status| {
-            // A toggler that has not seen an event yet reports itself
-            // disabled; only the switch position decides the colour.
-            let (toggler::Status::Active { is_toggled: on }
-            | toggler::Status::Hovered { is_toggled: on }
-            | toggler::Status::Disabled { is_toggled: on }) = status;
-            toggler::Style {
-                background: if on { ACCENT } else { DIM.scale_alpha(0.35) }.into(),
-                background_border_width: 0.0,
-                background_border_color: Color::TRANSPARENT,
-                foreground: INK.into(),
-                foreground_border_width: 0.0,
-                foreground_border_color: Color::TRANSPARENT,
-                text_color: None,
-                border_radius: None,
-                padding_ratio: 0.1,
-            }
-        });
-    let mut component = Component::new(format!("parameter.{id}.toggle"), "toggle", "native");
+    let on = params.get(id) >= 0.5;
+    let set = move |value: bool| {
+        Message::Param(ParamMessage::Batch(vec![
+            ParamMessage::BeginEdit(id),
+            ParamMessage::SetNormalized(id, if value { 1.0 } else { 0.0 }),
+            ParamMessage::EndEdit(id),
+        ]))
+    };
+    let default_on = default_normalized(params, id) >= 0.5;
+    let baked = R::LOAD_ARTWORK && crate::artwork::loaded();
+    let [cx, cy] = spec.center;
+    let mut layers: Vec<Element<'a, Msg, Theme, R>> = Vec::new();
+    if !baked {
+        layers.extend(flat_switch(layout::SWITCH.bounds, on));
+    }
+    layers.push(place(
+        [
+            cx - CONTROL_WIDTH / 2.0,
+            cy + KNOB_ROW_HEIGHT / 2.0 + 4.0,
+            CONTROL_WIDTH,
+            18.0,
+        ],
+        text(if on { "ON" } else { "OFF" })
+            .size(13)
+            .line_height(LineHeight::Absolute(18.0.into()))
+            .width(Length::Fill)
+            .align_x(iced_core::text::Alignment::Center)
+            .color(if on { ACCENT } else { DIM }),
+    ));
+    let mut component = Component::new(format!("parameter.{id}.switch"), "toggle", "native");
     component.parameter = Some(id);
-    place(
-        [spec.center[0] - 42.0, spec.center[1] - 11.0, 70.0, 24.0],
-        row![
-            text(spec.label).size(11).color(DIM),
-            layout::mark(component, toggle)
-        ]
-        .align_y(Alignment::Center)
-        .spacing(8),
-    )
+    layers.push(place(
+        [
+            cx - CONTROL_WIDTH / 2.0,
+            cy - KNOB_ROW_HEIGHT / 2.0,
+            CONTROL_WIDTH,
+            KNOB_ROW_HEIGHT + 22.0,
+        ],
+        layout::mark(
+            component,
+            mouse_area(Space::new().width(Length::Fill).height(Length::Fill))
+                .on_press(set(!on))
+                .on_right_press(set(default_on))
+                .interaction(mouse::Interaction::Pointer),
+        ),
+    ));
+    stack(layers).into()
+}
+
+/// The switch without its bake: the slot and a flat cap at the same place
+/// the compositor would stamp the baked one.
+fn flat_switch<'a, R: FreeRenderer + 'a>(
+    slot: [f32; 4],
+    on: bool,
+) -> Vec<Element<'a, Msg, Theme, R>> {
+    let physical = style::PhysicalStyle::default();
+    let [x, y, width, height] = style::cap_sprite_bounds(slot, on);
+    let [cap_width, cap_length] = physical.cap_size;
+    let cap = [
+        x + (width - cap_width) / 2.0,
+        y + (height - cap_length) / 2.0,
+        cap_width,
+        cap_length,
+    ];
+    let divot = physical.cap_divot;
+    let fill = move |color: Color, radius: f32| {
+        move |_: &Theme| truce_iced::iced::widget::container::Style {
+            background: Some(color.into()),
+            border: Border {
+                radius: radius.into(),
+                ..Border::default()
+            },
+            ..Default::default()
+        }
+    };
+    let blank = || {
+        container(Space::new())
+            .width(Length::Fill)
+            .height(Length::Fill)
+    };
+    vec![
+        place(slot, blank().style(fill(GROOVE, slot[2] / 2.0))),
+        place(
+            cap,
+            blank().style(fill(Color::from_rgb(0.48, 0.51, 0.53), cap_width / 2.0)),
+        ),
+        place(
+            [
+                cap[0] + cap_width / 2.0 - divot,
+                cap[1] + cap_length / 2.0 - divot,
+                2.0 * divot,
+                2.0 * divot,
+            ],
+            blank().style(fill(Color::from_rgb(0.025, 0.03, 0.032), divot)),
+        ),
+    ]
 }
 
 fn levels_meters<'a, R: FreeRenderer + 'a>() -> Vec<Element<'a, Msg, Theme, R>> {

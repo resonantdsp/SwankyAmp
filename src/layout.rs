@@ -62,10 +62,13 @@ impl ControlSpec {
 pub const CONTROLS: [ControlSpec; 20] = [
     ControlSpec::knob(0, "INPUT", "LEVELS", [176.0, 148.0], true),
     ControlSpec::knob(1, "OUTPUT", "LEVELS", [378.0, 148.0], true),
-    ControlSpec::knob(11, "BRIGHT", "CABINET", [641.0, 148.0], false),
-    ControlSpec::knob(12, "DISTANCE", "CABINET", [777.0, 148.0], false),
-    ControlSpec::knob(13, "DYNAMIC", "CABINET", [913.0, 148.0], false),
-    ControlSpec::toggle(10, "ON", "CABINET", [1022.0, 97.0]),
+    // The switch leads the Cabinet row: whether the cabinet is in at all is
+    // read before the knobs that shape it, and it takes the same first
+    // column as Staging and Tone below.
+    ControlSpec::toggle(10, "CABINET", "CABINET", [573.0, 148.0]),
+    ControlSpec::knob(11, "BRIGHT", "CABINET", [709.0, 148.0], false),
+    ControlSpec::knob(12, "DISTANCE", "CABINET", [845.0, 148.0], false),
+    ControlSpec::knob(13, "DYNAMIC", "CABINET", [981.0, 148.0], false),
     ControlSpec::knob(14, "DRIVE", "PREAMP", [101.0, 324.0], true),
     ControlSpec::knob(15, "TIGHT", "PREAMP", [245.0, 324.0], false),
     ControlSpec::knob(16, "GRIT", "PREAMP", [389.0, 324.0], false),
@@ -153,6 +156,22 @@ pub const SECTIONS: [SurfaceSpec; 6] = [
     SurfaceSpec::section("section.power", "power-amp", [14.0, 430.0, 462.0, 164.0]),
     SurfaceSpec::section("section.tone", "tone", [488.0, 430.0, 578.0, 164.0]),
 ];
+
+/// The parameter the cabinet switch sets.
+pub const CABINET_SWITCH: u32 = 10;
+
+/// The cabinet switch's slot, centred on the knob row.
+pub const SWITCH: SurfaceSpec = SurfaceSpec::plain(
+    "switch.cabinet",
+    "switch",
+    "v-slot",
+    [
+        573.0 - style::SLOT_HALF,
+        148.0 - style::SWITCH_SLOT_LENGTH / 2.0,
+        2.0 * style::SLOT_HALF,
+        style::SWITCH_SLOT_LENGTH,
+    ],
+);
 
 /// Pro's meter columns: 20 px wide, 4 px apart, rising from the top of the
 /// lit ring to the knob's label row so the L/R captions share the readout line.
@@ -356,9 +375,10 @@ pub struct PhysicalLayout {
     pub surfaces: Vec<Surface>,
 }
 
-/// Schema 2 adds the section outline radius. An older producer would bake
-/// square outlines without noticing the field, so the number changes.
-pub const SCHEMA: u32 = 2;
+/// Schema 2 added the section outline radius; schema 3 adds the switch slot
+/// family, whose moving cap an older producer would not bake. Either would
+/// be missed silently by a producer that ignored it, so the number changes.
+pub const SCHEMA: u32 = 3;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Manifest {
@@ -443,7 +463,7 @@ pub fn resolve<R: FreeRenderer>(
             .filter(|component| {
                 matches!(
                     component.kind.as_str(),
-                    "panel" | "section" | "knob" | "meter"
+                    "panel" | "section" | "knob" | "meter" | "switch"
                 )
             })
             .map(|component| Surface {
@@ -489,13 +509,14 @@ pub fn validate(manifest: &Manifest) -> Result<(), String> {
     if manifest.physical_sha256 != expected_hash {
         return Err("physical layout hash differs".into());
     }
-    let mut counts = [0usize; 4];
+    let mut counts = [0usize; 5];
     for surface in &manifest.physical.surfaces {
         let index = match surface.kind.as_str() {
             "panel" => 0,
             "section" => 1,
             "knob" => 2,
             "meter" => 3,
+            "switch" => 4,
             kind => return Err(format!("unsupported surface kind {kind}")),
         };
         counts[index] += 1;
@@ -528,10 +549,30 @@ pub fn validate(manifest: &Manifest) -> Result<(), String> {
             ));
         }
     }
-    if counts != [3, 6, 19, 4] {
+    if counts != [3, 6, 19, 4, 1] {
         return Err(format!("unexpected physical surface counts: {counts:?}"));
     }
+    switch_fits(manifest)?;
     separate_sections(manifest)
+}
+
+/// A slot must be exactly as wide as the cap's V and long enough for the cap
+/// to travel between its round ends, or the baked cap would not sit in it.
+fn switch_fits(manifest: &Manifest) -> Result<(), String> {
+    let profile = &manifest.physical.profile;
+    for surface in &manifest.physical.surfaces {
+        if surface.kind == "switch"
+            && ((surface.bounds[2] - 2.0 * profile.slot_half).abs() > 0.01
+                || profile.switch_travel(surface.bounds[3]) < 4.0
+                || profile.cap_size[0] <= surface.bounds[2])
+        {
+            return Err(format!(
+                "switch slot {:?} does not fit its cap",
+                surface.bounds
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// Each section's groove must stay its own outline: two boxes closer than a

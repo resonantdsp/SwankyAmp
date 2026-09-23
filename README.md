@@ -47,8 +47,12 @@ between them, each outlined by its own V groove. Pro's material language
 carries over with 1.4's rose highlight as Free's accent on the lit rings,
 the selected outlines and the output meter. The bundled CC BY 4.0 material
 layers provide the graphite, brushed metal, shadows, and response lighting.
-Export the exact resolved geometry (layout manifest schema 2, which gives each
-section its outline radius) or capture the editor at 1x and 2x with:
+The cabinet's on/off is a two-position vertical switch, a V slot baked into
+the faceplate with a brushed aluminium cap stamped at the top when on and the
+bottom when off; the cap is a baked sprite the compositor places from the
+parameter. Export the exact resolved geometry (layout manifest schema 3, which
+gives each section its outline radius and adds the switch slot) or capture
+the editor at 1x and 2x with:
 
 ```sh
 just export-layout /tmp/swanky-layout

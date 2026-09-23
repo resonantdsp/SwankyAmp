@@ -32,3 +32,6 @@ factory preset bank and signed candidate qualification are still in progress.
   as Pro's one-line "SWANKY AMP FREE 2.0", and replaced the static
   oversampling label with Pro's button: it cycles Auto, 1x, 2x and 4x and
   names the factor the engine resolved.
+- Replaced the cabinet toggle with a vertical two-position switch in its own
+  column of the Cabinet row: Pro's slider slot and brushed cap stood on end,
+  with the ON label lit in the accent.
