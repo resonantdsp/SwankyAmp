@@ -31,6 +31,12 @@ install beside Swanky Amp 1.4.0. The interface, factory preset bank and signed c
   knee. The preamp and power level tables still hold the released values
   pending calibration against the final voicing, and the preset refit is
   measured with the new knee.
+- Added a multi-hour soak (`just soak`, `just soak-check`), rerun on each
+  release candidate, that gates level drift, tremolo-band modulation and
+  non-finite output on low-level input. It reproduced the 1.2 report of a
+  tremolo developing over hours (issue #34) on the legacy path after about 3.7
+  hours, localized to the released tone stack; the shipping path passed four
+  hours.
 - Added automation to build, sign and qualify macOS and Windows candidates,
   attempt a qualified Linux bundle, and promote only the accepted candidate
   bytes.

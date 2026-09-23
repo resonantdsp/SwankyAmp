@@ -72,6 +72,21 @@ It renders every factory preset at 44.1 kHz and 1x with the DI scaled by -12, -6
 
 The `PREAMP_SWEEP` and `POWER_SWEEP` level tables still hold the released 1.4.0 values. They will be measured once against the final voicing, so the knee's makeup lives in the stages and no table is regenerated yet.
 
+### Soak
+
+Issue #34 reported that 1.2 started sounding like a tremolo after hours of running. The soak is rerun on each release candidate:
+
+```sh
+just soak 4        # hours of audio per run, started in the background
+just soak-check    # verdict so far, or the final one
+```
+
+`just soak` builds the `soak` tool in release mode and starts four detached processes at 44.1 kHz with Auto oversampling (2x): the shipping path, built exactly as the plugin engine builds it, for `clean`, `level 11` (the highest-gain factory preset) and Init, plus `level 11` on the legacy released path for comparison. Shipping runs read `presets/factory-2.0.xml`; the legacy run reads the released bank. Each writes `target/soak/<path>-<preset>.csv`, with its console output in the matching `.log`, its process ID in the `.pid`, and the commit it was built from in `target/soak/commit`. `SOAK_DIR` and `SOAK_RUNS` (see `scripts/soak.sh`) choose another directory and set of runs, including fixed oversampling. Each run renders two independent channels, as a stereo host would: stationary white noise at -40 dBFS RMS, and the same floor with a decaying 110 Hz pluck peaking at -20 dBFS every two seconds, so the drift and compression envelopes charge and release throughout. Every 10 seconds of audio a CSV row records output RMS and peak, the RMS at each active triode, the tone stack, power amp, cabinet and output seams, non-finite and subnormal sample counts, the processing time, and the tremolo-band modulation of the 100 Hz RMS envelope between 0.5 and 15 Hz, both as an equivalent sinusoidal depth over the whole band and as the strongest single frequency.
+
+A shipping-path run passes when no sample is non-finite, its output RMS over the last 30 minutes is within 0.1 dB of the first 30 minutes, and its band modulation never exceeds the largest value of the first 10 minutes by more than 25% plus 0.005. Stationary noise alone reads about 0.06 through the estimator, so the margin covers its scatter while a coherent tremolo of about 0.4 dB depth still fails. The legacy run is reported for context and is not gated. `soak-check` also reports first-to-last-hour and per-seam drift and the slowest window against the median. On an Apple M-series core four hours of audio take about 25 minutes per run.
+
+The first four-hour soak, [`verification/soak/2026-09-22-summary.txt`](verification/soak/2026-09-22-summary.txt), reproduced issue #34 on the legacy path. On `level 11`, after about 3.7 hours (13,290 to 13,640 s) the tone-stack seam rose by 23 to 26 dB while the power amp, cabinet and output fell by 15 to 26 dB, with modulation indices of 9 to 17 against a baseline under 0.7. Every triode seam stayed within 0.002 dB, which places the instability in the released tone stack at 44.1 kHz rather than in the stages' drift and compression envelopes. The shipping path of that commit, which already ran the tube stages and tone stack at 2x, passed four hours on all three presets with at most 0.005 dB of drift, modulation at its baseline and no non-finite samples.
+
 The versioned reference corpus captures the released cold startup, including its 1024-sample output mute. The Rust path settles its configured nonlinear state for one second before audio begins, and stages re-enter warm when the continuous stage-count control brings them back into the signal path. Model comparison therefore applies the same one-second silent pre-roll to the released chain and excludes it from the measured WAVs. The cold corpus and warmed comparison remain separate so the startup difference is explicit.
 
 After `just setup`, open the standalone shell with:

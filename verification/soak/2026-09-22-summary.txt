@@ -1,0 +1,30 @@
+# Four-hour soak, 2026-09-22, as printed by `soak check` (`just soak-check`).
+# Binary built by `just soak 4` from commit 6347e03 (clean tree), the soak tool
+# on top of master de9341d9b9ad77f51f10e550fd1fc1f7ee3af9be. Its shipping path is
+# de9341d's: Auto oversampling (2x at 44.1 kHz), 20 kHz plate filter, released
+# tone mapping and knee, released preset bank. It predates the standard tone
+# mapping (#54) and unit knee (#55).
+# The four processes ran in parallel on an 8-core machine. Their slowest windows
+# fall at the same wall-clock moment (about 400 s after start) in all four runs,
+# so those ratios record a machine-wide stall, not subnormal state.
+
+corrected clean (finished, target/soak/corrected-clean.csv; 14400 of 14400 s audio; first minute took 6.0 s wall)
+  noise nonfinite=0 subnormal=0 rms_drift_30min_db=-0.0023 rms_drift_1h_db=-0.0032 max_modulation=0.0727@420s baseline_modulation=0.0727 modulation_limit=0.0959 max_peak_modulation=0.0228@0.60Hz,11860s slowest_window_vs_median=8.06 verdict=PASS
+    seam_drift_30min_db triode_1=+0.0000 triode_2=+0.0000 tone_stack=+0.0002 power_amp=-0.0000 cabinet=-0.0023 output=-0.0023
+  pluck nonfinite=0 subnormal=0 rms_drift_30min_db=+0.0001 rms_drift_1h_db=+0.0005 max_modulation=0.7784@1480s baseline_modulation=0.7731 modulation_limit=0.9714 max_peak_modulation=0.4973@0.50Hz,14170s slowest_window_vs_median=8.06 verdict=PASS
+    seam_drift_30min_db triode_1=-0.0000 triode_2=-0.0000 tone_stack=+0.0002 power_amp=+0.0001 cabinet=+0.0001 output=+0.0001
+corrected init (finished, target/soak/corrected-init.csv; 14400 of 14400 s audio; first minute took 6.0 s wall)
+  noise nonfinite=0 subnormal=0 rms_drift_30min_db=-0.0024 rms_drift_1h_db=-0.0030 max_modulation=0.0673@3260s baseline_modulation=0.0654 modulation_limit=0.0867 max_peak_modulation=0.0212@0.60Hz,11860s slowest_window_vs_median=7.85 verdict=PASS
+    seam_drift_30min_db triode_1=+0.0000 triode_2=-0.0001 triode_3=-0.0002 tone_stack=+0.0005 power_amp=+0.0003 cabinet=-0.0024 output=-0.0024
+  pluck nonfinite=0 subnormal=5 rms_drift_30min_db=+0.0001 rms_drift_1h_db=+0.0006 max_modulation=0.7242@10150s baseline_modulation=0.7190 modulation_limit=0.9038 max_peak_modulation=0.4558@0.50Hz,14170s slowest_window_vs_median=7.85 verdict=PASS
+    seam_drift_30min_db triode_1=-0.0005 triode_2=-0.0006 triode_3=-0.0006 tone_stack=+0.0000 power_amp=+0.0002 cabinet=+0.0001 output=+0.0001
+corrected level 11 (finished, target/soak/corrected-level-11.csv; 14400 of 14400 s audio; first minute took 6.1 s wall)
+  noise nonfinite=0 subnormal=0 rms_drift_30min_db=-0.0043 rms_drift_1h_db=-0.0014 max_modulation=0.0821@5080s baseline_modulation=0.0773 modulation_limit=0.1016 max_peak_modulation=0.0273@9.90Hz,1150s slowest_window_vs_median=8.08 verdict=PASS
+    seam_drift_30min_db triode_1=+0.0001 triode_2=+0.0001 triode_3=+0.0017 triode_4=+0.0013 triode_5=+0.0019 tone_stack=-0.0000 power_amp=-0.0018 cabinet=-0.0043 output=-0.0043
+  pluck nonfinite=0 subnormal=0 rms_drift_30min_db=+0.0001 rms_drift_1h_db=-0.0021 max_modulation=0.5381@8070s baseline_modulation=0.5321 modulation_limit=0.6702 max_peak_modulation=0.3587@0.50Hz,9240s slowest_window_vs_median=8.08 verdict=PASS
+    seam_drift_30min_db triode_1=+0.0001 triode_2=+0.0002 triode_3=-0.0011 triode_4=-0.0016 triode_5=-0.0010 tone_stack=+0.0002 power_amp=+0.0019 cabinet=+0.0000 output=+0.0001
+legacy level 11 (finished, target/soak/legacy-level-11.csv; 14400 of 14400 s audio; first minute took 3.4 s wall)
+  noise nonfinite=0 subnormal=0 rms_drift_30min_db=-15.6031 rms_drift_1h_db=-5.6941 max_modulation=17.3439@13640s baseline_modulation=0.0667 modulation_limit=0.0884 max_peak_modulation=1.8813@0.80Hz,13640s slowest_window_vs_median=6.48 verdict=CONTEXT
+    seam_drift_30min_db triode_1=-0.0002 triode_2=+0.0000 triode_3=-0.0002 triode_4=-0.0002 triode_5=-0.0006 tone_stack=+23.0015 power_amp=-15.3744 cabinet=-15.6031 output=-15.6031
+  pluck nonfinite=0 subnormal=227 rms_drift_30min_db=-25.7675 rms_drift_1h_db=-9.2959 max_modulation=9.3214@13300s baseline_modulation=0.6502 modulation_limit=0.8178 max_peak_modulation=1.4506@5.20Hz,13290s slowest_window_vs_median=6.48 verdict=CONTEXT
+    seam_drift_30min_db triode_1=-0.0000 triode_2=+0.0000 triode_3=-0.0001 triode_4=-0.0004 triode_5=-0.0012 tone_stack=+25.8949 power_amp=-23.8871 cabinet=-25.7675 output=-25.7675
