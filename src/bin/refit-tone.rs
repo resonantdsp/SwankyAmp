@@ -9,7 +9,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
-use swanky_amp::dsp::calibration;
+use swanky_amp::dsp::amp::{AmpControls, LevelTables};
+use swanky_amp::dsp::calibration::{self, Clips};
 use swanky_amp::dsp::refit::{
     self, DRIVE_DEADBAND_DB, Measurement, POWER_DRIVE_LIMIT, PresetRefit, RESTRAINT, Residual,
     ToneSettings,
@@ -21,21 +22,6 @@ use swanky_amp::presets;
 const CONTROL_TOLERANCE: f32 = 0.011;
 const DB_TOLERANCE: f64 = 0.05;
 
-/// Output change per factory preset in dB, chosen by ear on the single-coil
-/// clip on September 23, 2026 to equalise the presets' RMS through the
-/// shipping path. 1.4.0's bank was never balanced.
-const FACTORY_BALANCE_DB: [(&str, f64); 10] = [
-    ("clean", -0.3),
-    ("bright", 0.3),
-    ("edge", 0.8),
-    ("distort", -2.2),
-    ("dirty distort", 2.8),
-    ("pre drive", -1.0),
-    ("power drive", -2.2),
-    ("full drive", -0.8),
-    ("high gain", 1.5),
-    ("level 11", 5.4),
-];
 /// The Output control spans -35..+35 dB over its stored -1..+1.
 const OUTPUT_RANGE_DB: f64 = 35.;
 
@@ -48,15 +34,16 @@ struct Report {
     balance: Vec<Balance>,
 }
 
-/// One preset's Output change and the level it produces on the single-coil
-/// clip, with Output as stored before and after.
+/// One preset's Output change and the loudness it produces, with Output as
+/// stored before and after.
 #[derive(Debug, Serialize, Deserialize)]
 struct Balance {
     name: String,
     change_db: f64,
     output_before: f32,
     output_after: f32,
-    rms_dbfs: f64,
+    di_lufs: f64,
+    pluck_lufs: f64,
 }
 
 fn option(name: &str) -> Result<String, String> {
@@ -79,7 +66,7 @@ fn write(path: &Path, contents: &str) -> Result<(), String> {
     fs::write(path, contents).map_err(|error| format!("{}: {error}", path.display()))
 }
 
-fn compute(xml: &str, clip: &[f32]) -> Result<Report, String> {
+fn compute(xml: &str, clips: &Clips) -> Result<Report, String> {
     let input = refit::pluck(refit::SAMPLE_RATE);
     let names = presets::names(xml);
     let controls = names
@@ -100,7 +87,7 @@ fn compute(xml: &str, clip: &[f32]) -> Result<Report, String> {
             .map(|handle| handle.join().expect("refit thread panicked"))
             .collect::<Vec<_>>()
     });
-    let balance = balance(xml, &factory_bank(xml, &presets)?, clip)?;
+    let balance = balance(xml, &presets, clips)?;
     Ok(Report {
         sample_rate: refit::SAMPLE_RATE,
         pluck_seed: refit::PLUCK_SEED,
@@ -108,14 +95,6 @@ fn compute(xml: &str, clip: &[f32]) -> Result<Report, String> {
         presets,
         balance,
     })
-}
-
-fn balance_db(name: &str) -> Result<f64, String> {
-    FACTORY_BALANCE_DB
-        .iter()
-        .find(|(preset, _)| *preset == name)
-        .map(|(_, change)| *change)
-        .ok_or_else(|| format!("no factory balance for {name}"))
 }
 
 /// Six decimals resolve Output to under 0.0001 dB, and match the bank the
@@ -130,29 +109,37 @@ fn balanced_output(output: f32, change_db: f64) -> String {
     }
 }
 
-fn balance(released: &str, factory: &str, clip: &[f32]) -> Result<Vec<Balance>, String> {
-    let names = presets::names(factory);
-    let jobs = names
-        .iter()
-        .map(|name| {
-            Ok((
-                name,
-                balance_db(name)?,
-                presets::controls(released, name)?.output,
-                presets::controls(factory, name)?,
-            ))
-        })
+/// Moves each refitted preset's Output so its loudness, averaged over the
+/// single-coil DI and the pluck, matches the factory defaults'. The Output
+/// gain follows every nonlinear stage, so the change is exact.
+fn balance(released: &str, presets: &[PresetRefit], clips: &Clips) -> Result<Vec<Balance>, String> {
+    let unbalanced = factory_bank(released, presets, &[])?;
+    let target = calibration::loudness(AmpControls::default(), clips, LevelTables::CALIBRATED);
+    let jobs = presets::names(&unbalanced)
+        .into_iter()
+        .map(|name| Ok((presets::controls(&unbalanced, &name)?, name)))
         .collect::<Result<Vec<_>, String>>()?;
     Ok(std::thread::scope(|scope| {
         let handles: Vec<_> = jobs
             .into_iter()
-            .map(|(name, change_db, output_before, controls)| {
-                scope.spawn(move || Balance {
-                    name: name.clone(),
-                    change_db,
-                    output_before,
-                    output_after: controls.output,
-                    rms_dbfs: refit::output_rms_db(controls, clip),
+            .map(|(controls, name)| {
+                scope.spawn(move || {
+                    let measured = calibration::loudness(controls, clips, LevelTables::CALIBRATED);
+                    let change_db = target.blend() - measured.blend();
+                    let output_after: f32 = balanced_output(controls.output, change_db)
+                        .parse()
+                        .expect("balanced Output is a number");
+                    // The stored Output is rounded; the loudness follows it.
+                    let applied =
+                        (f64::from(output_after) - f64::from(controls.output)) * OUTPUT_RANGE_DB;
+                    Balance {
+                        name,
+                        change_db,
+                        output_before: controls.output,
+                        output_after,
+                        di_lufs: measured.di + applied,
+                        pluck_lufs: measured.pluck + applied,
+                    }
                 })
             })
             .collect();
@@ -171,7 +158,11 @@ fn xml_value(value: f32) -> String {
     }
 }
 
-fn factory_bank(released: &str, presets: &[PresetRefit]) -> Result<String, String> {
+fn factory_bank(
+    released: &str,
+    presets: &[PresetRefit],
+    balance: &[Balance],
+) -> Result<String, String> {
     let mut xml = released.to_owned();
     for preset in presets {
         let (old, new) = (preset.original, preset.refit);
@@ -185,10 +176,11 @@ fn factory_bank(released: &str, presets: &[PresetRefit]) -> Result<String, Strin
         .filter(|(_, old, new)| old != new)
         .map(|(id, _, new)| (id, xml_value(new)))
         .collect();
-        let change_db = balance_db(&preset.name)?;
-        if change_db != 0. {
-            let output = presets::controls(released, &preset.name)?.output;
-            values.push(("idOutputLevel", balanced_output(output, change_db)));
+        if let Some(balanced) = balance.iter().find(|balanced| balanced.name == preset.name) {
+            values.push((
+                "idOutputLevel",
+                balanced_output(balanced.output_before, balanced.change_db),
+            ));
         }
         xml = presets::with_values(&xml, &preset.name, &values)?;
     }
@@ -314,36 +306,41 @@ fn balance_markdown(balance: &[Balance]) -> String {
     let mut text = format!(
         "\n## Factory balance\n\n\
          Swanky Amp 1.4.0's factory presets were never balanced for loudness.\n\
-         Version 2 moves each preset's Output by the change below, chosen by ear\n\
-         on the single-coil clip on September 23, 2026 to equalise the presets'\n\
-         RMS. Output stores -1..+1 for -35..+35 dB. RMS is the output on the\n\
-         single-coil DI through the shipping path at {} Hz with Auto\n\
-         oversampling, from an amplifier settled on a second of silence, over the\n\
-         clip and half a second of tail. The balance holds for this clip: on the\n\
-         sparser pluck the drive presets, which compress it harder, measure\n\
-         quieter than the clean ones.\n\n\
-         | Preset | Output change dB | Output before → after dB | RMS dBFS |\n\
-         |---|---|---|---|\n",
-        refit::BALANCE_SAMPLE_RATE,
+         Version 2 moves each preset's Output so its loudness matches the factory\n\
+         defaults'. Loudness is BS.1770-4 gated integrated loudness through the\n\
+         shipping path at {} Hz with Auto oversampling from a settled amplifier,\n\
+         averaged over the single-coil DI and the refit pluck, the measure `just\n\
+         calibrate` holds Drive, Power Drive and Grit to. Output stores -1..+1 for\n\
+         -35..+35 dB. The two clips disagree most on the clean presets, whose\n\
+         plucked attacks pass uncompressed, so each clip keeps some spread about\n\
+         the average.\n\n\
+         | Preset | Output change dB | Output before → after dB | DI LUFS | Pluck LUFS |\n\
+         |---|---|---|---|---|\n",
+        calibration::SAMPLE_RATE,
     );
     for preset in balance {
         text.push_str(&format!(
-            "| {} | {:+.1} | {:+.2} → {:+.2} | {:.2} |\n",
+            "| {} | {:+.2} | {:+.2} → {:+.2} | {:.2} | {:.2} |\n",
             preset.name,
             preset.change_db,
             f64::from(preset.output_before) * OUTPUT_RANGE_DB,
             f64::from(preset.output_after) * OUTPUT_RANGE_DB,
-            preset.rms_dbfs,
+            preset.di_lufs,
+            preset.pluck_lufs,
         ));
     }
-    let levels = balance.iter().map(|preset| preset.rms_dbfs);
-    let (quietest, loudest) = levels
-        .fold((f64::INFINITY, f64::NEG_INFINITY), |(low, high), level| {
-            (low.min(level), high.max(level))
-        });
+    let spread = |levels: Vec<f64>| {
+        let (low, high) = levels
+            .iter()
+            .fold((f64::INFINITY, f64::NEG_INFINITY), |(low, high), level| {
+                (low.min(*level), high.max(*level))
+            });
+        format!("{:.2} dB, from {low:.2} to {high:.2} LUFS", high - low)
+    };
     text.push_str(&format!(
-        "\nSpread: {:.2} dB, from {quietest:.2} to {loudest:.2} dBFS.\n",
-        loudest - quietest
+        "\nSpread on the DI: {}. On the pluck: {}.\n",
+        spread(balance.iter().map(|preset| preset.di_lufs).collect()),
+        spread(balance.iter().map(|preset| preset.pluck_lufs).collect()),
     ));
     text
 }
@@ -402,16 +399,17 @@ fn compare(committed: &Report, fresh: &Report) -> Vec<String> {
     }
     for (old, new) in committed.balance.iter().zip(&fresh.balance) {
         if old.name != new.name
-            || old.change_db != new.change_db
             || old.output_before != new.output_before
-            || old.output_after != new.output_after
+            || !close(old.change_db, new.change_db, DB_TOLERANCE)
         {
-            failures.push(format!("{}: factory balance changed", old.name));
-        } else if !close(old.rms_dbfs, new.rms_dbfs, DB_TOLERANCE) {
             failures.push(format!(
-                "{}: balanced RMS {:.2} dBFS is now {:.2}",
-                old.name, old.rms_dbfs, new.rms_dbfs
+                "{}: factory balance {:+.2} dB is now {:+.2}",
+                old.name, old.change_db, new.change_db
             ));
+        } else if !close(old.di_lufs, new.di_lufs, DB_TOLERANCE)
+            || !close(old.pluck_lufs, new.pluck_lufs, DB_TOLERANCE)
+        {
+            failures.push(format!("{}: balanced loudness moved", old.name));
         }
     }
     failures
@@ -509,7 +507,7 @@ fn run() -> Result<(), String> {
     let released = read(&presets_path)?;
     let clip_path = option("--clip")?;
     let clip_bytes = fs::read(&clip_path).map_err(|error| format!("{clip_path}: {error}"))?;
-    let clip = calibration::clip(&clip_bytes)?;
+    let clips = Clips::new(&clip_bytes)?;
 
     if env::args().any(|argument| argument == "--check") {
         let committed: Report = serde_json::from_str(&read(&json_path)?)
@@ -521,13 +519,14 @@ fn run() -> Result<(), String> {
                 markdown_path.display()
             ));
         }
-        if read(&factory_path)? != factory_bank(&released, &committed.presets)? {
+        if read(&factory_path)? != factory_bank(&released, &committed.presets, &committed.balance)?
+        {
             failures.push(format!(
                 "{} is not generated from refit.json",
                 factory_path.display()
             ));
         }
-        failures.extend(compare(&committed, &compute(&released, &clip)?));
+        failures.extend(compare(&committed, &compute(&released, &clips)?));
         if !failures.is_empty() {
             return Err(format!(
                 "refit is stale; run `just refit`:\n  {}",
@@ -538,11 +537,14 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
 
-    let report = compute(&released, &clip)?;
+    let report = compute(&released, &clips)?;
     let json = serde_json::to_string_pretty(&report).map_err(|error| error.to_string())? + "\n";
     write(&json_path, &json)?;
     write(&markdown_path, &markdown(&report))?;
-    write(&factory_path, &factory_bank(&released, &report.presets)?)?;
+    write(
+        &factory_path,
+        &factory_bank(&released, &report.presets, &report.balance)?,
+    )?;
     print!("{}", markdown(&report));
     Ok(())
 }

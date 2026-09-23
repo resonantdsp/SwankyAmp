@@ -26,7 +26,7 @@ the power stage: the seam level plus Power Drive's gain change.
 
 | Preset | Original | Refit | Seam unrefit | Seam refit | Drive refit dB | Output unrefit | Output refit | Limits |
 |---|---|---|---|---|---|---|---|---|
-| clean | +0.00 / -0.30 / +0.40 / -1.000 | +0.01 / +0.20 / -0.17 / -0.976 | 4.67 / +2.90 | 2.68 / -0.80 | -0.01 | 4.57 / +2.32 | 2.65 / -0.52 | none |
+| clean | +0.00 / -0.30 / +0.40 / -1.000 | +0.01 / +0.20 / -0.17 / -0.976 | 4.67 / +2.90 | 2.68 / -0.80 | -0.01 | 4.57 / +2.32 | 2.65 / -0.51 | none |
 | bright | -0.20 / +0.20 / +0.00 / -0.494 | -0.27 / +0.13 / -0.15 / -0.494 | 0.54 / +0.55 | 0.31 / -0.04 | -0.04 | 0.50 / +0.29 | 0.31 / -0.05 | none |
 | edge | -0.20 / +0.00 / +0.30 / -0.394 | -0.27 / +0.19 / -0.19 / -0.394 | 2.76 / +2.68 | 1.57 / -0.32 | -0.32 | 2.45 / +0.78 | 1.47 / -0.13 | none |
 | distort | +0.20 / +0.59 / +0.19 / +0.190 | +0.19 / +0.65 / -0.28 / +0.190 | 2.81 / +2.45 | 1.60 / -0.43 | -0.43 | 2.68 / -1.61 | 1.40 / -0.55 | none |
@@ -34,35 +34,35 @@ the power stage: the seam level plus Power Drive's gain change.
 | pre drive | -0.20 / +0.60 / +0.19 / +0.004 | -0.28 / +0.67 / -0.27 / +0.004 | 2.35 / +2.71 | 1.30 / -0.17 | -0.17 | 2.47 / -1.88 | 1.29 / -0.46 | none |
 | power drive | -0.20 / +0.60 / +0.47 / +0.388 | -0.32 / +0.61 / -0.03 / +0.388 | 1.99 / +2.38 | 1.17 / -0.06 | -0.06 | 2.36 / -1.18 | 1.17 / -0.61 | none |
 | full drive | -0.31 / +0.39 / +0.61 / +0.404 | -0.40 / +0.46 / +0.06 / +0.404 | 2.10 / +2.58 | 1.27 / -0.07 | -0.07 | 3.41 / -2.25 | 1.61 / -0.74 | none |
-| high gain | +0.20 / +0.19 / +0.60 / +0.610 | +0.19 / +0.32 / -0.02 / +0.627 | 3.47 / +2.70 | 2.03 / -0.56 | +0.01 | 4.12 / -2.43 | 2.18 / -0.71 | none |
-| level 11 | +0.40 / +1.00 / +0.44 / +1.000 | +0.32 / +0.99 / -0.06 / +1.000 | 2.56 / +2.15 | 1.56 / -0.33 | -0.33 | 3.47 / +0.30 | 2.44 / +0.41 | none |
+| high gain | +0.20 / +0.19 / +0.60 / +0.610 | +0.19 / +0.32 / -0.02 / +0.627 | 3.47 / +2.70 | 2.03 / -0.56 | +0.01 | 4.12 / -2.43 | 2.18 / -0.68 | none |
+| level 11 | +0.40 / +1.00 / +0.44 / +1.000 | +0.32 / +0.99 / -0.07 / +1.000 | 2.56 / +2.16 | 1.54 / -0.37 | -0.37 | 3.58 / -0.04 | 2.44 / +0.19 | none |
 
 ## Factory balance
 
 Swanky Amp 1.4.0's factory presets were never balanced for loudness.
-Version 2 moves each preset's Output by the change below, chosen by ear
-on the single-coil clip on September 23, 2026 to equalise the presets'
-RMS. Output stores -1..+1 for -35..+35 dB. RMS is the output on the
-single-coil DI through the shipping path at 44100 Hz with Auto
-oversampling, from an amplifier settled on a second of silence, over the
-clip and half a second of tail. The balance holds for this clip: on the
-sparser pluck the drive presets, which compress it harder, measure
-quieter than the clean ones.
+Version 2 moves each preset's Output so its loudness matches the factory
+defaults'. Loudness is BS.1770-4 gated integrated loudness through the
+shipping path at 44100 Hz with Auto oversampling from a settled amplifier,
+averaged over the single-coil DI and the refit pluck, the measure `just
+calibrate` holds Drive, Power Drive and Grit to. Output stores -1..+1 for
+-35..+35 dB. The two clips disagree most on the clean presets, whose
+plucked attacks pass uncompressed, so each clip keeps some spread about
+the average.
 
-| Preset | Output change dB | Output before → after dB | RMS dBFS |
-|---|---|---|---|
-| clean | -0.3 | -7.00 → -7.30 | -22.37 |
-| bright | +0.3 | -3.50 → -3.20 | -22.28 |
-| edge | +0.8 | -3.50 → -2.70 | -22.25 |
-| distort | -2.2 | +1.89 → -0.31 | -22.27 |
-| dirty distort | +2.8 | +0.00 → +2.80 | -22.34 |
-| pre drive | -1.0 | +0.00 → -1.00 | -22.23 |
-| power drive | -2.2 | +0.00 → -2.20 | -22.35 |
-| full drive | -0.8 | +0.00 → -0.80 | -22.34 |
-| high gain | +1.5 | -1.96 → -0.46 | -22.24 |
-| level 11 | +5.4 | +0.00 → +5.40 | -22.23 |
+| Preset | Output change dB | Output before → after dB | DI LUFS | Pluck LUFS |
+|---|---|---|---|---|
+| clean | +2.68 | -7.00 → -4.32 | -23.53 | -15.89 |
+| bright | +2.72 | -3.50 → -0.78 | -21.16 | -18.26 |
+| edge | +2.35 | -3.50 → -1.15 | -21.52 | -17.90 |
+| distort | -4.42 | +1.89 → -2.53 | -18.58 | -20.84 |
+| dirty distort | -2.39 | +0.00 → -2.39 | -17.81 | -21.62 |
+| pre drive | -1.72 | +0.00 → -1.72 | -18.64 | -20.78 |
+| power drive | -2.67 | +0.00 → -2.67 | -18.11 | -21.31 |
+| full drive | -2.76 | +0.00 → -2.76 | -18.01 | -21.41 |
+| high gain | -1.36 | -1.96 → -3.32 | -18.55 | -20.88 |
+| level 11 | -6.35 | +0.00 → -6.35 | -18.72 | -20.70 |
 
-Spread: 0.14 dB, from -22.37 to -22.23 dBFS.
+Spread on the DI: 5.72 dB, from -23.53 to -17.81 LUFS. On the pluck: 5.72 dB, from -21.62 to -15.89 LUFS.
 
 ## Summary
 

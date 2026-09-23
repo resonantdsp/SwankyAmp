@@ -115,6 +115,7 @@ pub(crate) struct AmpVoicing {
     pub triodes: [TriodeControls; STAGES],
     pub preamp_gain: f32,
     pub preamp_drive: f32,
+    pub preamp_grit: f32,
     pub tone: ToneControls,
     pub tetrode: TetrodeControls,
     pub power_gain: f32,
@@ -186,6 +187,7 @@ impl AmpVoicing {
             triodes,
             preamp_gain: PREAMP_DRIVE.at(preamp_drive).max(0.5),
             preamp_drive,
+            preamp_grit: controls.preamp_grit,
             tone: ToneControls {
                 bass: controls.low,
                 mids: controls.mid,
