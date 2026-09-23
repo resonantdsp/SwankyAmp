@@ -1,0 +1,2537 @@
+//! Shared cpal audio setup + callback. One implementation used by
+//! both `windowed` and `headless` runners.
+//!
+//! Both the input and output cpal streams are owned by dedicated
+//! worker threads (cpal `Stream` is `!Send` on macOS, so it can't
+//! cross threads). UI / menu / CLI callers manipulate them through
+//! `Send + Sync` controllers (`InputController`, `OutputController`)
+//! that talk to the workers via `mpsc` channels:
+//!
+//! - **Toggle / enable** for input (drop the cpal input stream when
+//!   off - saves CPU and skips the OS mic permission prompt) and
+//!   output (mute - keep the stream open so processing keeps ticking,
+//!   just zero-fill the speaker buffer).
+//! - **Switch device** for either side. Worker drops the old stream
+//!   and opens a new one against the requested device name; on
+//!   failure the previous device's name remains in place and the
+//!   audio callback keeps running unchanged.
+
+use crossbeam_queue::ArrayQueue;
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex, mpsc};
+
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+
+use truce_core::buffer::RawBufferScratch;
+use truce_core::cast::{sample_count_usize, sample_rate_u32};
+use truce_core::chunked_process::{ChunkedProcess, process_chunked};
+use truce_core::config::{AudioConfig, ProcessMode};
+use truce_core::events::{EVENT_LIST_PREALLOC, Event, EventBody, EventList};
+use truce_core::export::PluginExport;
+use truce_core::info::PluginCategory;
+use truce_params::{ParamInfo, Params};
+
+use crate::cli::Options;
+use crate::transport::Transport;
+use crate::vlog;
+
+type BoxErr = Box<dyn std::error::Error>;
+
+/// Per-stream audio-callback scratch for the channel-pointer arrays
+/// fed into [`RawBufferScratch::build`]. cpal's stream closure must
+/// be `Send + 'static`, but `Vec<*const f32>` / `Vec<*mut f32>` are
+/// `!Send` because raw pointers don't carry thread-safety. The cpal
+/// closure runs on a single dedicated audio thread per stream and the
+/// pointer values are written + consumed within one callback (they
+/// always alias `input_bufs` / `channel_bufs` on the same stack
+/// frame), so the closure capture is sound.
+struct CallbackPtrScratch {
+    inputs: Vec<*const f32>,
+    outputs: Vec<*mut f32>,
+}
+// SAFETY: see [`CallbackPtrScratch`] doc.
+unsafe impl Send for CallbackPtrScratch {}
+
+/// Widest interleaved mic-input frame the ring carries. The input
+/// callback normalizes the capture device's frames to the ring width
+/// (the output stream's channel count); this bounds the fixed-size
+/// frame so the ring is a lock-free, alloc-free `ArrayQueue`. A wider
+/// output folds its extra channels onto these.
+const MAX_INPUT_RING_CHANNELS: usize = 16;
+
+/// One interleaved mic-input frame, fixed-width so the ring never
+/// allocates. Only the first `width` lanes are meaningful (the ring
+/// width; see [`normalize_input_frame`]).
+#[derive(Clone, Copy)]
+struct InputFrame {
+    samples: [f32; MAX_INPUT_RING_CHANNELS],
+}
+
+/// Lock-free hand-off from the input (capture) audio thread to the
+/// output (render) audio thread. Bounded and drop-oldest on overflow -
+/// see [`build_and_play_input_stream`]. Frame-granular so an overflow
+/// drop never splits an interleaved frame (which would shift channel
+/// alignment).
+type InputRing = ArrayQueue<InputFrame>;
+
+/// Normalize one native capture frame (`src`, `src.len()` interleaved
+/// channels) to a ring frame of `width` channels. A mono source
+/// broadcasts to every lane (so a mono mic feeds both plugin inputs); a
+/// wider source is truncated, a narrower one zero-fills past its
+/// channels. Pure arithmetic - safe on the audio thread.
+fn normalize_input_frame(src: &[f32], width: usize) -> InputFrame {
+    let mut frame = InputFrame {
+        samples: [0.0; MAX_INPUT_RING_CHANNELS],
+    };
+    let w = width.min(MAX_INPUT_RING_CHANNELS);
+    if src.len() == 1 {
+        for lane in &mut frame.samples[..w] {
+            *lane = src[0];
+        }
+    } else {
+        for (lane, &s) in frame.samples[..w].iter_mut().zip(src.iter()) {
+            *lane = s;
+        }
+    }
+    frame
+}
+
+/// A queued MIDI event the UI thread hands off to the audio callback.
+pub struct MidiEvent {
+    pub body: EventBody,
+    /// Plugin MIDI input port this event targets. Device input stamps
+    /// the port its `--midi-input` slot maps to; the QWERTY keyboard
+    /// uses `0`.
+    pub port: u8,
+}
+
+/// Shared audio-thread resources handed back from `start_audio`.
+///
+/// The output stream is owned by a worker thread, not by this
+/// struct, so `AudioHandles` is fully `Send`. The worker exits
+/// when the controller channel closes (all `OutputController`
+/// clones dropped).
+pub struct AudioHandles<P: PluginExport> {
+    /// Event queue the caller pushes MIDI into; drained by the audio
+    /// callback each block.
+    pub pending: Arc<ArrayQueue<MidiEvent>>,
+    /// Editor-initiated custom-state (`load_state`) blobs. The UI thread
+    /// pushes here instead of locking the plugin, and the audio callback
+    /// drains and applies one at the block top under its per-block lock -
+    /// so a slow `load_state` never stalls the callback's `try_lock` (the
+    /// VST3 `StateLoadQueue` pattern; capacity 1, newest wins). Custom
+    /// state only; params restore atomically through `set_param`.
+    pub pending_state: Arc<ArrayQueue<Vec<u8>>>,
+    /// Plugin instance shared between caller and audio callback.
+    pub plugin: Arc<Mutex<P>>,
+    /// Audio config (sample rate, channels) resolved from the device.
+    pub sample_rate: f64,
+    pub channels: usize,
+    pub is_effect: bool,
+    /// `Send + Sync` handle for toggling mic input and switching
+    /// the input device. Backed by a worker thread that owns the
+    /// (`!Send`) cpal input stream.
+    pub input: InputController,
+    /// `Send + Sync` handle for switching the output device.
+    /// Backed by a worker thread that owns the (`!Send`) cpal
+    /// output stream.
+    pub output: OutputController,
+    /// Shared transport state; UI thread toggles play/stop, audio
+    /// thread advances position each block.
+    pub transport: Transport,
+    /// Live-mode `--input-file` source (gated on the `playback`
+    /// feature). Exposed so the runner can poll
+    /// `playback.is_eof()` to drive clean shutdown when paired
+    /// with `--output-file`.
+    #[cfg(feature = "playback")]
+    pub playback: Option<Arc<crate::playback::PlaybackSource>>,
+    /// Live-mode `--sidechain-file` source (gated on the `playback`
+    /// feature). Feeds the sidechain input bus independently of
+    /// `playback`, so the main and sidechain buses run separate files.
+    #[cfg(feature = "playback")]
+    pub sidechain_playback: Option<Arc<crate::playback::PlaybackSource>>,
+    /// Live-mode `--output-file` capture sink. The runner calls
+    /// `take_capture().finalize()` on its way out so the WAV
+    /// header gets the correct sample count.
+    #[cfg(feature = "playback")]
+    pub capture: Option<crate::playback::CaptureSink>,
+}
+
+// ---------------------------------------------------------------------------
+// Channel routing
+// ---------------------------------------------------------------------------
+
+/// How the plugin's channels map onto the audio device's channels.
+///
+/// Stored encoded in an `AtomicUsize` on each controller (so the menu
+/// can update it lock-free) and decoded in the audio callback. The
+/// default, `Direct`, is the historical 1:1 mapping and is what every
+/// non-multichannel-aware caller gets.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ChannelRoute {
+    /// Plugin channel N ↔ device channel N, across every channel.
+    /// Preserves multichannel plugins; for a stereo plugin on a
+    /// 4-out interface this is the same as `Stereo { base: 0 }`.
+    Direct,
+    /// Plugin channels 0 and 1 ↔ device channels `base` and `base+1`.
+    /// Other device outputs are silenced; other device inputs ignored.
+    Stereo { base: usize },
+    /// A single device channel `base`. On output the plugin's first
+    /// two channels fold down (sum) into it; on input it feeds both
+    /// plugin input channels.
+    Mono { base: usize },
+}
+
+impl ChannelRoute {
+    /// Pack into the `usize` the controllers store. `Direct` is 0 so a
+    /// freshly-zeroed atomic decodes to the default mapping.
+    #[must_use]
+    pub fn encode(self) -> usize {
+        match self {
+            ChannelRoute::Direct => 0,
+            ChannelRoute::Stereo { base } => 1 + base * 2,
+            ChannelRoute::Mono { base } => 2 + base * 2,
+        }
+    }
+
+    /// Parse a CLI / env spec into a route. Channel numbers are
+    /// 1-based (matching the menu labels): `direct` / `all` →
+    /// [`Self::Direct`], `N` → [`Self::Mono`] on channel N, `N-M` →
+    /// [`Self::Stereo`] pair starting at N (requires `M == N + 1`).
+    /// Returns `None` for anything malformed.
+    #[must_use]
+    pub fn parse(spec: &str) -> Option<Self> {
+        let s = spec.trim().to_ascii_lowercase();
+        if s == "direct" || s == "all" {
+            return Some(ChannelRoute::Direct);
+        }
+        if let Some((a, b)) = s.split_once('-') {
+            let a: usize = a.trim().parse().ok()?;
+            let b: usize = b.trim().parse().ok()?;
+            if a >= 1 && b == a + 1 {
+                return Some(ChannelRoute::Stereo { base: a - 1 });
+            }
+            return None;
+        }
+        let c: usize = s.parse().ok()?;
+        (c >= 1).then(|| ChannelRoute::Mono { base: c - 1 })
+    }
+
+    /// Inverse of [`Self::encode`].
+    #[must_use]
+    pub fn decode(v: usize) -> Self {
+        if v == 0 {
+            return ChannelRoute::Direct;
+        }
+        let k = v - 1;
+        if k.is_multiple_of(2) {
+            ChannelRoute::Stereo { base: k / 2 }
+        } else {
+            ChannelRoute::Mono { base: (k - 1) / 2 }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// InputController
+// ---------------------------------------------------------------------------
+
+/// `Send + Sync` handle for managing mic input from the UI thread.
+///
+/// Cloneable; multiple holders can request toggles or device
+/// switches. The actual `cpal::Stream` (`!Send` on macOS) lives on
+/// a dedicated worker thread spawned by `start_audio`.
+#[derive(Clone)]
+pub struct InputController {
+    /// Audio callback reads this every block to decide whether to
+    /// drain the input ring or zero-fill. Worker thread updates it
+    /// when a toggle completes (or fails).
+    pub enabled: Arc<AtomicBool>,
+    /// True if an input device is configured (default or
+    /// CLI-named). When false, toggling on is a no-op.
+    pub has_device: bool,
+    /// Sender for input commands. Worker blocks on the matching
+    /// receiver. Closing the channel exits the worker.
+    cmd_tx: mpsc::Sender<InputCmd>,
+    /// Worker mirrors the resolved device name here after each
+    /// open so the menu can render a checkmark on the active
+    /// device. `None` = default device or no device available.
+    current_name: Arc<Mutex<Option<String>>>,
+    /// How device input channels map onto the plugin's input bus,
+    /// encoded per [`ChannelRoute`]. Read by the output callback when
+    /// summing the input ring into the plugin bus; lets a stereo
+    /// plugin pull from device inputs 3-4, or a mono source feed both
+    /// plugin inputs. Shared with the callback.
+    channel_route: Arc<AtomicUsize>,
+}
+
+enum InputCmd {
+    SetEnabled(bool),
+    SetDevice(Option<String>),
+}
+
+impl InputController {
+    /// Toggle the input. Returns immediately; the worker thread
+    /// processes the request asynchronously.
+    pub fn set_enabled(&self, on: bool) {
+        let _ = self.cmd_tx.send(InputCmd::SetEnabled(on));
+    }
+
+    /// Read the current state. Source of truth for the audio
+    /// callback's zero-fill decision.
+    #[must_use]
+    pub fn is_enabled(&self) -> bool {
+        self.enabled.load(Ordering::Relaxed)
+    }
+
+    /// Switch the input device by name. Pass `None` to fall back
+    /// to the system default. If the input is currently enabled,
+    /// the worker re-opens the stream against the new device; if
+    /// disabled, the change takes effect on the next enable.
+    pub fn set_device(&self, name: Option<String>) {
+        let _ = self.cmd_tx.send(InputCmd::SetDevice(name));
+    }
+
+    /// Currently-resolved input device name, or `None` if no
+    /// device has been opened (or the worker resolved to the
+    /// system default with no nameable device).
+    #[must_use]
+    pub fn current_name(&self) -> Option<String> {
+        self.current_name.lock().ok().and_then(|g| g.clone())
+    }
+
+    /// Choose how device input channels feed the plugin's input bus.
+    /// Takes effect on the next audio block.
+    pub fn set_channel_route(&self, route: ChannelRoute) {
+        self.channel_route.store(route.encode(), Ordering::Relaxed);
+    }
+
+    /// The current input channel routing.
+    #[must_use]
+    pub fn channel_route(&self) -> ChannelRoute {
+        ChannelRoute::decode(self.channel_route.load(Ordering::Relaxed))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// OutputController
+// ---------------------------------------------------------------------------
+
+/// `Send + Sync` handle for managing the output device from the
+/// UI thread. Cloneable; clones share the worker.
+#[derive(Clone)]
+pub struct OutputController {
+    /// Audio callback reads this every block to decide whether to
+    /// zero-fill the output buffer (mute). Worker thread (and direct
+    /// callers via `set_enabled`) update it.
+    pub enabled: Arc<AtomicBool>,
+    cmd_tx: mpsc::SyncSender<OutputCmd>,
+    current_name: Arc<Mutex<Option<String>>>,
+    /// How the plugin's output bus maps onto device output channels,
+    /// encoded per [`ChannelRoute`]. Read by the output callback when
+    /// writing the plugin bus into the device buffer; lets a stereo
+    /// plugin drive device outputs 3-4, or fold down to a mono output.
+    /// Shared with the callback.
+    channel_route: Arc<AtomicUsize>,
+    /// The plugin's active bus-layout index (into `P::bus_layouts()`). The
+    /// worker updates it after a `SetLayout` switch; the Bus Layout menu
+    /// reads it to mark the active entry. The index (not the channel totals)
+    /// is the identity so two layouts sharing totals stay distinct.
+    layout: Arc<AtomicUsize>,
+}
+
+enum OutputCmd {
+    SetDevice(Option<String>),
+    RestartLatency,
+    /// Switch the plugin to the declared bus layout at this index. The index
+    /// is the layout's unambiguous identity - two layouts can share channel
+    /// totals but split main/sidechain differently, so the worker resolves
+    /// the widths from the index. It reopens the stream at those dimensions
+    /// and `reset()`s the plugin so its per-channel DSP re-prepares, and
+    /// keeps the device stream at a hardware-supported width (mapping the
+    /// plugin output onto it), so an asymmetric layout or a width the device
+    /// can't open natively still works.
+    SetLayout {
+        index: usize,
+    },
+}
+
+fn queue_latency_restart(
+    requested_latency: u32,
+    active_latency: &AtomicU32,
+    restart_pending: &AtomicBool,
+    restart_tx: &mpsc::SyncSender<OutputCmd>,
+) {
+    if requested_latency != active_latency.load(Ordering::Acquire)
+        && !restart_pending.swap(true, Ordering::AcqRel)
+        && restart_tx.try_send(OutputCmd::RestartLatency).is_err()
+    {
+        restart_pending.store(false, Ordering::Release);
+    }
+}
+
+fn prepare_plugin<P: PluginExport>(
+    plugin: &mut P,
+    sample_rate: f64,
+    max_frames: usize,
+    reset: bool,
+    active_latency: &AtomicU32,
+    restart_pending: &AtomicBool,
+) -> u32 {
+    if reset {
+        plugin.reset(&AudioConfig::new(sample_rate, max_frames));
+    }
+    let latency = plugin.latency();
+    active_latency.store(latency, Ordering::Release);
+    restart_pending.store(false, Ordering::Release);
+    latency
+}
+
+impl OutputController {
+    /// Mute / unmute the output. The cpal stream stays open either
+    /// way - disabling just makes the audio callback zero-fill its
+    /// buffer, so the plugin keeps processing (transport ticks,
+    /// MIDI is consumed) while the speakers are silent.
+    pub fn set_enabled(&self, on: bool) {
+        self.enabled.store(on, Ordering::Relaxed);
+    }
+
+    /// Read the current mute state. Source of truth for the audio
+    /// callback's zero-fill decision.
+    #[must_use]
+    pub fn is_enabled(&self) -> bool {
+        self.enabled.load(Ordering::Relaxed)
+    }
+
+    /// Switch the output device by name. Pass `None` to fall back
+    /// to the system default. Failure to open is logged but
+    /// non-fatal - the previous stream remains running.
+    pub fn set_device(&self, name: Option<String>) {
+        let _ = self.cmd_tx.send(OutputCmd::SetDevice(name));
+    }
+
+    /// Switch the plugin to the declared bus layout at `index`. The plugin is
+    /// `reset()` and re-prepared at that layout's dimensions; the device
+    /// stream stays at a hardware-supported width and the plugin output is
+    /// mapped onto it (so a mono layout plays through a stereo-only device).
+    pub fn set_layout(&self, index: usize) {
+        let _ = self.cmd_tx.send(OutputCmd::SetLayout { index });
+    }
+
+    /// The plugin's active bus-layout index (into `P::bus_layouts()`).
+    #[must_use]
+    pub fn current_index(&self) -> usize {
+        self.layout.load(Ordering::Relaxed)
+    }
+
+    /// Currently-resolved output device name, or `None` if not
+    /// resolvable.
+    #[must_use]
+    pub fn current_name(&self) -> Option<String> {
+        self.current_name.lock().ok().and_then(|g| g.clone())
+    }
+
+    /// Choose how the plugin's output bus maps onto device output
+    /// channels. Takes effect on the next audio block.
+    pub fn set_channel_route(&self, route: ChannelRoute) {
+        self.channel_route.store(route.encode(), Ordering::Relaxed);
+    }
+
+    /// The current output channel routing.
+    #[must_use]
+    pub fn channel_route(&self) -> ChannelRoute {
+        ChannelRoute::decode(self.channel_route.load(Ordering::Relaxed))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Device enumeration helpers (used by `--list-devices` + menus).
+// ---------------------------------------------------------------------------
+
+/// Print available audio devices and return. Used by `--list-devices`.
+pub fn list_devices() {
+    println!("Audio devices");
+    println!("Output:");
+    let (default_out, outs) = enumerate_devices(true);
+    for name in outs {
+        let marker = if default_out.as_deref() == Some(name.as_str()) {
+            " (default)"
+        } else {
+            ""
+        };
+        println!("  {name}{marker}");
+    }
+    println!("Input:");
+    let (default_in, ins) = enumerate_devices(false);
+    for name in ins {
+        let marker = if default_in.as_deref() == Some(name.as_str()) {
+            " (default)"
+        } else {
+            ""
+        };
+        println!("  {name}{marker}");
+    }
+}
+
+/// Snapshot of available output devices (`(default_name, all_names)`).
+#[must_use]
+pub fn list_output_devices() -> (Option<String>, Vec<String>) {
+    enumerate_devices(true)
+}
+
+/// Snapshot of available input devices (`(default_name, all_names)`).
+#[must_use]
+pub fn list_input_devices() -> (Option<String>, Vec<String>) {
+    enumerate_devices(false)
+}
+
+fn enumerate_devices(output: bool) -> (Option<String>, Vec<String>) {
+    let host = cpal::default_host();
+    let default_name = if output {
+        host.default_output_device()
+            .and_then(|d| d.description().map(|desc| desc.name().to_string()).ok())
+    } else {
+        host.default_input_device()
+            .and_then(|d| d.description().map(|desc| desc.name().to_string()).ok())
+    };
+    let names = if output {
+        host.output_devices()
+            .map(|it| {
+                it.filter_map(|d| d.description().map(|desc| desc.name().to_string()).ok())
+                    .collect()
+            })
+            .unwrap_or_default()
+    } else {
+        host.input_devices()
+            .map(|it| {
+                it.filter_map(|d| d.description().map(|desc| desc.name().to_string()).ok())
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    (default_name, names)
+}
+
+/// Background-refreshed cache of cpal device names.
+///
+/// `CoreAudio` enumeration is slow - hundreds of milliseconds with a
+/// few devices connected - and the macOS menu used to run it
+/// synchronously on the main thread every time a device submenu
+/// opened, which made the submenu visibly lag. The menu now reads
+/// cached names (instant) and fires an off-thread refresh so the
+/// *next* open reflects hot-plugged or removed devices. Cloneable;
+/// all clones share one cache.
+#[derive(Clone)]
+pub struct DeviceCache {
+    inner: Arc<Mutex<DeviceNames>>,
+    refreshing: Arc<AtomicBool>,
+}
+
+impl Default for DeviceCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Default)]
+struct DeviceNames {
+    outputs: Vec<String>,
+    inputs: Vec<String>,
+    /// False until the first enumeration lands. Distinguishes "not
+    /// warmed yet" from "warmed and genuinely empty" so a machine with
+    /// no inputs doesn't re-enumerate on every read.
+    warmed: bool,
+}
+
+impl DeviceCache {
+    /// Create the cache and warm it on a background thread.
+    #[must_use]
+    pub fn new() -> Self {
+        let cache = Self {
+            inner: Arc::new(Mutex::new(DeviceNames::default())),
+            refreshing: Arc::new(AtomicBool::new(false)),
+        };
+        cache.refresh_async();
+        cache
+    }
+
+    /// Cached output device names. Blocks once on a cold read (a menu
+    /// opened before the warm-up finished) so the list is never
+    /// spuriously empty.
+    #[must_use]
+    pub fn outputs(&self) -> Vec<String> {
+        self.ensure_warm();
+        self.inner
+            .lock()
+            .map(|g| g.outputs.clone())
+            .unwrap_or_default()
+    }
+
+    /// Cached input device names. Same cold-read guarantee as
+    /// [`Self::outputs`].
+    #[must_use]
+    pub fn inputs(&self) -> Vec<String> {
+        self.ensure_warm();
+        self.inner
+            .lock()
+            .map(|g| g.inputs.clone())
+            .unwrap_or_default()
+    }
+
+    fn ensure_warm(&self) {
+        // Check (and release the lock) before the slow enumeration so
+        // we never hold the mutex across a CoreAudio round-trip.
+        match self.inner.lock() {
+            Ok(g) if g.warmed => return,
+            Ok(_) => {}
+            Err(_) => return,
+        }
+        let (_, outputs) = enumerate_devices(true);
+        let (_, inputs) = enumerate_devices(false);
+        if let Ok(mut names) = self.inner.lock() {
+            names.outputs = outputs;
+            names.inputs = inputs;
+            names.warmed = true;
+        }
+    }
+
+    /// Re-enumerate both device lists on a background thread, storing
+    /// the result for the next read. No-op while a refresh is already
+    /// in flight, so rapid menu reopens don't pile up threads.
+    pub fn refresh_async(&self) {
+        if self.refreshing.swap(true, Ordering::AcqRel) {
+            return;
+        }
+        let inner = Arc::clone(&self.inner);
+        let refreshing = Arc::clone(&self.refreshing);
+        std::thread::spawn(move || {
+            let (_, outputs) = enumerate_devices(true);
+            let (_, inputs) = enumerate_devices(false);
+            if let Ok(mut names) = inner.lock() {
+                names.outputs = outputs;
+                names.inputs = inputs;
+                names.warmed = true;
+            }
+            refreshing.store(false, Ordering::Release);
+        });
+    }
+}
+
+// ---------------------------------------------------------------------------
+// start_audio
+// ---------------------------------------------------------------------------
+
+/// Resolve devices, instantiate the plugin, spawn input + output
+/// worker threads, return the handles the caller needs to push MIDI
+/// and reach the workers.
+///
+/// # Errors
+///
+/// Returns an error if the requested input/output device can't be
+/// found (or no default exists), the device's default stream config
+/// can't be queried, or any of the cpal stream-build calls fail.
+#[allow(clippy::too_many_lines)]
+pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, BoxErr> {
+    let audio_host = cpal::default_host();
+
+    // Resolve initial output device synchronously so we can pull
+    // its default config (sample rate, channels) before spawning
+    // the worker. The worker re-resolves by name on each switch.
+    let initial_output = match &opts.output_device {
+        Some(name) => find_device(&audio_host, name, true).ok_or_else(|| {
+            format!(
+                "no output device matching '{name}'. \
+                 Run with --list-devices to see available outputs."
+            )
+        })?,
+        None => audio_host.default_output_device().ok_or(
+            "no default audio output device. \
+             Plug in or enable an output, then retry.",
+        )?,
+    };
+
+    let default_config = initial_output
+        .default_output_config()
+        .map_err(|e| format!("could not query default config for the audio output: {e}"))?;
+
+    // The plugin runs a declared bus layout; the device stream tries to
+    // match its output width but falls back to the device default (the
+    // plugin output then maps onto whatever channels the device gives).
+    let layout_index = selected_layout_index::<P>(opts);
+    let (num_in, num_out, num_main_in) = layout_at_index::<P>(layout_index);
+    let requested_channels = u16::try_from(num_out).ok().filter(|&c| c > 0);
+    let config: cpal::StreamConfig =
+        resolve_config(&initial_output, &default_config, opts, requested_channels);
+    let sample_format = default_config.sample_format();
+    let sample_rate = f64::from(config.sample_rate);
+    let channels = config.channels as usize;
+    let is_effect = P::info().category == PluginCategory::Effect;
+
+    // Capacity 256: covers a generous MIDI burst within a single
+    // audio callback period. ArrayQueue is lock-free MPMC - the MIDI
+    // input thread pushes, the audio thread drains, neither blocks.
+    // On overflow the producer drops the oldest event (see midi.rs).
+    let pending: Arc<ArrayQueue<MidiEvent>> = Arc::new(ArrayQueue::new(256));
+    // Capacity 1, newest-wins: only the most recent editor state-load matters
+    // if several arrive before the audio thread drains one.
+    let pending_state: Arc<ArrayQueue<Vec<u8>>> = Arc::new(ArrayQueue::new(1));
+    let initial_max_frames = config.buffer_size_max_frames(&default_config);
+    let plugin = Arc::new(Mutex::new({
+        let mut p = P::create();
+        p.init();
+        p.reset(&AudioConfig::new(sample_rate, initial_max_frames));
+        // Apply `--state <path>` BEFORE snapping smoothers so the
+        // first audio block sees the restored values, not defaults
+        // ramping toward them.
+        if let Some(path) = opts.state_path.as_deref() {
+            crate::state::load_into(&mut p, path);
+        }
+        // `--preset` layers on top of `--state` (both pre-snap so
+        // the first block sees restored values), resolved through
+        // the same store `--list-presets` uses.
+        if let Some(sel) = opts.preset.as_deref() {
+            crate::presets::apply_on_launch::<P>(opts.presets_dir.as_deref(), &mut p, sel);
+        }
+        p.params().snap_smoothers();
+        p
+    }));
+
+    let input_setup = setup_input_pipeline(&audio_host, opts, is_effect, channels, sample_rate);
+    let input_ring = input_setup.ring;
+    let input_enabled = input_setup.enabled;
+    let input_ring_width = input_setup.ring_width;
+    let input_controller = input_setup.controller;
+    if let Some(spec) = opts.input_channels.as_deref() {
+        match ChannelRoute::parse(spec) {
+            Some(route) => input_controller.set_channel_route(route),
+            None => eprintln!(
+                "--input-channels: ignoring invalid '{spec}' \
+                 (expected 'direct', a channel like '3', or a pair like '3-4')"
+            ),
+        }
+    }
+
+    let transport = Transport::new(opts.bpm.unwrap_or(120.0), sample_rate);
+
+    // Initial output device name (may differ from the resolver's
+    // requested name if it matched by substring). When the user did
+    // not pass `--output`, leave this `None` so the worker re-resolves
+    // via `default_output_device()` on each open - the cpal ALSA
+    // backend's virtual default reports a description ("Default Audio
+    // Device") that doesn't appear in `output_devices()`, so a
+    // name-based re-resolve would fail.
+    let initial_output_name = if opts.output_device.is_some() {
+        initial_output
+            .description()
+            .map(|d| d.name().to_string())
+            .ok()
+    } else {
+        None
+    };
+    let output_current_name = Arc::new(Mutex::new(initial_output_name.clone()));
+    let (output_cmd_tx, output_cmd_rx) = mpsc::sync_channel::<OutputCmd>(8);
+    let (open_result_tx, open_result_rx) = mpsc::channel::<Result<(), String>>();
+
+    // Output defaults to enabled - the user launched standalone to
+    // hear the plugin. `--output-enabled off` (or the config file)
+    // can flip the launch state.
+    let output_enabled = Arc::new(AtomicBool::new(opts.output_enabled.unwrap_or(true)));
+
+    let output_channel_route = Arc::new(AtomicUsize::new(0));
+    // Shared active bus-layout index. Seeded with the launch selection; the
+    // worker updates it on a `SetLayout` switch. The index (not the channel
+    // totals) is the identity so two layouts sharing totals stay distinct.
+    let output_layout_shared = Arc::new(AtomicUsize::new(layout_index));
+    let active_latency = Arc::new(AtomicU32::new(
+        plugin
+            .lock()
+            .expect("plugin mutex poisoned after initial reset")
+            .latency(),
+    ));
+    let latency_restart_pending = Arc::new(AtomicBool::new(false));
+    let output_controller = OutputController {
+        enabled: Arc::clone(&output_enabled),
+        cmd_tx: output_cmd_tx.clone(),
+        current_name: Arc::clone(&output_current_name),
+        channel_route: Arc::clone(&output_channel_route),
+        layout: Arc::clone(&output_layout_shared),
+    };
+    // Apply `--output-channels` (and its env var) once at launch. The
+    // native menus override this live; on Linux (no menu) the CLI is
+    // the only way to pick channels. Input is applied below, once its
+    // controller exists.
+    if let Some(spec) = opts.output_channels.as_deref() {
+        match ChannelRoute::parse(spec) {
+            Some(route) => output_controller.set_channel_route(route),
+            None => eprintln!(
+                "--output-channels: ignoring invalid '{spec}' \
+                 (expected 'direct', a channel like '3', or a pair like '3-4')"
+            ),
+        }
+    }
+
+    // Decode `--input-file` (if set) once at startup against the
+    // resolved device sample-rate / channel-count. Hard error on
+    // unreadable / unparseable file - we fail noisily here rather
+    // than letting the audio worker silently emit zeros.
+    #[cfg(feature = "playback")]
+    let playback = match &opts.input_file {
+        // `num_main_in > 0`: a layout with no main input bus has nowhere
+        // to route the file, and decoding to a zero width divides by zero
+        // in `PlaybackSource::from_wav`.
+        Some(path) if is_effect && num_main_in > 0 => {
+            // Decode to the plugin's MAIN-bus width, not the device
+            // stream width: the callback mixes this into
+            // `input_bufs[..num_main_in]`, and a main bus wider than the
+            // device (e.g. a 5.1 layout through a stereo interface) would
+            // otherwise truncate the file to the device channel count and
+            // feed silence to the plugin's extra channels. The offline
+            // path pins the same split.
+            let src = crate::playback::PlaybackSource::from_wav(path, sample_rate, num_main_in)?;
+            vlog!(
+                "Playback: {} → input bus (one-shot, sums with mic when enabled)",
+                path.display()
+            );
+            Some(Arc::new(src))
+        }
+        Some(_) => {
+            // A non-effect (no input bus) or a layout with no main input
+            // has nowhere to feed the file; warn and ignore rather than
+            // failing.
+            eprintln!("--input-file ignored: plugin has no main input bus");
+            None
+        }
+        None => None,
+    };
+
+    // Decode `--sidechain-file` against the sidechain bus width. A
+    // plugin with no sidechain bus (or a non-effect) has nowhere to
+    // route it, so warn and ignore rather than fail.
+    #[cfg(feature = "playback")]
+    let sidechain_playback = {
+        let sc_width = num_in.saturating_sub(num_main_in);
+        match &opts.sidechain_file {
+            Some(path) if is_effect && sc_width > 0 => {
+                let src = crate::playback::PlaybackSource::from_wav(path, sample_rate, sc_width)?;
+                vlog!("Sidechain: {} → sidechain bus (one-shot)", path.display());
+                Some(Arc::new(src))
+            }
+            Some(_) => {
+                eprintln!("--sidechain-file ignored: plugin has no sidechain input bus");
+                None
+            }
+            None => None,
+        }
+    };
+
+    // `--output-file` capture sink. Created here so any
+    // filesystem error (missing parent dir, unwritable target,
+    // …) propagates back to the runner before audio starts.
+    #[cfg(feature = "playback")]
+    let capture = match &opts.output_file {
+        Some(path) => {
+            let sink = crate::playback::CaptureSink::create(path, sample_rate, channels)?;
+            vlog!(
+                "Capture: {} ({} Hz, {} ch, f32) - pre-mute output",
+                path.display(),
+                sample_rate,
+                channels,
+            );
+            Some(sink)
+        }
+        None => None,
+    };
+
+    let res = OutputResources {
+        plugin: Arc::clone(&plugin),
+        pending: Arc::clone(&pending),
+        pending_state: Arc::clone(&pending_state),
+        input_ring: Arc::clone(&input_ring),
+        input_enabled: Arc::clone(&input_enabled),
+        ring_width: Arc::clone(&input_ring_width),
+        output_enabled: Arc::clone(&output_enabled),
+        transport: transport.clone(),
+        current_name: Arc::clone(&output_current_name),
+        input_channel_route: Arc::clone(&input_controller.channel_route),
+        output_channel_route: Arc::clone(&output_channel_route),
+        layout: Arc::clone(&output_layout_shared),
+        promised_max_frames: Arc::new(AtomicUsize::new(initial_max_frames)),
+        restart_tx: output_cmd_tx,
+        active_latency,
+        latency_restart_pending,
+        #[cfg(feature = "playback")]
+        playback: playback.clone(),
+        #[cfg(feature = "playback")]
+        sidechain_playback: sidechain_playback.clone(),
+        #[cfg(feature = "playback")]
+        capture: capture.as_ref().map(super::playback::CaptureSink::pusher),
+    };
+
+    let initial_output_name_for_worker = initial_output_name.clone();
+    std::thread::Builder::new()
+        .name("truce-standalone-output".into())
+        .spawn(move || {
+            output_worker::<P>(
+                output_cmd_rx,
+                open_result_tx,
+                initial_output_name_for_worker,
+                config,
+                sample_format,
+                sample_rate,
+                num_in,
+                num_out,
+                num_main_in,
+                is_effect,
+                res,
+            );
+        })
+        .map_err(|e| format!("could not spawn output worker: {e}"))?;
+
+    // Wait for the worker to confirm initial open so any error
+    // propagates back to `start_audio`'s caller synchronously.
+    match open_result_rx.recv() {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => return Err(e.into()),
+        Err(e) => return Err(format!("output worker exited before reporting: {e}").into()),
+    }
+
+    if !output_enabled.load(Ordering::Relaxed) {
+        vlog!(
+            "Output: muted at launch - toggle from the Plugin menu or \
+             pass --output-enabled on"
+        );
+    }
+
+    Ok(AudioHandles {
+        pending,
+        pending_state,
+        plugin,
+        sample_rate,
+        channels,
+        is_effect,
+        input: input_controller,
+        output: output_controller,
+        transport,
+        #[cfg(feature = "playback")]
+        playback,
+        #[cfg(feature = "playback")]
+        sidechain_playback,
+        #[cfg(feature = "playback")]
+        capture,
+    })
+}
+
+/// Result of driving a parameter-dependent latency change through the
+/// standalone adapter's callback-to-worker lifecycle.
+#[doc(hidden)]
+pub struct DynamicLatencyTransition {
+    pub active_before: u32,
+    pub requested_after_process: u32,
+    pub active_after_restart: u32,
+    pub restart_queued: bool,
+}
+
+/// Adapter smoke path for plugins whose latency follows a parameter.
+///
+/// This processes a real block after `change`, observes the request through
+/// the same bounded callback handoff as the cpal path, then runs the output
+/// worker's reset operation with the current parameter store.
+#[doc(hidden)]
+pub fn dynamic_latency_transition<P, F>(change: F) -> DynamicLatencyTransition
+where
+    P: PluginExport,
+    F: FnOnce(&P::Params),
+{
+    const SAMPLE_RATE: f64 = 44_100.;
+    const FRAMES: usize = 64;
+
+    let mut plugin = P::create();
+    plugin.init();
+    plugin.reset(&AudioConfig::new(SAMPLE_RATE, FRAMES));
+    let active_before = plugin.latency();
+    change(plugin.params());
+
+    let layout = P::bus_layouts().into_iter().next().unwrap_or_default();
+    let input = vec![vec![P::Sample::default(); FRAMES]; layout.total_input_channels() as usize];
+    let input_refs: Vec<&[P::Sample]> = input.iter().map(Vec::as_slice).collect();
+    let mut output =
+        vec![vec![P::Sample::default(); FRAMES]; layout.total_output_channels() as usize];
+    let mut output_refs: Vec<&mut [P::Sample]> =
+        output.iter_mut().map(Vec::as_mut_slice).collect();
+    let mut buffer = truce_core::buffer::AudioBuffer::from_slices_checked(
+        &input_refs,
+        &mut output_refs,
+        FRAMES,
+    );
+    let events = EventList::with_capacity(0);
+    let transport = truce_core::events::TransportInfo::default();
+    let mut output_events = EventList::with_capacity(0);
+    let mut context = truce_core::process::ProcessContext::new(
+        &transport,
+        SAMPLE_RATE,
+        FRAMES,
+        &mut output_events,
+    );
+    plugin.process(&mut buffer, &events, &mut context);
+    let requested_after_process = plugin.latency();
+
+    let plugin = Arc::new(Mutex::new(plugin));
+    let active_latency = Arc::new(AtomicU32::new(active_before));
+    let restart_pending = Arc::new(AtomicBool::new(false));
+    let (restart_tx, restart_rx) = mpsc::sync_channel(1);
+    queue_latency_restart(
+        requested_after_process,
+        &active_latency,
+        &restart_pending,
+        &restart_tx,
+    );
+    let worker_plugin = Arc::clone(&plugin);
+    let worker_latency = Arc::clone(&active_latency);
+    let worker_pending = Arc::clone(&restart_pending);
+    let (restart_queued, active_after_restart) = std::thread::spawn(move || {
+        let restart_queued = matches!(restart_rx.try_recv(), Ok(OutputCmd::RestartLatency));
+        let latency = prepare_plugin(
+            &mut *worker_plugin
+                .lock()
+                .expect("plugin mutex poisoned in latency smoke worker"),
+            SAMPLE_RATE,
+            FRAMES,
+            restart_queued,
+            &worker_latency,
+            &worker_pending,
+        );
+        (restart_queued, latency)
+    })
+    .join()
+    .expect("latency smoke worker panicked");
+
+    DynamicLatencyTransition {
+        active_before,
+        requested_after_process,
+        active_after_restart,
+        restart_queued,
+    }
+}
+
+/// State produced by [`setup_input_pipeline`] that `start_audio`
+/// needs to wire into the output worker (`ring` / `enabled` go into
+/// `OutputResources`) and the public handles (`controller`).
+struct InputSetup {
+    controller: InputController,
+    ring: Arc<InputRing>,
+    enabled: Arc<AtomicBool>,
+    /// Ring frame width (= the live output stream's channel count). The
+    /// output worker updates it on a `SetLayout` switch; the input
+    /// producer reads it so its normalization tracks a runtime width
+    /// change instead of freezing at the launch width.
+    ring_width: Arc<AtomicUsize>,
+}
+
+/// Resolve the initial input device, allocate the input ring + control
+/// channels, and (for effects) spawn the input worker thread. Also
+/// flips `set_enabled(true)` when the user passed
+/// `--input-enabled on`, so the launch state matches the CLI ask.
+fn setup_input_pipeline(
+    audio_host: &cpal::Host,
+    opts: &Options,
+    is_effect: bool,
+    channels: usize,
+    sample_rate: f64,
+) -> InputSetup {
+    // Bound the ring at ~100 ms of capture frames. The producer
+    // drop-oldest on overflow, so a slow render (or a paused output)
+    // sheds the stalest audio instead of unbounded growth. Frame width
+    // = the output stream's channel count; the producer normalizes the
+    // capture device's native width onto it.
+    let ring_frames = (sample_count_usize(sample_rate) / 10).max(1);
+    let input_ring: Arc<InputRing> = Arc::new(ArrayQueue::new(ring_frames));
+    // Seeded with the launch output width; the output worker restamps it
+    // through `open_output_stream` on every (re)open, so a `SetLayout`
+    // switch propagates the new width to the input producer.
+    let ring_width = Arc::new(AtomicUsize::new(channels));
+
+    // Resolve the initial input device name so the menu can show
+    // the currently-active device on first open. Worker re-resolves
+    // on each open against this name (or whatever the user picks).
+    let initial_input_name: Option<String> = if is_effect {
+        let device = match &opts.input_device {
+            Some(name) => find_device(audio_host, name, false),
+            None => audio_host.default_input_device(),
+        };
+        let name = device.and_then(|d| d.description().map(|desc| desc.name().to_string()).ok());
+        if name.is_none() {
+            eprintln!("Note: no input device found - input-enable will be a no-op.");
+        }
+        name
+    } else {
+        None
+    };
+
+    let input_enabled = Arc::new(AtomicBool::new(false));
+    let has_input_device = initial_input_name.is_some();
+    let (input_cmd_tx, input_cmd_rx) = mpsc::channel::<InputCmd>();
+    let input_current_name = Arc::new(Mutex::new(initial_input_name.clone()));
+
+    let controller = InputController {
+        enabled: Arc::clone(&input_enabled),
+        has_device: has_input_device,
+        cmd_tx: input_cmd_tx,
+        current_name: Arc::clone(&input_current_name),
+        channel_route: Arc::new(AtomicUsize::new(0)),
+    };
+
+    if is_effect {
+        let device_name = initial_input_name.clone();
+        let ring = Arc::clone(&input_ring);
+        let ring_width = Arc::clone(&ring_width);
+        let enabled_flag = Arc::clone(&input_enabled);
+        let current = Arc::clone(&input_current_name);
+        std::thread::Builder::new()
+            .name("truce-standalone-input".into())
+            .spawn(move || {
+                input_worker(
+                    input_cmd_rx,
+                    device_name,
+                    ring_width,
+                    sample_rate,
+                    ring,
+                    enabled_flag,
+                    current,
+                );
+            })
+            .ok();
+    }
+
+    let want_input_enabled = is_effect && opts.input_enabled.unwrap_or(false);
+    if want_input_enabled {
+        controller.set_enabled(true);
+    }
+
+    if is_effect {
+        vlog!(
+            "Input:  {} ({})",
+            initial_input_name.as_deref().unwrap_or("(none)"),
+            if want_input_enabled {
+                "enabled"
+            } else {
+                {
+                    #[cfg(target_os = "macos")]
+                    {
+                        "disabled - press Cmd+I in the window or pass --input-enabled on"
+                    }
+                    #[cfg(not(target_os = "macos"))]
+                    {
+                        "disabled - press Ctrl+I in the window or pass --input-enabled on"
+                    }
+                }
+            }
+        );
+    }
+
+    InputSetup {
+        controller,
+        ring: input_ring,
+        enabled: input_enabled,
+        ring_width,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Output worker
+// ---------------------------------------------------------------------------
+
+/// Resources the output callback needs. Held by the worker; new
+/// streams clone the inner Arcs so `process()` keeps seeing the
+/// same plugin / pending / transport state across device switches.
+struct OutputResources<P: PluginExport> {
+    plugin: Arc<Mutex<P>>,
+    pending: Arc<ArrayQueue<MidiEvent>>,
+    /// Editor-initiated `load_state` blobs, drained at the block top (see
+    /// [`AudioHandles::pending_state`]).
+    pending_state: Arc<ArrayQueue<Vec<u8>>>,
+    input_ring: Arc<InputRing>,
+    input_enabled: Arc<AtomicBool>,
+    /// Mic-ring frame width, restamped by `open_output_stream` on every
+    /// (re)open so a `SetLayout` switch propagates the new output channel
+    /// count to the input producer (shared with the input worker).
+    ring_width: Arc<AtomicUsize>,
+    /// Drives the audio callback's mute / unmute decision (UI thread
+    /// flips it via `OutputController::set_enabled`).
+    output_enabled: Arc<AtomicBool>,
+    transport: Transport,
+    current_name: Arc<Mutex<Option<String>>>,
+    /// Input channel routing (encoded [`ChannelRoute`]). Shared with
+    /// `InputController` (menu writes it).
+    input_channel_route: Arc<AtomicUsize>,
+    /// Output channel routing (encoded [`ChannelRoute`]). Shared with
+    /// `OutputController` (menu writes it).
+    output_channel_route: Arc<AtomicUsize>,
+    /// The plugin's active bus layout as a packed `(num_in, num_out)`,
+    /// shared with `OutputController` so the Bus Layout menu can mark the
+    /// active entry. The worker updates it after a `SetLayout` switch.
+    layout: Arc<AtomicUsize>,
+    /// The `max_frames` the plugin was last `reset()` with. A device
+    /// switch onto a larger buffer bound must renew the promise
+    /// before the new stream's first callback.
+    promised_max_frames: Arc<AtomicUsize>,
+    /// Bounded callback-to-worker handoff for a dynamic-latency restart.
+    restart_tx: mpsc::SyncSender<OutputCmd>,
+    /// Latency of the processing state prepared by the output worker.
+    active_latency: Arc<AtomicU32>,
+    /// Coalesces repeated callback observations until the worker reopens.
+    latency_restart_pending: Arc<AtomicBool>,
+    /// Optional `.wav` playback source (gated on the `playback`
+    /// feature). When present, summed into the input bus alongside
+    /// the mic ring - see the matrix in `cli.rs::HELP`.
+    #[cfg(feature = "playback")]
+    playback: Option<Arc<crate::playback::PlaybackSource>>,
+    /// Optional `.wav` sidechain source (gated on `playback`). Feeds
+    /// the sidechain input bus, independent of the main `playback`.
+    #[cfg(feature = "playback")]
+    sidechain_playback: Option<Arc<crate::playback::PlaybackSource>>,
+    /// Optional `--output-file` capture pusher. Cloned into each
+    /// cpal callback closure, so device switches don't tear down
+    /// the capture. The owning `CaptureSink` lives on
+    /// `AudioHandles`; finalize is the runner's responsibility.
+    #[cfg(feature = "playback")]
+    capture: Option<crate::playback::CapturePusher>,
+}
+
+// Spawned-thread body - owns its state across the worker's lifetime.
+// Switching to refs would force the caller to outlive the thread.
+#[allow(clippy::too_many_arguments, clippy::needless_pass_by_value)]
+fn output_worker<P: PluginExport>(
+    cmd_rx: mpsc::Receiver<OutputCmd>,
+    open_result: mpsc::Sender<Result<(), String>>,
+    initial_device_name: Option<String>,
+    mut config: cpal::StreamConfig,
+    sample_format: cpal::SampleFormat,
+    sample_rate: f64,
+    // The plugin's bus dimensions. `config.channels` is the *device* stream
+    // width, which need not equal these - a mono plugin on a stereo-only
+    // device runs `num_out == 1` but the stream stays at 2.
+    mut num_in: usize,
+    mut num_out: usize,
+    // Main-input width of the active layout (channels past it are the
+    // sidechain). Resolved by index from the selected layout, so it's
+    // reassigned - not re-derived from ambiguous totals - on a runtime
+    // `SetLayout` switch below.
+    mut num_main_in: usize,
+    is_effect: bool,
+    res: OutputResources<P>,
+) {
+    let mut stream: Option<cpal::Stream> = None;
+
+    let initial = open_output_stream::<P>(
+        initial_device_name.as_deref(),
+        &config,
+        sample_format,
+        sample_rate,
+        config.channels as usize,
+        num_in,
+        num_out,
+        num_main_in,
+        is_effect,
+        false,
+        &res,
+        &mut stream,
+    );
+    let _ = open_result.send(initial);
+
+    while let Ok(cmd) = cmd_rx.recv() {
+        match cmd {
+            OutputCmd::SetDevice(name) => {
+                // The device currently playing - on a failed switch we
+                // reopen it so audio keeps running (the documented
+                // contract). `open_output_stream` leaves `current_name`
+                // untouched on failure, so it still holds this value.
+                let previous = res.current_name.lock().ok().and_then(|g| g.clone());
+                // Drop the old stream BEFORE building the new one
+                // - some backends won't open a second exclusive
+                // stream against the same device.
+                stream = None;
+                if let Err(e) = open_output_stream::<P>(
+                    name.as_deref(),
+                    &config,
+                    sample_format,
+                    sample_rate,
+                    config.channels as usize,
+                    num_in,
+                    num_out,
+                    num_main_in,
+                    is_effect,
+                    false,
+                    &res,
+                    &mut stream,
+                ) {
+                    eprintln!("output device switch failed: {e}; restoring previous device");
+                    // Reopen the previous device so a failed switch
+                    // doesn't leave the host permanently silent; fall back
+                    // to the OS default when its name can't be re-resolved.
+                    if let Err(e2) = reopen_output_or_default::<P>(
+                        previous.as_deref(),
+                        &config,
+                        sample_format,
+                        sample_rate,
+                        num_in,
+                        num_out,
+                        num_main_in,
+                        is_effect,
+                        false,
+                        &res,
+                        &mut stream,
+                    ) {
+                        eprintln!("failed to restore previous output device: {e2}");
+                    }
+                }
+            }
+            OutputCmd::SetLayout { index } => {
+                let host = cpal::default_host();
+                let name = res.current_name.lock().ok().and_then(|g| g.clone());
+                let device = match name.as_deref() {
+                    Some(n) => find_device(&host, n, true),
+                    None => host.default_output_device(),
+                };
+                let Some(dev) = device else {
+                    eprintln!("bus-layout: no output device");
+                    continue;
+                };
+                let (new_in, new_out, new_main_in) = layout_at_index::<P>(index);
+                let new_out_dev = u16::try_from(new_out).unwrap_or(u16::MAX);
+                // Snapshot the current widths so a failed switch can revert
+                // to them rather than leaving the host silent.
+                let (old_in, old_out, old_main_in, old_channels) =
+                    (num_in, num_out, num_main_in, config.channels);
+                // Keep the device stream at a width the hardware can open.
+                // Prefer the layout's output width (so a surround device
+                // plays surround), else keep the current stream width and
+                // map the plugin output onto it (a mono layout plays
+                // through a stereo-only device instead of being rejected).
+                config.channels = if device_supports_output_channels(&dev, new_out_dev) {
+                    new_out_dev
+                } else {
+                    config.channels
+                };
+                num_in = new_in;
+                num_out = new_out;
+                num_main_in = new_main_in;
+                stream = None;
+                if let Err(e) = open_output_stream::<P>(
+                    name.as_deref(),
+                    &config,
+                    sample_format,
+                    sample_rate,
+                    config.channels as usize,
+                    num_in,
+                    num_out,
+                    num_main_in,
+                    is_effect,
+                    true,
+                    &res,
+                    &mut stream,
+                ) {
+                    eprintln!("bus-layout switch failed: {e}; reverting to the previous layout");
+                    // Revert the widths and reopen at the previous layout so
+                    // audio keeps running (and the plugin is re-prepared for
+                    // the arrangement it's actually being handed).
+                    num_in = old_in;
+                    num_out = old_out;
+                    num_main_in = old_main_in;
+                    config.channels = old_channels;
+                    if let Err(e2) = reopen_output_or_default::<P>(
+                        name.as_deref(),
+                        &config,
+                        sample_format,
+                        sample_rate,
+                        num_in,
+                        num_out,
+                        num_main_in,
+                        is_effect,
+                        true,
+                        &res,
+                        &mut stream,
+                    ) {
+                        eprintln!("failed to restore the previous bus layout: {e2}");
+                    }
+                } else {
+                    res.layout.store(index, Ordering::Relaxed);
+                }
+            }
+            OutputCmd::RestartLatency => {
+                let requested_latency = res
+                    .plugin
+                    .lock()
+                    .expect("plugin mutex poisoned before latency restart")
+                    .latency();
+                if requested_latency == res.active_latency.load(Ordering::Acquire) {
+                    res.latency_restart_pending.store(false, Ordering::Release);
+                    continue;
+                }
+                let name = res.current_name.lock().ok().and_then(|g| g.clone());
+                stream = None;
+                if let Err(error) = reopen_output_or_default::<P>(
+                    name.as_deref(),
+                    &config,
+                    sample_format,
+                    sample_rate,
+                    num_in,
+                    num_out,
+                    num_main_in,
+                    is_effect,
+                    true,
+                    &res,
+                    &mut stream,
+                ) {
+                    res.latency_restart_pending.store(false, Ordering::Release);
+                    eprintln!("latency restart failed: {error}");
+                }
+            }
+        }
+    }
+    drop(stream);
+}
+
+/// Reopen the output, falling back to the OS default when a *named*
+/// device can't be re-resolved. Used on the restore / revert paths: the
+/// ALSA virtual default reports a description ("Default Audio Device")
+/// that isn't in `output_devices()`, so re-resolving a previous name
+/// that was really the unnamed default fails there - and without this
+/// fallback the host stays silent, the exact outcome the restore exists
+/// to prevent.
+#[allow(clippy::too_many_arguments)]
+fn reopen_output_or_default<P: PluginExport>(
+    name: Option<&str>,
+    config: &cpal::StreamConfig,
+    sample_format: cpal::SampleFormat,
+    sample_rate: f64,
+    num_in: usize,
+    num_out: usize,
+    num_main_in: usize,
+    is_effect: bool,
+    force_reset: bool,
+    res: &OutputResources<P>,
+    stream: &mut Option<cpal::Stream>,
+) -> Result<(), String> {
+    let first = open_output_stream::<P>(
+        name,
+        config,
+        sample_format,
+        sample_rate,
+        config.channels as usize,
+        num_in,
+        num_out,
+        num_main_in,
+        is_effect,
+        force_reset,
+        res,
+        stream,
+    );
+    if first.is_ok() || name.is_none() {
+        return first;
+    }
+    open_output_stream::<P>(
+        None,
+        config,
+        sample_format,
+        sample_rate,
+        config.channels as usize,
+        num_in,
+        num_out,
+        num_main_in,
+        is_effect,
+        force_reset,
+        res,
+        stream,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn open_output_stream<P: PluginExport>(
+    name: Option<&str>,
+    config: &cpal::StreamConfig,
+    sample_format: cpal::SampleFormat,
+    sample_rate: f64,
+    // Device interleave stride (= `config.channels`); the plugin's bus is
+    // (`num_in`, `num_out`), mapped onto these device channels by the route.
+    channels: usize,
+    num_in: usize,
+    num_out: usize,
+    // Main-input width of the selected layout; channels [num_main_in,
+    // num_in) are the sidechain bus. Resolved by the caller from the
+    // selected layout index (see `layout_at_index`).
+    num_main_in: usize,
+    is_effect: bool,
+    // Force a `reset()` even when the frame bound didn't grow. A bus-layout
+    // switch changes the channel arrangement, so the plugin has to re-prepare
+    // its per-channel DSP state; every format wrapper couples an arrangement
+    // change to a reset. Device switches (same layout) pass `false`.
+    force_reset: bool,
+    res: &OutputResources<P>,
+    stream_slot: &mut Option<cpal::Stream>,
+) -> Result<(), String> {
+    // Resolve fresh each open - hot-plug may have changed the
+    // device list since the last switch.
+    let host = cpal::default_host();
+    let device = match name {
+        Some(n) => {
+            find_device(&host, n, true).ok_or_else(|| format!("no output device matching '{n}'"))?
+        }
+        None => host
+            .default_output_device()
+            .ok_or_else(|| "no default audio output device".to_string())?,
+    };
+    let resolved_name = device.description().map(|d| d.name().to_string()).ok();
+
+    let plugin_a = Arc::clone(&res.plugin);
+    let pending_a = Arc::clone(&res.pending);
+    let pending_state_a = Arc::clone(&res.pending_state);
+    let ring_a = Arc::clone(&res.input_ring);
+    let enabled_a = Arc::clone(&res.input_enabled);
+    let out_enabled_a = Arc::clone(&res.output_enabled);
+    let in_route_a = Arc::clone(&res.input_channel_route);
+    let out_route_a = Arc::clone(&res.output_channel_route);
+    let active_latency_a = Arc::clone(&res.active_latency);
+    let latency_restart_pending_a = Arc::clone(&res.latency_restart_pending);
+    let restart_tx_a = res.restart_tx.clone();
+    let transport_a = res.transport.clone();
+    #[cfg(feature = "playback")]
+    let playback_a = res.playback.clone();
+    #[cfg(feature = "playback")]
+    let sidechain_playback_a = res.sidechain_playback.clone();
+    #[cfg(feature = "playback")]
+    let capture_a = res.capture.clone();
+
+    // Per-stream audio-callback scratch. Owned by the move-closure so
+    // it lives across callbacks but never crosses threads - cpal calls
+    // the closure on a single dedicated audio thread per stream.
+    // Amortizes the `vec![0.0; num_frames]` per-channel allocation and
+    // the `channel_bufs.clone()` for the effect input mirror, plus the
+    // two `EventList::default()`s per block (input drain + plugin output)
+    // - both `clear()`ed and reused, capacity-preserving.
+    let mut channel_bufs: Vec<Vec<f32>> = Vec::with_capacity(channels);
+    let mut input_bufs: Vec<Vec<f32>> = Vec::with_capacity(channels);
+    let mut event_list = EventList::with_capacity(EVENT_LIST_PREALLOC);
+    let mut output_events = EventList::with_capacity(EVENT_LIST_PREALLOC);
+    let mut sub_event_scratch = EventList::with_capacity(EVENT_LIST_PREALLOC);
+    // Cached for `chunked_process::process_chunked`. Built once at
+    // callback setup; static for the lifetime of the cpal stream.
+    // `plugin_a` is locked once here (stream setup, not audio thread)
+    // to pull `param_infos` + the `params_arc` clone the chunker uses
+    // as its `&dyn Params` handle. The chunker can't call
+    // `plugin.params()` itself because process_chunked already holds
+    // `&mut plugin` for the duration of the `process()` calls.
+    let (param_infos, params_arc) = {
+        let p = plugin_a
+            .lock()
+            .expect("plugin mutex poisoned at audio setup");
+        (p.params().param_infos(), p.params_arc())
+    };
+    let min_subblock_samples = P::info().automation.min_subblock_samples;
+    // Raw-pointer arrays + `RawBufferScratch` reused across callbacks.
+    // The pointer arrays mirror `input_bufs` / `channel_bufs` each
+    // block; the scratch wraps the raw->slice conversion plus the
+    // alias-detection copy fallback used by every format wrapper.
+    let mut ptr_scratch = CallbackPtrScratch {
+        inputs: Vec::with_capacity(channels),
+        outputs: Vec::with_capacity(channels),
+    };
+    let mut scratch: RawBufferScratch<<P as truce_core::plugin::PluginRuntime>::Sample> =
+        RawBufferScratch::default();
+    // Pre-grow the widening / alias-copy scratch to the stream's frame
+    // bound (the same number `reset` hands the plugin) so an f64
+    // plugin's first callback doesn't allocate its per-channel scratch
+    // inside cpal's real-time callback. Every format wrapper does this
+    // at its setup hook; the standalone was the one caller that didn't.
+    // The bound comes from *this* device's reported range - hot-plug
+    // re-opens may land on a device with a different maximum.
+    let supported = device
+        .default_output_config()
+        .map_err(|e| format!("could not query the output config for the scratch bound: {e}"))?;
+    let frame_bound = config.buffer_size_max_frames(&supported);
+    // The plugin sized its DSP for the bound it was last `reset()`
+    // with; a device whose maximum exceeds it could deliver blocks
+    // past that promise. Renew it before the stream opens (no
+    // callback is running - the old stream is already dropped). A
+    // layout switch also has to re-prepare the plugin for the new
+    // channel arrangement, so `force_reset` triggers it regardless.
+    let bound_grew = frame_bound > res.promised_max_frames.load(Ordering::Relaxed);
+    if bound_grew {
+        res.promised_max_frames
+            .store(frame_bound, Ordering::Relaxed);
+    }
+    {
+        let mut p = plugin_a
+            .lock()
+            .expect("plugin mutex poisoned at audio setup");
+        let latency_changed = p.latency() != res.active_latency.load(Ordering::Acquire);
+        prepare_plugin(
+            &mut *p,
+            sample_rate,
+            frame_bound,
+            bound_grew || force_reset || latency_changed,
+            &res.active_latency,
+            &res.latency_restart_pending,
+        );
+    }
+    scratch.ensure_capacity(num_in, num_out, frame_bound);
+    // `num_main_in` (the main/sidechain split of the selected layout) is
+    // resolved by the caller and passed in - the layout is fixed for the
+    // stream's lifetime.
+
+    let stream = match sample_format {
+        cpal::SampleFormat::F32 => device
+            .build_output_stream(
+                config,
+                move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                    audio_callback::<P>(
+                        data,
+                        channels,
+                        num_in,
+                        num_main_in,
+                        num_out,
+                        sample_rate,
+                        is_effect,
+                        &plugin_a,
+                        &pending_a,
+                        &pending_state_a,
+                        &ring_a,
+                        &enabled_a,
+                        &out_enabled_a,
+                        &in_route_a,
+                        &out_route_a,
+                        &active_latency_a,
+                        &latency_restart_pending_a,
+                        &restart_tx_a,
+                        &transport_a,
+                        &mut channel_bufs,
+                        &mut input_bufs,
+                        &mut event_list,
+                        &mut output_events,
+                        &mut sub_event_scratch,
+                        &param_infos,
+                        &params_arc,
+                        min_subblock_samples,
+                        &mut ptr_scratch,
+                        &mut scratch,
+                        #[cfg(feature = "playback")]
+                        playback_a.as_ref(),
+                        #[cfg(feature = "playback")]
+                        sidechain_playback_a.as_ref(),
+                        #[cfg(feature = "playback")]
+                        capture_a.as_ref(),
+                    );
+                },
+                |err| eprintln!("Audio error: {err}"),
+                None,
+            )
+            .map_err(|e| format!("could not build output stream: {e}"))?,
+        format => {
+            return Err(format!(
+                "audio output format {format:?} is not supported \
+                 (truce standalone handles f32 only)"
+            ));
+        }
+    };
+
+    stream
+        .play()
+        .map_err(|e| format!("could not start output stream: {e}"))?;
+
+    *stream_slot = Some(stream);
+    // Publish the new stream's channel count as the mic-ring frame width
+    // so the input producer normalizes onto it after a layout switch.
+    res.ring_width.store(channels, Ordering::Relaxed);
+    if let Ok(mut g) = res.current_name.lock() {
+        g.clone_from(&resolved_name);
+    }
+
+    vlog!(
+        "Output: {} @ {} Hz, {} ch",
+        resolved_name.as_deref().unwrap_or("(unnamed)"),
+        sample_rate,
+        channels,
+    );
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Input worker
+// ---------------------------------------------------------------------------
+
+// Spawned-thread body - owns its state across the worker's lifetime.
+// Switching to refs would force the caller to outlive the thread.
+#[allow(clippy::needless_pass_by_value)]
+fn input_worker(
+    cmd_rx: mpsc::Receiver<InputCmd>,
+    initial_device_name: Option<String>,
+    ring_width: Arc<AtomicUsize>,
+    sample_rate: f64,
+    ring: Arc<InputRing>,
+    enabled_flag: Arc<AtomicBool>,
+    current_name: Arc<Mutex<Option<String>>>,
+) {
+    let mut stream: Option<cpal::Stream> = None;
+    let mut device_name = initial_device_name;
+    let mut want_enabled = false;
+
+    while let Ok(cmd) = cmd_rx.recv() {
+        match cmd {
+            InputCmd::SetEnabled(on) => {
+                want_enabled = on;
+                apply_input_state(
+                    &mut stream,
+                    want_enabled,
+                    device_name.as_deref(),
+                    &ring_width,
+                    sample_rate,
+                    &ring,
+                    &enabled_flag,
+                    &current_name,
+                );
+            }
+            InputCmd::SetDevice(name) => {
+                device_name = name;
+                if want_enabled {
+                    // Drop old before opening new - some backends
+                    // won't open a second exclusive stream against
+                    // the same device.
+                    stream = None;
+                    enabled_flag.store(false, Ordering::Relaxed);
+                    apply_input_state(
+                        &mut stream,
+                        true,
+                        device_name.as_deref(),
+                        &ring_width,
+                        sample_rate,
+                        &ring,
+                        &enabled_flag,
+                        &current_name,
+                    );
+                } else if let Ok(mut g) = current_name.lock() {
+                    // Reflect the chosen device immediately even
+                    // though we haven't opened a stream - the menu
+                    // checkmark should match the user's pick.
+                    g.clone_from(&device_name);
+                }
+            }
+        }
+    }
+    drop(stream);
+}
+
+#[allow(clippy::too_many_arguments)]
+fn apply_input_state(
+    stream: &mut Option<cpal::Stream>,
+    want: bool,
+    device_name: Option<&str>,
+    ring_width: &Arc<AtomicUsize>,
+    sample_rate: f64,
+    ring: &Arc<InputRing>,
+    enabled_flag: &Arc<AtomicBool>,
+    current_name: &Arc<Mutex<Option<String>>>,
+) {
+    let currently = stream.is_some();
+    if want == currently {
+        return;
+    }
+    if want {
+        let host = cpal::default_host();
+        let device = match device_name {
+            Some(name) => find_device(&host, name, false),
+            None => host.default_input_device(),
+        };
+        if let Some(dev) = device {
+            let resolved = dev.description().map(|d| d.name().to_string()).ok();
+            match build_and_play_input_stream(
+                &dev,
+                Arc::clone(ring_width),
+                sample_rate,
+                Arc::clone(ring),
+            ) {
+                Ok(s) => {
+                    *stream = Some(s);
+                    enabled_flag.store(true, Ordering::Relaxed);
+                    if let Ok(mut g) = current_name.lock() {
+                        *g = resolved;
+                    }
+                }
+                Err(e) => {
+                    eprintln!("mic enable failed: {e}");
+                    enabled_flag.store(false, Ordering::Relaxed);
+                }
+            }
+        } else {
+            eprintln!("mic enable failed: no input device available");
+            enabled_flag.store(false, Ordering::Relaxed);
+        }
+    } else {
+        *stream = None;
+        enabled_flag.store(false, Ordering::Relaxed);
+        // Drain stale frames so re-enabling doesn't replay old audio.
+        while ring.pop().is_some() {}
+    }
+}
+
+/// Resolve an input `StreamConfig` for `device`. Prefers the render
+/// side's `(channels, sample_rate)` so the two clocks match, but many
+/// capture devices can't open that shape (a mono USB mic on a stereo
+/// render stream, a 44.1 kHz interface against a 48 kHz output). On any
+/// mismatch, fall back to the device's own default config so the mic
+/// still opens. A fallback whose rate differs from the render rate is
+/// not sample-rate-converted, so the ring drifts within its drop-oldest
+/// cap - opening at all beats a permanently-unusable mic.
+fn resolve_input_config(
+    device: &cpal::Device,
+    channels: usize,
+    sample_rate: f64,
+) -> cpal::StreamConfig {
+    // Channel count < u16::MAX (typical: 1-8); sample rate goes through
+    // `cast::sample_rate_u32` which debug-asserts the (positive,
+    // ≤ u32::MAX) preconditions.
+    #[allow(clippy::cast_possible_truncation)]
+    let ideal = cpal::StreamConfig {
+        channels: channels as u16,
+        sample_rate: sample_rate_u32(sample_rate),
+        buffer_size: cpal::BufferSize::Default,
+    };
+    // If the device advertises the ideal shape, trust it; else drop to
+    // the device default. `supported_input_configs` ranges tell us
+    // without a throwaway `build_input_stream`.
+    let supported = device.supported_input_configs().is_ok_and(|mut r| {
+        r.any(|c| {
+            c.channels() == ideal.channels
+                && c.min_sample_rate() <= ideal.sample_rate
+                && c.max_sample_rate() >= ideal.sample_rate
+        })
+    });
+    if supported {
+        return ideal;
+    }
+    match device.default_input_config() {
+        Ok(def) => {
+            eprintln!(
+                "mic: device can't open {} ch @ {} Hz; using its default {} ch @ {} Hz",
+                ideal.channels,
+                ideal.sample_rate,
+                def.channels(),
+                def.sample_rate(),
+            );
+            def.config()
+        }
+        Err(_) => ideal,
+    }
+}
+
+/// Build an input stream against the given device that hands captured
+/// frames to `ring`. `ring_width` is the ring's frame width (the output
+/// stream's channel count); the callback normalizes the device's native
+/// frames onto it. Called from the worker thread.
+fn build_and_play_input_stream(
+    device: &cpal::Device,
+    ring_width: Arc<AtomicUsize>,
+    sample_rate: f64,
+    ring: Arc<InputRing>,
+) -> Result<cpal::Stream, BoxErr> {
+    // Open the physical input at the width preferred when it's enabled;
+    // the mic's channel count (`in_ch`) is fixed for the stream's life.
+    let input_config =
+        resolve_input_config(device, ring_width.load(Ordering::Relaxed), sample_rate);
+    let in_ch = input_config.channels as usize;
+    let stream = device
+        .build_input_stream(
+            &input_config,
+            move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                if in_ch == 0 {
+                    return;
+                }
+                // Normalize each native frame onto the *current* ring
+                // width (re-read each block so a `SetLayout` switch that
+                // changed the output channel count reaches the producer)
+                // and hand it off. `force_push` drops the oldest frame
+                // when the ring is full - a slow / paused render sheds the
+                // stalest audio. No lock, no allocation, no O(n) drain.
+                let width = ring_width.load(Ordering::Relaxed);
+                for frame in data.chunks_exact(in_ch) {
+                    ring.force_push(normalize_input_frame(frame, width));
+                }
+            },
+            |err| eprintln!("Input error: {err}"),
+            None,
+        )
+        .map_err(|e| -> BoxErr { format!("could not build input stream: {e}").into() })?;
+    stream
+        .play()
+        .map_err(|e| -> BoxErr { format!("could not start input stream: {e}").into() })?;
+    Ok(stream)
+}
+
+fn find_device(host: &cpal::Host, name: &str, output: bool) -> Option<cpal::Device> {
+    let devices = if output {
+        host.output_devices().ok()?
+    } else {
+        host.input_devices().ok()?
+    };
+    devices.into_iter().find(|d| {
+        d.description()
+            .is_ok_and(|desc| desc.name().to_lowercase().contains(&name.to_lowercase()))
+    })
+}
+
+/// Build the cpal `StreamConfig` honoring opts where possible. Falls
+/// back to the device's default config for any unspecified or
+/// unsupported choice.
+/// The exact `(num_in, num_out)` channel counts of the bus layout the
+/// standalone runs. `--bus-layout <index>` selects it (out-of-range warns
+/// and falls back); with no selection the plugin's first (default) layout
+/// is used. The plugin always runs a *declared* layout - never the
+/// device's default channel count.
+/// Returns `(total_in, total_out, main_in)` for the selected layout. The
+/// main/sidechain split (`main_in`; channels past it are the sidechain the
+/// standalone feeds from `--sidechain-file`) is read from the SELECTED
+/// layout by index - not from a total-channel match, which picks the wrong
+/// layout when two share totals but split differently, routing the
+/// sidechain file over the main channels. The offline path pins the split
+/// the same way.
+fn selected_layout_index<P: PluginExport>(opts: &Options) -> usize {
+    let count = P::bus_layouts().len();
+    match opts.bus_layout {
+        Some(i) if i < count => i,
+        Some(i) => {
+            eprintln!(
+                "--bus-layout {i}: out of range (plugin declares {count} layout(s)); \
+                 using the default layout"
+            );
+            0
+        }
+        None => 0,
+    }
+}
+
+/// `(total_in, total_out, main_in)` for the declared layout at `idx`. The
+/// layout index is the unambiguous identity (two layouts can share channel
+/// totals but split main/sidechain differently), so both the initial
+/// selection and a runtime `SetLayout` switch resolve widths from here.
+fn layout_at_index<P: PluginExport>(idx: usize) -> (usize, usize, usize) {
+    P::bus_layouts().get(idx).map_or((0, 0, 0), |l| {
+        (
+            l.total_input_channels() as usize,
+            l.total_output_channels() as usize,
+            l.inputs
+                .first()
+                .map_or(0, |b| b.channels.channel_count() as usize),
+        )
+    })
+}
+
+/// Whether the output device advertises a config with exactly `ch`
+/// channels. Used to reject a `--bus-layout` wider than the hardware.
+fn device_supports_output_channels(device: &cpal::Device, ch: u16) -> bool {
+    device
+        .supported_output_configs()
+        .is_ok_and(|mut r| r.any(|c| c.channels() == ch))
+}
+
+fn resolve_config(
+    device: &cpal::Device,
+    default: &cpal::SupportedStreamConfig,
+    opts: &Options,
+    requested_channels: Option<u16>,
+) -> cpal::StreamConfig {
+    let mut channels = default.channels();
+    // A `--bus-layout` selection runs the plugin at that layout's channel
+    // count, so request it from the device. The device has to support the
+    // count so the device stream matches (a 6-channel device plays 5.1
+    // directly); otherwise keep the device default and map the plugin's
+    // output onto it - the plugin still runs its declared layout.
+    if let Some(req) = requested_channels {
+        if req == channels {
+            // Already the default - nothing to do.
+        } else if device_supports_output_channels(device, req) {
+            channels = req;
+        } else {
+            eprintln!(
+                "bus-layout: device doesn't offer {req} output channels; \
+                 keeping the {channels}-channel device stream and mapping \
+                 the plugin's output onto it"
+            );
+        }
+    }
+    let mut sample_rate = default.sample_rate();
+    let mut buffer_size = cpal::BufferSize::Default;
+
+    if let Some(sr) = opts.sample_rate {
+        // Verify the requested rate is in the supported set; fall
+        // back silently if not.
+        if let Ok(mut ranges) = device.supported_output_configs() {
+            let desired = sr;
+            let supported =
+                ranges.any(|r| r.min_sample_rate() <= desired && r.max_sample_rate() >= desired);
+            if supported {
+                sample_rate = desired;
+            } else {
+                eprintln!(
+                    "sample rate {sr} Hz not supported; \
+                     using device default {}",
+                    default.sample_rate()
+                );
+            }
+        }
+    }
+    if let Some(bs) = opts.buffer_size {
+        buffer_size = cpal::BufferSize::Fixed(bs);
+    }
+
+    cpal::StreamConfig {
+        channels,
+        sample_rate,
+        buffer_size,
+    }
+}
+
+trait BufferSizeMax {
+    fn buffer_size_max_frames(&self, supported: &cpal::SupportedStreamConfig) -> usize;
+}
+impl BufferSizeMax for cpal::StreamConfig {
+    fn buffer_size_max_frames(&self, supported: &cpal::SupportedStreamConfig) -> usize {
+        match self.buffer_size {
+            cpal::BufferSize::Fixed(n) => n as usize,
+            // `Default` leaves the callback size to the device: bound
+            // by the size range the device itself reports, so `reset`
+            // and the scratch pre-grow cover whatever it delivers. A
+            // device that reports no usable range gets the same
+            // generous fallback the VST3 wrapper uses for hosts that
+            // skip `setupProcessing`. "Usable" matters: cpal's WASAPI
+            // backend reports `Range { min: 0, max: u32::MAX }` (not
+            // `Unknown`) whenever `GetBufferSizeLimits` is unsupported
+            // - every software audio stack - and sizing per-channel
+            // scratch to that bound is a 17 GB allocation. Anything
+            // beyond a plausible hardware maximum routes to the
+            // fallback instead.
+            cpal::BufferSize::Default => match supported.buffer_size() {
+                cpal::SupportedBufferSize::Range {
+                    max: max @ 1..=32_768,
+                    ..
+                } => *max as usize,
+                _ => 8192,
+            },
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+fn audio_callback<P: PluginExport>(
+    data: &mut [f32],
+    // Device interleave stride (the cpal stream's channel count). Kept
+    // separate from the plugin's bus dimensions so a plugin bus that
+    // doesn't match the device (a mono plugin on a stereo-only output, a
+    // mono-in/stereo-out effect) maps onto the device channels via the
+    // route rather than forcing a device stream at the plugin's width,
+    // which the hardware may not offer.
+    channels: usize,
+    // The active bus layout's exact (input, output) channel counts. Input
+    // scratch is sized to `num_in`, output to `num_out`, so an asymmetric
+    // layout (1 -> 2, 2 -> 1) runs at its real dimensions instead of a
+    // single collapsed width.
+    num_in: usize,
+    // Channels [0, num_main_in) are the main input bus; [num_main_in,
+    // num_in) are the sidechain. The mic and `--input-file` feed the main
+    // bus; `--sidechain-file` feeds the sidechain when the plugin has one.
+    num_main_in: usize,
+    num_out: usize,
+    sample_rate: f64,
+    is_effect: bool,
+    plugin: &Arc<Mutex<P>>,
+    pending: &Arc<ArrayQueue<MidiEvent>>,
+    pending_state: &Arc<ArrayQueue<Vec<u8>>>,
+    input_ring: &Arc<InputRing>,
+    input_enabled: &Arc<AtomicBool>,
+    output_enabled: &Arc<AtomicBool>,
+    input_channel_route: &Arc<AtomicUsize>,
+    output_channel_route: &Arc<AtomicUsize>,
+    active_latency: &Arc<AtomicU32>,
+    latency_restart_pending: &Arc<AtomicBool>,
+    restart_tx: &mpsc::SyncSender<OutputCmd>,
+    transport: &Transport,
+    channel_bufs: &mut Vec<Vec<f32>>,
+    input_bufs: &mut Vec<Vec<f32>>,
+    event_list: &mut EventList,
+    output_events: &mut EventList,
+    sub_event_scratch: &mut EventList,
+    param_infos: &[ParamInfo],
+    params_arc: &Arc<P::Params>,
+    min_subblock_samples: u32,
+    ptr_scratch: &mut CallbackPtrScratch,
+    scratch: &mut RawBufferScratch<<P as truce_core::plugin::PluginRuntime>::Sample>,
+    #[cfg(feature = "playback")] playback: Option<&Arc<crate::playback::PlaybackSource>>,
+    #[cfg(feature = "playback")] sidechain_playback: Option<&Arc<crate::playback::PlaybackSource>>,
+    #[cfg(feature = "playback")] capture: Option<&crate::playback::CapturePusher>,
+) {
+    // `num_main_in` only routes the sidechain when the `playback` feature
+    // supplies a file source to feed it.
+    #[cfg(not(feature = "playback"))]
+    let _ = num_main_in;
+    let num_frames = data.len() / channels;
+
+    let Ok(mut plugin) = plugin.try_lock() else {
+        data.fill(0.0);
+        return;
+    };
+
+    // Apply an editor-initiated state load before this block's work, under
+    // the `&mut plugin` we now hold. The UI thread only pushed the bytes to
+    // the lock-free `pending_state`, so it never blocked us or stalled this
+    // callback's `try_lock`. `load_state` legitimately allocates (a sampler
+    // decoding, say); accepted here at the block top, the same handoff the
+    // VST3 wrapper uses for its queued state.
+    if let Some(bytes) = pending_state.pop()
+        && let Err(e) = plugin.load_state(&bytes)
+    {
+        // Debug-only breadcrumb: this runs on the audio thread (the editor's
+        // load pops off the handoff queue here), and `eprintln!` locks stderr
+        // and allocates, so it must never fire in a release build. Matches
+        // `truce_core::state::apply_state`, which defers the same log.
+        #[cfg(debug_assertions)]
+        eprintln!("truce-standalone: load_state failed: {e}");
+        #[cfg(not(debug_assertions))]
+        let _ = e;
+    }
+
+    // Drain queued MIDI only after the lock is held. A lost try_lock
+    // (an editor state read in flight) returns early above, and events
+    // drained before it would be wiped by the next callback's
+    // `event_list.clear()` - dropped notes. Left in `pending` they
+    // arrive one block late at offset 0 instead.
+    event_list.clear();
+    output_events.clear();
+    while let Some(ev) = pending.pop() {
+        event_list.push(Event {
+            sample_offset: 0,
+            port: ev.port,
+            body: ev.body,
+        });
+    }
+
+    // Re-shape the plugin's output scratch to (num_out, num_frames) and
+    // zero it - the plugin writes here, and it maps onto the device buffer
+    // afterward. `Vec::resize` only allocates when growing past capacity,
+    // so a stable cpal stream (fixed layout + buffer size) doesn't allocate
+    // after warm-up.
+    channel_bufs.resize_with(num_out, Vec::new);
+    for buf in channel_bufs.iter_mut() {
+        buf.clear();
+        buf.resize(num_frames, 0.0);
+    }
+
+    // Effect-only input plumbing: mic + file are independent input
+    // sources that *sum* into the plugin's input bus (`input_bufs`, sized
+    // `num_in`), separate from the output the plugin writes (`channel_bufs`,
+    // sized `num_out`). Instruments skip the whole block and just clear
+    // `input_bufs`.
+    if is_effect {
+        // Input scratch: (num_in, num_frames), zeroed. Same
+        // resize-without-realloc trick as the output above.
+        input_bufs.resize_with(num_in, Vec::new);
+        for buf in input_bufs.iter_mut() {
+            buf.clear();
+            buf.resize(num_frames, 0.0);
+        }
+        // (1) Mic ring → input_bufs (per-block sum). Pop up to one
+        // block of frames off the lock-free ring (each already
+        // normalized to the ring width `w`).
+        if input_enabled.load(Ordering::Relaxed) {
+            // Map device input channels onto the plugin's input bus per
+            // the selected route. `Direct` is the 1:1 default (clamped to
+            // `num_in`, so a narrower plugin bus drops the extra device
+            // channels); `Stereo` pulls a chosen device pair into plugin in
+            // 0/1; `Mono` feeds one device channel into both plugin inputs.
+            // Bounds checks keep an out-of-range base (e.g. after a device
+            // swap to fewer channels) from indexing past the frame.
+            let route = ChannelRoute::decode(input_channel_route.load(Ordering::Relaxed));
+            let n_in = input_bufs.len();
+            let w = channels.min(MAX_INPUT_RING_CHANNELS);
+            let frames = input_ring.len().min(num_frames);
+            // `i` is the frame index: each iteration pops one ring frame
+            // and writes it into every `input_bufs` channel at `[i]`, so a
+            // range loop (not an iterator) is the clear form.
+            #[allow(clippy::needless_range_loop)]
+            for i in 0..frames {
+                let Some(popped) = input_ring.pop() else {
+                    break;
+                };
+                let frame = &popped.samples[..w];
+                match route {
+                    ChannelRoute::Direct => {
+                        for ch in 0..w.min(n_in) {
+                            input_bufs[ch][i] += frame[ch];
+                        }
+                    }
+                    ChannelRoute::Stereo { base } => {
+                        if base < w && n_in > 0 {
+                            input_bufs[0][i] += frame[base];
+                        }
+                        if n_in > 1 && base + 1 < w {
+                            input_bufs[1][i] += frame[base + 1];
+                        }
+                    }
+                    ChannelRoute::Mono { base } => {
+                        if base < w && n_in > 0 {
+                            let s = frame[base];
+                            input_bufs[0][i] += s;
+                            if n_in > 1 {
+                                input_bufs[1][i] += s;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // (2) Playback files → their buses. The main file sums onto the
+        // main bus (alongside the mic); the sidechain file feeds the
+        // sidechain bus, so the two are independent sources you can drive
+        // and test separately.
+        #[cfg(feature = "playback")]
+        {
+            if let Some(src) = playback {
+                src.mix_into(&mut input_bufs[..num_main_in], num_frames);
+            }
+            if let Some(src) = sidechain_playback
+                && num_in > num_main_in
+            {
+                src.mix_into(&mut input_bufs[num_main_in..num_in], num_frames);
+            }
+        }
+    } else {
+        input_bufs.clear();
+    }
+    // Build raw-pointer arrays that mirror `input_bufs` / `channel_bufs`
+    // and feed them through the shared `RawBufferScratch::build` helper.
+    // Standalone never aliases input and output buffers (`input_bufs`
+    // is a copy of `channel_bufs` for effects, plain empty for
+    // instruments), so the alias-detection scratch path inside
+    // `build` is dormant; routing through the same helper keeps
+    // every host on a single unsafe path.
+    ptr_scratch.inputs.clear();
+    ptr_scratch.outputs.clear();
+    for buf in input_bufs.iter() {
+        ptr_scratch.inputs.push(buf.as_ptr());
+    }
+    for buf in channel_bufs.iter_mut() {
+        ptr_scratch.outputs.push(buf.as_mut_ptr());
+    }
+    let num_frames_u32 = u32::try_from(num_frames).unwrap_or(u32::MAX);
+    let num_in_u32 = u32::try_from(ptr_scratch.inputs.len()).unwrap_or(u32::MAX);
+    let num_out_u32 = u32::try_from(ptr_scratch.outputs.len()).unwrap_or(u32::MAX);
+    // SAFETY: the `*const f32` / `*mut f32` entries above all point
+    // into `input_bufs` / `channel_bufs`, both alive for the rest of
+    // this call (they're owned by the cpal closure and not mutated
+    // until the next block); each `Vec<f32>` was sized to
+    // `num_frames` above, satisfying `build`'s readability /
+    // writability requirements.
+    let mut audio_buffer = unsafe {
+        scratch.build(
+            ptr_scratch.inputs.as_ptr(),
+            ptr_scratch.outputs.as_mut_ptr(),
+            num_in_u32,
+            num_out_u32,
+            num_frames_u32,
+            P::supports_in_place(),
+        )
+    };
+
+    let transport_info = transport.tick_audio(num_frames);
+    let mut transport_snap = transport_info;
+    let chunk_args = ChunkedProcess {
+        events: event_list,
+        sub_event_scratch,
+        transport: &mut transport_snap,
+        sample_rate,
+        // The standalone is a live host; offline render goes through
+        // `offline.rs` + the driver, not this realtime path.
+        process_mode: ProcessMode::Realtime,
+        output_events,
+        params_fn: None,
+        meters_fn: None,
+        param_infos,
+        min_subblock_samples,
+    };
+    process_chunked(
+        &mut *plugin,
+        params_arc.as_ref() as &dyn Params,
+        &mut audio_buffer,
+        chunk_args,
+    );
+    queue_latency_restart(
+        plugin.latency(),
+        active_latency,
+        latency_restart_pending,
+        restart_tx,
+    );
+    let _ = audio_buffer;
+    // Narrow rendered f64 output back to host f32 when the plugin's
+    // `Sample = f64`. No-op for `f32` plugins.
+    // SAFETY: `ptr_scratch.outputs` lives through this function;
+    // `num_out_u32` / `num_frames_u32` match the build above.
+    unsafe {
+        scratch.finish_widening(
+            ptr_scratch.outputs.as_mut_ptr(),
+            num_out_u32,
+            num_frames_u32,
+        );
+    }
+
+    let route = ChannelRoute::decode(output_channel_route.load(Ordering::Relaxed));
+    write_output_to_device(
+        data,
+        channels,
+        num_frames,
+        channel_bufs,
+        output_enabled.load(Ordering::Relaxed),
+        route,
+        #[cfg(feature = "playback")]
+        capture,
+    );
+}
+
+/// Map the plugin's rendered output onto the interleaved device buffer
+/// `data`. `channel_bufs` holds one `Vec<f32>` per plugin output channel
+/// (each `num_frames` long); `channels` is the device interleave stride.
+///
+/// A layout with no output channels - a MIDI-only instrument *or* an
+/// input-only analyzer / sink - leaves `channel_bufs` empty. There is then
+/// nothing to route, and every path below indexes `channel_bufs[..]`
+/// (`Direct` via `n_buf - 1`, `Stereo` / `Mono` via `[0]` / `[1]`), so the
+/// empty case is silenced and returned first. Keeping that guard here, next
+/// to the indexing it protects, is deliberate: cpal drives this from an
+/// `extern "C"` callback on the OS audio thread, where a `0 - 1` underflow
+/// panic (or an empty-`Vec` index) would abort the host process.
+///
+/// `output_enabled == false` is device mute: the plugin already ran, so the
+/// `--output-file` capture copy is still taken (mute is speaker silence, not
+/// a bounce cut), then the device buffer is zeroed.
+fn write_output_to_device(
+    data: &mut [f32],
+    channels: usize,
+    num_frames: usize,
+    channel_bufs: &[Vec<f32>],
+    output_enabled: bool,
+    route: ChannelRoute,
+    #[cfg(feature = "playback")] capture: Option<&crate::playback::CapturePusher>,
+) {
+    let n_buf = channel_bufs.len();
+    if n_buf == 0 {
+        data.fill(0.0);
+        return;
+    }
+
+    // `--output-file` capture: hand a copy of the post-process, pre-mute
+    // output to the writer thread. The capture path transfers Vec ownership
+    // to the writer thread (channel-bounded `mpsc::sync_channel`), so the
+    // per-block alloc here can't be amortized without a free-list pool. Left
+    // as-is - `--output-file` is the offline render/capture path (often
+    // paired with `--no-playback`), not the real-time playback hot path.
+    #[cfg(feature = "playback")]
+    if let Some(pusher) = capture {
+        let mut interleaved = vec![0.0_f32; num_frames * channels];
+        for frame in 0..num_frames {
+            for ch in 0..channels {
+                let ch_idx = ch.min(n_buf - 1);
+                interleaved[frame * channels + ch] = channel_bufs[ch_idx][frame];
+            }
+        }
+        pusher.submit(interleaved);
+    }
+
+    // Output mute: keep the plugin running (transport, MIDI, meters all still
+    // tick) but zero-fill the device buffer so the speakers stay silent.
+    // Cheaper and more responsive than tearing down the cpal stream.
+    if !output_enabled {
+        data.fill(0.0);
+        return;
+    }
+
+    // Map the plugin's output bus onto device output channels per the
+    // selected route. `Direct` is the 1:1 default; `Stereo` drives a chosen
+    // device pair (other channels silent); `Mono` folds the plugin's first
+    // two channels down into one device channel. The non-Direct modes clear
+    // the buffer first since they only write the selected channels.
+    match route {
+        ChannelRoute::Direct => {
+            for frame in 0..num_frames {
+                for ch in 0..channels {
+                    let ch_idx = ch.min(n_buf - 1);
+                    data[frame * channels + ch] = channel_bufs[ch_idx][frame];
+                }
+            }
+        }
+        ChannelRoute::Stereo { base } => {
+            data.fill(0.0);
+            for frame in 0..num_frames {
+                if base < channels {
+                    data[frame * channels + base] = channel_bufs[0][frame];
+                }
+                if n_buf > 1 && base + 1 < channels {
+                    data[frame * channels + base + 1] = channel_bufs[1][frame];
+                }
+            }
+        }
+        ChannelRoute::Mono { base } => {
+            data.fill(0.0);
+            if base < channels {
+                for frame in 0..num_frames {
+                    let mut v = channel_bufs[0][frame];
+                    if n_buf > 1 {
+                        v += channel_bufs[1][frame];
+                    }
+                    data[frame * channels + base] = v;
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ChannelRoute, write_output_to_device};
+
+    /// Call `write_output_to_device` the same way `audio_callback` does,
+    /// threading the `playback`-gated `capture` arg through so the test
+    /// compiles in both feature configs.
+    fn route(
+        data: &mut [f32],
+        channels: usize,
+        num_frames: usize,
+        channel_bufs: &[Vec<f32>],
+        output_enabled: bool,
+        route: ChannelRoute,
+    ) {
+        write_output_to_device(
+            data,
+            channels,
+            num_frames,
+            channel_bufs,
+            output_enabled,
+            route,
+            #[cfg(feature = "playback")]
+            None,
+        );
+    }
+
+    #[test]
+    fn zero_output_layout_silences_without_underflow() {
+        // A MIDI-only instrument or an input-only analyzer / sink declares no
+        // output buses, so `channel_bufs` is empty while the device stream
+        // still asks for `channels` frames. Routing must not compute
+        // `0usize - 1` or index an empty buffer (either aborts the cpal audio
+        // thread); it silences the device and returns.
+        let channels = 2;
+        let num_frames = 4;
+        let channel_bufs: Vec<Vec<f32>> = Vec::new();
+        for &r in &[
+            ChannelRoute::Direct,
+            ChannelRoute::Stereo { base: 0 },
+            ChannelRoute::Mono { base: 0 },
+        ] {
+            let mut data = vec![7.0_f32; num_frames * channels];
+            route(&mut data, channels, num_frames, &channel_bufs, true, r);
+            assert!(
+                data.iter().all(|&s| s == 0.0),
+                "zero-output layout must silence the device buffer ({r:?})"
+            );
+        }
+    }
+
+    #[test]
+    fn direct_route_maps_and_clamps_channels() {
+        let channels = 2;
+        let num_frames = 2;
+        // Mono plugin output on a stereo device: `ch.min(n_buf - 1)` folds
+        // both device channels onto the single plugin channel.
+        let mono = vec![vec![0.25_f32, 0.5]];
+        let mut data = vec![0.0_f32; num_frames * channels];
+        route(
+            &mut data,
+            channels,
+            num_frames,
+            &mono,
+            true,
+            ChannelRoute::Direct,
+        );
+        assert_eq!(data, vec![0.25, 0.25, 0.5, 0.5]);
+
+        // Stereo plugin output maps 1:1.
+        let stereo = vec![vec![0.1_f32, 0.2], vec![0.3, 0.4]];
+        let mut data = vec![0.0_f32; num_frames * channels];
+        route(
+            &mut data,
+            channels,
+            num_frames,
+            &stereo,
+            true,
+            ChannelRoute::Direct,
+        );
+        assert_eq!(data, vec![0.1, 0.3, 0.2, 0.4]);
+    }
+
+    #[test]
+    fn muted_output_zeroes_device_buffer() {
+        let channels = 2;
+        let num_frames = 2;
+        let stereo = vec![vec![0.1_f32, 0.2], vec![0.3, 0.4]];
+        let mut data = vec![9.0_f32; num_frames * channels];
+        route(
+            &mut data,
+            channels,
+            num_frames,
+            &stereo,
+            false,
+            ChannelRoute::Direct,
+        );
+        assert!(data.iter().all(|&s| s == 0.0), "mute silences the device");
+    }
+
+    #[test]
+    fn encode_decode_roundtrips() {
+        let cases = [
+            ChannelRoute::Direct,
+            ChannelRoute::Stereo { base: 0 },
+            ChannelRoute::Stereo { base: 2 },
+            ChannelRoute::Mono { base: 0 },
+            ChannelRoute::Mono { base: 3 },
+        ];
+        for route in cases {
+            assert_eq!(ChannelRoute::decode(route.encode()), route);
+        }
+    }
+
+    #[test]
+    fn direct_encodes_to_zero() {
+        // A freshly-zeroed atomic must decode to the default mapping.
+        assert_eq!(ChannelRoute::Direct.encode(), 0);
+        assert_eq!(ChannelRoute::decode(0), ChannelRoute::Direct);
+    }
+
+    #[test]
+    fn parse_specs() {
+        assert_eq!(ChannelRoute::parse("direct"), Some(ChannelRoute::Direct));
+        assert_eq!(ChannelRoute::parse(" ALL "), Some(ChannelRoute::Direct));
+        // 1-based in the spec, 0-based base internally.
+        assert_eq!(
+            ChannelRoute::parse("1"),
+            Some(ChannelRoute::Mono { base: 0 })
+        );
+        assert_eq!(
+            ChannelRoute::parse("3"),
+            Some(ChannelRoute::Mono { base: 2 })
+        );
+        assert_eq!(
+            ChannelRoute::parse("3-4"),
+            Some(ChannelRoute::Stereo { base: 2 })
+        );
+        // Non-adjacent / reversed / zero / garbage are rejected.
+        assert_eq!(ChannelRoute::parse("3-5"), None);
+        assert_eq!(ChannelRoute::parse("4-3"), None);
+        assert_eq!(ChannelRoute::parse("0"), None);
+        assert_eq!(ChannelRoute::parse("x"), None);
+    }
+}

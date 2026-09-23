@@ -62,6 +62,9 @@ pub struct SwankyAmpParams {
         flags = "hidden"
     )]
     pub power_sag_ratio: FloatParam,
+    /// 0 is Auto; 1, 2 and 3 request 1x, 2x and 4x processing.
+    #[param(id = 21, name = "Oversampling", range = "discrete(0, 3)", default = 0)]
+    pub oversampling: IntParam,
 }
 
 fn plain(param: &FloatParam) -> f32 {
@@ -69,6 +72,10 @@ fn plain(param: &FloatParam) -> f32 {
 }
 
 impl SwankyAmpParams {
+    pub fn oversampling_choice(&self) -> usize {
+        self.oversampling.value_usize()
+    }
+
     pub fn snapshot(&self) -> AmpControls {
         AmpControls {
             input: plain(&self.input),

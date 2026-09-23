@@ -1,4 +1,8 @@
 use truce::prelude::*;
+
+#[cfg(feature = "rt-paranoid")]
+truce::enable_rt_paranoid!();
+
 pub mod artwork;
 pub mod dsp;
 pub mod engine;
@@ -25,6 +29,10 @@ impl PluginLogic for SwankyAmp {
         engine.reset(params, config.sample_rate, config.max_block_size);
     }
 
+    fn reset_realtime(engine: &mut Self::DspState, params: &Self::Params) {
+        engine.reset_realtime(params);
+    }
+
     fn process(
         engine: &mut Self::DspState,
         params: &Self::Params,
@@ -34,6 +42,10 @@ impl PluginLogic for SwankyAmp {
     ) -> ProcessStatus {
         engine.process(params, buffer);
         ProcessStatus::Normal
+    }
+
+    fn latency(engine: &Self::DspState) -> u32 {
+        engine.latency()
     }
 
     fn editor(params: Arc<Self::Params>) -> Box<dyn Editor> {
@@ -153,6 +165,147 @@ mod tests {
     }
 
     #[test]
+    fn oversampling_policy_reports_its_resolved_host_latency() {
+        let params = SwankyAmpParams::default();
+        let mut engine = engine::Engine::new(&params);
+        for (sample_rate, latency) in [(44_100., 32), (48_000., 32), (88_200., 0), (96_000., 0)] {
+            engine.reset(&params, sample_rate, 64);
+            assert_eq!(<SwankyAmp as PluginLogic>::latency(&engine), latency);
+        }
+
+        params.oversampling.set_value(3);
+        engine.reset(&params, 44_100., 64);
+        assert_eq!(<SwankyAmp as PluginLogic>::latency(&engine), 48);
+        engine.reset(&params, 96_000., 64);
+        assert_eq!(<SwankyAmp as PluginLogic>::latency(&engine), 32);
+    }
+
+    #[test]
+    fn oversampling_reentry_does_not_restore_stale_driven_state() {
+        let params = SwankyAmpParams::default();
+        params.cabinet_on.set_value(false);
+        params.oversampling.set_value(2);
+        let mut engine = engine::Engine::new(&params);
+        engine.reset(&params, 44_100., 64);
+        let settled = render(&mut engine, &params, &[vec![0.; 2_048]], 127);
+        let settled_peak = settled[0].iter().copied().map(f32::abs).fold(0., f32::max);
+        let _ = render(&mut engine, &params, &[signal(4_096, 0.)], 127);
+
+        params.oversampling.set_value(1);
+        engine.reset(&params, 44_100., 64);
+        let _ = render(&mut engine, &params, &[vec![0.; 8_192]], 127);
+        params.oversampling.set_value(2);
+        engine.reset(&params, 44_100., 64);
+        let reentry = render(&mut engine, &params, &[vec![0.; 2_048]], 127);
+        assert!(
+            reentry[0].iter().all(|sample| sample.is_finite()),
+            "returning to 2x after silence produced non-finite output"
+        );
+        let peak = reentry[0].iter().copied().map(f32::abs).fold(0., f32::max);
+        let allowed_peak = settled_peak + 1e-8;
+        assert!(
+            peak <= allowed_peak,
+            "returning to 2x emitted a {peak} peak after the other mode had settled; the prepared 2x silence floor was {settled_peak} and the allowed peak was {allowed_peak}"
+        );
+    }
+
+    #[test]
+    fn oversampling_reentry_uses_the_current_control_equilibrium() {
+        let params = SwankyAmpParams::default();
+        params.cabinet_on.set_value(false);
+        params.oversampling.set_value(1);
+        let mut switched = engine::Engine::new(&params);
+        switched.reset(&params, 44_100., 64);
+
+        params.stages.set_value(5.);
+        params.preamp_drive.set_value(0.9);
+        params.preamp_grit.set_value(0.7);
+        params.power_drive.set_value(0.8);
+        params.power_sag.set_value(0.5);
+        let _ = render(&mut switched, &params, &[signal(4_096, 0.)], 127);
+        params.oversampling.set_value(2);
+        switched.reset(&params, 44_100., 64);
+        let switched = render(&mut switched, &params, &[vec![0.; 2_048]], 127);
+
+        let mut fresh = engine::Engine::new(&params);
+        fresh.reset(&params, 44_100., 64);
+        let fresh = render(&mut fresh, &params, &[vec![0.; 2_048]], 127);
+        assert_close(&switched[0], &fresh[0], 1e-6);
+    }
+
+    #[test]
+    fn choices_resolving_to_the_same_factor_keep_audio_state() {
+        let params = SwankyAmpParams::default();
+        params.cabinet_on.set_value(false);
+        let input = signal(4_096, 0.);
+
+        let mut continuous = engine::Engine::new(&params);
+        continuous.reset(&params, 44_100., 64);
+        let continuous = render(&mut continuous, &params, std::slice::from_ref(&input), 127);
+
+        let mut selected = engine::Engine::new(&params);
+        selected.reset(&params, 44_100., 64);
+        let first = render(&mut selected, &params, &[input[..2_048].to_vec()], 127);
+        params.oversampling.set_value(2);
+        let second = render(&mut selected, &params, &[input[2_048..].to_vec()], 127);
+        let selected: Vec<f32> = first[0].iter().chain(&second[0]).copied().collect();
+        assert_close(&selected, &continuous[0], 1e-6);
+    }
+
+    #[cfg(feature = "standalone")]
+    #[test]
+    fn standalone_adapter_restarts_the_current_controls_for_latency_changes() {
+        let transition = truce_standalone::audio::dynamic_latency_transition::<
+            __truce_runtime::__HotShellWrapper,
+            _,
+        >(|params| {
+            params.stages.set_value(5.);
+            params.preamp_drive.set_value(0.9);
+            params.preamp_grit.set_value(0.7);
+            params.power_drive.set_value(0.8);
+            params.oversampling.set_value(1);
+        });
+        assert_eq!(transition.active_before, 32);
+        assert_eq!(transition.requested_after_process, 0);
+        assert!(
+            transition.restart_queued,
+            "standalone did not hand the changed latency to its output worker"
+        );
+        assert_eq!(transition.active_after_restart, 0);
+    }
+
+    #[cfg(feature = "clap")]
+    #[test]
+    fn clap_adapter_keeps_active_latency_until_restart() {
+        let transition =
+            truce_clap::dynamic_latency_transition::<__truce_runtime::__HotShellWrapper>(21, 1.);
+        assert_eq!(transition.active_before, 32);
+        assert_eq!(transition.reported_while_active, 32);
+        assert_eq!(transition.callback_requests, 1);
+        assert_eq!(transition.restart_requests, 1);
+        assert_eq!(transition.active_after_restart, 0);
+        assert_eq!(transition.latency_notifications, 1);
+        assert!(
+            transition.active_output_peak > 1e-4,
+            "CLAP adapter check did not process meaningful audio"
+        );
+        assert!(
+            transition.active_reset_max_error <= 2.5e-4,
+            "CLAP real-time reset did not return the active path to its prepared equilibrium (audio error {})",
+            transition.active_reset_max_error
+        );
+        assert!(
+            transition.uncleared_state_error >= 1e-3,
+            "CLAP adapter check did not establish materially driven state before reset (unreset error {})",
+            transition.uncleared_state_error
+        );
+        assert_eq!(
+            transition.active_reset_allocations, 0,
+            "CLAP active reset allocated on the real-time thread"
+        );
+    }
+
+    #[test]
     fn increasing_stage_count_after_silence_reenters_warm() {
         let params = SwankyAmpParams::default();
         let mut engine = engine::Engine::new(&params);
@@ -208,7 +361,11 @@ mod tests {
         let mut silence_engine = engine::Engine::new(&params);
         silence_engine.reset(&params, 44_100., 64);
         let silence = render(&mut silence_engine, &params, &[vec![0.; 2_048]], 257);
-        assert!(silence[0].iter().all(|sample| sample.abs() < 1e-7));
+        let silence_peak = silence[0].iter().copied().map(f32::abs).fold(0., f32::max);
+        assert!(
+            silence_peak < 3e-7,
+            "Auto oversampling emitted a {silence_peak} peak for silent input"
+        );
     }
 
     #[test]

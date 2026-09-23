@@ -19,11 +19,16 @@ required-features = ["standalone"]
 name = "render-model"
 path = "src/bin/render-model.rs"
 
+[[bin]]
+name = "dsp-probe"
+path = "src/bin/dsp-probe.rs"
+
 [features]
 default = ["clap", "vst3", "standalone"]
 clap = ["dep:truce-clap", "dep:clap-sys"]
 vst3 = ["dep:truce-vst3"]
 standalone = ["dep:truce-standalone"]
+rt-paranoid = ["truce/rt-paranoid"]
 
 [dependencies]
 truce = { version = "=6.3.0", default-features = false }
@@ -61,6 +66,11 @@ truce-test = "=6.3.0"
 baseview-truce = { path = "vendor/baseview-truce" }
 truce-clap = { path = "vendor/truce-clap" }
 truce-iced = { path = "vendor/truce-iced" }
+truce = { path = "vendor/truce" }
+truce-core = { path = "vendor/truce-core" }
+truce-loader = { path = "vendor/truce-loader" }
+truce-plugin = { path = "vendor/truce-plugin" }
+truce-standalone = { path = "vendor/truce-standalone" }
 
 [profile.dev]
 debug = 1

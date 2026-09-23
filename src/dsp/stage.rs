@@ -52,6 +52,12 @@ impl Fitted {
 /// Number of triode stages in the preamp.
 pub const STAGES: usize = 5;
 
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum PlateFilter {
+    Released44k1,
+    Fixed20k,
+}
+
 #[allow(clippy::excessive_precision)] // fitted values, kept verbatim
 mod triode {
     use super::{Fitted, Range::*};
@@ -222,12 +228,13 @@ pub struct Triode {
     comp_offset: f32,
     comp_corner: Divisor,
     plate_lp: OnePole,
+    plate_filter: PlateFilter,
 }
 
 impl Triode {
     /// `unscale` removes the stage's nominal gain so stages cascade at a
     /// constant level; it is the preamp's calibrated stage gain.
-    pub fn new(stage: usize, unscale: f32, sample_rate: f32) -> Self {
+    pub fn new(stage: usize, unscale: f32, sample_rate: f32, plate_filter: PlateFilter) -> Self {
         let mut triode = Self {
             stage,
             sample_rate,
@@ -260,6 +267,7 @@ impl Triode {
             comp_offset: 0.,
             comp_corner: Divisor::default(),
             plate_lp: OnePole::default(),
+            plate_filter,
         };
         triode.configure(TriodeControls::default());
         triode
@@ -278,6 +286,33 @@ impl Triode {
         self.drift_smooth.reset();
         self.comp_charge.reset();
         self.plate_lp.reset();
+    }
+
+    pub fn settle(&mut self, x: f32) -> f32 {
+        let c = &self.controls;
+        let a = x * self.overhead_inv;
+        let h = self.grid_hp.settle(a);
+        let excess = (h - self.grid_level).max(0.);
+        let charge =
+            self.grid_charge
+                .settle_capped(excess, self.grid_rise, self.grid_fall, self.grid_cap);
+        let g = h - self.grid_smooth.settle(charge);
+        let g = soft_clip_up(g, self.grid_corner, self.grid_clip);
+        let p = soft_clip_down(g * self.scale, self.bias_corner, self.bias);
+        let p = soft_clip_down(-p, self.plate_corner, self.plate_clip);
+        let drift = self
+            .drift_smooth
+            .settle(p.max(self.drift_level) - self.drift_level);
+        let p = p - drift * self.drift_depth;
+        let excess = p.max(self.comp_level) - self.comp_level;
+        let ceiling =
+            self.comp_charge
+                .settle_capped(excess, self.comp_rise, self.comp_fall, self.comp_cap)
+                * self.comp_depth
+                + self.comp_offset;
+        let p = soft_clip_up(p, self.comp_corner, ceiling);
+        let p = -self.plate_lp.settle(p);
+        c.mix * (p * c.overhead * self.unscale_inv) + (1. - c.mix) * x
     }
 
     #[inline]
@@ -320,10 +355,15 @@ impl Triode {
         self.comp_depth = COMP_DEPTH.fixed();
         self.comp_offset = COMP_OFFSET.at(controls.comp_offset);
         self.comp_corner = Divisor::new(COMP_CORNER.fixed());
-        // Faust 1.4.0 emitted this fixed 44.1 kHz section. Its rate-tracking
-        // replacement belongs to the corrected model, after this proof port.
-        self.plate_lp
-            .set_digital(0.863_271_24, 0.863_271_24, 0.726_542_53);
+        match self.plate_filter {
+            PlateFilter::Released44k1 => {
+                self.plate_lp
+                    .set_digital(0.863_271_24, 0.863_271_24, 0.726_542_53);
+            }
+            PlateFilter::Fixed20k => {
+                self.plate_lp.set_lowpass(20_000., sr);
+            }
+        }
     }
 
     #[inline]
@@ -436,6 +476,15 @@ impl Side {
         self.drift.reset();
         self.comp.reset();
     }
+
+    fn settle(&mut self, v: f32, p: &SideVoicing) -> f32 {
+        let drift = self.drift.settle(v.max(p.drift_level) - p.drift_level);
+        let v = v - drift * p.drift_depth;
+        let load = self.comp.settle((v * p.clip.inv()).abs().min(1.));
+        let ceiling = p.clip.value() / (1. + load * p.comp_depth);
+        let v = soft_clip_up(v, p.clip_corner, ceiling);
+        soft_clip_down(v, p.cross_corner, 0.)
+    }
 }
 
 /// Push-pull tetrode power stage.
@@ -523,6 +572,30 @@ impl Tetrode {
         self.band_hp.reset();
         self.band_lp.reset();
         self.drift2_smooth.reset();
+    }
+
+    pub fn settle(&mut self, x: f32) -> f32 {
+        let g = self.grid_hp.settle(x - self.grid_offset1) - self.grid_offset2;
+        let g = g - self.grid_smooth.settle(g);
+        let excess = (g - self.grid_level).max(0.);
+        let g = g - self.grid_charge.settle_capped(
+            excess,
+            self.grid_rise,
+            self.grid_fall,
+            self.grid_cap,
+        );
+        let v = g * self.scale;
+        let side = &self.side;
+        let pushed = self.positive.settle(v, side) - self.negative.settle(-v, side);
+        let draw = (v * self.clip.inv()).abs();
+        let demand = (self.sag_onset * draw.min(1.) + draw.max(1.)) * self.sag_factor_inv;
+        let sag = self.sag_charge.settle(demand, self.sag_rise, self.sag_fall);
+        let y = pushed / (1. + sag * self.sag_gain) * self.sag_makeup;
+        let y = self.band_lp.settle(self.band_hp.settle(y));
+        let drift = self
+            .drift2_smooth
+            .settle(y.abs().max(self.drift2_level) - self.drift2_level);
+        y + drift * self.drift2_depth
     }
 
     pub fn configure(&mut self, controls: TetrodeControls) {

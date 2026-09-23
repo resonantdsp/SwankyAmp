@@ -22,6 +22,16 @@ just render-model "high gain" /tmp/high-gain.wav
 
 `just model-check` runs the ten-preset comparison by itself. It checks every active triode plus the tone stack, power amp, cabinet, and final output. The fixed acceptance bounds are 0.2% relative waveform RMS, 0.65% relative peak error, and 0.02 dB in each low, mid, and high band. The peak bound covers the measured 0.627% level-11 power-stage difference from a noncontracting C++ build; RMS and band bounds remain unchanged and retain the timing, polarity, state, and voicing checks.
 
+The shipping path applies Auto oversampling to the nonlinear tube stages while the cabinet remains at the host rate. Auto uses 2x at 44.1 and 48 kHz and 1x at 88.2 kHz and above; fixed 1x, 2x, and 4x choices are capped below 193.92 kHz internally. The host receives the measured FIR delay: 32 samples at 2x and 48 samples at 4x. CLAP and VST3 changes request the host's deactivate/activate sequence; the standalone stops and rebuilds its output stream on the existing worker. An active CLAP reset clears processing history at the current factor with a bounded, allocation-free equilibrium calculation. Activation applies the pending factor off the audio thread. Choices that resolve to the active factor keep their state without a restart. The plate low-pass stays at 20 kHz as the tube rate changes and reproduces the released coefficients at 44.1 kHz.
+
+Regenerate the public factor, latency, seam-level, and aliasing measurements with:
+
+```sh
+just dsp-report
+```
+
+The report keeps the released knee and tone mapping in both paths, uses the explicit legacy renderer for the baseline, and measures active-reset equilibrium across all ten factory presets, control extremes, and supported rates. It does not establish factory-preset acceptance for the corrected sound.
+
 The versioned reference corpus captures the released cold startup, including its 1024-sample output mute. The Rust path settles its configured nonlinear state for one second before audio begins, and stages re-enter warm when the continuous stage-count control brings them back into the signal path. Model comparison therefore applies the same one-second silent pre-roll to the released chain and excludes it from the measured WAVs. The cold corpus and warmed comparison remain separate so the startup difference is explicit.
 
 After `just setup`, open the standalone shell with:
@@ -230,7 +240,7 @@ request-timing information needed to serve and operate the endpoint.
 
 ## Source and licences
 
-Swanky Amp is licensed under GPLv3 or later; see [LICENSE](LICENSE). The model authority is the exact Free 1.4.0 C++ wrapper and generated Faust headers preserved in `verification/reference/released` from the `juce-1.4.0` tag. The Rust port retains the released control mappings, detuning, fitted constants, stage behavior, calibration tables, old cubic knee, and old tone mapping. Small equation and filter primitives were selectively adapted from the separately implemented Pro code only where comparison proved that they express the released Free equations.
+Swanky Amp is licensed under GPLv3 or later; see [LICENSE](LICENSE). The model authority is the exact Free 1.4.0 C++ wrapper and generated Faust headers preserved in `verification/reference/released` from the `juce-1.4.0` tag. The public legacy renderer retains the released control mappings, detuning, fitted constants, stage behavior, calibration tables, cubic knee, fixed digital plate filter, and old tone mapping. The shipping path currently adds tube-only oversampling and a rate-tracked 20 kHz plate filter; later corrected-model work remains subject to measurement and player audition. Small equation and filter primitives were selectively adapted from the separately implemented Pro code only where comparison proved that they express the released Free equations.
 
 The editable artwork in `assets/artwork` is licensed under CC BY 4.0; see its
 `ARTWORK-LICENSE.txt`. The editor typography uses PT Sans under the SIL Open
@@ -238,7 +248,7 @@ Font License in `assets/fonts/PTSans-OFL.txt`.
 
 This repository contains no Pro parameter grids, cabinet impulse responses, pedals, gate, reverb, licensing logic, Blender sources, artwork production sources, or shared private DSP dependency.
 
-Three framework patches were copied from the corresponding vendored upstream sources in the Swanky Amp Pro checkout because the plugin exercises their public behavior:
+Three existing framework patches were copied from the corresponding vendored upstream sources in the Swanky Amp Pro checkout because the plugin exercises their public behavior:
 
 - `vendor/baseview-truce`: frame delivery and host keyboard/modifier fixes.
 - `vendor/truce-iced`: iced input, focus, redraw, and clipboard fixes.
@@ -253,4 +263,10 @@ the uses that are not Covered Framework Offerings; covered commercial framework
 products and services remain subject to the Rider. Cargo-truce is a build tool
 and is not linked into the plugin.
 
-Each directory carries its unchanged upstream licence files, original manifest, source reference, and a focused `UPSTREAM.md` description of the local changes. Everything else resolves from the pinned Cargo lockfile.
+The dynamic-latency work adds narrow copies from the exact published Truce 6.3.0 sources:
+
+- `vendor/truce-clap`: dynamic-latency restart and active reset handling, extending the existing state-notification copy.
+- `vendor/truce-standalone`: dynamic-latency restart on the output worker.
+- `vendor/truce-core`, `vendor/truce-plugin`, `vendor/truce-loader`, and `vendor/truce`: the narrow real-time reset lifecycle hook and its forwarding bridge.
+
+Each Truce directory carries the unchanged governing Truce licence and MIT and Apache texts, original manifest, source reference, and a focused `UPSTREAM.md` description of the local changes. `vendor/baseview-truce` carries its own MIT and Apache licence texts and provenance. Everything else resolves from the pinned Cargo lockfile.
