@@ -86,6 +86,16 @@ render-model preset="clean" output="verification/model-output.wav":
         --preset "{{ preset }}" --sample-rate 44100 \
         --output "{{ output }}" --seams-dir "{{ output }}-seams"
 
+# Start the release soak for issue #34 in the background: three presets on the
+# shipping path plus level 11 on the legacy path, logs under target/soak.
+soak hours="4":
+    cargo build --release --quiet --no-default-features --bin soak
+    bash scripts/soak.sh start "{{ hours }}"
+
+# Print the soak verdict from target/soak, finished or still running.
+soak-check:
+    bash scripts/soak.sh check
+
 export-layout output="assets/layout":
     cargo run --quiet --bin swanky-amp-2 -- export-layout "{{ output }}"
 

@@ -27,6 +27,10 @@ path = "src/bin/dsp-probe.rs"
 name = "refit-tone"
 path = "src/bin/refit-tone.rs"
 
+[[bin]]
+name = "soak"
+path = "src/bin/soak.rs"
+
 [features]
 default = ["clap", "vst3", "standalone"]
 clap = ["dep:truce-clap", "dep:clap-sys"]

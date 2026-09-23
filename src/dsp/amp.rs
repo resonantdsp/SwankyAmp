@@ -463,6 +463,21 @@ pub struct CorrectedPath {
 }
 
 impl CorrectedPath {
+    /// The path the plugin engine runs, with whatever corrections it ships,
+    /// so long-run checks follow the product without restating them.
+    pub fn shipping(
+        sample_rate: f32,
+        max_block: usize,
+        controls: AmpControls,
+        doublings: usize,
+    ) -> Self {
+        assert!(doublings <= crate::engine::doublings_cap(f64::from(sample_rate)));
+        Self {
+            channel: AmpChannel::new(sample_rate, max_block, controls, doublings),
+            doublings,
+        }
+    }
+
     pub fn new(
         sample_rate: f32,
         max_block: usize,
