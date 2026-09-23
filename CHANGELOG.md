@@ -47,5 +47,7 @@ install beside Swanky Amp 1.4.0. The interface, factory preset bank and signed c
   oversampling label with Pro's button: it cycles Auto, 1x, 2x and 4x and
   names the factor the engine resolved.
 - Replaced the cabinet toggle with a vertical two-position switch in its own
-  column of the Cabinet row: Pro's slider slot and brushed cap stood on end,
-  with the ON label lit in the accent.
+  column of the Cabinet row: a brushed aluminium disc that sits in either end
+  of a V track two discs tall, with the ON label lit in the accent.
+- Set the knob markers to Pro's divot proportions, so both knob sizes match
+  Pro's knobs.

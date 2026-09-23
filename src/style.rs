@@ -22,16 +22,13 @@ pub const INK: Color = Color::from_rgb(0.86, 0.88, 0.89);
 pub const MUTED: Color = Color::from_rgb(0.53, 0.59, 0.61);
 /// Corner radius shared by every outlined control.
 pub const CONTROL_RADIUS: f32 = 6.0;
-/// Texels per interface pixel in the switch cap sprite: every edge the cap
+/// Texels per interface pixel in the switch disc sprite: every edge the disc
 /// has comes from the sprite, so it is drawn sharper than the 1x bake to hold
 /// up on a Retina display.
-pub const CAP_SUPERSAMPLE: u32 = 2;
-/// The cabinet switch's slot: as tall as a small knob, plus a little so the
-/// two cap positions are unmistakable.
-pub const SWITCH_SLOT_LENGTH: f32 = 56.0;
-/// Half the switch slot's width at the surface: a little wider than Pro's
-/// slider slot, so the cap holds its own beside the knobs.
-pub const SLOT_HALF: f32 = 6.0;
+pub const DISC_SUPERSAMPLE: u32 = 2;
+/// The cabinet switch's disc diameter, half a small knob's: the whole switch
+/// is a track two discs tall, about a small knob's height.
+pub const SWITCH_DIAMETER: f32 = 24.0;
 /// Corner radius of a group's groove outline.
 pub const SECTION_RADIUS: f32 = 10.0;
 /// How much brighter than the accent a lit ring reads, before the display
@@ -97,22 +94,19 @@ pub struct PhysicalStyle {
     pub meter_gap: f32,
     pub meter_reflection_extent: f32,
     pub meter_radiance: [[f32; 3]; 2],
-    /// The cabinet switch's cap as (width across the slot, length along its
-    /// travel): Pro's slider thumb stood on end, wider and shorter so it reads
-    /// beside the knobs and its two positions sit well apart.
-    pub cap_size: [f32; 2],
-    pub cap_height: f32,
-    pub cap_lift: f32,
-    pub cap_bevel: f32,
-    /// Clearance baked around the cap in its sprite, which is what its cast
+    /// The cabinet switch's disc diameter. Its track is a stadium exactly
+    /// this wide and twice this tall, so the disc sits flush in one end or
+    /// the other with no travel beyond them.
+    pub switch_diameter: f32,
+    /// The disc's top face above the faceplate.
+    pub disc_height: f32,
+    pub disc_bevel: f32,
+    /// Clearance baked around the disc in its sprite, which is what its cast
     /// shadow needs.
-    pub cap_margin: f32,
-    /// Half the slot's width at the surface; its round ends take this much of
-    /// the length at either end.
-    pub slot_half: f32,
+    pub disc_margin: f32,
+    /// Depth of the track's V below the faceplate: deeper than the section
+    /// grooves, so the empty half of the track reads as a recess at 1x.
     pub slot_depth: f32,
-    /// Radius of the glossy black divot on the cap, in interface pixels.
-    pub cap_divot: f32,
 }
 
 impl Default for PhysicalStyle {
@@ -155,14 +149,11 @@ impl Default for PhysicalStyle {
             meter_gap: METER_GAP,
             meter_reflection_extent: 20.0,
             meter_radiance: [[0.084, 1.512, METER_PEAK], meter_radiance(METER_OUTPUT)],
-            cap_size: [18.0, 24.0],
-            cap_height: 7.0,
-            cap_lift: 1.0,
-            cap_bevel: 1.4,
-            cap_margin: 12.0,
-            slot_half: SLOT_HALF,
-            slot_depth: 4.4,
-            cap_divot: 2.5,
+            switch_diameter: SWITCH_DIAMETER,
+            disc_height: 4.0,
+            disc_bevel: 1.2,
+            disc_margin: 12.0,
+            slot_depth: 10.0,
         }
     }
 }
@@ -210,32 +201,47 @@ pub fn outlined(lit: bool) -> iced_widget::container::Style {
 }
 
 impl PhysicalStyle {
-    /// The cap sprite's plan size in interface pixels.
-    pub fn cap_sprite(&self) -> [f32; 2] {
-        self.cap_size
-            .map(|side| (side + 2.0 * self.cap_margin).round())
-    }
-
-    /// How far the cap's centre moves between off and on. The cap never
-    /// overhangs a round end, so one baked shadow serves both positions.
-    pub fn switch_travel(&self, slot_length: f32) -> f32 {
-        slot_length - 2.0 * self.slot_half - self.cap_size[1]
+    /// The disc sprite's plan size in interface pixels.
+    pub fn disc_sprite(&self) -> [f32; 2] {
+        [(self.switch_diameter + 2.0 * self.disc_margin).round(); 2]
     }
 }
 
-/// The cap's sprite placement for a switch whose slot has these bounds:
-/// at the top when on, the bottom when off, on whole pixels so the sprite's
-/// texels land where they were baked.
-pub fn cap_sprite_bounds(slot: [f32; 4], on: bool) -> [f32; 4] {
+/// The disc's sprite placement for a switch whose track has these bounds: in
+/// the top half when on, the bottom half when off, on whole pixels so the
+/// sprite's texels land where they were baked.
+pub fn disc_sprite_bounds(track: [f32; 4], on: bool) -> [f32; 4] {
     let p = PhysicalStyle::default();
-    let [x, y, width, height] = slot;
-    let sprite = p.cap_sprite();
-    let center_y =
-        y + p.slot_half + p.cap_size[1] / 2.0 + if on { 0.0 } else { p.switch_travel(height) };
+    let [x, y, width, height] = track;
+    let sprite = p.disc_sprite();
+    let center_y = y + if on { height / 4.0 } else { height * 3.0 / 4.0 };
     [
         (x + width / 2.0 - sprite[0] / 2.0).round(),
         (center_y - sprite[1] / 2.0).round(),
         sprite[0],
         sprite[1],
     ]
+}
+
+/// The knob marker is Pro's glossy black divot. It is drawn at runtime by the
+/// compositor and the canvas fallback, never baked, so it stays outside the
+/// physical profile.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MarkerStyle {
+    /// Marker centre as a fraction of the knob radius.
+    pub radius: f32,
+    /// Marker rim radius as a fraction of the knob radius.
+    pub half_width: f32,
+    /// Divot depth as a fraction of its rim radius.
+    pub depth: f32,
+}
+
+impl Default for MarkerStyle {
+    fn default() -> Self {
+        Self {
+            radius: 0.77,
+            half_width: 0.1067,
+            depth: 0.4,
+        }
+    }
 }

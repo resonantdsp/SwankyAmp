@@ -417,8 +417,8 @@ fn display_value(id: u32, normalized: f32) -> String {
     }
 }
 
-/// The cabinet switch: Pro's slider slot and cap stood on end with two
-/// positions, up for on. A press anywhere on its column flips it and a
+/// The cabinet switch: a brushed aluminium disc in a V track two discs
+/// tall, up for on. A press anywhere on its column flips it and a
 /// right-click restores the default, as the knobs reset.
 fn cabinet_switch<'a, R: FreeRenderer + 'a>(
     spec: layout::ControlSpec,
@@ -474,22 +474,20 @@ fn cabinet_switch<'a, R: FreeRenderer + 'a>(
     stack(layers).into()
 }
 
-/// The switch without its bake: the slot and a flat cap at the same place
+/// The switch without its bake: the track and a flat disc at the same place
 /// the compositor would stamp the baked one.
 fn flat_switch<'a, R: FreeRenderer + 'a>(
-    slot: [f32; 4],
+    track: [f32; 4],
     on: bool,
 ) -> Vec<Element<'a, Msg, Theme, R>> {
-    let physical = style::PhysicalStyle::default();
-    let [x, y, width, height] = style::cap_sprite_bounds(slot, on);
-    let [cap_width, cap_length] = physical.cap_size;
-    let cap = [
-        x + (width - cap_width) / 2.0,
-        y + (height - cap_length) / 2.0,
-        cap_width,
-        cap_length,
+    let [x, y, width, height] = style::disc_sprite_bounds(track, on);
+    let diameter = style::PhysicalStyle::default().switch_diameter;
+    let disc = [
+        x + (width - diameter) / 2.0,
+        y + (height - diameter) / 2.0,
+        diameter,
+        diameter,
     ];
-    let divot = physical.cap_divot;
     let fill = move |color: Color, radius: f32| {
         move |_: &Theme| truce_iced::iced::widget::container::Style {
             background: Some(color.into()),
@@ -506,19 +504,10 @@ fn flat_switch<'a, R: FreeRenderer + 'a>(
             .height(Length::Fill)
     };
     vec![
-        place(slot, blank().style(fill(GROOVE, slot[2] / 2.0))),
+        place(track, blank().style(fill(GROOVE, track[2] / 2.0))),
         place(
-            cap,
-            blank().style(fill(Color::from_rgb(0.48, 0.51, 0.53), cap_width / 2.0)),
-        ),
-        place(
-            [
-                cap[0] + cap_width / 2.0 - divot,
-                cap[1] + cap_length / 2.0 - divot,
-                2.0 * divot,
-                2.0 * divot,
-            ],
-            blank().style(fill(Color::from_rgb(0.025, 0.03, 0.032), divot)),
+            disc,
+            blank().style(fill(Color::from_rgb(0.48, 0.51, 0.53), diameter / 2.0)),
         ),
     ]
 }
