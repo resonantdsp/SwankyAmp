@@ -1,24 +1,29 @@
-//! Measures the shipping path's level compensation against the released
-//! 1.4.0 path on the single-coil calibration clip.
+//! Measures the shipping path's level compensation.
 //!
-//! As released, the preamp table normalises the last active triode's output
-//! against Drive, the tone-stack scale normalises the stack's gain at the
-//! factory defaults, and the power table normalises the power amp's output
-//! against Power Drive; the cabinet keeps its own fixed scale. Oversampling,
-//! the unit-slope knee and the standard tone-stack mapping change the level
-//! reaching each of them, so each is transferred to the shipping path by the
-//! RMS ratio of the released seam to the shipping seam: every table point
-//! lands on the released level, so Drive and Power Drive move loudness as
-//! 1.4.0 did. In order, each with the values found so far in place: the
-//! Drive sweep at the last active triode, the tone-stack scale anchoring the
-//! power stage input at the factory defaults, then the Power Drive sweep at
-//! the power amp. Every render starts from a settled amplifier with the other
-//! controls at their defaults. Grit and Stages stay uncompensated, as
-//! released.
+//! The first stage keeps the released structure against the released 1.4.0
+//! path on the single-coil DI: the preamp table normalises the last active
+//! triode's output against Drive, the tone-stack scale normalises the stack's
+//! gain at the factory defaults, and the power table normalises the power
+//! amp's output against Power Drive. Each is transferred to the shipping path
+//! by the RMS ratio of the released seam to the shipping seam, so the power
+//! stage is driven as 1.4.0 drove it.
+//!
+//! The second stage holds loudness. 1.4.0 lost level as Drive and Power
+//! Drive rose, by amounts that depend on the material: on a plucked note
+//! heavy compression flattens the attack, so RMS falls further than on a
+//! played DI. Loudness is ITU-R BS.1770-4 gated integrated loudness, averaged
+//! in LUFS over the single-coil DI and the refit pluck, and the target is the
+//! factory defaults' loudness from the first stage, so Init keeps its level.
+//! In order, each with the values found so far in place: the power table is
+//! rescaled point by point to the target, then an output gain against Drive,
+//! then one against Grit, all applied after the cabinet so they change level
+//! and nothing else. Stages stays uncompensated, as released. Every render
+//! starts from a settled amplifier with the other controls at their
+//! defaults.
 
 use super::amp::{
-    AmpControls, AmpPath, ClipKnee, CorrectedPath, LevelTables, SeamOutput, TABLE_POINTS,
-    ToneMapping, interpolate,
+    AmpControls, AmpPath, ClipKnee, CorrectedPath, GRIT_COMPRESSION_LIMIT, LevelTables, SeamOutput,
+    TABLE_POINTS, ToneMapping, interpolate,
 };
 use super::mapping::{AmpVoicing, drive_setting, power_drive_setting};
 use crate::engine::doublings_for;
@@ -101,6 +106,135 @@ fn power_input(levels: Levels, controls: AmpControls, tables: &LevelTables) -> f
     levels.tone_stack * f64::from(tables.tone_stack * interpolate(drive, &tables.preamp))
 }
 
+fn shipping_output(controls: AmpControls, clip: &[f32], tables: LevelTables) -> Vec<f32> {
+    let doublings = doublings_for(0, f64::from(SAMPLE_RATE));
+    let mut path = CorrectedPath::new(
+        SAMPLE_RATE as f32,
+        BLOCK,
+        controls,
+        doublings,
+        ToneMapping::Standard,
+        ClipKnee::UnitSlope,
+        tables,
+    );
+    let mut audio = clip.to_vec();
+    for block in audio.chunks_mut(BLOCK) {
+        path.process(block);
+    }
+    audio
+}
+
+/// The two calibration inputs at `SAMPLE_RATE`: a played single-coil DI and
+/// the refit's synthetic pluck, whose attacks the amplifier compresses harder.
+pub struct Clips {
+    pub di: Vec<f32>,
+    pub pluck: Vec<f32>,
+}
+
+impl Clips {
+    pub fn new(di_wav: &[u8]) -> Result<Self, String> {
+        Ok(Self {
+            di: clip(di_wav)?,
+            pluck: resample(
+                &super::refit::pluck(super::refit::SAMPLE_RATE),
+                super::refit::SAMPLE_RATE,
+            ),
+        })
+    }
+}
+
+/// Loudness on each clip and their mean, in LUFS.
+#[derive(Debug, Clone, Copy)]
+pub struct Loudness {
+    pub di: f64,
+    pub pluck: f64,
+}
+
+impl Loudness {
+    pub fn blend(self) -> f64 {
+        (self.di + self.pluck) / 2.
+    }
+}
+
+/// The shipping path's loudness with `tables` in place.
+pub fn loudness(controls: AmpControls, clips: &Clips, tables: LevelTables) -> Loudness {
+    Loudness {
+        di: integrated_loudness(&shipping_output(controls, &clips.di, tables)),
+        pluck: integrated_loudness(&shipping_output(controls, &clips.pluck, tables)),
+    }
+}
+
+fn biquad(samples: &[f64], b: [f64; 3], a: [f64; 3]) -> Vec<f64> {
+    let (mut x1, mut x2, mut y1, mut y2) = (0., 0., 0., 0.);
+    samples
+        .iter()
+        .map(|&x| {
+            let y = (b[0] * x + b[1] * x1 + b[2] * x2 - a[1] * y1 - a[2] * y2) / a[0];
+            (x2, x1, y2, y1) = (x1, x, y1, y);
+            y
+        })
+        .collect()
+}
+
+/// ITU-R BS.1770-4 integrated loudness of a mono signal at `SAMPLE_RATE`, in
+/// LUFS: K-weighting, 400 ms blocks at 75 % overlap, the -70 LUFS absolute
+/// gate and the -10 LU relative gate.
+pub fn integrated_loudness(samples: &[f32]) -> f64 {
+    let rate = f64::from(SAMPLE_RATE);
+    let input: Vec<f64> = samples.iter().map(|&x| f64::from(x)).collect();
+    // The standard's two stages, designed for any rate as in its annex.
+    let (gain_db, q, fc) = (
+        3.999_843_853_973_347,
+        0.707_175_236_955_419_3,
+        1_681.974_450_955_532,
+    );
+    let a = 10_f64.powf(gain_db / 40.);
+    let w = std::f64::consts::TAU * fc / rate;
+    let (cos, alpha) = (w.cos(), w.sin() / (2. * q));
+    let root = 2. * a.sqrt() * alpha;
+    let shelf = biquad(
+        &input,
+        [
+            a * ((a + 1.) + (a - 1.) * cos + root),
+            -2. * a * ((a - 1.) + (a + 1.) * cos),
+            a * ((a + 1.) + (a - 1.) * cos - root),
+        ],
+        [
+            (a + 1.) - (a - 1.) * cos + root,
+            2. * ((a - 1.) - (a + 1.) * cos),
+            (a + 1.) - (a - 1.) * cos - root,
+        ],
+    );
+    let (q, fc) = (0.500_327_037_325_395_3, 38.135_470_876_139_82);
+    let w = std::f64::consts::TAU * fc / rate;
+    let (cos, alpha) = (w.cos(), w.sin() / (2. * q));
+    let weighted = biquad(
+        &shelf,
+        [(1. + cos) / 2., -(1. + cos), (1. + cos) / 2.],
+        [1. + alpha, -2. * cos, 1. - alpha],
+    );
+    let size = (0.4 * rate) as usize;
+    let hop = size / 4;
+    let blocks: Vec<f64> = (0..=weighted.len().saturating_sub(size) / hop)
+        .map(|block| {
+            let window = &weighted[block * hop..block * hop + size];
+            window.iter().map(|x| x * x).sum::<f64>() / size as f64
+        })
+        .collect();
+    let level = |power: f64| -0.691 + 10. * power.log10();
+    let mean = |powers: &[f64]| powers.iter().sum::<f64>() / powers.len() as f64;
+    let audible: Vec<f64> = blocks.into_iter().filter(|&p| level(p) > -70.).collect();
+    if audible.is_empty() {
+        return f64::NEG_INFINITY;
+    }
+    let relative = level(mean(&audible)) - 10.;
+    let gated: Vec<f64> = audible
+        .into_iter()
+        .filter(|&p| level(p) > relative)
+        .collect();
+    level(mean(&gated))
+}
+
 fn table_point(index: usize) -> f32 {
     -1. + 2. * index as f32 / (TABLE_POINTS - 1) as f32
 }
@@ -135,7 +269,41 @@ pub struct Calibration {
     pub tone_stack: Point,
     /// Power amp seam over the Power Drive sweep.
     pub power: [Point; TABLE_POINTS],
+    /// The power table the first stage transferred, before loudness.
+    pub power_transfer: [f32; TABLE_POINTS],
+    /// The factory defaults' loudness the second stage holds.
+    pub target: Loudness,
+    /// Loudness at each table point before that table's gain is applied.
+    pub power_loudness: [Loudness; TABLE_POINTS],
+    pub drive_loudness: [Loudness; TABLE_POINTS],
+    pub grit_loudness: [Loudness; TABLE_POINTS],
     pub anchor: Anchor,
+}
+
+/// Measures `controls_at(index)` at every table point in parallel.
+fn sweep(
+    clips: &Clips,
+    tables: LevelTables,
+    controls_at: impl Fn(usize) -> AmpControls + Sync,
+) -> [Loudness; TABLE_POINTS] {
+    std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..TABLE_POINTS)
+            .map(|index| {
+                let controls = controls_at(index);
+                scope.spawn(move || loudness(controls, clips, tables))
+            })
+            .collect();
+        let measured: Vec<Loudness> = handles
+            .into_iter()
+            .map(|handle| handle.join().expect("calibration render panicked"))
+            .collect();
+        std::array::from_fn(|index| measured[index])
+    })
+}
+
+/// The gain that brings `measured` to `target`.
+fn to_target(target: Loudness, measured: Loudness) -> f64 {
+    10_f64.powf((target.blend() - measured.blend()) / 20.)
 }
 
 fn gain(point: Point) -> f64 {
@@ -165,8 +333,9 @@ fn transfer(
     (table, points)
 }
 
-/// Measures the compensation on `clip`, which must be at `SAMPLE_RATE`.
-pub fn measure(clip: &[f32]) -> Calibration {
+/// Measures the compensation on `clips`.
+pub fn measure(clips: &Clips) -> Calibration {
+    let clip = &clips.di;
     let defaults = AmpControls::default();
     let mut tables = LevelTables::RELEASED;
     let (preamp, drive) = transfer(&tables.preamp, |index| {
@@ -198,12 +367,45 @@ pub fn measure(clip: &[f32]) -> Calibration {
         )
     });
     tables.power = power;
+    tables.grit_compression = GRIT_COMPRESSION_LIMIT;
+
+    let target = loudness(defaults, clips, tables);
+    let power_loudness = sweep(clips, tables, |index| AmpControls {
+        power_drive: power_drive_setting(table_point(index)),
+        ..defaults
+    });
+    tables.power = std::array::from_fn(|index| {
+        (f64::from(tables.power[index]) * to_target(target, power_loudness[index])) as f32
+    });
+    let drive_loudness = sweep(clips, tables, |index| AmpControls {
+        preamp_drive: drive_setting(table_point(index)),
+        ..defaults
+    });
+    tables.drive = std::array::from_fn(|index| to_target(target, drive_loudness[index]) as f32);
+    // Loudness is not linear between table points, so the defaults can miss
+    // the target they set by a few tenths of a dB. Scaling the two Drive
+    // points either side of the default moves the default by exactly that
+    // gain and keeps Init where it was.
+    let miss = to_target(target, loudness(defaults, clips, tables)) as f32;
+    let below = ((AmpVoicing::from_controls(defaults).preamp_drive + 1.) * 5.) as usize;
+    tables.drive[below] *= miss;
+    tables.drive[below + 1] *= miss;
+    let grit_loudness = sweep(clips, tables, |index| AmpControls {
+        preamp_grit: table_point(index),
+        ..defaults
+    });
+    tables.grit = std::array::from_fn(|index| to_target(target, grit_loudness[index]) as f32);
 
     Calibration {
         tables,
         drive,
         tone_stack,
         power: power_points,
+        power_transfer: power,
+        target,
+        power_loudness,
+        drive_loudness,
+        grit_loudness,
         anchor: anchor(clip, tables),
     }
 }
@@ -262,9 +464,14 @@ pub fn clip(bytes: &[u8]) -> Result<Vec<f32>, String> {
             (i32::from_le_bytes([0, sample[0], sample[1], sample[2]]) >> 8) as f32 / 8_388_608.
         })
         .collect();
+    Ok(resample(&source, rate))
+}
+
+/// Linear interpolation from `rate` to `SAMPLE_RATE`.
+fn resample(source: &[f32], rate: u32) -> Vec<f32> {
     let step = f64::from(rate) / f64::from(SAMPLE_RATE);
     let frames = (source.len() as f64 / step).round() as usize;
-    Ok((0..frames)
+    (0..frames)
         .map(|frame| {
             let position = frame as f64 * step;
             let lower = position as usize;
@@ -272,7 +479,7 @@ pub fn clip(bytes: &[u8]) -> Result<Vec<f32>, String> {
             let fraction = (position - lower as f64) as f32;
             source[lower] + fraction * (source[upper] - source[lower])
         })
-        .collect())
+        .collect()
 }
 
 #[cfg(test)]
@@ -283,6 +490,51 @@ mod tests {
     /// from the released level. Power Drive's default sits between table
     /// points, so this bounds the interpolation error.
     const ANCHOR_TOLERANCE_DB: f64 = 0.1;
+
+    /// Drive, Power Drive and Grit change the sound, not the volume: their
+    /// extremes keep the defaults' loudness averaged over the two clips.
+    #[test]
+    fn drive_power_drive_and_grit_extremes_keep_the_default_loudness() {
+        const TOLERANCE_DB: f64 = 1.;
+        let clips = Clips::new(include_bytes!(
+            "../../verification/reference/input/single-coil.wav"
+        ))
+        .expect("calibration clip reads");
+        let defaults = AmpControls::default();
+        let target = loudness(defaults, &clips, LevelTables::CALIBRATED).blend();
+        for extreme in [-1., 1.] {
+            for (control, controls) in [
+                (
+                    "Drive",
+                    AmpControls {
+                        preamp_drive: extreme,
+                        ..defaults
+                    },
+                ),
+                (
+                    "Power Drive",
+                    AmpControls {
+                        power_drive: extreme,
+                        ..defaults
+                    },
+                ),
+                (
+                    "Grit",
+                    AmpControls {
+                        preamp_grit: extreme,
+                        ..defaults
+                    },
+                ),
+            ] {
+                let change = loudness(controls, &clips, LevelTables::CALIBRATED).blend() - target;
+                assert!(
+                    change.abs() <= TOLERANCE_DB,
+                    "{control} at {extreme:+} moves loudness {change:+.2} dB \
+                     (tolerance {TOLERANCE_DB} dB)"
+                );
+            }
+        }
+    }
 
     #[test]
     fn factory_defaults_land_on_the_released_level() {

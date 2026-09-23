@@ -44,14 +44,24 @@ const RELEASED_POWER_SWEEP: [f32; 11] = [
     3.162_063e-2,
 ];
 
-/// The level compensation: the preamp scale against Drive and the output
-/// scale against Power Drive, each at 11 evenly spaced points of the shaped
-/// control from -1 to 1, and the tone stack's gain compensation.
+/// The level compensation. The preamp scale against Drive and the tone
+/// stack's gain set the level into the power stage; the output gains against
+/// Power Drive, Drive and Grit follow the cabinet, so they change loudness
+/// without changing the sound. Each table holds 11 evenly spaced points of
+/// its control from -1 to 1, shaped for Drive and Power Drive.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LevelTables {
     pub preamp: [f32; TABLE_POINTS],
     pub tone_stack: f32,
     pub power: [f32; TABLE_POINTS],
+    pub drive: [f32; TABLE_POINTS],
+    pub grit: [f32; TABLE_POINTS],
+    /// The most Grit may raise the triode compressor's threshold, in its
+    /// control units. Above about 0.72 the threshold of the most detuned
+    /// stage sits above its plate signal, the compressor never charges, its
+    /// ceiling falls to zero and the stage's output collapses to a constant:
+    /// 1.4.0 lost 52 dB at full Grit this way.
+    pub grit_compression: f32,
 }
 
 impl LevelTables {
@@ -60,6 +70,9 @@ impl LevelTables {
         preamp: RELEASED_PREAMP_SWEEP,
         tone_stack: 1. / 0.530_222,
         power: RELEASED_POWER_SWEEP,
+        drive: [1.; TABLE_POINTS],
+        grit: [1.; TABLE_POINTS],
+        grit_compression: 1.,
     };
 
     /// The values `calibrate` measured for the shipping path.
@@ -67,10 +80,17 @@ impl LevelTables {
         preamp: super::calibration_data::PREAMP_SWEEP,
         tone_stack: super::calibration_data::TONE_STACK_SCALE,
         power: super::calibration_data::POWER_SWEEP,
+        drive: super::calibration_data::DRIVE_GAIN,
+        grit: super::calibration_data::GRIT_GAIN,
+        grit_compression: GRIT_COMPRESSION_LIMIT,
     };
 }
 
 pub const TABLE_POINTS: usize = 11;
+
+/// Keeps the compressor threshold just below the collapse at about 0.72,
+/// where it still reaches the plate signal at every input level measured.
+pub(crate) const GRIT_COMPRESSION_LIMIT: f32 = 0.7;
 
 pub(crate) fn interpolate(value: f32, table: &[f32; TABLE_POINTS]) -> f32 {
     let bin = (value + 1.) * 5.;
@@ -159,7 +179,8 @@ impl TubePath {
     }
 
     fn apply_voicing(&mut self, voicing: AmpVoicing) {
-        for (triode, controls) in self.triodes.iter_mut().zip(voicing.triodes) {
+        for (triode, mut controls) in self.triodes.iter_mut().zip(voicing.triodes) {
+            controls.comp_level = controls.comp_level.min(self.tables.grit_compression);
             triode.configure(controls);
         }
         self.tone_stack.configure(voicing.tone);
@@ -220,7 +241,7 @@ pub struct AmpPath {
     tubes: TubePath,
     cabinet: Cabinet,
     voicing: AmpVoicing,
-    power_sweep: [f32; TABLE_POINTS],
+    tables: LevelTables,
     output_gain: f32,
 }
 
@@ -275,7 +296,7 @@ impl AmpPath {
             ),
             cabinet: Cabinet::new(sample_rate),
             voicing,
-            power_sweep: tables.power,
+            tables,
             output_gain: 1.,
         };
         path.apply_voicing(voicing);
@@ -305,8 +326,10 @@ impl AmpPath {
         self.cabinet.set_dynamic(voicing.cabinet_dynamic);
         self.cabinet
             .set_dynamic_level(voicing.cabinet_dynamic_level);
-        self.output_gain =
-            interpolate(voicing.power_drive, &self.power_sweep) * voicing.output_gain;
+        self.output_gain = interpolate(voicing.power_drive, &self.tables.power)
+            * interpolate(voicing.preamp_drive, &self.tables.drive)
+            * interpolate(voicing.preamp_grit, &self.tables.grit)
+            * voicing.output_gain;
         self.voicing = voicing;
     }
 

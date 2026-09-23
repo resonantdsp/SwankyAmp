@@ -21,15 +21,45 @@ pub(super) const TONE_STACK_SCALE: f32 = 2.412_191e0;
 
 #[allow(clippy::excessive_precision)] // Written to seven significant digits.
 pub(super) const POWER_SWEEP: [f32; 11] = [
-    8.583_239e-1,
-    4.479_401e-1,
-    2.377_831e-1,
-    1.277_434e-1,
-    7.052_718e-2,
-    4.673_650e-2,
-    3.847_659e-2,
-    3.690_467e-2,
-    3.581_545e-2,
-    3.395_242e-2,
-    3.213_043e-2,
+    6.352_246e-1,
+    3.374_166e-1,
+    1.864_519e-1,
+    1.132_935e-1,
+    8.012_906e-2,
+    6.589_405e-2,
+    6.027_615e-2,
+    5.963_952e-2,
+    6.023_011e-2,
+    6.139_116e-2,
+    6.428_187e-2,
+];
+
+#[allow(clippy::excessive_precision)] // Written to seven significant digits.
+pub(super) const DRIVE_GAIN: [f32; 11] = [
+    7.985_045e-1,
+    8.737_708e-1,
+    1.015_058e0,
+    9.920_422e-1,
+    9.710_928e-1,
+    9.788_806e-1,
+    1.134_849e0,
+    1.255_718e0,
+    1.194_512e0,
+    1.193_524e0,
+    1.334_387e0,
+];
+
+#[allow(clippy::excessive_precision)] // Written to seven significant digits.
+pub(super) const GRIT_GAIN: [f32; 11] = [
+    1.000_092e0,
+    1.000_094e0,
+    1.000_092e0,
+    1.000_093e0,
+    1.000_093e0,
+    1.000_000e0,
+    1.008_274e0,
+    1.098_573e0,
+    1.361_050e0,
+    1.931_944e0,
+    2.965_699e0,
 ];

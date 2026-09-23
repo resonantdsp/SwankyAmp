@@ -23,9 +23,9 @@ install beside Swanky Amp 1.4.0. The interface, factory preset bank and signed c
   `verification/tone-stack/refit-report.md`; Swanky Amp 1.4.0 remains
   available for the original voicing.
 - Balanced the factory presets to equal loudness, which 1.4.0's never were:
-  each preset's Output moves by -2.2 to +5.4 dB so that all ten play the
-  single-coil DI within 0.14 dB RMS of each other. Imported 1.x presets are
-  not rebalanced.
+  each preset's Output moves by -6.4 to +2.7 dB so that all ten match Init's
+  loudness averaged over the single-coil DI and a plucked test signal.
+  Imported 1.x presets are not rebalanced.
 - Fixed a slow tone-stack instability that silenced high-gain presets after
   hours of continuous play. The first-order treble sections were discretised
   as biquads with a spurious pole at Nyquist, which f32 rounding placed just
@@ -46,6 +46,16 @@ install beside Swanky Amp 1.4.0. The interface, factory preset bank and signed c
   stage and at the output with the cabinet off. The factory presets' output
   sat within 1.0 dB of 1.4.0, from up to 2.5 dB below, before the
   factory balance.
+- Drive, Power Drive and Grit now change the sound without changing the
+  volume. 1.4.0 got quieter as each rose: on plucked notes Power Drive cost
+  9 dB from 0 to 10 (15 dB after the corrections), Drive 5 dB, and Grit
+  silenced the amplifier at its top. Output gains measured by `just calibrate`
+  hold the loudness, averaged over a played DI and a pluck, within 0.6 dB of
+  Init across each control, and Init is unchanged.
+- Fixed Grit silencing the amplifier near its top: it raised a triode
+  compressor's threshold past the stage's plate signal, collapsing the
+  stage's output to a constant (-52 dB in 1.4.0, -100 dB after the knee
+  correction). The threshold now stops just short of that point.
 - Added a multi-hour soak (`just soak`, `just soak-check`), rerun on each
   release candidate, that gates level drift, tremolo-band modulation and
   non-finite output on low-level input. It reproduced the 1.2 report of a
