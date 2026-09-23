@@ -22,6 +22,12 @@ install beside Swanky Amp 1.4.0. The interface, factory preset bank and signed c
   sound roughly as they did, with the residuals recorded in
   `verification/tone-stack/refit-report.md`; Swanky Amp 1.4.0 remains
   available for the original voicing.
+- Fixed a slow tone-stack instability that silenced high-gain presets after
+  hours of continuous play. The first-order treble sections were discretised
+  as biquads with a spurious pole at Nyquist, which f32 rounding placed just
+  outside the unit circle; they are now true first-order filters, with the
+  response unchanged. `just tone-stack-soak` checks 24 hours of samples
+  before a release.
 - Joined the triode soft clips' knees smoothly: the released cubic left each
   knee with slope 4/3.4, a corner at every grid, bias, plate and compression
   clip. Each triode stage carries a fixed makeup gain fitted against the

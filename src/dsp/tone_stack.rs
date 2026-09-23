@@ -28,6 +28,16 @@ impl ToneMapping {
             Self::Standard => 2. * f64::from(sample_rate),
         }
     }
+
+    /// The treble sections are first order. The released mapping keeps the
+    /// 1.4.0 second-order form, Nyquist pole included, so the legacy path
+    /// stays bit-identical to the frozen renders.
+    fn first_order(self, b: [f64; 2], a: [f64; 2], c: f64) -> ([f32; 3], [f32; 2]) {
+        match self {
+            Self::Released => discretise([b[0], b[1], 0.], [a[0], a[1], 0.], c),
+            Self::Standard => discretise_first_order(b, a, c),
+        }
+    }
 }
 
 fn discretise(b: [f64; 3], a: [f64; 3], c: f64) -> ([f32; 3], [f32; 2]) {
@@ -44,6 +54,29 @@ fn discretise(b: [f64; 3], a: [f64; 3], c: f64) -> ([f32; 3], [f32; 2]) {
             (normal * (2. * a0 - 2. * a2 * c * c)) as f32,
             (normal * (a0 - a1 * c + a2 * c * c)) as f32,
         ],
+    )
+}
+
+/// Discretises a first-order section `(b0 + b1·s) / (a0 + a1·s)`.
+///
+/// Released 1.4.0 passed these through the second-order `discretise` with
+/// `a2 = b2 = 0`, which multiplies numerator and denominator by `1 + z⁻¹`: a
+/// pole on the unit circle at Nyquist, cancelled only in exact arithmetic.
+/// Rounded to f32 that pole can land a few parts in 10⁹ outside the circle
+/// (the Marshall treble at 88.2 kHz, the Fender treble at 176.4 kHz), so
+/// rounding noise at Nyquist grows until it swamps the signal after hours of
+/// play. The true first-order section has no such pole.
+fn discretise_first_order(b: [f64; 2], a: [f64; 2], c: f64) -> ([f32; 3], [f32; 2]) {
+    let [b0, b1] = b;
+    let [a0, a1] = a;
+    let normal = 1. / (a0 + a1 * c);
+    (
+        [
+            (normal * (b0 + b1 * c)) as f32,
+            (normal * (b0 - b1 * c)) as f32,
+            0.,
+        ],
+        [(normal * (a0 - a1 * c)) as f32, 0.],
     )
 }
 
@@ -159,9 +192,9 @@ impl ToneStack {
             self.fender.mid_low.set_digital(b, a);
             self.fender.mid_low_gain = 4.;
             let c1 = 250e-12;
-            let (b, a) = discretise(
-                [0., treble * c1 * r1 * r1, 0.],
-                [r1 + ri, ((r1 + ri) * r2 + ri * r1) * c1, 0.],
+            let (b, a) = self.mapping.first_order(
+                [0., treble * c1 * r1 * r1],
+                [r1 + ri, ((r1 + ri) * r2 + ri * r1) * c1],
                 c,
             );
             self.fender.treble.set_digital(b, a);
@@ -185,9 +218,9 @@ impl ToneStack {
             self.marshall.mid_low_gain = 1.4;
             let c1 = 470e-12;
             let (r1, r2) = (33e3, 220e3);
-            let (b, a) = discretise(
-                [0., treble * c1 * r1 * r1, 0.],
-                [r1 + ri, ((r1 + ri) * r2 + ri * r1) * c1, 0.],
+            let (b, a) = self.mapping.first_order(
+                [0., treble * c1 * r1 * r1],
+                [r1 + ri, ((r1 + ri) * r2 + ri * r1) * c1],
                 c,
             );
             self.marshall.treble.set_digital(b, a);
@@ -237,13 +270,9 @@ impl ToneStack {
             self.ac30.mid_low_gain = 8.;
             let c1 = 560e-12;
             let ri = 48e3;
-            let (b, a) = discretise(
-                [r2, ((r2 + treble * r1) * r3 + r1 * r2) * c1, 0.],
-                [
-                    r2 + r1 + ri,
-                    ((r2 + r1 + ri) * r3 + r1 * (r2 + ri)) * c1,
-                    0.,
-                ],
+            let (b, a) = self.mapping.first_order(
+                [r2, ((r2 + treble * r1) * r3 + r1 * r2) * c1],
+                [r2 + r1 + ri, ((r2 + r1 + ri) * r3 + r1 * (r2 + ri)) * c1],
                 c,
             );
             self.ac30.treble.set_digital(b, a);
@@ -295,6 +324,47 @@ impl ToneStack {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Peak output in the last second of `seconds` of silence that follows
+    /// one second of noise at the level the stack sees at high gain.
+    fn tail_peak(sample_rate: f32, controls: ToneControls, seconds: f32) -> f32 {
+        let mut stack = ToneStack::new(sample_rate, ToneMapping::Standard);
+        stack.configure(controls);
+        let mut state = 1_u32;
+        for _ in 0..sample_rate as usize {
+            state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            stack.process(10. * (state as f32 / u32::MAX as f32 * 2. - 1.));
+        }
+        let silence = (sample_rate * seconds) as usize;
+        let last = silence - sample_rate as usize;
+        (0..silence)
+            .map(|_| stack.process(0.))
+            .skip(last)
+            .fold(0., |peak, sample| peak.max(sample.abs()))
+    }
+
+    #[test]
+    fn stack_falls_silent_after_the_input_stops() {
+        for sample_rate in [44_100., 88_200., 176_400.] {
+            for model in [0., 1., 2.] {
+                for knobs in [-1., 1.] {
+                    let controls = ToneControls {
+                        bass: knobs,
+                        mids: knobs,
+                        treble: knobs,
+                        presence: knobs,
+                        model,
+                    };
+                    let peak = tail_peak(sample_rate, controls, 3.);
+                    assert!(
+                        peak < 1e-9,
+                        "{sample_rate} Hz, stack {model}, knobs {knobs}: output still {peak:e} \
+                         two seconds after a signal at level 10 stopped"
+                    );
+                }
+            }
+        }
+    }
 
     /// Frequency of the deepest cut between 100 Hz and 5 kHz, measured from
     /// the stack's impulse response.

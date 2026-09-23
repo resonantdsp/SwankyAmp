@@ -1,5 +1,7 @@
 use super::amp::{AmpChannel, AmpControls};
+use super::mapping::AmpVoicing;
 use super::oversample::Oversampler;
+use super::tone_stack::{ToneMapping, ToneStack};
 
 pub struct OversamplingImpulse {
     pub factor: usize,
@@ -107,4 +109,51 @@ pub fn oversampling_impulse(doublings: usize) -> OversamplingImpulse {
         symmetry_max_error,
         dc_gain: output.iter().sum(),
     }
+}
+
+/// Mean and RMS of the shipping tone stack's output over one window.
+pub struct ToneStackWindow {
+    pub mean: f64,
+    pub rms: f64,
+}
+
+/// Drives the shipping tone stack alone with deterministic white noise of
+/// `input_rms` for `seconds`, one summary per `window` seconds. The stack is
+/// linear and nothing upstream depends on its state, so this reproduces hours
+/// of play in the time the few biquads take, which is what a slow numerical
+/// instability needs.
+pub fn tone_stack_soak(
+    sample_rate: f32,
+    controls: AmpControls,
+    input_rms: f64,
+    seconds: f64,
+    window: f64,
+) -> Vec<ToneStackWindow> {
+    let mut stack = ToneStack::new(sample_rate, ToneMapping::Standard);
+    stack.configure(AmpVoicing::from_controls(controls).tone);
+    let amplitude = input_rms * 3_f64.sqrt();
+    let window_frames = (window * f64::from(sample_rate)).round() as u64;
+    let windows = (seconds / window).round() as usize;
+    let mut state = 0_u64;
+    (0..windows)
+        .map(|_| {
+            let (mut sum, mut squares) = (0., 0.);
+            for _ in 0..window_frames {
+                state = state.wrapping_add(0x9e37_79b9_7f4a_7c15);
+                let mut z = state;
+                z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+                z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+                z ^= z >> 31;
+                let noise = (z >> 11) as f64 / (1_u64 << 53) as f64 * 2. - 1.;
+                let output = f64::from(stack.process((noise * amplitude) as f32));
+                sum += output;
+                squares += output * output;
+            }
+            let frames = window_frames as f64;
+            ToneStackWindow {
+                mean: sum / frames,
+                rms: (squares / frames).sqrt(),
+            }
+        })
+        .collect()
 }
