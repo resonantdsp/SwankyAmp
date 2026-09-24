@@ -10,7 +10,7 @@ signed build starts.
 
 Swanky Amp 2 preserves the released Free amplifier and cabinet sound, with the
 tone stack and soft-clip knees corrected, in a new Rust host identity that will
-install beside Swanky Amp 1.4.0. The interface, factory preset bank and signed candidate qualification are still in progress.
+install beside Swanky Amp 1.4.0. Qualification of the signed candidate in real hosts is still in progress.
 
 - Ported the released amplifier and cabinet processing into mono and stereo
   paths under the `SwankyAmp2` / `com.resonantdsp.swanky-amp-2` / `SwA2`
