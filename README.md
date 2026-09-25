@@ -248,7 +248,8 @@ The cabinet's on/off is a two-position vertical switch: a brushed aluminium
 disc in a V track baked into the faceplate, exactly one disc wide and two
 tall, the disc in the top half when on and the bottom half when off. The disc
 is a baked sprite the compositor places from the parameter. Knob markers are
-Pro's glossy black divots at the same proportions. Export the exact resolved
+Pro's glossy black divots at the same proportions. Readouts show whole units
+at rest and tenths while a knob is dragged. Export the exact resolved
 geometry (layout manifest schema 4, which gives each section its outline
 radius and describes the switch track) or capture
 the editor at 1x and 2x with:

@@ -49,6 +49,8 @@ pub struct FreeUi {
     hovered: bool,
     presets: PresetBar,
     owner: Option<Arc<SwankyAmpParams>>,
+    /// The knob a pointer gesture is turning, whose readout shows tenths.
+    turning: Option<u32>,
 }
 
 impl FreeUi {
@@ -65,6 +67,7 @@ impl FreeUi {
             hovered: false,
             presets: PresetBar::offline(),
             owner: None,
+            turning: None,
         }
     }
 
@@ -134,7 +137,9 @@ impl FreeUi {
         layers.extend(levels_meters(self.meter_levels));
         for control in layout::CONTROLS {
             layers.push(match control.kind {
-                ControlKind::Knob => control_column(control, params),
+                ControlKind::Knob => {
+                    control_column(control, params, self.turning == Some(control.id))
+                }
                 ControlKind::Toggle => cabinet_switch(control, params),
             });
         }
@@ -211,6 +216,12 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
                 self.sync_meters();
                 self.presets.sync(params.params());
                 self.presets.poll(params);
+            }
+            // A bare BeginEdit opens a drag on a knob; one-shot changes
+            // arrive as a batch and never touch the readout's precision.
+            Message::Param(ParamMessage::BeginEdit(id)) => self.turning = Some(id),
+            Message::Param(ParamMessage::EndEdit(id)) if self.turning == Some(id) => {
+                self.turning = None;
             }
             Message::Plugin(Action::Preset(message)) => {
                 self.presets.update(message, params, ctx);
@@ -472,6 +483,7 @@ fn default_normalized(params: &ParamCache<SwankyAmpParams>, id: u32) -> f32 {
 fn control_column<'a, R: FreeRenderer + 'a>(
     spec: layout::ControlSpec,
     params: &'a ParamCache<SwankyAmpParams>,
+    turning: bool,
 ) -> Element<'a, Msg, Theme, R> {
     let knob = Knob {
         target: Target {
@@ -487,7 +499,7 @@ fn control_column<'a, R: FreeRenderer + 'a>(
         .width(Length::Fill)
         .align_x(iced_core::text::Alignment::Center)
         .color(INK);
-    let value = text(display_value(spec.id, params.get(spec.id) as f32))
+    let value = text(display_value(spec.id, params.get(spec.id) as f32, turning))
         .size(14)
         .line_height(LineHeight::Absolute(20.0.into()))
         .width(Length::Fill)
@@ -513,13 +525,19 @@ fn control_column<'a, R: FreeRenderer + 'a>(
     )
 }
 
-fn display_value(id: u32, normalized: f32) -> String {
-    if matches!(id, 0 | 1) {
-        format!("{:+.0} dB", normalized.mul_add(70.0, -35.0))
-    } else if id == 7 {
-        format!("{:02.0}", normalized.mul_add(4.0, 1.0))
-    } else {
-        format!("{:02.0}", normalized * 10.0)
+/// Whole units at rest, as 1.4 showed them, and tenths while the knob is
+/// turned so a fine move is visible.
+fn display_value(id: u32, normalized: f32, turning: bool) -> String {
+    let (value, decibels) = match id {
+        0 | 1 => (normalized.mul_add(70.0, -35.0), true),
+        7 => (normalized.mul_add(4.0, 1.0), false),
+        _ => (normalized * 10.0, false),
+    };
+    match (decibels, turning) {
+        (true, false) => format!("{value:+.0} dB"),
+        (true, true) => format!("{value:+.1} dB"),
+        (false, false) => format!("{value:02.0}"),
+        (false, true) => format!("{value:.1}"),
     }
 }
 
@@ -702,11 +720,19 @@ mod tests {
 
     #[test]
     fn readouts_preserve_the_released_free_scale() {
-        assert_eq!(display_value(0, 0.0), "-35 dB");
-        assert_eq!(display_value(1, 0.5), "+0 dB");
-        assert_eq!(display_value(0, 1.0), "+35 dB");
-        assert_eq!(display_value(7, 0.5), "03");
-        assert_eq!(display_value(14, 0.3), "03");
+        assert_eq!(display_value(0, 0.0, false), "-35 dB");
+        assert_eq!(display_value(1, 0.5, false), "+0 dB");
+        assert_eq!(display_value(0, 1.0, false), "+35 dB");
+        assert_eq!(display_value(7, 0.5, false), "03");
+        assert_eq!(display_value(14, 0.3, false), "03");
+    }
+
+    #[test]
+    fn a_turned_knob_reads_in_tenths_so_fine_moves_show() {
+        assert_eq!(display_value(1, 0.52, true), "+1.4 dB");
+        assert_eq!(display_value(7, 0.51, true), "3.0");
+        assert_eq!(display_value(14, 0.337, true), "3.4");
+        assert_eq!(display_value(14, 0.337, false), "03");
     }
 
     #[test]
