@@ -101,7 +101,7 @@ install beside Swanky Amp 1.4.0. Qualification of the signed candidate in real h
   every preset, Save, Save as…, Remove, Import 1.x presets and Open folder.
   Presets apply through the host, the selection survives a session reload, and
   a dot marks a changed preset. Input and the cabinet switch stay with the
-  session, as in 1.4.0.
+  session, as in 1.4.0. Remove asks in the menu before it deletes the file.
 - Kept presets in the 1.x XML format, one file per preset under
   `Resonant DSP/Swanky Amp 2`, and applied 1.4.0's migrations for presets from
   earlier releases. Unreadable files are skipped and named.

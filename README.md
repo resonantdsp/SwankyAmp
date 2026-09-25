@@ -102,7 +102,9 @@ The header's preset field shows the current preset's name between `‹` and
 `›`, which step through the factory presets and then the user's own. A press
 on the name opens the menu: Init, the ten factory presets, the user presets,
 then Save (a changed user preset), Save as…, Remove (user presets only),
-Import 1.x presets and Open folder. Init restores every preset control to its
+Import 1.x presets and Open folder. Remove deletes the preset's file, so its
+first press only turns the item into "Remove <name>?" and keeps the menu open;
+a second press deletes it, and closing the menu cancels. Init restores every preset control to its
 default; there is no Reset button. Choosing a preset sets its controls
 through the host, so automation and undo see the change, and the selected
 preset is part of the plugin state, so a reopened session shows its name

@@ -56,6 +56,9 @@ pub struct PresetBar {
     status: Option<(String, Instant)>,
     import: Option<ImportJob>,
     naming: Option<Pending<Option<PathBuf>>>,
+    /// The user preset a first press on Remove asked about. Deleting a file
+    /// cannot be undone, so only a second press on the same preset does it.
+    removing: Option<String>,
 }
 
 impl PresetBar {
@@ -88,6 +91,7 @@ impl PresetBar {
             status: None,
             import: None,
             naming: None,
+            removing: None,
         }
     }
 
@@ -223,7 +227,8 @@ impl PresetBar {
         ctx: &PluginContext<SwankyAmpParams>,
     ) {
         self.sync(params.params());
-        let close = !matches!(message, PresetMsg::Toggle);
+        let armed = self.removing.take();
+        let mut close = !matches!(message, PresetMsg::Toggle);
         match message {
             PresetMsg::Toggle => {
                 self.open = !self.open;
@@ -253,6 +258,10 @@ impl PresetBar {
                 }
             }
             PresetMsg::SaveAs => self.ask_name(),
+            PresetMsg::Remove if armed.as_deref() != Some(self.current.key.as_str()) => {
+                self.removing = Some(self.current.key.clone());
+                close = false;
+            }
             PresetMsg::Remove => {
                 let outcome = self.library.remove(&self.current).map(|()| {
                     let removed = self.current.name.clone();
@@ -468,6 +477,12 @@ impl PresetBar {
             ));
         }
         let user = self.current.scope == Scope::User;
+        let confirming = self.removing.as_deref() == Some(self.current.key.as_str());
+        let remove = if confirming {
+            format!("Remove {}?", abbreviate(&self.current.name))
+        } else {
+            "Remove".into()
+        };
         let actions: Vec<Element<'a, Msg, Theme, R>> = vec![
             item(
                 "Save".into(),
@@ -475,7 +490,7 @@ impl PresetBar {
                 false,
             ),
             item("Save as…".into(), Some(PresetMsg::SaveAs), false),
-            item("Remove".into(), user.then_some(PresetMsg::Remove), false),
+            item(remove, user.then_some(PresetMsg::Remove), confirming),
             item(
                 "Import 1.x presets".into(),
                 self.import.is_none().then_some(PresetMsg::Import),
@@ -618,4 +633,77 @@ fn place<'a, R: iced_core::Renderer + 'a>(
     content: impl Into<Element<'a, Msg, Theme, R>>,
 ) -> Element<'a, Msg, Theme, R> {
     crate::ui::place(bounds, content)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dsp::amp::AmpControls;
+    use truce::core::TransportInfo;
+    use truce::core::editor::EditorBridge;
+
+    /// A host that accepts every edit and reports nothing back.
+    struct Host;
+
+    impl EditorBridge for Host {
+        fn begin_edit(&self, _: u32) {}
+        fn set_param(&self, _: u32, _: f64) {}
+        fn end_edit(&self, _: u32) {}
+        fn request_resize(&self, _: u32, _: u32) -> bool {
+            false
+        }
+        fn get_param(&self, _: u32) -> f64 {
+            0.0
+        }
+        fn get_param_plain(&self, _: u32) -> f64 {
+            0.0
+        }
+        fn format_param(&self, _: u32) -> String {
+            String::new()
+        }
+        fn get_meter(&self, _: u32) -> f32 {
+            0.0
+        }
+        fn get_state(&self) -> Vec<u8> {
+            Vec::new()
+        }
+        fn set_state(&self, _: Vec<u8>) {}
+        fn transport(&self) -> Option<TransportInfo> {
+            None
+        }
+    }
+
+    #[test]
+    fn remove_deletes_a_user_preset_only_when_pressed_twice() {
+        let root = std::env::temp_dir().join(format!("swanky-remove-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let library = Library::with_user_root(Some(root.clone()));
+        let saved = library.save("mine", &AmpControls::default()).unwrap();
+        let file = saved.path.clone().unwrap();
+        let params = Arc::new(SwankyAmpParams::default());
+        let cache = ParamCache::new(Arc::clone(&params));
+        let ctx = PluginContext::new(Arc::new(Host), Arc::clone(&params));
+        let mut bar = PresetBar::with_library(library);
+        let mut press = |message| bar.update(message, &cache, &ctx);
+
+        press(PresetMsg::Select(saved.key.clone()));
+        press(PresetMsg::Toggle);
+        press(PresetMsg::Remove);
+        assert!(
+            file.exists(),
+            "the first press on Remove deleted the preset"
+        );
+        // Leaving the menu forgets the question.
+        press(PresetMsg::Close);
+        press(PresetMsg::Toggle);
+        press(PresetMsg::Remove);
+        assert!(
+            file.exists(),
+            "a press after reopening the menu deleted the preset"
+        );
+        press(PresetMsg::Remove);
+        assert!(!file.exists(), "confirming Remove kept the preset");
+        assert_eq!(bar.status(), Some("Removed mine"));
+        std::fs::remove_dir_all(root).unwrap();
+    }
 }
