@@ -33,6 +33,7 @@ const KNOB_ROW_HEIGHT: f32 = 84.0;
 #[derive(Debug, Clone)]
 pub enum Action {
     OpenReleaseNotice,
+    OpenProductPage,
     Preset(PresetMsg),
     Focus(bool),
     Pointer(bool),
@@ -219,6 +220,7 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
                     notice.open();
                 }
             }
+            Message::Plugin(Action::OpenProductPage) => release_notice::open_product_page(),
             Message::Plugin(Action::Focus(focused)) => {
                 self.focused = focused;
                 self.sync_meters();
@@ -446,14 +448,16 @@ fn notice_control<'a, R: FreeRenderer + 'a>(action: NoticeAction) -> Element<'a,
     .width(Length::Fill)
     .height(Length::Fill)
     .style(move |_| style::outlined(download));
-    if download {
-        mouse_area(body)
-            .on_press(Message::Plugin(Action::OpenReleaseNotice))
-            .interaction(mouse::Interaction::Pointer)
-            .into()
-    } else {
-        body.into()
-    }
+    // At rest the mark still acts: it opens the product page, where the
+    // player finds what the plugin is, its releases and support.
+    mouse_area(body)
+        .on_press(Message::Plugin(if download {
+            Action::OpenReleaseNotice
+        } else {
+            Action::OpenProductPage
+        }))
+        .interaction(mouse::Interaction::Pointer)
+        .into()
 }
 
 fn default_normalized(params: &ParamCache<SwankyAmpParams>, id: u32) -> f32 {

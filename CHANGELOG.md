@@ -72,8 +72,9 @@ install beside Swanky Amp 1.4.0. Qualification of the signed candidate in real h
   bytes.
 - Added a bounded, cached release notice: a header action that turns into a
   highlighted download arrow when a newer stable release is published and opens the
-  fixed catalogue page on an explicit press. The website's static
-  current-release document remains a release prerequisite.
+  fixed catalogue page on an explicit press. At rest the information mark
+  opens the product page. The website's static current-release document
+  remains a release prerequisite.
 - Regrouped the editor after 1.4: six separate rounded boxes, each traced by a
   V groove, with Pro's outlined header controls and uncluttered ten-cell
   meters. 1.4's rose highlight is the accent for lit rings, lit outlines, the

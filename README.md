@@ -435,7 +435,8 @@ turns into a highlighted download arrow, and an explicit press on it opens the
 fixed tagged catalogue URL
 `https://resonantdsp.com/products/swanky-amp/?utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=release-notice`
 in the default browser; the downloaded document cannot choose a link. At rest
-the action does nothing when pressed.
+a press opens the same product page tagged
+`utm_campaign=information` instead.
 
 The check has a three-second total timeout, follows no redirects and retains its
 last valid answer and last attempt time in the process. It also stores them
