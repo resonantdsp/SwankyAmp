@@ -108,6 +108,7 @@ fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
         let radius = knob.geometry.z;
         let local = point - knob.geometry.xy;
         let value = clamp(knob.state.x, 0.0, 1.0);
+        let enabled = knob.state.y;
         if knob.geometry.w >= 0.0 {
             let normalized = local / radius;
             let uv = response_uv(normalized);
@@ -121,7 +122,7 @@ fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
             let fraction = position - f32(upper);
             let previous = textureSampleLevel(responses, linear_sampler, uv, max(upper - 1, 0), 0.0).rgb;
             let next = textureSampleLevel(responses, linear_sampler, uv, upper, 0.0).rgb;
-            light += mix(select(vec3(0.0), previous, upper > 0), next, fraction) * tail;
+            light += mix(select(vec3(0.0), previous, upper > 0), next, fraction) * enabled * tail;
 
             let distance = arc_distance(local, radius * controls.ring.x, value);
             let width = radius * controls.ring.y;
@@ -130,7 +131,7 @@ fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
             let halo = 0.035 * exp(-0.5 * pow(outside / 1.2, 2.0))
                 + 0.008 * exp(-0.5 * pow(outside / 4.0, 2.0));
             let onset = clamp(value * controls.ring.w * radius * controls.ring.x / aa, 0.0, 1.0);
-            light += controls.emission.rgb * (coverage + halo) * onset;
+            light += controls.emission.rgb * (coverage + halo) * enabled * onset;
         }
 
         let marker_radius = radius * controls.marker.x;
@@ -141,7 +142,10 @@ fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
         let width = radius * controls.marker.y;
         let inside = 1.0 - smoothstep(width - aa * 0.5, width + aa * 0.5, distance);
         let amount = clamp(distance / width, 0.0, 1.0);
-        radiance = mix(radiance, divot_paint(outward, amount, controls.marker.z), inside);
+        // A knob with no effect keeps its divot as a shallow shade in the
+        // metal, as Pro draws a bypassed section's knobs.
+        let face = mix(radiance * 0.55, divot_paint(outward, amount, controls.marker.z), enabled);
+        radiance = mix(radiance, face, inside);
         let bevel = 1.0 - smoothstep(0.2, 0.2 + aa, abs(distance - width - 0.3));
         radiance += vec3(0.14) * bevel * max(dot(outward, normalize(vec2(0.15, 1.0))), 0.0) * (1.0 - inside);
         radiance *= 1.0 - 0.14 * bevel * max(-outward.y, 0.0) * (1.0 - inside);

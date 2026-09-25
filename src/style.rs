@@ -20,6 +20,9 @@ pub const METER_OUTPUT: Color = ACCENT;
 const METER_PEAK: f32 = 4.2;
 pub const INK: Color = Color::from_rgb(0.86, 0.88, 0.89);
 pub const MUTED: Color = Color::from_rgb(0.53, 0.59, 0.61);
+/// How much of its colour a control keeps while it has no effect, as Pro
+/// dims a bypassed section.
+pub const DISABLED_ALPHA: f32 = 0.35;
 /// Corner radius shared by every outlined control.
 pub const CONTROL_RADIUS: f32 = 6.0;
 /// Texels per interface pixel in the switch disc sprite: every edge the disc
@@ -48,6 +51,9 @@ pub const WIDTH: f32 = 1080.0;
 pub const HEIGHT: f32 = 640.0;
 pub const HEADER_HEIGHT: f32 = 64.0;
 pub const FOOTER_HEIGHT: f32 = 32.0;
+/// The window's side inset to the group boxes; whatever sits at the right
+/// edge of the header or footer ends on the same line as the boxes.
+pub const MARGIN: f32 = 14.0;
 pub const UTILITY_X: f32 = 760.0;
 
 pub const KNOB_LARGE_RADIUS: f32 = 32.0;

@@ -392,6 +392,7 @@ impl Uniform {
                 ],
             };
         }
+        let cabinet_on = params.get(layout::CABINET_SWITCH) >= 0.5;
         for (index, control) in layout::CONTROLS
             .iter()
             .filter(|control| control.kind == layout::ControlKind::Knob)
@@ -409,7 +410,12 @@ impl Uniform {
                     radius,
                     if control.large { 0.0 } else { -1.0 },
                 ],
-                state: [params.get(control.id) as f32, 1.0, 0.0, 0.0],
+                state: [
+                    params.get(control.id) as f32,
+                    f32::from(control.in_effect(cabinet_on)),
+                    0.0,
+                    0.0,
+                ],
             };
             result.scene[2] += 1.0;
         }

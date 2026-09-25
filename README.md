@@ -102,11 +102,15 @@ The header's preset field shows the current preset's name between `‹` and
 `›`, which step through the factory presets and then the user's own. A press
 on the name opens the menu: Init, the ten factory presets, the user presets,
 then Save (a changed user preset), Save as…, Remove (user presets only),
-Import 1.x presets and Open folder. Init restores every preset control to its
+Import 1.x presets and Open folder. Remove deletes the preset's file, so its
+first press only turns the item into "Remove <name>?" and keeps the menu open;
+a second press deletes it, and closing the menu cancels. Init restores every preset control to its
 default; there is no Reset button. Choosing a preset sets its controls
 through the host, so automation and undo see the change, and the selected
 preset is part of the plugin state, so a reopened session shows its name
-again. A dot after the name marks a preset changed since it was chosen.
+again. A dot after the name marks a preset changed since it was chosen. The
+menu capitalises the factory presets like Init; the bank, the saved state and
+the tools such as `just capture-preset` name them in lower case, as 1.4.0 did.
 
 Version 2's factory presets are balanced to equal loudness: each one's
 Output is set so that its loudness, averaged over the single-coil DI and the
@@ -244,7 +248,10 @@ The cabinet's on/off is a two-position vertical switch: a brushed aluminium
 disc in a V track baked into the faceplate, exactly one disc wide and two
 tall, the disc in the top half when on and the bottom half when off. The disc
 is a baked sprite the compositor places from the parameter. Knob markers are
-Pro's glossy black divots at the same proportions. Export the exact resolved
+Pro's glossy black divots at the same proportions. While the cabinet is off, its
+three knobs, their labels and readouts are dimmed as Pro dims a bypassed
+section, and stay adjustable. Readouts show whole units at rest and tenths
+while a knob is dragged. Export the exact resolved
 geometry (layout manifest schema 4, which gives each section its outline
 radius and describes the switch track) or capture
 the editor at 1x and 2x with:
@@ -435,7 +442,8 @@ turns into a highlighted download arrow, and an explicit press on it opens the
 fixed tagged catalogue URL
 `https://resonantdsp.com/products/swanky-amp/?utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=release-notice`
 in the default browser; the downloaded document cannot choose a link. At rest
-the action does nothing when pressed.
+a press opens the same product page tagged
+`utm_campaign=information` instead.
 
 The check has a three-second total timeout, follows no redirects and retains its
 last valid answer and last attempt time in the process. It also stores them

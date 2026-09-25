@@ -13,15 +13,15 @@ pub trait FreeRenderer:
 {
     const LOAD_ARTWORK: bool;
 
-    fn knob(&mut self, bounds: Rectangle, radius: f32, value: f32, ring: bool) {
-        draw_knob(self, bounds, radius, value, ring);
+    fn knob(&mut self, bounds: Rectangle, radius: f32, value: f32, ring: bool, enabled: bool) {
+        draw_knob(self, bounds, radius, value, ring, enabled);
     }
 }
 
 impl FreeRenderer for crate::layout::Measure {
     const LOAD_ARTWORK: bool = false;
 
-    fn knob(&mut self, _: Rectangle, _: f32, _: f32, _: bool) {}
+    fn knob(&mut self, _: Rectangle, _: f32, _: f32, _: bool, _: bool) {}
 }
 impl FreeRenderer for iced_wgpu::Renderer {
     const LOAD_ARTWORK: bool = true;
@@ -37,6 +37,8 @@ pub struct Target {
 pub struct Knob {
     pub target: Target,
     pub large: bool,
+    /// Drawn dimmed when false; it still turns.
+    pub enabled: bool,
 }
 
 #[derive(Default)]
@@ -262,6 +264,7 @@ impl<R: FreeRenderer> Widget<Msg, Theme, R> for Knob {
             self.radius(),
             self.target.value,
             self.large,
+            self.enabled,
         );
     }
 }
@@ -391,6 +394,7 @@ fn draw_knob<R: iced_core::Renderer + ?Sized>(
     radius: f32,
     value: f32,
     ring: bool,
+    enabled: bool,
 ) {
     if crate::artwork::loaded() {
         return;
@@ -423,7 +427,7 @@ fn draw_knob<R: iced_core::Renderer + ?Sized>(
                 renderer,
                 point,
                 radius * physical.ring_half_width,
-                if amount <= value {
+                if enabled && amount <= value {
                     style::ACCENT
                 } else {
                     Color::from_rgb(0.12, 0.14, 0.15)
@@ -441,6 +445,10 @@ fn draw_knob<R: iced_core::Renderer + ?Sized>(
             center.y - angle.sin() * radius * marker.radius,
         ),
         radius * marker.half_width,
-        Color::from_rgb(0.025, 0.03, 0.032),
+        if enabled {
+            Color::from_rgb(0.025, 0.03, 0.032)
+        } else {
+            Color::from_rgb(0.16, 0.18, 0.19)
+        },
     );
 }

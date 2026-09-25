@@ -33,6 +33,7 @@ const KNOB_ROW_HEIGHT: f32 = 84.0;
 #[derive(Debug, Clone)]
 pub enum Action {
     OpenReleaseNotice,
+    OpenProductPage,
     Preset(PresetMsg),
     Focus(bool),
     Pointer(bool),
@@ -48,6 +49,8 @@ pub struct FreeUi {
     hovered: bool,
     presets: PresetBar,
     owner: Option<Arc<SwankyAmpParams>>,
+    /// The knob a pointer gesture is turning, whose readout shows tenths.
+    turning: Option<u32>,
 }
 
 impl FreeUi {
@@ -64,6 +67,7 @@ impl FreeUi {
             hovered: false,
             presets: PresetBar::offline(),
             owner: None,
+            turning: None,
         }
     }
 
@@ -133,12 +137,14 @@ impl FreeUi {
         layers.extend(levels_meters(self.meter_levels));
         for control in layout::CONTROLS {
             layers.push(match control.kind {
-                ControlKind::Knob => control_column(control, params),
+                ControlKind::Knob => {
+                    control_column(control, params, self.turning == Some(control.id))
+                }
                 ControlKind::Toggle => cabinet_switch(control, params),
             });
         }
-        layers.push(place(
-            [18.0, 614.0, 680.0, 16.0],
+        layers.push(footer(
+            [style::MARGIN, 680.0],
             match self.presets.status() {
                 Some(status) => text(status.to_owned()).size(10).color(INK),
                 None => {
@@ -148,9 +154,13 @@ impl FreeUi {
                 }
             },
         ));
-        layers.push(place(
-            [938.0, 614.0, 124.0, 16.0],
-            text("RESONANT DSP").size(10).color(DIM),
+        layers.push(footer(
+            [RIGHT_EDGE - 124.0, 124.0],
+            text("RESONANT DSP")
+                .size(10)
+                .color(DIM)
+                .width(Length::Fill)
+                .align_x(iced_core::text::Alignment::Right),
         ));
         layers.extend(self.presets.menu(PRESET_FIELD, params));
         stack(layers)
@@ -207,6 +217,12 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
                 self.presets.sync(params.params());
                 self.presets.poll(params);
             }
+            // A bare BeginEdit opens a drag on a knob; one-shot changes
+            // arrive as a batch and never touch the readout's precision.
+            Message::Param(ParamMessage::BeginEdit(id)) => self.turning = Some(id),
+            Message::Param(ParamMessage::EndEdit(id)) if self.turning == Some(id) => {
+                self.turning = None;
+            }
             Message::Plugin(Action::Preset(message)) => {
                 self.presets.update(message, params, ctx);
             }
@@ -215,6 +231,7 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
                     notice.open();
                 }
             }
+            Message::Plugin(Action::OpenProductPage) => release_notice::open_product_page(),
             Message::Plugin(Action::Focus(focused)) => {
                 self.focused = focused;
                 self.sync_meters();
@@ -312,9 +329,29 @@ pub(crate) fn place<'a, R: iced_core::Renderer + 'a>(
     .into()
 }
 
+/// Footer text between `x` and `x + width`, on the footer bar's centre line.
+fn footer<'a, R: iced_core::Renderer + 'a>(
+    [x, width]: [f32; 2],
+    content: impl Into<Element<'a, Msg, Theme, R>>,
+) -> Element<'a, Msg, Theme, R> {
+    place(
+        [
+            x,
+            style::HEIGHT - style::FOOTER_HEIGHT,
+            width,
+            style::FOOTER_HEIGHT,
+        ],
+        container(content).center_y(Length::Fill),
+    )
+}
+
+/// The group boxes' right edge, where the header's last action and the
+/// footer's mark end too.
+const RIGHT_EDGE: f32 = style::WIDTH - style::MARGIN;
+
 /// Where the preset field sits: right to left from the boxes' edge, one
 /// group gap between header actions.
-const OVERSAMPLING_FIELD: [f32; 2] = [1066.0 - 72.0, 72.0];
+const OVERSAMPLING_FIELD: [f32; 2] = [RIGHT_EDGE - 72.0, 72.0];
 const PRESET_FIELD: [f32; 4] = [
     OVERSAMPLING_FIELD[0] - HEADER_GROUP_GAP - 150.0,
     HEADER_CONTROL[0],
@@ -329,7 +366,7 @@ fn header<'a, R: FreeRenderer + 'a>(
 ) -> Vec<Element<'a, Msg, Theme, R>> {
     let [top, height] = HEADER_CONTROL;
     // Pro's wordmark: the name in bold ink and the edition beside it at the
-    // same size, here in the accent rather than Pro's muted grey.
+    // same size in the product's accent, rose here where Pro's is orange.
     let wordmark = row![
         text("SWANKY AMP").size(29).font(style::BOLD).color(INK),
         text("FREE 2.0").size(29).font(style::FONT).color(ACCENT),
@@ -340,7 +377,7 @@ fn header<'a, R: FreeRenderer + 'a>(
     let notice_x = PRESET_FIELD[0] - HEADER_GROUP_GAP - height;
     vec![
         place(
-            [22.0, 0.0, 400.0, style::HEADER_HEIGHT],
+            [style::MARGIN, 0.0, 400.0, style::HEADER_HEIGHT],
             container(wordmark).center_y(Length::Fill),
         ),
         place(
@@ -422,14 +459,16 @@ fn notice_control<'a, R: FreeRenderer + 'a>(action: NoticeAction) -> Element<'a,
     .width(Length::Fill)
     .height(Length::Fill)
     .style(move |_| style::outlined(download));
-    if download {
-        mouse_area(body)
-            .on_press(Message::Plugin(Action::OpenReleaseNotice))
-            .interaction(mouse::Interaction::Pointer)
-            .into()
-    } else {
-        body.into()
-    }
+    // At rest the mark still acts: it opens the product page, where the
+    // player finds what the plugin is, its releases and support.
+    mouse_area(body)
+        .on_press(Message::Plugin(if download {
+            Action::OpenReleaseNotice
+        } else {
+            Action::OpenProductPage
+        }))
+        .interaction(mouse::Interaction::Pointer)
+        .into()
 }
 
 fn default_normalized(params: &ParamCache<SwankyAmpParams>, id: u32) -> f32 {
@@ -444,7 +483,10 @@ fn default_normalized(params: &ParamCache<SwankyAmpParams>, id: u32) -> f32 {
 fn control_column<'a, R: FreeRenderer + 'a>(
     spec: layout::ControlSpec,
     params: &'a ParamCache<SwankyAmpParams>,
+    turning: bool,
 ) -> Element<'a, Msg, Theme, R> {
+    let enabled = spec.in_effect(params.get(layout::CABINET_SWITCH) >= 0.5);
+    let fade = if enabled { 1.0 } else { style::DISABLED_ALPHA };
     let knob = Knob {
         target: Target {
             id: spec.id,
@@ -452,19 +494,20 @@ fn control_column<'a, R: FreeRenderer + 'a>(
             default: default_normalized(params, spec.id),
         },
         large: spec.large,
+        enabled,
     };
     let label = text(spec.label)
         .size(13)
         .line_height(LineHeight::Absolute(18.0.into()))
         .width(Length::Fill)
         .align_x(iced_core::text::Alignment::Center)
-        .color(INK);
-    let value = text(display_value(spec.id, params.get(spec.id) as f32))
+        .color(INK.scale_alpha(fade));
+    let value = text(display_value(spec.id, params.get(spec.id) as f32, turning))
         .size(14)
         .line_height(LineHeight::Absolute(20.0.into()))
         .width(Length::Fill)
         .align_x(iced_core::text::Alignment::Center)
-        .color(DIM);
+        .color(DIM.scale_alpha(fade));
     let body = column![
         container(knob)
             .height(KNOB_ROW_HEIGHT)
@@ -485,13 +528,19 @@ fn control_column<'a, R: FreeRenderer + 'a>(
     )
 }
 
-fn display_value(id: u32, normalized: f32) -> String {
-    if matches!(id, 0 | 1) {
-        format!("{:+.0} dB", normalized.mul_add(70.0, -35.0))
-    } else if id == 7 {
-        format!("{:02.0}", normalized.mul_add(4.0, 1.0))
-    } else {
-        format!("{:02.0}", normalized * 10.0)
+/// Whole units at rest, as 1.4 showed them, and tenths while the knob is
+/// turned so a fine move is visible.
+fn display_value(id: u32, normalized: f32, turning: bool) -> String {
+    let (value, decibels) = match id {
+        0 | 1 => (normalized.mul_add(70.0, -35.0), true),
+        7 => (normalized.mul_add(4.0, 1.0), false),
+        _ => (normalized * 10.0, false),
+    };
+    match (decibels, turning) {
+        (true, false) => format!("{value:+.0} dB"),
+        (true, true) => format!("{value:+.1} dB"),
+        (false, false) => format!("{value:02.0}"),
+        (false, true) => format!("{value:.1}"),
     }
 }
 
@@ -674,11 +723,19 @@ mod tests {
 
     #[test]
     fn readouts_preserve_the_released_free_scale() {
-        assert_eq!(display_value(0, 0.0), "-35 dB");
-        assert_eq!(display_value(1, 0.5), "+0 dB");
-        assert_eq!(display_value(0, 1.0), "+35 dB");
-        assert_eq!(display_value(7, 0.5), "03");
-        assert_eq!(display_value(14, 0.3), "03");
+        assert_eq!(display_value(0, 0.0, false), "-35 dB");
+        assert_eq!(display_value(1, 0.5, false), "+0 dB");
+        assert_eq!(display_value(0, 1.0, false), "+35 dB");
+        assert_eq!(display_value(7, 0.5, false), "03");
+        assert_eq!(display_value(14, 0.3, false), "03");
+    }
+
+    #[test]
+    fn a_turned_knob_reads_in_tenths_so_fine_moves_show() {
+        assert_eq!(display_value(1, 0.52, true), "+1.4 dB");
+        assert_eq!(display_value(7, 0.51, true), "3.0");
+        assert_eq!(display_value(14, 0.337, true), "3.4");
+        assert_eq!(display_value(14, 0.337, false), "03");
     }
 
     #[test]

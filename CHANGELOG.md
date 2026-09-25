@@ -72,8 +72,9 @@ install beside Swanky Amp 1.4.0. Qualification of the signed candidate in real h
   bytes.
 - Added a bounded, cached release notice: a header action that turns into a
   highlighted download arrow when a newer stable release is published and opens the
-  fixed catalogue page on an explicit press. The website's static
-  current-release document remains a release prerequisite.
+  fixed catalogue page on an explicit press. At rest the information mark
+  opens the product page. The website's static current-release document
+  remains a release prerequisite.
 - Regrouped the editor after 1.4: six separate rounded boxes, each traced by a
   V groove, with Pro's outlined header controls and uncluttered ten-cell
   meters. 1.4's rose highlight is the accent for lit rings, lit outlines, the
@@ -82,6 +83,15 @@ install beside Swanky Amp 1.4.0. Qualification of the signed candidate in real h
   as Pro's one-line "SWANKY AMP FREE 2.0", and replaced the static
   oversampling label with Pro's button: it cycles Auto, 1x, 2x and 4x and
   names the factor the engine resolved.
+- Ended the footer's RESONANT DSP mark on the boxes' right margin, the line
+  the header's last button already ends on, and started the wordmark and the
+  footer's hint on the left margin. Footer text sits on the footer bar's
+  centre line.
+- Knob readouts show tenths while a knob is dragged, as 1.4's did, so a fine
+  move is visible; at rest they keep whole units.
+- The cabinet's Bright, Distance and Dynamic knobs, their labels and readouts
+  dim while the cabinet is off, as Pro dims a bypassed section. They stay
+  adjustable.
 - Replaced the cabinet toggle with a vertical two-position switch in its own
   column of the Cabinet row: a brushed aluminium disc that sits in either end
   of a V track two discs tall, with the ON label lit in the accent.
@@ -96,7 +106,8 @@ install beside Swanky Amp 1.4.0. Qualification of the signed candidate in real h
   every preset, Save, Save as…, Remove, Import 1.x presets and Open folder.
   Presets apply through the host, the selection survives a session reload, and
   a dot marks a changed preset. Input and the cabinet switch stay with the
-  session, as in 1.4.0.
+  session, as in 1.4.0. Remove asks in the menu before it deletes the file,
+  and the factory presets are capitalised like Init.
 - Kept presets in the 1.x XML format, one file per preset under
   `Resonant DSP/Swanky Amp 2`, and applied 1.4.0's migrations for presets from
   earlier releases. Unreadable files are skipped and named.
