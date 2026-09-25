@@ -418,6 +418,16 @@ pub struct Entry {
     pub path: Option<PathBuf>,
 }
 
+const FACTORY_KEY: &str = "factory:";
+
+fn capitalised(name: &str) -> String {
+    let mut chars = name.chars();
+    chars
+        .next()
+        .map(|first| first.to_uppercase().chain(chars).collect())
+        .unwrap_or_default()
+}
+
 impl Entry {
     pub const INIT: &str = "init";
 
@@ -534,12 +544,14 @@ impl Library {
         self.user_root.as_deref()
     }
 
-    /// Init and the factory bank, which need no disk access.
+    /// Init and the factory bank, which need no disk access. A factory
+    /// preset's key keeps the bank's name, which 1.4.0 shared and saved
+    /// sessions store; the menu shows it capitalised like Init.
     pub fn builtin(&self) -> Vec<Entry> {
         std::iter::once(Entry::init())
             .chain(self.factory.iter().map(|(name, _)| Entry {
-                key: format!("factory:{name}"),
-                name: name.clone(),
+                key: format!("{FACTORY_KEY}{name}"),
+                name: capitalised(name),
                 scope: Scope::Factory,
                 path: None,
             }))
@@ -603,7 +615,7 @@ impl Library {
             Scope::Factory => self
                 .factory
                 .iter()
-                .find(|(name, _)| *name == entry.name)
+                .find(|(name, _)| entry.key.strip_prefix(FACTORY_KEY) == Some(name))
                 .map(|(_, preset)| Some(*preset))
                 .ok_or_else(|| format!("Factory preset {} is not shipped.", entry.name)),
             Scope::User => {
@@ -924,6 +936,26 @@ mod tests {
                 "{name} read differently from a file"
             );
         }
+    }
+
+    #[test]
+    fn factory_presets_read_capitalised_and_keep_their_session_keys() {
+        let library = Library::with_user_root(None);
+        for entry in library.builtin() {
+            assert!(
+                entry.name.starts_with(|first: char| first.is_uppercase()),
+                "{} is not capitalised like Init",
+                entry.name
+            );
+        }
+        // A session saved by an earlier build names its preset this way.
+        let entry = library.find("factory:high gain").unwrap();
+        assert_eq!(entry.name, "High gain");
+        let loaded = library.load(&entry).unwrap().unwrap().controls;
+        assert_eq!(
+            session_neutral(loaded),
+            controls(FACTORY_BANK, "high gain").unwrap()
+        );
     }
 
     #[test]

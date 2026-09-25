@@ -108,7 +108,9 @@ a second press deletes it, and closing the menu cancels. Init restores every pre
 default; there is no Reset button. Choosing a preset sets its controls
 through the host, so automation and undo see the change, and the selected
 preset is part of the plugin state, so a reopened session shows its name
-again. A dot after the name marks a preset changed since it was chosen.
+again. A dot after the name marks a preset changed since it was chosen. The
+menu capitalises the factory presets like Init; the bank, the saved state and
+the tools such as `just capture-preset` name them in lower case, as 1.4.0 did.
 
 Version 2's factory presets are balanced to equal loudness: each one's
 Output is set so that its loudness, averaged over the single-coil DI and the
