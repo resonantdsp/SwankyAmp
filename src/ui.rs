@@ -137,8 +137,8 @@ impl FreeUi {
                 ControlKind::Toggle => cabinet_switch(control, params),
             });
         }
-        layers.push(place(
-            [18.0, 614.0, 680.0, 16.0],
+        layers.push(footer(
+            [style::MARGIN, 680.0],
             match self.presets.status() {
                 Some(status) => text(status.to_owned()).size(10).color(INK),
                 None => {
@@ -148,8 +148,8 @@ impl FreeUi {
                 }
             },
         ));
-        layers.push(place(
-            [RIGHT_EDGE - 124.0, 614.0, 124.0, 16.0],
+        layers.push(footer(
+            [RIGHT_EDGE - 124.0, 124.0],
             text("RESONANT DSP")
                 .size(10)
                 .color(DIM)
@@ -316,6 +316,22 @@ pub(crate) fn place<'a, R: iced_core::Renderer + 'a>(
     .into()
 }
 
+/// Footer text between `x` and `x + width`, on the footer bar's centre line.
+fn footer<'a, R: iced_core::Renderer + 'a>(
+    [x, width]: [f32; 2],
+    content: impl Into<Element<'a, Msg, Theme, R>>,
+) -> Element<'a, Msg, Theme, R> {
+    place(
+        [
+            x,
+            style::HEIGHT - style::FOOTER_HEIGHT,
+            width,
+            style::FOOTER_HEIGHT,
+        ],
+        container(content).center_y(Length::Fill),
+    )
+}
+
 /// The group boxes' right edge, where the header's last action and the
 /// footer's mark end too.
 const RIGHT_EDGE: f32 = style::WIDTH - style::MARGIN;
@@ -337,7 +353,7 @@ fn header<'a, R: FreeRenderer + 'a>(
 ) -> Vec<Element<'a, Msg, Theme, R>> {
     let [top, height] = HEADER_CONTROL;
     // Pro's wordmark: the name in bold ink and the edition beside it at the
-    // same size, here in the accent rather than Pro's muted grey.
+    // same size in the product's accent, rose here where Pro's is orange.
     let wordmark = row![
         text("SWANKY AMP").size(29).font(style::BOLD).color(INK),
         text("FREE 2.0").size(29).font(style::FONT).color(ACCENT),
@@ -348,7 +364,7 @@ fn header<'a, R: FreeRenderer + 'a>(
     let notice_x = PRESET_FIELD[0] - HEADER_GROUP_GAP - height;
     vec![
         place(
-            [22.0, 0.0, 400.0, style::HEADER_HEIGHT],
+            [style::MARGIN, 0.0, 400.0, style::HEADER_HEIGHT],
             container(wordmark).center_y(Length::Fill),
         ),
         place(
