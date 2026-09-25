@@ -262,7 +262,10 @@ just capture /tmp/swanky-capture
 ```
 
 `just capture-preset "high gain" /tmp/swanky-capture` draws the editor with
-that factory preset applied and named in the header. `capture` needs a
+that factory preset applied and named in the header, and
+`just capture-information /tmp/swanky-capture` with the information panel
+open; `just capture-information /tmp/swanky-capture 2.0.1` also announces
+that release in it. `capture` needs a
 working GPU adapter. The layout export remains available when
 the artwork package is missing or stale so a new bake can be produced from
 changed widget geometry.
@@ -436,14 +439,18 @@ document and a timeout are all silent.
 
 The plugin accepts only a strict stable `major.minor.patch` version and
 compares it numerically, component by component, with the running version.
-The header carries a small outlined information action to the left of the
-preset bar. When the document names a strictly newer version, that action
-turns into a highlighted download arrow, and an explicit press on it opens the
-fixed tagged catalogue URL
-`https://resonantdsp.com/products/swanky-amp/?utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=release-notice`
-in the default browser; the downloaded document cannot choose a link. At rest
-a press opens the same product page tagged
-`utm_campaign=information` instead.
+The header carries a small outlined information button to the left of the
+preset bar. A press opens the information panel over the dimmed editor: the
+product name and running version, such as "Swanky Amp Free 2.0.0", and links
+to the website's product page, the manual and support, each tagged
+`utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=information`. Escape,
+the button again or a press outside the panel closes it. When the document
+names a strictly newer version, the button turns into a highlighted download
+arrow and the panel adds a line announcing that version with a Download link
+to the fixed tagged catalogue URL
+`https://resonantdsp.com/products/swanky-amp/?utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=release-notice`,
+opened in the default browser only on an explicit press; the downloaded
+document cannot choose a link.
 
 The check has a three-second total timeout, follows no redirects and retains its
 last valid answer and last attempt time in the process. It also stores them

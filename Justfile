@@ -139,6 +139,11 @@ capture-preset name="high gain" output="verification/interface-preset":
 capture-live output="verification/interface-live":
     cargo run --quiet --bin swanky-amp-2 -- capture "{{ output }}" live
 
+# Capture with the information panel open; name a newer release, such as
+# 2.0.1, to show its notice.
+capture-information output="verification/interface-information" release="":
+    cargo run --quiet --bin swanky-amp-2 -- capture "{{ output }}" information {{ release }}
+
 pack-artwork layers package="assets/artwork.pack":
     cargo run --quiet --bin swanky-amp-2 -- pack-artwork "{{ layers }}" "{{ package }}"
 
