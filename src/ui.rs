@@ -369,7 +369,7 @@ fn header<'a, R: FreeRenderer + 'a>(
     // same size in the product's accent, rose here where Pro's is orange.
     let wordmark = row![
         text("SWANKY AMP").size(29).font(style::BOLD).color(INK),
-        text("FREE 2.0").size(29).font(style::FONT).color(ACCENT),
+        text("FREE").size(29).font(style::FONT).color(ACCENT),
     ]
     .spacing(8)
     .align_y(Alignment::Center);
