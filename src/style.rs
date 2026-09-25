@@ -20,6 +20,9 @@ pub const METER_OUTPUT: Color = ACCENT;
 const METER_PEAK: f32 = 4.2;
 pub const INK: Color = Color::from_rgb(0.86, 0.88, 0.89);
 pub const MUTED: Color = Color::from_rgb(0.53, 0.59, 0.61);
+/// How much of its colour a control keeps while it has no effect, as Pro
+/// dims a bypassed section.
+pub const DISABLED_ALPHA: f32 = 0.35;
 /// Corner radius shared by every outlined control.
 pub const CONTROL_RADIUS: f32 = 6.0;
 /// Texels per interface pixel in the switch disc sprite: every edge the disc

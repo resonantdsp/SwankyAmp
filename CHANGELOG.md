@@ -89,6 +89,9 @@ install beside Swanky Amp 1.4.0. Qualification of the signed candidate in real h
   centre line.
 - Knob readouts show tenths while a knob is dragged, as 1.4's did, so a fine
   move is visible; at rest they keep whole units.
+- The cabinet's Bright, Distance and Dynamic knobs, their labels and readouts
+  dim while the cabinet is off, as Pro dims a bypassed section. They stay
+  adjustable.
 - Replaced the cabinet toggle with a vertical two-position switch in its own
   column of the Cabinet row: a brushed aluminium disc that sits in either end
   of a V track two discs tall, with the ON label lit in the accent.

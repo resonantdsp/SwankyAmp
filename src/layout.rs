@@ -46,6 +46,13 @@ impl ControlSpec {
         }
     }
 
+    /// Whether the control shapes the sound with the cabinet switch in this
+    /// position: the cabinet's own knobs are idle while it is off, and are
+    /// drawn dimmed but stay adjustable, as 1.4 always left them.
+    pub fn in_effect(&self, cabinet_on: bool) -> bool {
+        cabinet_on || !(self.group == "CABINET" && self.kind == ControlKind::Knob)
+    }
+
     const fn toggle(id: u32, label: &'static str, group: &'static str, center: [f32; 2]) -> Self {
         Self {
             id,

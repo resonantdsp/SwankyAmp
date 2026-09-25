@@ -485,6 +485,8 @@ fn control_column<'a, R: FreeRenderer + 'a>(
     params: &'a ParamCache<SwankyAmpParams>,
     turning: bool,
 ) -> Element<'a, Msg, Theme, R> {
+    let enabled = spec.in_effect(params.get(layout::CABINET_SWITCH) >= 0.5);
+    let fade = if enabled { 1.0 } else { style::DISABLED_ALPHA };
     let knob = Knob {
         target: Target {
             id: spec.id,
@@ -492,19 +494,20 @@ fn control_column<'a, R: FreeRenderer + 'a>(
             default: default_normalized(params, spec.id),
         },
         large: spec.large,
+        enabled,
     };
     let label = text(spec.label)
         .size(13)
         .line_height(LineHeight::Absolute(18.0.into()))
         .width(Length::Fill)
         .align_x(iced_core::text::Alignment::Center)
-        .color(INK);
+        .color(INK.scale_alpha(fade));
     let value = text(display_value(spec.id, params.get(spec.id) as f32, turning))
         .size(14)
         .line_height(LineHeight::Absolute(20.0.into()))
         .width(Length::Fill)
         .align_x(iced_core::text::Alignment::Center)
-        .color(DIM);
+        .color(DIM.scale_alpha(fade));
     let body = column![
         container(knob)
             .height(KNOB_ROW_HEIGHT)
