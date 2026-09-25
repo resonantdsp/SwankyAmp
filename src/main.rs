@@ -26,6 +26,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let fixture = arguments.get(2).map(String::as_str);
         let preset = match fixture {
             Some("preset") => Some(arguments.get(3).ok_or("capture <dir> preset <name>")?),
+            Some("information") => {
+                swanky_amp::ui::capture_information(arguments.get(3).cloned());
+                None
+            }
             _ => None,
         };
         std::fs::create_dir_all(&destination)?;

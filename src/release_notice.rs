@@ -8,9 +8,6 @@ use serde::{Deserialize, Serialize};
 
 const ENDPOINT: &str = "https://resonantdsp.com/release-notices/swanky-amp.json";
 const CATALOGUE_URL: &str = "https://resonantdsp.com/products/swanky-amp/?utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=release-notice";
-/// The same catalogue page, reached from the information action while no
-/// newer release is known.
-const PRODUCT_URL: &str = "https://resonantdsp.com/products/swanky-amp/?utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=information";
 const PRODUCT_ID: &str = "SwankyAmp";
 const CACHE_INTERVAL: Duration = Duration::from_secs(24 * 60 * 60);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(3);
@@ -22,23 +19,27 @@ pub struct Notice {
     pub url: &'static str,
 }
 
-impl Notice {
-    /// Opens the fixed catalogue page in the default browser.
-    pub fn open(&self) {
-        open_in_browser(self.url);
-    }
-}
-
-/// Opens the product's catalogue page in the default browser, for the
-/// information action at rest.
-pub fn open_product_page() {
-    open_in_browser(PRODUCT_URL);
-}
+/// Where the information panel sends a player who needs more than it holds,
+/// tagged like the release notice so the website can tell the visits apart.
+pub const LINKS: [(&str, &str); 3] = [
+    (
+        "Website",
+        "https://resonantdsp.com/products/swanky-amp/?utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=information",
+    ),
+    (
+        "Manual",
+        "https://resonantdsp.com/manuals/swanky-amp-free/?utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=information",
+    ),
+    (
+        "Support",
+        "https://resonantdsp.com/support/?utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=information",
+    ),
+];
 
 /// The launcher is never awaited and a failure is ignored: the press is a
 /// convenience and the editor must not block or report on the user's desktop
 /// setup.
-fn open_in_browser(url: &str) {
+pub fn open_in_browser(url: &str) {
     let launcher = if cfg!(target_os = "macos") {
         "open"
     } else if cfg!(target_os = "windows") {

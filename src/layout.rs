@@ -244,6 +244,8 @@ pub struct Component {
     pub parameter: Option<u32>,
     pub bounds: [f32; 4],
     pub radius: Option<f32>,
+    /// The words a text component shows, for review and tests.
+    pub text: Option<String>,
 }
 
 impl Component {
@@ -255,6 +257,7 @@ impl Component {
             parameter: None,
             bounds: [0.0; 4],
             radius: None,
+            text: None,
         }
     }
 }
@@ -475,11 +478,12 @@ pub fn manifest() -> Manifest {
     resolve(&crate::ui::FreeUi::resting(), &cache, &mut Measure)
 }
 
-pub fn resolve<R: FreeRenderer>(
+/// Every marked component the editor shows, where it is resolved.
+pub fn components<R: FreeRenderer>(
     ui: &crate::ui::FreeUi,
     params: &truce_iced::ParamCache<SwankyAmpParams>,
     renderer: &mut R,
-) -> Manifest {
+) -> Vec<Component> {
     style::load_fonts();
     let element = ui.view_content::<R>(params);
     let mut tree = iced_runtime::UserInterface::build(
@@ -490,11 +494,18 @@ pub fn resolve<R: FreeRenderer>(
     );
     let mut collect = Collect::default();
     tree.operate(renderer, &mut collect);
+    collect.0
+}
+
+pub fn resolve<R: FreeRenderer>(
+    ui: &crate::ui::FreeUi,
+    params: &truce_iced::ParamCache<SwankyAmpParams>,
+    renderer: &mut R,
+) -> Manifest {
     let physical = PhysicalLayout {
         size: [style::WIDTH, style::HEIGHT],
         profile: style::PhysicalStyle::default(),
-        surfaces: collect
-            .0
+        surfaces: components(ui, params, renderer)
             .iter()
             .filter(|component| {
                 matches!(

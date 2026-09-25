@@ -72,6 +72,40 @@ impl PluginLogic for SwankyAmp {
 
 truce::plugin! { logic: SwankyAmp, params: SwankyAmpParams }
 
+/// A host that accepts every edit and reports nothing back, for tests that
+/// drive the editor.
+#[cfg(test)]
+pub(crate) struct NullHost;
+
+#[cfg(test)]
+impl truce::core::editor::EditorBridge for NullHost {
+    fn begin_edit(&self, _: u32) {}
+    fn set_param(&self, _: u32, _: f64) {}
+    fn end_edit(&self, _: u32) {}
+    fn request_resize(&self, _: u32, _: u32) -> bool {
+        false
+    }
+    fn get_param(&self, _: u32) -> f64 {
+        0.0
+    }
+    fn get_param_plain(&self, _: u32) -> f64 {
+        0.0
+    }
+    fn format_param(&self, _: u32) -> String {
+        String::new()
+    }
+    fn get_meter(&self, _: u32) -> f32 {
+        0.0
+    }
+    fn get_state(&self) -> Vec<u8> {
+        Vec::new()
+    }
+    fn set_state(&self, _: Vec<u8>) {}
+    fn transport(&self) -> Option<truce::core::TransportInfo> {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

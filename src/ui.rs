@@ -8,9 +8,12 @@ use crate::{
     widgets::{FreeRenderer, Knob, Msg, NoticeGlyph, Target},
 };
 use iced_core::{Element, Length, Padding, Theme, mouse, text::LineHeight};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use truce::prelude::Params;
-use truce_iced::iced::widget::{Column, Space, column, container, mouse_area, row, stack, text};
+use truce_iced::iced::widget::{
+    Column, Row, Space, button, center, column, container, mouse_area, opaque, row, rule, stack,
+    text,
+};
 use truce_iced::iced::{Alignment, Border, Color, Subscription, Task, event, keyboard, window};
 use truce_iced::{IcedPlugin, Message, ParamCache, ParamMessage, PluginContext};
 
@@ -32,8 +35,10 @@ const KNOB_ROW_HEIGHT: f32 = 84.0;
 
 #[derive(Debug, Clone)]
 pub enum Action {
-    OpenReleaseNotice,
-    OpenProductPage,
+    Information(bool),
+    Browse(&'static str),
+    /// Escape: closes whichever of the panel and the preset menu is open.
+    Dismiss,
     Preset(PresetMsg),
     Focus(bool),
     Pointer(bool),
@@ -42,6 +47,8 @@ pub enum Action {
 pub struct FreeUi {
     releases: Option<release_notice::Service>,
     notice: Option<Notice>,
+    /// Whether the information panel is over the editor.
+    information: bool,
     meters: Option<Arc<MeterState>>,
     meter_levels: [f32; 4],
     meter_revision: u64,
@@ -60,6 +67,7 @@ impl FreeUi {
         Self {
             releases: None,
             notice: None,
+            information: false,
             meters: None,
             meter_levels: [0.0; 4],
             meter_revision: 0,
@@ -133,7 +141,12 @@ impl FreeUi {
                     .color(INK),
             ));
         }
-        layers.extend(header(self.notice.as_ref(), &self.presets, params));
+        layers.extend(header(
+            self.notice.as_ref(),
+            self.information,
+            &self.presets,
+            params,
+        ));
         layers.extend(levels_meters(self.meter_levels));
         for control in layout::CONTROLS {
             layers.push(match control.kind {
@@ -163,6 +176,9 @@ impl FreeUi {
                 .align_x(iced_core::text::Alignment::Right),
         ));
         layers.extend(self.presets.menu(PRESET_FIELD, params));
+        if self.information {
+            layers.push(information_overlay(self.notice.as_ref()));
+        }
         stack(layers)
             .width(style::WIDTH)
             .height(style::HEIGHT)
@@ -183,6 +199,11 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
             // starts live until a focus or pointer event says otherwise.
             ..Self::resting()
         };
+        if let Some(release) = CAPTURED_INFORMATION.get() {
+            ui.releases = None;
+            ui.notice = release_notice::notice_for(release.as_deref());
+            ui.information = true;
+        }
         ui.sync_meters();
         ui
     }
@@ -197,7 +218,7 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
                 iced_core::Event::Keyboard(keyboard::Event::KeyPressed {
                     key: keyboard::Key::Named(keyboard::key::Named::Escape),
                     ..
-                }) => Action::Preset(PresetMsg::Close),
+                }) => Action::Dismiss,
                 _ => return None,
             };
             Some(Message::Plugin(action))
@@ -226,12 +247,12 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
             Message::Plugin(Action::Preset(message)) => {
                 self.presets.update(message, params, ctx);
             }
-            Message::Plugin(Action::OpenReleaseNotice) => {
-                if let Some(notice) = &self.notice {
-                    notice.open();
-                }
+            Message::Plugin(Action::Information(open)) => self.information = open,
+            Message::Plugin(Action::Browse(url)) => release_notice::open_in_browser(url),
+            Message::Plugin(Action::Dismiss) => {
+                self.information = false;
+                self.presets.update(PresetMsg::Close, params, ctx);
             }
-            Message::Plugin(Action::OpenProductPage) => release_notice::open_product_page(),
             Message::Plugin(Action::Focus(focused)) => {
                 self.focused = focused;
                 self.sync_meters();
@@ -361,6 +382,7 @@ const PRESET_FIELD: [f32; 4] = [
 
 fn header<'a, R: FreeRenderer + 'a>(
     notice: Option<&Notice>,
+    information: bool,
     presets: &PresetBar,
     params: &ParamCache<SwankyAmpParams>,
 ) -> Vec<Element<'a, Msg, Theme, R>> {
@@ -382,7 +404,7 @@ fn header<'a, R: FreeRenderer + 'a>(
         ),
         place(
             [notice_x, top, height, height],
-            notice_control(notice_action(notice)),
+            notice_control(notice_action(notice), information),
         ),
         place(PRESET_FIELD, presets.field(params)),
         place(
@@ -450,7 +472,10 @@ fn notice_action(notice: Option<&Notice>) -> NoticeAction {
     }
 }
 
-fn notice_control<'a, R: FreeRenderer + 'a>(action: NoticeAction) -> Element<'a, Msg, Theme, R> {
+fn notice_control<'a, R: FreeRenderer + 'a>(
+    action: NoticeAction,
+    information: bool,
+) -> Element<'a, Msg, Theme, R> {
     let download = action == NoticeAction::Download;
     let body = container(NoticeGlyph {
         download,
@@ -458,16 +483,131 @@ fn notice_control<'a, R: FreeRenderer + 'a>(action: NoticeAction) -> Element<'a,
     })
     .width(Length::Fill)
     .height(Length::Fill)
-    .style(move |_| style::outlined(download));
-    // At rest the mark still acts: it opens the product page, where the
-    // player finds what the plugin is, its releases and support.
-    mouse_area(body)
-        .on_press(Message::Plugin(if download {
-            Action::OpenReleaseNotice
-        } else {
-            Action::OpenProductPage
+    .style(move |_| style::outlined(download || information));
+    layout::mark(
+        Component::new("action.information", "button", "native"),
+        mouse_area(body)
+            .on_press(Message::Plugin(Action::Information(!information)))
+            .interaction(mouse::Interaction::Pointer),
+    )
+}
+
+/// Set by the capture command: a review capture renders a freshly created
+/// editor and cannot press the button, so it asks for the panel here, with
+/// the release that stands in for the website's answer.
+static CAPTURED_INFORMATION: OnceLock<Option<String>> = OnceLock::new();
+
+/// Editors created after this open with the information panel showing, and
+/// announce `release` if it is newer than this build.
+pub fn capture_information(release: Option<String>) {
+    let _ = CAPTURED_INFORMATION.set(release);
+}
+
+const INFORMATION_WIDTH: f32 = 400.0;
+
+/// Pro's About panel without its licensing: what this is, a newer release
+/// when there is one, and where to find more. It dims the editor behind it,
+/// and a press anywhere outside closes it.
+fn information_overlay<'a, R: FreeRenderer + 'a>(
+    notice: Option<&Notice>,
+) -> Element<'a, Msg, Theme, R> {
+    let line = |id: &str, body: String, size: f32, font, color| {
+        let mut spec = Component::new(id, "text", "native");
+        spec.text = Some(body.clone());
+        layout::mark(
+            spec,
+            text(body)
+                .size(size)
+                .font(font)
+                .line_height(LineHeight::Absolute(20.0.into()))
+                .color(color),
+        )
+    };
+    let mut content = Column::new().spacing(14).push(line(
+        "information.product",
+        format!("Swanky Amp Free {}", env!("CARGO_PKG_VERSION")),
+        17.0,
+        style::BOLD,
+        INK,
+    ));
+    if let Some(notice) = notice {
+        content = content.push(
+            row![
+                line(
+                    "information.release",
+                    format!("Swanky Amp Free {} is available", notice.version),
+                    15.0,
+                    style::FONT,
+                    ACCENT,
+                ),
+                link("Download", notice.url),
+            ]
+            .spacing(10)
+            .align_y(Alignment::Center),
+        );
+    }
+    let links = Row::with_children(
+        release_notice::LINKS
+            .iter()
+            .map(|(body, url)| link(body, url)),
+    )
+    .spacing(18);
+    content = content
+        .push(rule::horizontal(1).style(|_| rule::Style {
+            color: style::MUTED.scale_alpha(0.25),
+            radius: 0.0.into(),
+            fill_mode: rule::FillMode::Full,
+            snap: false,
         }))
-        .interaction(mouse::Interaction::Pointer)
+        .push(links);
+    let panel = layout::mark(
+        Component::new("information", "dialog", "native"),
+        container(content)
+            .width(INFORMATION_WIDTH)
+            .padding(20)
+            .style(|_| truce_iced::iced::widget::container::Style {
+                background: Some(Color::from_rgb(0.085, 0.095, 0.105).into()),
+                border: Border {
+                    color: style::MUTED.scale_alpha(0.4),
+                    width: 1.0,
+                    radius: style::CONTROL_RADIUS.into(),
+                },
+                shadow: iced_core::Shadow {
+                    color: Color::BLACK.scale_alpha(0.45),
+                    offset: iced_core::Vector::new(0.0, 6.0),
+                    blur_radius: 18.0,
+                },
+                ..Default::default()
+            }),
+    );
+    opaque(
+        mouse_area(
+            center(opaque(panel)).style(|_| truce_iced::iced::widget::container::Style {
+                background: Some(Color::BLACK.scale_alpha(0.85).into()),
+                ..Default::default()
+            }),
+        )
+        .on_press(Message::Plugin(Action::Information(false))),
+    )
+}
+
+/// Plain text that acts, as Pro's panel links are, lit in the accent under
+/// the pointer.
+fn link<'a, R: FreeRenderer + 'a>(
+    body: &'static str,
+    url: &'static str,
+) -> Element<'a, Msg, Theme, R> {
+    button(text(body).size(14).font(style::FONT))
+        .padding([4, 0])
+        .style(|_, status| button::Style {
+            text_color: if matches!(status, button::Status::Hovered | button::Status::Pressed) {
+                ACCENT
+            } else {
+                style::MUTED
+            },
+            ..Default::default()
+        })
+        .on_press(Message::Plugin(Action::Browse(url)))
         .into()
 }
 
@@ -718,8 +858,124 @@ fn meter_column<'a, R: FreeRenderer + 'a>(
 
 #[cfg(test)]
 mod tests {
-    use super::{NoticeAction, display_value, notice_action, oversampling_label};
-    use crate::release_notice::notice_for;
+    use super::{Action, FreeUi, NoticeAction, display_value, notice_action, oversampling_label};
+    use crate::layout::{self, Measure};
+    use crate::{NullHost, params::SwankyAmpParams, release_notice::notice_for, style};
+    use iced_core::{Event, Point, Size, clipboard, mouse};
+    use iced_runtime::user_interface::{Cache, UserInterface};
+    use std::sync::Arc;
+    use truce_iced::{IcedPlugin, Message, ParamCache, PluginContext};
+
+    /// An editor driven as a player drives it, by pressing where things are.
+    struct Editor {
+        ui: FreeUi,
+        params: ParamCache<SwankyAmpParams>,
+        ctx: PluginContext<SwankyAmpParams>,
+    }
+
+    impl Editor {
+        fn new(release: Option<&str>) -> Self {
+            let params = Arc::new(SwankyAmpParams::default());
+            let mut ui = FreeUi::resting();
+            ui.notice = notice_for(release);
+            Self {
+                ui,
+                params: ParamCache::new(Arc::clone(&params)),
+                ctx: PluginContext::new(Arc::new(NullHost), params),
+            }
+        }
+
+        fn bounds(&self, id: &str) -> Option<[f32; 4]> {
+            layout::components(&self.ui, &self.params, &mut Measure)
+                .into_iter()
+                .find(|component| component.id == id)
+                .map(|component| component.bounds)
+        }
+
+        fn text(&self, id: &str) -> Option<String> {
+            layout::components(&self.ui, &self.params, &mut Measure)
+                .into_iter()
+                .find(|component| component.id == id)
+                .and_then(|component| component.text)
+        }
+
+        fn press(&mut self, [x, y]: [f32; 2]) {
+            let mut renderer = Measure;
+            let mut messages = Vec::new();
+            UserInterface::build(
+                self.ui.view_content::<Measure>(&self.params),
+                Size::new(style::WIDTH, style::HEIGHT),
+                Cache::new(),
+                &mut renderer,
+            )
+            .update(
+                &[Event::Mouse(mouse::Event::ButtonPressed(
+                    mouse::Button::Left,
+                ))],
+                mouse::Cursor::Available(Point::new(x, y)),
+                &mut renderer,
+                &mut clipboard::Null,
+                &mut messages,
+            );
+            for message in messages {
+                let _ = self.ui.update(message, &self.params, &self.ctx);
+            }
+        }
+
+        fn press_button(&mut self) {
+            let [x, y, width, height] = self.bounds("action.information").unwrap();
+            self.press([x + width / 2.0, y + height / 2.0]);
+        }
+    }
+
+    #[test]
+    fn the_information_button_opens_a_panel_naming_this_version() {
+        let mut editor = Editor::new(None);
+        assert_eq!(editor.bounds("information"), None);
+        editor.press_button();
+        assert_eq!(
+            editor.text("information.product"),
+            Some(format!("Swanky Amp Free {}", env!("CARGO_PKG_VERSION")))
+        );
+        assert_eq!(editor.text("information.release"), None);
+
+        let [x, y, ..] = editor.bounds("information").unwrap();
+        editor.press([x + 4.0, y + 4.0]);
+        assert!(
+            editor.bounds("information").is_some(),
+            "a press inside the panel closed it"
+        );
+    }
+
+    #[test]
+    fn the_panel_closes_on_the_button_a_press_outside_or_escape() {
+        let mut editor = Editor::new(None);
+        editor.press_button();
+        editor.press_button();
+        assert_eq!(editor.bounds("information"), None, "the button again");
+
+        editor.press_button();
+        editor.press([style::WIDTH - 4.0, style::HEIGHT - 4.0]);
+        assert_eq!(editor.bounds("information"), None, "a press outside");
+
+        editor.press_button();
+        let _ = editor.ui.update(
+            Message::Plugin(Action::Dismiss),
+            &editor.params,
+            &editor.ctx,
+        );
+        assert_eq!(editor.bounds("information"), None, "Escape");
+    }
+
+    #[test]
+    fn the_panel_announces_a_newer_release() {
+        let mut editor = Editor::new(Some("99.0.0"));
+        editor.press_button();
+        assert_eq!(
+            editor.text("information.release"),
+            Some("Swanky Amp Free 99.0.0 is available".into())
+        );
+    }
 
     #[test]
     fn readouts_preserve_the_released_free_scale() {
