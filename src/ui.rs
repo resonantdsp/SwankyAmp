@@ -149,8 +149,12 @@ impl FreeUi {
             },
         ));
         layers.push(place(
-            [938.0, 614.0, 124.0, 16.0],
-            text("RESONANT DSP").size(10).color(DIM),
+            [RIGHT_EDGE - 124.0, 614.0, 124.0, 16.0],
+            text("RESONANT DSP")
+                .size(10)
+                .color(DIM)
+                .width(Length::Fill)
+                .align_x(iced_core::text::Alignment::Right),
         ));
         layers.extend(self.presets.menu(PRESET_FIELD, params));
         stack(layers)
@@ -312,9 +316,13 @@ pub(crate) fn place<'a, R: iced_core::Renderer + 'a>(
     .into()
 }
 
+/// The group boxes' right edge, where the header's last action and the
+/// footer's mark end too.
+const RIGHT_EDGE: f32 = style::WIDTH - style::MARGIN;
+
 /// Where the preset field sits: right to left from the boxes' edge, one
 /// group gap between header actions.
-const OVERSAMPLING_FIELD: [f32; 2] = [1066.0 - 72.0, 72.0];
+const OVERSAMPLING_FIELD: [f32; 2] = [RIGHT_EDGE - 72.0, 72.0];
 const PRESET_FIELD: [f32; 4] = [
     OVERSAMPLING_FIELD[0] - HEADER_GROUP_GAP - 150.0,
     HEADER_CONTROL[0],

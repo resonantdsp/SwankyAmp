@@ -144,17 +144,44 @@ pub const PANELS: [SurfaceSpec; 3] = [
     ),
 ];
 
+/// The right column ends at the window margin.
+const RIGHT_COLUMN_WIDTH: f32 = style::WIDTH - style::MARGIN - 488.0;
+
 /// The six Free groups as separate rounded boxes, after 1.4.0: a gap of
 /// graphite between them, each traced by its own groove, so no group has to
 /// share an edge with another. The two columns share their edges so the
 /// boxes read as one grid; each row spaces its knobs evenly within its box.
 pub const SECTIONS: [SurfaceSpec; 6] = [
-    SurfaceSpec::section("section.levels", "levels", [14.0, 78.0, 462.0, 164.0]),
-    SurfaceSpec::section("section.cabinet", "cabinet", [488.0, 78.0, 578.0, 164.0]),
-    SurfaceSpec::section("section.preamp", "preamp", [14.0, 254.0, 462.0, 164.0]),
-    SurfaceSpec::section("section.staging", "staging", [488.0, 254.0, 578.0, 164.0]),
-    SurfaceSpec::section("section.power", "power-amp", [14.0, 430.0, 462.0, 164.0]),
-    SurfaceSpec::section("section.tone", "tone", [488.0, 430.0, 578.0, 164.0]),
+    SurfaceSpec::section(
+        "section.levels",
+        "levels",
+        [style::MARGIN, 78.0, 462.0, 164.0],
+    ),
+    SurfaceSpec::section(
+        "section.cabinet",
+        "cabinet",
+        [488.0, 78.0, RIGHT_COLUMN_WIDTH, 164.0],
+    ),
+    SurfaceSpec::section(
+        "section.preamp",
+        "preamp",
+        [style::MARGIN, 254.0, 462.0, 164.0],
+    ),
+    SurfaceSpec::section(
+        "section.staging",
+        "staging",
+        [488.0, 254.0, RIGHT_COLUMN_WIDTH, 164.0],
+    ),
+    SurfaceSpec::section(
+        "section.power",
+        "power-amp",
+        [style::MARGIN, 430.0, 462.0, 164.0],
+    ),
+    SurfaceSpec::section(
+        "section.tone",
+        "tone",
+        [488.0, 430.0, RIGHT_COLUMN_WIDTH, 164.0],
+    ),
 ];
 
 /// The parameter the cabinet switch sets.

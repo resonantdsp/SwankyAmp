@@ -82,6 +82,8 @@ install beside Swanky Amp 1.4.0. Qualification of the signed candidate in real h
   as Pro's one-line "SWANKY AMP FREE 2.0", and replaced the static
   oversampling label with Pro's button: it cycles Auto, 1x, 2x and 4x and
   names the factor the engine resolved.
+- Ended the footer's RESONANT DSP mark on the boxes' right margin, the line
+  the header's last button already ends on.
 - Replaced the cabinet toggle with a vertical two-position switch in its own
   column of the Cabinet row: a brushed aluminium disc that sits in either end
   of a V track two discs tall, with the ON label lit in the accent.

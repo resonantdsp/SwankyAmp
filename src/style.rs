@@ -48,6 +48,9 @@ pub const WIDTH: f32 = 1080.0;
 pub const HEIGHT: f32 = 640.0;
 pub const HEADER_HEIGHT: f32 = 64.0;
 pub const FOOTER_HEIGHT: f32 = 32.0;
+/// The window's side inset to the group boxes; whatever sits at the right
+/// edge of the header or footer ends on the same line as the boxes.
+pub const MARGIN: f32 = 14.0;
 pub const UTILITY_X: f32 = 760.0;
 
 pub const KNOB_LARGE_RADIUS: f32 = 32.0;
