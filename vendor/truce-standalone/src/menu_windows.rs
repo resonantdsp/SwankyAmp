@@ -9,6 +9,8 @@
 //! - **Input Device** submenu - repopulated from cpal on each open
 //!   (effect plugins only)
 //! - **Output Device** submenu - same for outputs
+//! - **Buffer Size** submenu - the sizes in [`BUFFER_SIZES`], checked on
+//!   the size the device accepted
 //! - **Input / Output Channels** submenus - channel routing (when the
 //!   device exposes >= 2 channels)
 //! - **MIDI Input** submenu(s) - one per plugin MIDI input port
@@ -61,6 +63,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 use crate::audio::{self, ChannelRoute, InputController, OutputController};
 use crate::midi::{self, MIDI_MENU_MAX_PORTS, MidiChannel, MidiController};
 use crate::presets::PresetController;
+use crate::settings::BUFFER_SIZES;
 use crate::vlog;
 
 /// Command ID for the mic-input toggle.
@@ -109,6 +112,10 @@ const MENU_CMD_MIDI_MAX_PORTS: usize = MIDI_MENU_MAX_PORTS;
 const MENU_CMD_MIDI_CHANNEL_BASE: u16 = 0xC600;
 const MENU_CMD_MIDI_CHANNEL_END: u16 = 0xC6FF;
 
+/// Buffer Size items: `cmd == base + index` into [`BUFFER_SIZES`].
+const MENU_CMD_BUFFER_SIZE_BASE: u16 = 0xCD00;
+const MENU_CMD_BUFFER_SIZE_END: u16 = 0xCDFF;
+
 /// Preset commands. Previous / Next / Save are fixed; the Load
 /// submenu items occupy a range, command ID `BASE + index` into
 /// `PresetController::entries` (libraries beyond the range are
@@ -140,6 +147,8 @@ struct MenuState {
     /// `null` for instrument plugins (input device picker not built).
     hmenu_input_devices: HMENU,
     hmenu_output_devices: HMENU,
+    /// Buffer Size submenu, repopulated with the accepted size checked.
+    hmenu_buffer_size: HMENU,
     /// Channel-routing submenus. `null` when the device exposes fewer
     /// than two channels (nothing to pick) or, for input, on
     /// instruments. Repopulated on `WM_INITMENUPOPUP`.
@@ -276,6 +285,19 @@ pub fn install(
             output_label.as_ptr(),
         );
 
+        // Buffer Size submenu. Empty at install; repopulated with the
+        // size the device accepted checked on WM_INITMENUPOPUP.
+        let buffer_size_menu = CreatePopupMenu();
+        if !buffer_size_menu.is_null() {
+            let label = wide("Buffer Size");
+            AppendMenuW(
+                plugin_menu,
+                MF_POPUP,
+                buffer_size_menu as usize,
+                label.as_ptr(),
+            );
+        }
+
         // Channel-routing submenus. Only worth showing when the device
         // has >= 2 channels. Empty at install; repopulated (with the
         // current selection checked) on WM_INITMENUPOPUP.
@@ -385,6 +407,7 @@ pub fn install(
             has_mic_item: is_effect,
             hmenu_input_devices: input_dev_menu,
             hmenu_output_devices: output_dev_menu,
+            hmenu_buffer_size: buffer_size_menu,
             hmenu_input_channels: input_ch_menu,
             hmenu_output_channels: output_ch_menu,
             hmenu_bus_layout: bus_layout_menu,
@@ -646,6 +669,16 @@ unsafe extern "system" fn subclass_proc(
                     return 0;
                 }
 
+                if (MENU_CMD_BUFFER_SIZE_BASE..=MENU_CMD_BUFFER_SIZE_END).contains(&cmd_id) {
+                    if let Some(&frames) =
+                        BUFFER_SIZES.get(usize::from(cmd_id - MENU_CMD_BUFFER_SIZE_BASE))
+                    {
+                        vlog!("buffer size: {frames}");
+                        state.output.set_buffer_size(frames);
+                    }
+                    return 0;
+                }
+
                 if !state.hmenu_input_channels.is_null()
                     && (MENU_CMD_INPUT_CHANNELS_BASE..=MENU_CMD_INPUT_CHANNELS_END)
                         .contains(&cmd_id)
@@ -733,6 +766,8 @@ unsafe extern "system" fn subclass_proc(
                         current.as_deref(),
                         MENU_CMD_OUTPUT_DEVICE_BASE,
                     );
+                } else if !state.hmenu_buffer_size.is_null() && popup == state.hmenu_buffer_size {
+                    repopulate_buffer_size_menu(popup, state.output.buffer_size());
                 } else if !state.hmenu_input_channels.is_null()
                     && popup == state.hmenu_input_channels
                 {
@@ -876,6 +911,25 @@ unsafe fn repopulate_device_menu(
                 flags |= MF_CHECKED;
             }
             AppendMenuW(popup, flags, cmd_id as usize, text.as_ptr());
+        }
+    }
+}
+
+/// Rebuild the Buffer Size popup: one item per size in [`BUFFER_SIZES`],
+/// firing `MENU_CMD_BUFFER_SIZE_BASE + index`, with `current` checked.
+unsafe fn repopulate_buffer_size_menu(popup: HMENU, current: Option<u32>) {
+    unsafe {
+        let count = GetMenuItemCount(popup);
+        for _ in 0..count {
+            DeleteMenu(popup, 0, MF_BYPOSITION);
+        }
+        for (cmd, frames) in (MENU_CMD_BUFFER_SIZE_BASE..).zip(BUFFER_SIZES) {
+            let mut flags = MF_STRING;
+            if current == Some(frames) {
+                flags |= MF_CHECKED;
+            }
+            let text = wide(&format!("{frames} samples"));
+            AppendMenuW(popup, flags, cmd as usize, text.as_ptr());
         }
     }
 }

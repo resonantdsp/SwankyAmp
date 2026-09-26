@@ -38,6 +38,7 @@ pub mod offline;
 #[cfg(feature = "playback")]
 pub mod playback;
 pub mod presets;
+pub mod settings;
 pub mod state;
 pub mod transport;
 

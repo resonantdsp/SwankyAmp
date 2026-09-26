@@ -237,6 +237,13 @@ After `just setup`, open the standalone shell with:
 just run
 ```
 
+The standalone's Settings menu chooses the input, the output and the buffer
+size (128 samples unless chosen), and remembers them on the machine; the
+`--input`, `--output` and `--buffer` flags override them for one launch
+(`cargo run --release -- --help` lists every option). Choosing an audio
+interface as the input takes the output to it too, unless an output has been
+chosen, and the input is kept within about one buffer of the output.
+
 The editor uses one iced widget tree for the live controls and the artwork
 layout contract. As in 1.4, the six Free signal-flow groups (Levels, Cabinet,
 Preamp, Staging, Power Amp and Tone) are separate rounded boxes with graphite
@@ -495,7 +502,7 @@ and is not linked into the plugin.
 The dynamic-latency work adds narrow copies from the exact published Truce 6.3.0 sources:
 
 - `vendor/truce-clap`: dynamic-latency restart and active reset handling, extending the existing state-notification copy.
-- `vendor/truce-standalone`: dynamic-latency restart on the output worker.
+- `vendor/truce-standalone`: dynamic-latency restart on the output worker, and, as in Pro, an input kept within about one buffer of the output, a Buffer Size menu and remembered devices and buffer size.
 - `vendor/truce-core`, `vendor/truce-plugin`, `vendor/truce-loader`, and `vendor/truce`: the narrow real-time reset lifecycle hook and its forwarding bridge.
 
 Each Truce directory carries the unchanged governing Truce licence and MIT and Apache texts, original manifest, source reference, and a focused `UPSTREAM.md` description of the local changes. `vendor/baseview-truce` carries its own MIT and Apache licence texts and provenance. Everything else resolves from the pinned Cargo lockfile.

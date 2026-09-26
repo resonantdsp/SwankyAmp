@@ -70,6 +70,15 @@ install beside Swanky Amp 1.4.0. Qualification of the signed candidate in real h
 - Added automation to build, sign and qualify macOS and Windows candidates,
   attempt a qualified Linux bundle, and promote only the accepted candidate
   bytes.
+- Kept the standalone app's input from falling behind its output: a guitar
+  played through it stays within about one buffer, where startup, a stall or
+  separate input and output devices could leave up to a tenth of a second of
+  delay for the session. The Settings menu gains a Buffer Size choice of 32 to
+  1024 samples, 128 unless chosen, and the app remembers its input, output and
+  buffer size between launches; `--input`, `--output` and `--buffer` override
+  them for one launch. Choosing an audio interface as the input takes the
+  output to it as well, unless an output has been chosen. On Windows, devices
+  are listed by their full names, such as "Speakers (UMC202HD 192k)".
 - Added an information panel, opened from the header's information button:
   it names the product and its version, links to the website, the manual and
   support, and closes with Escape, the button again or a press outside.

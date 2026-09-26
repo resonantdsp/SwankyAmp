@@ -8,6 +8,8 @@
 //! - **Audio Output** (toggle, ⌘O, checkmark when unmuted)
 //! - **Input Device** submenu - lists cpal-visible inputs (effects only)
 //! - **Output Device** submenu - same for outputs
+//! - **Buffer Size** submenu - the sizes in [`BUFFER_SIZES`], checkmark on
+//!   the size the device accepted
 //! - **Input / Output Channels** submenus - channel routing (when the
 //!   device exposes >= 2 channels)
 //! - **MIDI Input** submenu(s) - one per plugin MIDI input port
@@ -45,6 +47,7 @@ use objc::{class, msg_send, sel, sel_impl};
 use crate::audio::{ChannelRoute, DeviceCache, InputController, OutputController};
 use crate::midi::{MIDI_MENU_MAX_PORTS, MidiChannel, MidiController};
 use crate::presets::PresetController;
+use crate::settings::BUFFER_SIZES;
 use crate::vlog;
 
 /// Heap-allocated state the Objective-C class points at via ivar.
@@ -69,6 +72,8 @@ struct MenuState {
     input_device_menu: *mut Object,
     /// Output device submenu - repopulated on open from cpal.
     output_device_menu: *mut Object,
+    /// Buffer Size submenu - its checkmark refreshed on open.
+    buffer_size_menu: *mut Object,
     /// Pointer to the action-target object itself, for re-targeting
     /// the device items repopulated each open.
     target: *mut Object,
@@ -190,6 +195,28 @@ pub fn install(
         let output_dev_menu = make_menu("Output Device");
         let _: () = msg_send![output_dev_item, setSubmenu: output_dev_menu];
         let _: () = msg_send![plugin_menu, addItem: output_dev_item];
+
+        // Buffer Size submenu. The sizes are fixed; the checkmark follows
+        // the size the device accepted, so it is refreshed on open. Same
+        // target requirement as the device submenus above.
+        let buffer_item = make_menu_item("Buffer Size");
+        let _: () = msg_send![buffer_item, setTarget: target];
+        let buffer_menu = make_menu("Buffer Size");
+        let current_buffer = buffer_size_tag(output.buffer_size());
+        for frames in BUFFER_SIZES {
+            add_tagged_item(
+                buffer_menu,
+                target,
+                sel!(selectBufferSizeAction:),
+                &format!("{frames} samples"),
+                i64::from(frames),
+                current_buffer,
+            );
+        }
+        let _: () = msg_send![buffer_item, setSubmenu: buffer_menu];
+        let _: () = msg_send![plugin_menu, addItem: buffer_item];
+        let _: () = msg_send![buffer_menu, setDelegate: target];
+        set_buffer_size_menu(target, buffer_menu);
 
         // Channel-routing submenus. Pointless on a mono device (nothing
         // to choose), so only shown when the device has >= 2 channels.
@@ -600,6 +627,12 @@ unsafe fn populate_bus_layout_menu(
     }
 }
 
+/// The Buffer Size item tag to checkmark: the size itself, or none when
+/// the device runs at its own size.
+fn buffer_size_tag(frames: Option<u32>) -> i64 {
+    frames.map_or(-1, i64::from)
+}
+
 /// `ChannelRoute` packed into an `NSMenuItem` `tag` (`NSInteger` = i64).
 fn encoded_tag(route: ChannelRoute) -> i64 {
     i64::try_from(route.encode()).unwrap_or(0)
@@ -980,6 +1013,29 @@ fn ensure_class() -> &'static Class {
             select_bus_layout_action as extern "C" fn(&Object, Sel, *mut Object),
         );
 
+        // Buffer size chosen (tag = frames). The output reopens at it and
+        // the input follows; the checkmark is corrected on the next open
+        // if the device settles on another size.
+        extern "C" fn select_buffer_size_action(this: &Object, _: Sel, sender: *mut Object) {
+            unsafe {
+                let Some(state) = state_from(this) else {
+                    return;
+                };
+                let tag: i64 = msg_send![sender, tag];
+                let Ok(frames) = u32::try_from(tag) else {
+                    return;
+                };
+                vlog!("buffer size: {frames}");
+                state.output.set_buffer_size(frames);
+                let menu: *mut Object = msg_send![sender, menu];
+                update_channel_checkmarks(menu, tag);
+            }
+        }
+        decl.add_method(
+            sel!(selectBufferSizeAction:),
+            select_buffer_size_action as extern "C" fn(&Object, Sel, *mut Object),
+        );
+
         // MIDI input device chosen. The item tag encodes the plugin
         // port and whether it's the "None" (disconnect) row; device
         // rows carry the name in their title.
@@ -1061,6 +1117,11 @@ fn ensure_class() -> &'static Class {
                         sel!(selectOutputDeviceAction:),
                     );
                     state.device_cache.refresh_async();
+                    return;
+                }
+
+                if !state.buffer_size_menu.is_null() && menu == state.buffer_size_menu {
+                    update_channel_checkmarks(menu, buffer_size_tag(state.output.buffer_size()));
                     return;
                 }
 
@@ -1244,6 +1305,7 @@ unsafe fn make_menu_target(
         keyboard_item: std::ptr::null_mut(),
         input_device_menu: std::ptr::null_mut(),
         output_device_menu: std::ptr::null_mut(),
+        buffer_size_menu: std::ptr::null_mut(),
         target: std::ptr::null_mut(),
         device_cache: DeviceCache::new(),
         midi,
@@ -1282,6 +1344,18 @@ unsafe fn update_menu_state(
         state.output_device_menu = output_device_menu;
         state.midi_input_menus = midi_input_menus;
         state.target = target_self;
+    }
+}
+
+/// Record the Buffer Size submenu so `menuWillOpen:` can refresh its
+/// checkmark.
+unsafe fn set_buffer_size_menu(target: *mut Object, menu: *mut Object) {
+    unsafe {
+        let state_ptr: *mut c_void = *(*target).get_ivar(STATE_IVAR);
+        if state_ptr.is_null() {
+            return;
+        }
+        (*state_ptr.cast::<MenuState>()).buffer_size_menu = menu;
     }
 }
 
