@@ -37,9 +37,12 @@ clippy:
     cargo clippy --all-targets --no-default-features -- -D warnings
     cargo clippy --all-targets -- -D warnings
 
+# The vendored standalone host is a patched dependency, whose tests the
+# crate's own run leaves out.
 test:
     cargo test --no-default-features
     cargo test --no-default-features --features clap,standalone,rt-paranoid adapter_
+    cargo test -p truce-standalone
 
 release-tests:
     python3 -m unittest discover -s .github/scripts -p 'test_*.py'

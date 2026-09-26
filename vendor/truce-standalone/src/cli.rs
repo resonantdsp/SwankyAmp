@@ -7,8 +7,10 @@
 //! 3. Plugin-author defaults supplied via
 //!    [`crate::run_with`] / [`crate::Defaults`] (only `input_enabled`
 //!    and `output_enabled` participate at this tier)
-//! 4. Compiled runtime default (input off, output on, cpal-picked
-//!    devices)
+//! 4. The devices and buffer size last chosen from the Settings menu on
+//!    this machine (see [`crate::settings`]; not for offline renders)
+//! 5. Compiled runtime default (input off, output on, cpal-picked
+//!    devices, a 128-frame buffer)
 
 use std::path::PathBuf;
 
@@ -20,7 +22,11 @@ pub struct Options {
     pub headless: bool,
     pub list_devices: bool,
     pub list_midi: bool,
+    /// Output device named for this launch; overrides the saved choice
+    /// and is not saved.
     pub output_device: Option<String>,
+    /// Input device named for this launch; overrides the saved choice
+    /// and is not saved.
     pub input_device: Option<String>,
     /// Output channel routing spec (`direct`, a channel like `3`, or a
     /// pair like `3-4`). Parsed into a `ChannelRoute` in `start_audio`;
@@ -45,6 +51,8 @@ pub struct Options {
     /// with Cmd/Ctrl+K or the Settings menu's "Computer Keyboard" item.
     pub qwerty_midi: bool,
     pub sample_rate: Option<u32>,
+    /// Buffer size in frames for this launch; overrides the saved choice
+    /// and is not saved. Offline renders use it as their block size.
     pub buffer_size: Option<u32>,
     /// `--bus-layout <index>`: which `bus_layouts()` entry to run in.
     /// Its channel count is requested from the audio device (a plugin
@@ -117,8 +125,10 @@ OPTIONS:
   --headless                Run audio only; no window
   --list-devices            List audio output + input devices and exit
   --list-midi               List MIDI input devices and exit
-  --output <name>           Audio output device (substring match)
-  --input <name>            Audio input device (effect plugins)
+  --output <name>           Audio output device (substring match). Overrides
+                            the Settings menu's choice for this launch.
+  --input <name>            Audio input device (effect plugins). Overrides
+                            the Settings menu's choice for this launch.
   --output-channels <spec>  Route output to specific device channels:
                             `direct` (all, default), a channel like `3`
                             (mono), or a pair like `3-4` (stereo).
@@ -132,7 +142,9 @@ OPTIONS:
                             (default: off). Toggle live with Cmd/Ctrl+K
                             or the Settings menu's Computer Keyboard item.
   --sample-rate <hz>        e.g. 44100, 48000, 96000
-  --buffer <frames>         Audio buffer size (power of two recommended)
+  --buffer <frames>         Audio buffer size (power of two recommended).
+                            Overrides the Settings menu's choice for this
+                            launch (default: that choice, else 128).
   --bus-layout <index>      Run in this bus_layouts() entry (its channel
                             count is requested from the device)
   --list-bus-layouts        List the plugin's bus layouts and exit
@@ -180,7 +192,12 @@ const HELP_TAIL: &str = "\
 
 PRECEDENCE (first match wins):
   CLI flag > TRUCE_STANDALONE_* env var > plugin-author Defaults
-   > runtime default (input off, output on, cpal-picked devices)
+   > devices and buffer size last chosen from the Settings menu
+   > runtime default (input off, output on, cpal-picked devices,
+     128-frame buffer)
+
+  A flag or env var applies to its launch only; the Settings menu's
+  choices are what the standalone remembers.
 
   Plugin-author defaults are set in code by calling
   `truce_standalone::run_with::<Plugin>(Defaults { … })` instead
