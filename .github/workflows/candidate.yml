@@ -117,6 +117,7 @@ jobs:
           for bundle in \
             "/Library/Audio/Plug-Ins/VST3/Swanky Amp 2.vst3" \
             "/Library/Audio/Plug-Ins/CLAP/Swanky Amp 2.clap" \
+            "/Library/Audio/Plug-Ins/Components/Swanky Amp 2.component" \
             "/Applications/Swanky Amp 2.app"; do
             test -e "$bundle"
             codesign --verify --strict --verbose=2 "$bundle"

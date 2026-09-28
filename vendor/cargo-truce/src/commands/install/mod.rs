@@ -926,57 +926,7 @@ fn install_au(
         fs_ctx::copy(&dylib, macos_dir.join(&exec_name))?;
     }
 
-    let plist = format!(
-        r#"<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleExecutable</key>
-    <string>{exec_name}</string>
-    <key>CFBundleIdentifier</key>
-    <string>{vendor_id}.{bundle_id}.component</string>
-    <key>CFBundleName</key>
-    <string>{display_name}</string>
-    <key>CFBundlePackageType</key>
-    <string>BNDL</string>
-    <key>CFBundleVersion</key>
-    <string>1</string>
-    <key>AudioComponents</key>
-    <array>
-        <dict>
-            <key>type</key>
-            <string>{au_type}</string>
-            <key>subtype</key>
-            <string>{au_subtype}</string>
-            <key>manufacturer</key>
-            <string>{au_mfr}</string>
-            <key>name</key>
-            <string>{vendor}: {display_name}</string>
-            <key>description</key>
-            <string>{display_name}</string>
-            <key>version</key>
-            <integer>65536</integer>
-            <key>factoryFunction</key>
-            <string>TruceAUFactory</string>
-            <key>sandboxSafe</key>
-            <true/>
-            <key>tags</key>
-            <array>
-                <string>{au_tag}</string>
-            </array>
-        </dict>
-    </array>
-</dict>
-</plist>"#,
-        display_name = p.name,
-        bundle_id = p.bundle_id,
-        vendor_id = config.vendor.id,
-        vendor = config.vendor.name,
-        au_type = p.resolved_au_type(),
-        au_subtype = p.resolved_fourcc(),
-        au_mfr = config.vendor.au_manufacturer,
-        au_tag = p.au_tag,
-    );
+    let plist = crate::commands::package::stage::au2_info_plist(root, p, config)?;
     let plist_tmp = tmp_manifests()
         .join(format!("{}_au.plist", p.bundle_id))
         .to_string_lossy()

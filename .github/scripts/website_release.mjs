@@ -8,7 +8,7 @@ export const DEFAULT_LICENSE_SUMMARY = 'Free and open source under GPLv3 or late
 const ARTIFACTS = {
   'macos-pkg': {
     slug: 'macos-universal', os: 'macOS', architecture: 'Apple silicon and Intel',
-    format: 'CLAP, VST3 and standalone in a signed and notarized .pkg installer',
+    format: 'CLAP, VST3, Audio Unit and standalone in a signed and notarized .pkg installer',
     requirements: 'macOS 11 or later',
   },
   'windows-exe': {

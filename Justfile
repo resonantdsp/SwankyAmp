@@ -29,6 +29,11 @@ export CLAP_VALIDATOR := if os() == "windows" {
 export CPAL_ASIO_DIR := tools / "ASIOSDK"
 bundle_features := if os() == "windows" { "--features asio" } else { "" }
 
+# The Audio Unit is macOS-only, and the formats are named rather than taken
+# from the default features, which would also build Audio Unit version 3;
+# truce.toml says why that is not shipped.
+bundle_formats := if os() == "macos" { "--clap --vst3 --au2" } else { "" }
+
 default: check
 
 # One-time: the pinned build tool, the pinned format validators and, on
@@ -170,7 +175,7 @@ refresh-artwork layers="assets/artwork":
 check: fmt clippy test release-tests reference-check model-check refit-check calibrate-check validate-assets
 
 build:
-    bash scripts/truce.sh build {{ bundle_features }}
+    bash scripts/truce.sh build {{ bundle_formats }} {{ bundle_features }}
 
 build-standalone:
     cargo build --release --no-default-features --features standalone {{ bundle_features }} --bin swanky-amp-2
@@ -180,7 +185,7 @@ run:
     bash scripts/truce.sh run {{ bundle_features }}
 
 validate *flags: build
-    bash scripts/truce.sh install --user --no-build
+    bash scripts/truce.sh install --user --no-build {{ bundle_formats }}
     bash scripts/validate.sh {{ os() }} {{ flags }}
 
 validate-installed *flags:

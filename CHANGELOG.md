@@ -88,6 +88,13 @@ install beside Swanky Amp 1.4.0. Qualification of the signed candidate in real h
   menu, and a guitar played into it reaches the output in the same buffer.
   The information panel of the Windows standalone carries Steinberg's notice:
   ASIO is a trademark and software of Steinberg Media Technologies GmbH.
+- Added an Audio Unit (version 2) for Logic Pro and GarageBand, which the
+  macOS installer puts beside CLAP, VST3 and the standalone app. It tells a
+  sandboxed host such as GarageBand that it checks for releases over the
+  network and opens preset files outside the host, and it finds the user
+  presets in the account's home folder there, as every other format does.
+- Offered mono in, stereo out beside stereo and mono, so a mono guitar track
+  can feed a stereo output, which plays the amplifier on both sides.
 - Added an information panel, opened from the header's information button:
   it names the product and its version, links to the website, the manual and
   support, and closes with Escape, the button again or a press outside.

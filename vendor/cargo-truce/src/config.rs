@@ -173,6 +173,12 @@ pub(crate) struct PluginDef {
     #[serde(default = "default_au_tag")]
     #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     pub(crate) au_tag: String,
+    /// `[plugin.au_resource_usage]`: what the AU v2 component reaches
+    /// outside a sandboxed host. Absent, the component claims to be
+    /// sandbox-safe, as 6.3.0 always did.
+    #[serde(default)]
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    pub(crate) au_resource_usage: Option<AuResourceUsage>,
     /// Per-plugin Windows app icon (`.ico`, path relative to workspace
     /// root). Embedded as `RT_GROUP_ICON` in the standalone `.exe`.
     /// Distinct from `[windows.packaging] installer_icon` (Inno-wizard
@@ -243,6 +249,20 @@ pub(crate) struct PluginDef {
     #[serde(default = "default_true")]
     #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     pub(crate) ios_scale_editor_to_fit: bool,
+}
+
+/// The `resourceUsage` keys of an AU v2 component that Apple documents.
+#[derive(Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+pub(crate) struct AuResourceUsage {
+    /// `network.client`: the component makes outgoing connections.
+    #[serde(default)]
+    pub(crate) network_client: bool,
+    /// `temporary-exception.files.all.read-write`: the component reads and
+    /// writes files outside the host's container.
+    #[serde(default)]
+    pub(crate) files_read_write: bool,
 }
 
 fn default_true() -> bool {
@@ -668,6 +688,7 @@ mod suite_tests {
             },
             au3_subtype: None,
             au_tag: default_au_tag(),
+            au_resource_usage: None,
             windows_icon: None,
             macos_icon: None,
             ios_app_group: None,

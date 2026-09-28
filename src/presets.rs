@@ -462,10 +462,45 @@ pub fn legacy_root() -> Option<PathBuf> {
 
 fn preset_base() -> Option<PathBuf> {
     if cfg!(target_os = "macos") {
-        dirs::home_dir().map(|home| home.join("Library").join("Audio").join("Presets"))
+        home().map(|home| home.join("Library").join("Audio").join("Presets"))
     } else {
         dirs::data_dir()
     }
+}
+
+/// The home folder of the account running the plugin. A sandboxed host such
+/// as GarageBand points HOME at its own container, where the presets the
+/// standalone and the other formats share are not, so on macOS the folder
+/// comes from the account record instead.
+fn home() -> Option<PathBuf> {
+    #[cfg(target_os = "macos")]
+    if let Some(home) = account_home() {
+        return Some(home);
+    }
+    dirs::home_dir()
+}
+
+#[cfg(target_os = "macos")]
+fn account_home() -> Option<PathBuf> {
+    use std::ffi::{CStr, OsStr};
+    use std::os::unix::ffi::OsStrExt;
+    let mut entry: libc::passwd = unsafe { std::mem::zeroed() };
+    let mut found: *mut libc::passwd = std::ptr::null_mut();
+    let mut buffer = vec![0 as libc::c_char; 4096];
+    let status = unsafe {
+        libc::getpwuid_r(
+            libc::getuid(),
+            &mut entry,
+            buffer.as_mut_ptr(),
+            buffer.len(),
+            &mut found,
+        )
+    };
+    if status != 0 || found.is_null() || entry.pw_dir.is_null() {
+        return None;
+    }
+    let directory = unsafe { CStr::from_ptr(entry.pw_dir) };
+    Some(PathBuf::from(OsStr::from_bytes(directory.to_bytes())))
 }
 
 /// Characters no preset name may carry, so a name is always one file on

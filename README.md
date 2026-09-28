@@ -1,6 +1,6 @@
 # Swanky Amp
 
-Swanky Amp is Resonant DSP's free guitar amplifier. Version 2 is a Rust rebuild of the released Free 1.4.0 amplifier model, with its tone stack corrected, an iced editor, a standalone app, and CLAP and VST3 formats. It accepts mono and stereo host layouts and processes stereo channels through independent amplifier paths.
+Swanky Amp is Resonant DSP's free guitar amplifier. Version 2 is a Rust rebuild of the released Free 1.4.0 amplifier model, with its tone stack corrected, an iced editor, a standalone app, and CLAP, VST3 and, on macOS, Audio Unit formats. It accepts mono, stereo and mono-in, stereo-out host layouts, processes stereo channels through independent amplifier paths, and plays a mono input on both sides of a stereo output.
 
 The released JUCE 1.4.0 source is preserved at the `juce-1.4.0` tag. Version 2 deliberately uses a new host and installation identity, `Swanky Amp 2` / `com.resonantdsp.swanky-amp-2`, so it installs beside the released `Swanky Amp` and does not take over old sessions.
 
@@ -22,7 +22,7 @@ just render-model "high gain" /tmp/high-gain.wav
 
 `just model-check` runs the ten-preset comparison by itself. It checks every active triode plus the tone stack, power amp, cabinet, and final output. The fixed acceptance bounds are 0.2% relative waveform RMS, 0.65% relative peak error, and 0.02 dB in each low, mid, and high band. The peak bound covers the measured 0.627% level-11 power-stage difference from a noncontracting C++ build; RMS and band bounds remain unchanged and retain the timing, polarity, state, and voicing checks.
 
-The shipping path applies Auto oversampling to the nonlinear tube stages while the cabinet remains at the host rate. Auto uses 2x at 44.1 and 48 kHz and 1x at 88.2 kHz and above; fixed 1x, 2x, and 4x choices are capped below 193.92 kHz internally. The header button cycles Auto, 1x, 2x and 4x and shows the factor the engine is running once audio has been prepared, such as "Auto 2×"; it is lit whenever the tube stages oversample or Auto is still choosing. The host receives the measured FIR delay: 32 samples at 2x and 48 samples at 4x. CLAP and VST3 changes request the host's deactivate/activate sequence; the standalone stops and rebuilds its output stream on the existing worker. An active CLAP reset clears processing history at the current factor with a bounded, allocation-free equilibrium calculation. Activation applies the pending factor off the audio thread. Choices that resolve to the active factor keep their state without a restart. The plate low-pass stays at 20 kHz as the tube rate changes and reproduces the released coefficients at 44.1 kHz.
+The shipping path applies Auto oversampling to the nonlinear tube stages while the cabinet remains at the host rate. Auto uses 2x at 44.1 and 48 kHz and 1x at 88.2 kHz and above; fixed 1x, 2x, and 4x choices are capped below 193.92 kHz internally. The header button cycles Auto, 1x, 2x and 4x and shows the factor the engine is running once audio has been prepared, such as "Auto 2×"; it is lit whenever the tube stages oversample or Auto is still choosing. The host receives the measured FIR delay: 32 samples at 2x and 48 samples at 4x. CLAP and VST3 changes request the host's deactivate/activate sequence; an Audio Unit host is told the new latency and the factor takes effect at its next reset; the standalone stops and rebuilds its output stream on the existing worker. An active CLAP reset clears processing history at the current factor with a bounded, allocation-free equilibrium calculation. Activation applies the pending factor off the audio thread. Choices that resolve to the active factor keep their state without a restart. The plate low-pass stays at 20 kHz as the tube rate changes and reproduces the released coefficients at 44.1 kHz.
 
 Regenerate the public factor, latency, seam-level, and aliasing measurements with:
 
@@ -320,8 +320,8 @@ just validate
 `setup` builds the repository's source-pinned cargo-truce 6.3.0 inside this
 checkout and downloads checksum-verified builds of pluginval and clap-validator,
 and on Windows the checksum-verified ASIO SDK.
-`validate` builds and installs the CLAP and VST3 bundles and runs both
-validators. GitHub Actions builds the standalone and runs the same bundle
+`validate` builds and installs the CLAP and VST3 bundles, and on macOS the
+Audio Unit, and runs the validators over them, auval among them on macOS. GitHub Actions builds the standalone and runs the same bundle
 validation on macOS and Windows without signing or repository secrets.
 
 ## Releasing
@@ -498,7 +498,9 @@ Three existing framework patches were copied from the corresponding vendored ups
 - `vendor/truce-clap`: host state notification required by clap-validator.
 
 The source-only `vendor/cargo-truce` copy is the published 6.3.0 build tool with
-one Azure `ExcludeCredentials` patch copied from the Pro release chain. Its
+the patches its `UPSTREAM.md` records: the Azure `ExcludeCredentials` patch
+and the Audio Unit Info.plist patch shared with the Pro release chain, and the
+scoped Windows installer name. Its
 unchanged upstream Truce License 1.0, `LICENSE-MIT` and `LICENSE-APACHE` files
 and a precise source and patch record are included in that directory. The Truce
 Framework Rider's Section 2.2 explicitly lists audio plug-ins and suites among
@@ -511,6 +513,7 @@ The dynamic-latency work adds narrow copies from the exact published Truce 6.3.0
 - `vendor/truce-clap`: dynamic-latency restart and active reset handling, extending the existing state-notification copy.
 - `vendor/truce-standalone`: dynamic-latency restart on the output worker, and, as in Pro, an input kept within about one buffer of the output, a Buffer Size menu, remembered devices and buffer size, and the Windows standalone on ASIO.
 - `vendor/truce-core`, `vendor/truce-plugin`, `vendor/truce-loader`, and `vendor/truce`: the narrow real-time reset lifecycle hook and its forwarding bridge.
+- `vendor/truce-au`: a latency change reaches the Audio Unit host's property listeners.
 
 The Windows standalone is built with the ASIO SDK under Resonant DSP's
 Steinberg ASIO licence agreement. The SDK is fetched at build time and never
