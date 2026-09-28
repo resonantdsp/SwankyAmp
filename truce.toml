@@ -12,6 +12,18 @@ fourcc = "SwA2"
 category = "effect"
 vst3_subcategory = "Distortion"
 
+# The editor checks for a newer release over the network and imports and saves
+# presets as files outside a host's container, so the Audio Unit states both to
+# a sandboxed host such as GarageBand instead of claiming to be sandbox-safe.
+[plugin.au_resource_usage]
+network_client = true
+files_read_write = true
+
+# Named rather than read from the default features: those would bring Audio
+# Unit version 3, whose container app takes the standalone app's place.
+[packaging]
+formats = ["clap", "vst3", "au2", "standalone"]
+
 # Distribution packages are notarized and stapled. Local packaging can opt out
 # explicitly with --no-notarize; candidate builds may not.
 [macos.packaging]

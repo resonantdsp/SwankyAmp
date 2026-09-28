@@ -39,6 +39,7 @@ path = "src/bin/calibrate.rs"
 default = ["clap", "vst3", "standalone"]
 clap = ["dep:truce-clap", "dep:clap-sys"]
 vst3 = ["dep:truce-vst3"]
+au = ["dep:truce-au"]
 standalone = ["dep:truce-standalone"]
 # Runs the Windows standalone on ASIO when a driver is installed. Building it
 # needs the ASIO SDK (`just setup` fetches it) and libclang, so only the
@@ -51,6 +52,7 @@ truce = { version = "=6.3.0", default-features = false }
 truce-clap = { version = "=6.3.0", optional = true }
 clap-sys = { version = "0.5", optional = true }
 truce-vst3 = { version = "=6.3.0", optional = true }
+truce-au = { version = "=6.3.0", optional = true }
 truce-standalone = { version = "=6.3.0", features = ["gui"], optional = true }
 truce-iced = "=6.3.0"
 truce-params = "=6.3.0"
@@ -77,12 +79,17 @@ rustls = { version = "0.23", default-features = false, features = [
   "tls12",
 ] }
 
+# The account's home folder, which a sandboxed host hides behind HOME.
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2"
+
 [dev-dependencies]
 truce-test = "=6.3.0"
 
 [patch.crates-io]
 baseview-truce = { path = "vendor/baseview-truce" }
 truce-clap = { path = "vendor/truce-clap" }
+truce-au = { path = "vendor/truce-au" }
 truce-iced = { path = "vendor/truce-iced" }
 truce = { path = "vendor/truce" }
 truce-core = { path = "vendor/truce-core" }

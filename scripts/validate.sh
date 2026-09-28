@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Run the format validators against the installed bundles.
+# Run the format validators against the installed bundles, auval among them on
+# macOS.
 #
 # Usage: scripts/validate.sh <platform> [truce flags...]
 # CLAP_BUNDLE names the bundle for the Windows pass, which packaged candidates
@@ -17,6 +18,14 @@ shift
 
 clap_bundle=${CLAP_BUNDLE:-}
 
+if [ "$platform" = "macos" ]; then
+  # auval asks the component registrar, which can go on serving the list it had
+  # before the install. A restarted registrar rescans, and listing waits for it,
+  # where auval run straight after the restart can still miss the component.
+  killall -9 AudioComponentRegistrar 2>/dev/null || true
+  auval -a >/dev/null 2>&1 || true
+  exec bash scripts/truce.sh validate --clap --pluginval --auval "$@"
+fi
 if [ "$platform" != "windows" ]; then
   exec bash scripts/truce.sh validate --clap --pluginval "$@"
 fi

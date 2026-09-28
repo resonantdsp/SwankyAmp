@@ -509,22 +509,46 @@ pub(crate) fn stage_vst2(
     }
 }
 
-/// Stage an AU v2 bundle (`.component` directory) into the staging
-/// directory. Audio Unit is macOS-only.
+/// The AU v2 component's `Info.plist`, shared by staging and `install`.
+///
+/// The bundle and component versions follow the plugin's version, packed
+/// the way truce-au reports it at runtime, because Logic and `GarageBand`
+/// key their validation cache on the component version and would keep a
+/// stale entry across an update that left it unchanged. A plugin that
+/// declares `[plugin.au_resource_usage]` states what it reaches outside a
+/// host's sandbox instead of claiming to be sandbox-safe, which Apple's
+/// `AudioComponent.h` requires of a component that uses the network or the
+/// file system.
 #[cfg(target_os = "macos")]
-pub(crate) fn stage_au2(root: &Path, p: &PluginDef, config: &Config, staging: &Path) -> Res {
-    let dylib =
-        truce_build::target_dir(root).join(format!("release/lib{}_au.dylib", p.dylib_stem()));
-    if !dylib.exists() {
-        return Err(format!("Missing: {}", dylib.display()).into());
-    }
-    let bundle = staging.join(format!("{}.component", p.file_stem()));
-    let macos_dir = bundle.join("Contents/MacOS");
-    fs::create_dir_all(&macos_dir)?;
-    let exec_name = p.file_stem();
-    fs::copy(&dylib, macos_dir.join(&exec_name))?;
-
-    let plist = format!(
+pub(crate) fn au2_info_plist(
+    root: &Path,
+    p: &PluginDef,
+    config: &Config,
+) -> Result<String, crate::CargoTruceError> {
+    let version = match &p.version {
+        Some(version) => version.clone(),
+        None => crate::util::read_workspace_version(root)?,
+    };
+    let sandbox = match &p.au_resource_usage {
+        None => "            <key>sandboxSafe</key>\n            <true/>\n".to_string(),
+        Some(usage) => {
+            let mut keys = String::new();
+            if usage.network_client {
+                keys.push_str(
+                    "                <key>network.client</key>\n                <true/>\n",
+                );
+            }
+            if usage.files_read_write {
+                keys.push_str(
+                    "                <key>temporary-exception.files.all.read-write</key>\n                <true/>\n",
+                );
+            }
+            format!(
+                "            <key>resourceUsage</key>\n            <dict>\n{keys}            </dict>\n"
+            )
+        }
+    };
+    Ok(format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -537,8 +561,10 @@ pub(crate) fn stage_au2(root: &Path, p: &PluginDef, config: &Config, staging: &P
     <string>{display_name}</string>
     <key>CFBundlePackageType</key>
     <string>BNDL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>{bundle_version}</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>{bundle_version}</string>
     <key>AudioComponents</key>
     <array>
         <dict>
@@ -553,12 +579,10 @@ pub(crate) fn stage_au2(root: &Path, p: &PluginDef, config: &Config, staging: &P
             <key>description</key>
             <string>{display_name}</string>
             <key>version</key>
-            <integer>65536</integer>
+            <integer>{component_version}</integer>
             <key>factoryFunction</key>
             <string>TruceAUFactory</string>
-            <key>sandboxSafe</key>
-            <true/>
-            <key>tags</key>
+{sandbox}            <key>tags</key>
             <array>
                 <string>{au_tag}</string>
             </array>
@@ -574,8 +598,47 @@ pub(crate) fn stage_au2(root: &Path, p: &PluginDef, config: &Config, staging: &P
         au_subtype = xml_escape(p.resolved_fourcc()),
         au_mfr = xml_escape(&config.vendor.au_manufacturer),
         au_tag = xml_escape(&p.au_tag),
-        exec_name = xml_escape(&exec_name),
-    );
+        exec_name = xml_escape(&p.file_stem()),
+        bundle_version = xml_escape(bundle_version(&version)),
+        component_version = au_component_version(&version),
+    ))
+}
+
+/// The release part of a version, without a pre-release or build suffix,
+/// which `CFBundleVersion` does not allow.
+#[cfg(target_os = "macos")]
+fn bundle_version(version: &str) -> &str {
+    version.split(['-', '+']).next().unwrap_or(version)
+}
+
+/// `(major << 16) | (minor << 8) | patch`, parsed exactly as truce-au packs
+/// the version it reports to the host, so the registry and the running
+/// component agree.
+#[cfg(target_os = "macos")]
+fn au_component_version(version: &str) -> u32 {
+    let mut parts = version.split('.').map(|p| p.trim().parse::<u32>().ok());
+    let major = parts.next().flatten().unwrap_or(1);
+    let minor = parts.next().flatten().unwrap_or(0);
+    let patch = parts.next().flatten().unwrap_or(0);
+    ((major & 0xFFFF) << 16) | ((minor & 0xFF) << 8) | (patch & 0xFF)
+}
+
+/// Stage an AU v2 bundle (`.component` directory) into the staging
+/// directory. Audio Unit is macOS-only.
+#[cfg(target_os = "macos")]
+pub(crate) fn stage_au2(root: &Path, p: &PluginDef, config: &Config, staging: &Path) -> Res {
+    let dylib =
+        truce_build::target_dir(root).join(format!("release/lib{}_au.dylib", p.dylib_stem()));
+    if !dylib.exists() {
+        return Err(format!("Missing: {}", dylib.display()).into());
+    }
+    let bundle = staging.join(format!("{}.component", p.file_stem()));
+    let macos_dir = bundle.join("Contents/MacOS");
+    fs::create_dir_all(&macos_dir)?;
+    let exec_name = p.file_stem();
+    fs::copy(&dylib, macos_dir.join(&exec_name))?;
+
+    let plist = au2_info_plist(root, p, config)?;
     fs::write(bundle.join("Contents/Info.plist"), &plist)?;
     // The shim's kAudioUnitProperty_FactoryPresets handler enumerates
     // these from the sealed bundle - emit before codesign.

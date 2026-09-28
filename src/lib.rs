@@ -24,6 +24,18 @@ impl PluginLogic for SwankyAmp {
     type Params = SwankyAmpParams;
     type DspState = engine::Engine;
 
+    /// A guitar usually arrives on a mono track, and a host offers that track a
+    /// stereo output only when the plugin declares mono in, stereo out.
+    fn bus_layouts() -> Vec<BusLayout> {
+        vec![
+            BusLayout::stereo(),
+            BusLayout::new()
+                .with_input("Main", ChannelConfig::Mono)
+                .with_output("Main", ChannelConfig::Stereo),
+            BusLayout::mono(),
+        ]
+    }
+
     fn init(params: &Self::Params, _: &InitContext) -> Self::DspState {
         engine::Engine::new(params)
     }
@@ -328,9 +340,8 @@ mod tests {
     }
 
     #[test]
-    fn mono_and_stereo_layouts_are_advertised() {
-        let layouts = <Plugin as PluginRuntime>::bus_layouts();
-        let widths: Vec<(u32, u32)> = layouts
+    fn a_mono_track_can_take_a_stereo_output_that_plays_on_both_sides() {
+        let widths: Vec<(u32, u32)> = <Plugin as PluginRuntime>::bus_layouts()
             .iter()
             .map(|layout| {
                 (
@@ -339,7 +350,27 @@ mod tests {
                 )
             })
             .collect();
-        assert_eq!(widths, vec![(2, 2), (1, 1)]);
+        for width in [(2, 2), (1, 2), (1, 1)] {
+            assert!(widths.contains(&width), "{width:?} is not offered");
+        }
+
+        let params = SwankyAmpParams::default();
+        let mut engine = engine::Engine::new(&params);
+        engine.reset(&params, 44_100., 256);
+        let input = signal(4_096, 0.);
+        let mut outputs = vec![vec![0.; input.len()]; 2];
+        for start in (0..input.len()).step_by(256) {
+            let end = start + 256;
+            let mut block_refs: Vec<&mut [f32]> = outputs
+                .iter_mut()
+                .map(|channel| &mut channel[start..end])
+                .collect();
+            let inputs = [&input[start..end]];
+            let mut buffer = AudioBuffer::from_slices_checked(&inputs, &mut block_refs, 256);
+            engine.process(&params, &mut buffer);
+        }
+        assert!(outputs[0].iter().any(|sample| sample.abs() > 1e-3));
+        assert_eq!(outputs[0], outputs[1], "both sides play the one input");
     }
 
     #[test]

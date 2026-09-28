@@ -138,10 +138,19 @@ impl Engine {
                 buffer.output(channel)[start..start + length]
                     .copy_from_slice(&self.scratch[channel][..length]);
             }
+            // A mono input on a stereo output plays its one path on both sides.
+            if channels == 1 {
+                for channel in 1..buffer.num_output_channels() {
+                    buffer.output(channel)[start..start + length]
+                        .copy_from_slice(&self.scratch[0][..length]);
+                }
+            }
             start += length;
         }
-        for channel in channels..buffer.num_output_channels() {
-            buffer.output(channel).fill(0.);
+        if channels > 1 {
+            for channel in channels..buffer.num_output_channels() {
+                buffer.output(channel).fill(0.);
+            }
         }
 
         if channels == 1 {

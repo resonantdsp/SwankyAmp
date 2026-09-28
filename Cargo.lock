@@ -2172,7 +2172,7 @@ dependencies = [
  "parking_lot",
  "wasm-bindgen",
  "web-sys",
- "windows 0.61.3",
+ "windows 0.62.2",
 ]
 
 [[package]]
@@ -3582,6 +3582,7 @@ dependencies = [
  "iced_runtime",
  "iced_wgpu",
  "iced_widget",
+ "libc",
  "rfd",
  "roxmltree",
  "rustls",
@@ -3589,6 +3590,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "truce",
+ "truce-au",
  "truce-clap",
  "truce-iced",
  "truce-params",
@@ -3661,7 +3663,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3875,6 +3877,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "truce-au"
+version = "6.3.0"
+dependencies = [
+ "cc",
+ "crossbeam-queue",
+ "truce-core",
+ "truce-params",
+ "truce-shim-types",
+]
+
+[[package]]
 name = "truce-build"
 version = "6.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4058,6 +4071,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "truce-shim-types"
+version = "6.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d24abb900fc0dc4d9f46dd8b88150f68b2570993649e85c1cf12a7db94e06e8e"
+
+[[package]]
 name = "truce-standalone"
 version = "6.3.0"
 dependencies = [
@@ -4136,7 +4155,7 @@ checksum = "f2f6fb2847f6742cd76af783a2a2c49e9375d0a111c7bef6f71cd9e738c72d6e"
 dependencies = [
  "memoffset 0.9.1",
  "tempfile",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
