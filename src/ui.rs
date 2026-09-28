@@ -37,6 +37,7 @@ const KNOB_ROW_HEIGHT: f32 = 84.0;
 pub enum Action {
     Information(bool),
     Browse(&'static str),
+    CopyDiagnostics,
     /// Escape: closes whichever of the panel and the preset menu is open.
     Dismiss,
     Preset(PresetMsg),
@@ -49,6 +50,8 @@ pub struct FreeUi {
     notice: Option<Notice>,
     /// Whether the information panel is over the editor.
     information: bool,
+    /// Whether the diagnostics were copied since the panel opened.
+    diagnostics_copied: bool,
     meters: Option<Arc<MeterState>>,
     meter_levels: [f32; 4],
     meter_revision: u64,
@@ -68,6 +71,7 @@ impl FreeUi {
             releases: None,
             notice: None,
             information: false,
+            diagnostics_copied: false,
             meters: None,
             meter_levels: [0.0; 4],
             meter_revision: 0,
@@ -177,7 +181,10 @@ impl FreeUi {
         ));
         layers.extend(self.presets.menu(PRESET_FIELD, params));
         if self.information {
-            layers.push(information_overlay(self.notice.as_ref()));
+            layers.push(information_overlay(
+                self.notice.as_ref(),
+                self.diagnostics_copied,
+            ));
         }
         stack(layers)
             .width(style::WIDTH)
@@ -247,7 +254,17 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
             Message::Plugin(Action::Preset(message)) => {
                 self.presets.update(message, params, ctx);
             }
-            Message::Plugin(Action::Information(open)) => self.information = open,
+            Message::Plugin(Action::Information(open)) => {
+                self.information = open;
+                self.diagnostics_copied = false;
+            }
+            Message::Plugin(Action::CopyDiagnostics) => {
+                truce_iced::clipboard::write(
+                    iced_core::clipboard::Kind::Standard,
+                    crate::diagnostics::report(params.params()),
+                );
+                self.diagnostics_copied = true;
+            }
             Message::Plugin(Action::Browse(url)) => release_notice::open_in_browser(url),
             Message::Plugin(Action::Dismiss) => {
                 self.information = false;
@@ -510,6 +527,7 @@ const INFORMATION_WIDTH: f32 = 400.0;
 /// and a press anywhere outside closes it.
 fn information_overlay<'a, R: FreeRenderer + 'a>(
     notice: Option<&Notice>,
+    diagnostics_copied: bool,
 ) -> Element<'a, Msg, Theme, R> {
     let line = |id: &str, body: String, size: f32, font, color| {
         let mut spec = Component::new(id, "text", "native");
@@ -540,17 +558,26 @@ fn information_overlay<'a, R: FreeRenderer + 'a>(
                     style::FONT,
                     ACCENT,
                 ),
-                link("Download", notice.url),
+                link("Download", Action::Browse(notice.url)),
             ]
             .spacing(10)
             .align_y(Alignment::Center),
         );
     }
+    let copy = if diagnostics_copied {
+        "Copied"
+    } else {
+        "Copy diagnostics"
+    };
     let links = Row::with_children(
         release_notice::LINKS
             .iter()
-            .map(|(body, url)| link(body, url)),
+            .map(|(body, url)| link(body, Action::Browse(url))),
     )
+    .push(layout::mark(
+        Component::new("information.diagnostics", "button", "native"),
+        link(copy, Action::CopyDiagnostics),
+    ))
     .spacing(18);
     content = content
         .push(rule::horizontal(1).style(|_| rule::Style {
@@ -615,7 +642,7 @@ fn asio_notice() -> Option<&'static str> {
 /// the pointer.
 fn link<'a, R: FreeRenderer + 'a>(
     body: &'static str,
-    url: &'static str,
+    action: Action,
 ) -> Element<'a, Msg, Theme, R> {
     button(text(body).size(14).font(style::FONT))
         .padding([4, 0])
@@ -627,7 +654,7 @@ fn link<'a, R: FreeRenderer + 'a>(
             },
             ..Default::default()
         })
-        .on_press(Message::Plugin(Action::Browse(url)))
+        .on_press(Message::Plugin(action))
         .into()
 }
 

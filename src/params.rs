@@ -75,6 +75,10 @@ pub struct SwankyAmpParams {
     /// instance's editor. Session state, never host state.
     #[skip]
     pub meter_state: std::sync::Arc<crate::meters::MeterState>,
+    /// The rate and buffer the host is running, for a support report.
+    /// Session state, never host state.
+    #[skip]
+    pub audio: std::sync::Arc<crate::diagnostics::Audio>,
     /// The selected preset's key, so a restored session names its preset
     /// again.
     #[persist]
