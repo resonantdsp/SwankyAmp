@@ -73,6 +73,7 @@ jobs:
       - run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
       - run: just setup
       - run: just validate-assets
+      - run: just notices
       - name: Load signing identities and notarization profile
         env:
           APPLE_CERTIFICATES_P12: ${{ secrets.APPLE_CERTIFICATES_P12 }}
@@ -101,6 +102,8 @@ jobs:
             --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID" --keychain "$KEYCHAIN"
           rm -f "$key"
       - run: just package --system
+        env:
+          THIRD_PARTY_NOTICES: ${{ github.workspace }}/THIRD-PARTY-NOTICES.txt
       - name: Install and validate the package contents
         run: |
           pkg=$(find target/dist -maxdepth 1 -name '*.pkg' -print -quit)
@@ -172,6 +175,8 @@ jobs:
         shell: bash
       - run: just validate-assets
         shell: bash
+      - run: just notices
+        shell: bash
       - name: Require configured Free signing identity
         shell: bash
         run: |
@@ -202,6 +207,8 @@ jobs:
         run: az account get-access-token --scope https://codesigning.azure.net/.default --output none
       - run: just package --host-only --system
         shell: bash
+        env:
+          THIRD_PARTY_NOTICES: ${{ github.workspace }}/THIRD-PARTY-NOTICES.txt
       - name: Install and validate the installer contents
         shell: pwsh
         run: |
@@ -265,7 +272,10 @@ jobs:
           shared-key: bundles-ubuntu-22.04
       - run: just setup
       - run: just validate-assets
+      - run: just notices
       - run: just package --formats clap,vst3,standalone
+        env:
+          THIRD_PARTY_NOTICES: ${{ github.workspace }}/THIRD-PARTY-NOTICES.txt
       - name: Install and validate the bundle contents
         run: |
           archive=$(find target/dist -maxdepth 1 -name '*.tar.gz' -print -quit)

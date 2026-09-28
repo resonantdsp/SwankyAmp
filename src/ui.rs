@@ -38,6 +38,7 @@ pub enum Action {
     Information(bool),
     Browse(&'static str),
     CopyDiagnostics,
+    Notices,
     /// Escape: closes whichever of the panel and the preset menu is open.
     Dismiss,
     Preset(PresetMsg),
@@ -266,6 +267,7 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
                 self.diagnostics_copied = true;
             }
             Message::Plugin(Action::Browse(url)) => release_notice::open_in_browser(url),
+            Message::Plugin(Action::Notices) => release_notice::show_notices(),
             Message::Plugin(Action::Dismiss) => {
                 self.information = false;
                 self.presets.update(PresetMsg::Close, params, ctx);
@@ -586,7 +588,11 @@ fn information_overlay<'a, R: FreeRenderer + 'a>(
             fill_mode: rule::FillMode::Full,
             snap: false,
         }))
-        .push(links);
+        .push(links)
+        .push(layout::mark(
+            Component::new("information.notices", "button", "native"),
+            link("Third-party licences", Action::Notices),
+        ));
     if let Some(notice) = asio_notice() {
         content = content.push(line(
             "information.asio",
@@ -646,16 +652,20 @@ fn link<'a, R: FreeRenderer + 'a>(
 ) -> Element<'a, Msg, Theme, R> {
     button(text(body).size(14).font(style::FONT))
         .padding([4, 0])
-        .style(|_, status| button::Style {
-            text_color: if matches!(status, button::Status::Hovered | button::Status::Pressed) {
-                ACCENT
-            } else {
-                style::MUTED
-            },
-            ..Default::default()
-        })
+        .style(link_style)
         .on_press(Message::Plugin(action))
         .into()
+}
+
+fn link_style(_: &Theme, status: button::Status) -> button::Style {
+    button::Style {
+        text_color: if matches!(status, button::Status::Hovered | button::Status::Pressed) {
+            ACCENT
+        } else {
+            style::MUTED
+        },
+        ..Default::default()
+    }
 }
 
 fn default_normalized(params: &ParamCache<SwankyAmpParams>, id: u32) -> f32 {
