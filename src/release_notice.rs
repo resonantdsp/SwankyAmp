@@ -50,6 +50,21 @@ pub fn open_in_browser(url: &str) {
     let _ = std::process::Command::new(launcher).arg(url).spawn();
 }
 
+/// The fonts and crates this build ships, with their licences; `just notices`
+/// writes it from the dependency tree and a candidate build embeds it; see
+/// `build.rs`.
+pub const THIRD_PARTY_NOTICES: &str = include_str!(concat!(env!("OUT_DIR"), "/notices.txt"));
+
+/// Shows the third-party notices in the platform's text viewer. They are
+/// embedded rather than installed beside the plug-in, so every format carries
+/// the notices for exactly the code it runs. Failure is ignored, as for links.
+pub fn show_notices() {
+    let path = std::env::temp_dir().join("Swanky Amp third-party licences.txt");
+    if std::fs::write(&path, THIRD_PARTY_NOTICES).is_ok() {
+        open_in_browser(&path.to_string_lossy());
+    }
+}
+
 /// A process-shared view of the release notice. Each editor opening schedules
 /// a refresh if another worker is not already running; reading the latest
 /// result never performs I/O.

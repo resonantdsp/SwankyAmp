@@ -99,7 +99,9 @@ install beside Swanky Amp 1.4.0. Qualification of the signed candidate in real h
   it names the product and its version, links to the website, the manual and
   support, and closes with Escape, the button again or a press outside. Its
   Copy diagnostics link copies the version, system, host and format, sample
-  rate and buffer for a support request.
+  rate and buffer for a support request, and its Third-party licences link
+  opens the licences of the fonts and open-source code the product is built
+  from, generated from its dependencies.
 - Added a bounded, cached release notice: the information button turns into a
   highlighted download arrow when a newer stable release is published, and the
   panel announces it with a link to the fixed catalogue page. The website's

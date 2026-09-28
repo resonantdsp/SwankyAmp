@@ -494,6 +494,16 @@ The editable artwork in `assets/artwork` is licensed under CC BY 4.0; see its
 `ARTWORK-LICENSE.txt`. The editor typography uses PT Sans under the SIL Open
 Font License in `assets/fonts/PTSans-OFL.txt`.
 
+The information panel's Third-party licences link opens the third-party
+notices the plug-in embeds: the font's licence and every crate the shipped
+formats link, grouped by licence. `just notices` writes them
+to `THIRD-PARTY-NOTICES.txt` with a pinned cargo-about from `about.toml` and
+`about.hbs`. The candidate workflow runs it before packaging and names the file
+in `THIRD_PARTY_NOTICES`, which `build.rs` embeds; a build without that
+variable embeds a one-line placeholder, so local builds and checks never
+generate the notices. Every licence `about.toml` accepts is compatible with
+GPLv3.
+
 This repository contains no Pro parameter grids, cabinet impulse responses, pedals, gate, reverb, licensing logic, Blender sources, artwork production sources, or shared private DSP dependency.
 
 Three existing framework patches were copied from the corresponding vendored upstream sources in the Swanky Amp Pro checkout because the plugin exercises their public behavior:
