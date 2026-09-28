@@ -4,6 +4,7 @@ use truce::prelude::*;
 truce::enable_rt_paranoid!();
 
 pub mod artwork;
+pub mod diagnostics;
 pub mod dsp;
 pub mod engine;
 pub mod layout;

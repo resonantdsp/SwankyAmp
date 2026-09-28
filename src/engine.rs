@@ -98,6 +98,7 @@ impl Engine {
     }
 
     pub fn process(&mut self, params: &SwankyAmpParams, buffer: &mut AudioBuffer) {
+        params.audio.record(self.sample_rate, buffer.num_samples());
         let controls = params.snapshot();
         if controls != self.controls {
             for path in &mut self.paths {

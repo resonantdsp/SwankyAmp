@@ -3598,6 +3598,7 @@ dependencies = [
  "truce-test",
  "truce-vst3",
  "ureq",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

@@ -466,6 +466,11 @@ to the fixed tagged catalogue URL
 opened in the default browser only on an explicit press; the downloaded
 document cannot choose a link.
 
+Copy diagnostics, beside the links, puts a short block on the clipboard for a
+support request: product and version, operating system and architecture, the
+host application and plug-in format, the sample rate and buffer audio last ran
+at, and the licence. Nothing is sent anywhere; the player pastes it.
+
 The check has a three-second total timeout, follows no redirects and retains its
 last valid answer and last attempt time in the process. It also stores them
 under the operating system's cache directory in
