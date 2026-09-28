@@ -6,8 +6,10 @@
 //! - **Mic Input** (checkable, `Ctrl+I` shown as the accelerator hint;
 //!   effect plugins only)
 //! - **Audio Output** (checkable mute toggle, `Ctrl+O`)
+//! - **Audio Driver** submenu - ASIO or Windows (WASAPI), ASIO greyed
+//!   when no ASIO driver is installed
 //! - **Input Device** submenu - repopulated from cpal on each open
-//!   (effect plugins only)
+//!   (effect plugins only); on ASIO the installed ASIO drivers
 //! - **Output Device** submenu - same for outputs
 //! - **Buffer Size** submenu - the sizes in [`BUFFER_SIZES`], checked on
 //!   the size the device accepted
@@ -61,9 +63,10 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 };
 
 use crate::audio::{self, ChannelRoute, InputController, OutputController};
+use crate::driver;
 use crate::midi::{self, MIDI_MENU_MAX_PORTS, MidiChannel, MidiController};
 use crate::presets::PresetController;
-use crate::settings::BUFFER_SIZES;
+use crate::settings::{AudioDriver, BUFFER_SIZES};
 use crate::vlog;
 
 /// Command ID for the mic-input toggle.
@@ -72,6 +75,9 @@ const MENU_CMD_MIC: u16 = 0xC001;
 const MENU_CMD_OUTPUT: u16 = 0xC002;
 /// Command ID for the computer-keyboard-to-MIDI toggle.
 const MENU_CMD_KEYBOARD: u16 = 0xC003;
+/// Audio Driver items.
+const MENU_CMD_DRIVER_ASIO: u16 = 0xC004;
+const MENU_CMD_DRIVER_WASAPI: u16 = 0xC005;
 
 /// Reserved command-ID ranges for dynamically-built device items.
 /// 256 slots per side is more than any sane system would expose.
@@ -144,6 +150,8 @@ struct MenuState {
     /// only). Gates `WM_COMMAND` dispatch and skips the
     /// checkmark refresh on `WM_INITMENUPOPUP` for instruments.
     has_mic_item: bool,
+    /// Audio Driver submenu, repopulated with the active driver checked.
+    hmenu_driver: HMENU,
     /// `null` for instrument plugins (input device picker not built).
     hmenu_input_devices: HMENU,
     hmenu_output_devices: HMENU,
@@ -263,6 +271,14 @@ pub fn install(
             0,
             std::ptr::null(),
         );
+
+        // Audio Driver submenu. Empty at install; repopulated with the
+        // active driver checked on WM_INITMENUPOPUP.
+        let driver_menu = CreatePopupMenu();
+        if !driver_menu.is_null() {
+            let label = wide("Audio Driver");
+            AppendMenuW(plugin_menu, MF_POPUP, driver_menu as usize, label.as_ptr());
+        }
 
         // Input Device submenu - empty at install; repopulated on
         // WM_INITMENUPOPUP so hot-plug just works. Effects only.
@@ -405,6 +421,7 @@ pub fn install(
             keyboard: qwerty,
             hmenu_plugin: plugin_menu,
             has_mic_item: is_effect,
+            hmenu_driver: driver_menu,
             hmenu_input_devices: input_dev_menu,
             hmenu_output_devices: output_dev_menu,
             hmenu_buffer_size: buffer_size_menu,
@@ -621,6 +638,17 @@ unsafe extern "system" fn subclass_proc(
                     return 0;
                 }
 
+                if cmd_id == MENU_CMD_DRIVER_ASIO || cmd_id == MENU_CMD_DRIVER_WASAPI {
+                    let target = if cmd_id == MENU_CMD_DRIVER_ASIO {
+                        AudioDriver::Asio
+                    } else {
+                        AudioDriver::Wasapi
+                    };
+                    vlog!("audio driver: {} (request, via menu)", target.name());
+                    state.output.set_driver(target);
+                    return 0;
+                }
+
                 // Preset Load item: dispatch by the clicked item's
                 // label (re-enumeration may have shifted indices).
                 if (MENU_CMD_PRESET_LOAD_BASE..=MENU_CMD_PRESET_LOAD_END).contains(&cmd_id) {
@@ -748,9 +776,17 @@ unsafe extern "system" fn subclass_proc(
                 let state = &*state_ptr;
                 let popup = wparam as HMENU;
 
-                if !state.hmenu_input_devices.is_null() && popup == state.hmenu_input_devices {
+                if !state.hmenu_driver.is_null() && popup == state.hmenu_driver {
+                    repopulate_driver_menu(popup);
+                } else if !state.hmenu_input_devices.is_null() && popup == state.hmenu_input_devices
+                {
                     let (_, names) = audio::list_input_devices();
-                    let current = state.input.current_name();
+                    // An ASIO interface is one device for input and output.
+                    let current = if driver::active() == AudioDriver::Asio {
+                        state.output.current_name()
+                    } else {
+                        state.input.current_name()
+                    };
                     repopulate_device_menu(
                         popup,
                         &names,
@@ -912,6 +948,44 @@ unsafe fn repopulate_device_menu(
             }
             AppendMenuW(popup, flags, cmd_id as usize, text.as_ptr());
         }
+    }
+}
+
+/// Rebuild the Audio Driver popup with the active driver checked. ASIO is
+/// greyed out when no ASIO driver is installed.
+unsafe fn repopulate_driver_menu(popup: HMENU) {
+    unsafe {
+        let count = GetMenuItemCount(popup);
+        for _ in 0..count {
+            DeleteMenu(popup, 0, MF_BYPOSITION);
+        }
+        let active = driver::active();
+        let check = |driver: AudioDriver| {
+            if active == driver {
+                MF_CHECKED
+            } else {
+                MF_UNCHECKED
+            }
+        };
+        let (asio_label, asio_state) = if driver::asio_installed() {
+            ("ASIO", MF_ENABLED)
+        } else {
+            ("ASIO (no driver installed)", MF_GRAYED)
+        };
+        let asio = wide(asio_label);
+        AppendMenuW(
+            popup,
+            MF_STRING | asio_state | check(AudioDriver::Asio),
+            MENU_CMD_DRIVER_ASIO as usize,
+            asio.as_ptr(),
+        );
+        let wasapi = wide("Windows (WASAPI)");
+        AppendMenuW(
+            popup,
+            MF_STRING | check(AudioDriver::Wasapi),
+            MENU_CMD_DRIVER_WASAPI as usize,
+            wasapi.as_ptr(),
+        );
     }
 }
 

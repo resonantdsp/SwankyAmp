@@ -84,6 +84,13 @@ jobs:
         with:
           cache-on-failure: true
           shared-key: bundles-${{ matrix.os }}
+      # The ASIO SDK the Windows standalone builds with, which `just setup`
+      # downloads on a miss. Restored unchanged, it leaves asio-sys built.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: needs.changes.outputs.code == 'true' && runner.os == 'Windows'
+        with:
+          path: tools/ASIOSDK
+          key: asio-sdk-${{ hashFiles('scripts/install-asio-sdk.sh') }}
       - run: just setup
         if: needs.changes.outputs.code == 'true'
         shell: bash

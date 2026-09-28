@@ -24,11 +24,19 @@ export CLAP_VALIDATOR := if os() == "windows" {
     tools / "clap-validator"
 }
 
+# The Windows standalone runs on ASIO when a driver is installed. Its builds
+# there compile the ASIO SDK that `setup` fetches, and need libclang.
+export CPAL_ASIO_DIR := tools / "ASIOSDK"
+bundle_features := if os() == "windows" { "--features asio" } else { "" }
+
 default: check
 
+# One-time: the pinned build tool, the pinned format validators and, on
+# Windows, the ASIO SDK.
 setup:
     bash scripts/install-truce.sh
     bash scripts/install-validators.sh
+    bash scripts/install-asio-sdk.sh
 
 fmt:
     cargo fmt --all --check
@@ -162,14 +170,14 @@ refresh-artwork layers="assets/artwork":
 check: fmt clippy test release-tests reference-check model-check refit-check calibrate-check validate-assets
 
 build:
-    bash scripts/truce.sh build
+    bash scripts/truce.sh build {{ bundle_features }}
 
 build-standalone:
-    cargo build --release --no-default-features --features standalone --bin swanky-amp-2
+    cargo build --release --no-default-features --features standalone {{ bundle_features }} --bin swanky-amp-2
 
 # Open the standalone shell for local interface and audio checks.
 run:
-    bash scripts/truce.sh run
+    bash scripts/truce.sh run {{ bundle_features }}
 
 validate *flags: build
     bash scripts/truce.sh install --user --no-build
@@ -179,7 +187,7 @@ validate-installed *flags:
     bash scripts/validate.sh {{ os() }} {{ flags }}
 
 package *flags:
-    bash scripts/truce.sh package {{ flags }}
+    bash scripts/truce.sh package {{ bundle_features }} {{ flags }}
 
 version version:
     bash .github/scripts/version.sh "{{ version }}"

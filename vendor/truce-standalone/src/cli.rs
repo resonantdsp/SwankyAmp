@@ -7,12 +7,16 @@
 //! 3. Plugin-author defaults supplied via
 //!    [`crate::run_with`] / [`crate::Defaults`] (only `input_enabled`
 //!    and `output_enabled` participate at this tier)
-//! 4. The devices and buffer size last chosen from the Settings menu on
-//!    this machine (see [`crate::settings`]; not for offline renders)
+//! 4. The driver, devices and buffer size last chosen from the Settings
+//!    menu on this machine (see [`crate::settings`]; not for offline
+//!    renders)
 //! 5. Compiled runtime default (input off, output on, cpal-picked
-//!    devices, a 128-frame buffer)
+//!    devices, a 128-frame buffer, and on Windows ASIO when a driver for
+//!    it is installed)
 
 use std::path::PathBuf;
+
+use crate::settings::AudioDriver;
 
 /// Resolved CLI + env + project-baked + runtime defaults.
 // Sparse independent CLI flags - bitflags would just add ceremony.
@@ -34,6 +38,9 @@ pub struct Options {
     pub output_channels: Option<String>,
     /// Input channel routing spec; same grammar as `output_channels`.
     pub input_channels: Option<String>,
+    /// Audio driver for this launch on Windows; overrides the saved choice
+    /// and is not saved.
+    pub driver: Option<AudioDriver>,
     /// Whether the mic input is enabled at launch. `None` →
     /// privacy default (off). Set explicitly via `--input-enabled
     /// on|off`, the env var, or `[plugin.standalone].input_enabled`
@@ -134,6 +141,11 @@ OPTIONS:
                             (mono), or a pair like `3-4` (stereo).
   --input-channels <spec>   Route input from specific device channels;
                             same grammar as --output-channels.
+  --driver <asio|wasapi>    Windows audio driver. Overrides the Settings
+                            menu's choice for this launch (default: that
+                            choice, else ASIO when a driver is installed).
+                            With ASIO, --input and --output name the
+                            interface.
   --input-enabled <on|off>  Enable mic input at launch (default: off).
                             Press `I` in the window to toggle live.
   --output-enabled <on|off> Enable speaker output at launch (default: on).
@@ -192,9 +204,9 @@ const HELP_TAIL: &str = "\
 
 PRECEDENCE (first match wins):
   CLI flag > TRUCE_STANDALONE_* env var > plugin-author Defaults
-   > devices and buffer size last chosen from the Settings menu
+   > driver, devices and buffer size last chosen from the Settings menu
    > runtime default (input off, output on, cpal-picked devices,
-     128-frame buffer)
+     128-frame buffer, ASIO on Windows when a driver is installed)
 
   A flag or env var applies to its launch only; the Settings menu's
   choices are what the standalone remembers.
@@ -224,6 +236,7 @@ fn print_help() {
 /// Returns `Err(String)` if a value-bearing flag is missing its
 /// argument, fails the type-coercion (`f64`, `usize`, etc.), or an
 /// unrecognized positional / leftover token slips through.
+#[allow(clippy::too_many_lines)]
 pub fn parse() -> Result<Options, String> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     let mut args = pico_args::Arguments::from_vec(args);
@@ -257,6 +270,11 @@ pub fn parse() -> Result<Options, String> {
     let input_channels = args
         .opt_value_from_str::<_, String>("--input-channels")
         .map_err(|e| format!("--input-channels: {e}"))?;
+    let driver = args
+        .opt_value_from_str::<_, String>("--driver")
+        .map_err(|e| format!("--driver: {e}"))?
+        .map(|s| parse_driver(&s, "--driver"))
+        .transpose()?;
     let input_enabled = args
         .opt_value_from_str::<_, String>("--input-enabled")
         .map_err(|e| format!("--input-enabled: {e}"))?
@@ -328,6 +346,9 @@ pub fn parse() -> Result<Options, String> {
         input_device: input_device.or_else(|| env("INPUT")),
         output_channels: output_channels.or_else(|| env("OUTPUT_CHANNELS")),
         input_channels: input_channels.or_else(|| env("INPUT_CHANNELS")),
+        driver: driver.or_else(|| {
+            env("DRIVER").and_then(|s| parse_driver(&s, "TRUCE_STANDALONE_DRIVER").ok())
+        }),
         input_enabled: input_enabled.or_else(|| {
             env("INPUT_ENABLED")
                 .and_then(|s| parse_on_off(&s, "TRUCE_STANDALONE_INPUT_ENABLED").ok())
@@ -383,6 +404,12 @@ fn parse_on_off(s: &str, source: &str) -> Result<bool, String> {
         "off" | "false" | "0" | "no" => Ok(false),
         other => Err(format!("{source}: expected `on` or `off` (got `{other}`)")),
     }
+}
+
+/// Parse a driver name; `source` names the flag or variable it came from.
+fn parse_driver(s: &str, source: &str) -> Result<AudioDriver, String> {
+    AudioDriver::parse(s)
+        .ok_or_else(|| format!("{source}: expected `asio` or `wasapi` (got `{}`)", s.trim()))
 }
 
 fn env(name: &str) -> Option<String> {

@@ -31,6 +31,8 @@
 
 pub mod audio;
 pub mod cli;
+pub mod driver;
+mod format;
 pub mod keyboard;
 pub mod midi;
 #[cfg(feature = "playback")]

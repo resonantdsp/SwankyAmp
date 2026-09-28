@@ -40,6 +40,10 @@ default = ["clap", "vst3", "standalone"]
 clap = ["dep:truce-clap", "dep:clap-sys"]
 vst3 = ["dep:truce-vst3"]
 standalone = ["dep:truce-standalone"]
+# Runs the Windows standalone on ASIO when a driver is installed. Building it
+# needs the ASIO SDK (`just setup` fetches it) and libclang, so only the
+# Windows recipes enable it.
+asio = ["truce-standalone?/asio"]
 rt-paranoid = ["truce/rt-paranoid"]
 
 [dependencies]

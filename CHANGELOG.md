@@ -79,6 +79,15 @@ install beside Swanky Amp 1.4.0. Qualification of the signed candidate in real h
   them for one launch. Choosing an audio interface as the input takes the
   output to it as well, unless an output has been chosen. On Windows, devices
   are listed by their full names, such as "Speakers (UMC202HD 192k)".
+- The Windows standalone app plays through an audio interface's own ASIO
+  driver when one is installed, instead of the Windows shared audio path,
+  which adds about 10 ms in each direction. The Settings menu gains an Audio
+  Driver choice between ASIO and Windows (WASAPI), which the app remembers;
+  `--driver asio` or `--driver wasapi` overrides it for one launch. On ASIO the
+  interface is one device for input and output, chosen from either device
+  menu, and a guitar played into it reaches the output in the same buffer.
+  The information panel of the Windows standalone carries Steinberg's notice:
+  ASIO is a trademark and software of Steinberg Media Technologies GmbH.
 - Added an information panel, opened from the header's information button:
   it names the product and its version, links to the website, the manual and
   support, and closes with Escape, the button again or a press outside.
