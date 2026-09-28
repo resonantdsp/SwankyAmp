@@ -6,6 +6,33 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# `verify` runs after packaging: a build that never received the notices embeds
+# a placeholder without failing, so every plug-in and app binary staged for the
+# installers must carry the generated text. Small binaries are loader shims
+# that hold no product code.
+if [ "${1:-}" = "verify" ]; then
+  marker="the third-party fonts and software listed below"
+  found=0
+  while IFS= read -r -d '' file; do
+    [ "$(wc -c < "$file")" -gt 1000000 ] || continue
+    case "$(head -c 4 "$file" | od -An -tx1 | tr -d ' \n')" in
+    cffaedfe | cafebabe | 7f454c46 | 4d5a*) ;;
+    *) continue ;;
+    esac
+    if ! LC_ALL=C grep -q -a -F "$marker" "$file"; then
+      echo "$file carries no third-party notices." >&2
+      exit 1
+    fi
+    found=$((found + 1))
+  done < <(find target/package -type f -print0)
+  if [ "$found" -eq 0 ]; then
+    echo "No packaged binaries under target/package to check." >&2
+    exit 1
+  fi
+  echo "$found packaged binaries carry the third-party notices."
+  exit 0
+fi
+
 # Pinned by release and checksum so the notices do not change with the tool.
 CARGO_ABOUT_VERSION=0.9.2
 case "$(uname -s)-$(uname -m)" in
@@ -65,7 +92,7 @@ HEADER
     cat "$font"
     echo
   done
-  "$tool" generate --features asio about.hbs 2>/dev/null
+  "$tool" generate --features asio,au about.hbs 2>/dev/null
   echo "--------------------------------------------------------------------------------"
   echo "The Truce License 1.0"
   echo
