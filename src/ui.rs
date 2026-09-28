@@ -594,13 +594,20 @@ fn information_overlay<'a, R: FreeRenderer + 'a>(
             link("Third-party licences", Action::Notices),
         ));
     if let Some(notice) = asio_notice() {
-        content = content.push(line(
-            "information.asio",
-            notice.to_owned(),
-            11.0,
-            style::FONT,
-            DIM,
-        ));
+        content = content.push(
+            row![
+                crate::asio_logo::AsioLogo { height: 32.0 },
+                line(
+                    "information.asio",
+                    notice.to_owned(),
+                    11.0,
+                    style::FONT,
+                    DIM,
+                )
+            ]
+            .spacing(12)
+            .align_y(Alignment::Center),
+        );
     }
     let panel = layout::mark(
         Component::new("information", "dialog", "native"),
@@ -633,13 +640,14 @@ fn information_overlay<'a, R: FreeRenderer + 'a>(
     )
 }
 
-/// Steinberg's ASIO licence asks for this line in the About panel of a
-/// product that hosts ASIO drivers. Only the Windows standalone built with
-/// ASIO does; the plug-ins play through whatever driver their host has open.
+/// Steinberg's ASIO usage guidelines ask for the ASIO Compatible logo with
+/// this attribution, in their wording, in the About panel of a product that
+/// runs on ASIO by default. Only the Windows standalone built with ASIO does;
+/// the plug-ins play through whatever driver their host has open.
 fn asio_notice() -> Option<&'static str> {
     #[cfg(feature = "standalone")]
     if truce_standalone::driver::asio_built() {
-        return Some("ASIO is a trademark and software of Steinberg Media Technologies GmbH.");
+        return Some("ASIO is a registered trademark of Steinberg Media Technologies GmbH.");
     }
     None
 }

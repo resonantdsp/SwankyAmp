@@ -53,7 +53,7 @@ on a device that cannot run the current rate prepares the plugin again at the
 device's rate. The fork depends on cpal 0.18, whose ASIO backend fixes duplex
 streams and driver reloading, and so on midir 0.11, which shares its ALSA
 bindings; neither adds a crate to the macOS or Windows builds. ASIO is a
-trademark and software of Steinberg Media Technologies GmbH.
+registered trademark of Steinberg Media Technologies GmbH.
 
 A latency restart reaches the output worker the way a driver's reset request
 does, through the worker's bounded command queue by a weak handle, so the
