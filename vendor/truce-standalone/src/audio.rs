@@ -18,13 +18,17 @@
 //!   belongs to an interface with outputs moves the output there too,
 //!   unless an output was chosen, so both streams run on one clock.
 //! - **Buffer size**, which reopens both streams at the new size.
+//! - **Driver** on Windows, ASIO or WASAPI (see [`crate::driver`]). An
+//!   ASIO interface is one device for input and output, so on ASIO the
+//!   output worker opens the input stream with the output and the input
+//!   worker only lets it through or not.
 //!
-//! Device and buffer choices made here are remembered on this machine
-//! (see [`crate::settings`]).
+//! Device, buffer and driver choices made here are remembered on this
+//! machine (see [`crate::settings`]).
 
 use crossbeam_queue::ArrayQueue;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, mpsc};
+use std::sync::{Arc, Mutex, Weak, mpsc};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
@@ -38,7 +42,9 @@ use truce_core::info::PluginCategory;
 use truce_params::{ParamInfo, Params};
 
 use crate::cli::Options;
-use crate::settings::{self, SettingsStore};
+use crate::driver;
+use crate::format::{build_input, build_output};
+use crate::settings::{self, AudioDriver, SettingsStore};
 use crate::transport::Transport;
 use crate::vlog;
 
@@ -369,7 +375,7 @@ pub struct InputController {
     channel_route: Arc<AtomicUsize>,
     /// Asks the output worker to follow a picked input onto its
     /// interface's outputs.
-    output_cmd: mpsc::SyncSender<OutputCmd>,
+    output_cmd: Arc<mpsc::SyncSender<OutputCmd>>,
     /// Whether an output device was chosen (by flag, saved choice or the
     /// menu), which stops the output following the input.
     output_chosen: Arc<AtomicBool>,
@@ -380,6 +386,8 @@ enum InputCmd {
     SetDevice(Option<String>),
     /// Reopen an open stream at the current buffer size.
     Reopen,
+    /// The output moved to another driver; follow it.
+    DriverChanged,
 }
 
 impl InputController {
@@ -402,8 +410,13 @@ impl InputController {
     /// disabled, the change takes effect on the next enable. The choice
     /// is remembered for the next launch. When no output device has been
     /// chosen and the input belongs to an interface with outputs, the
-    /// output moves to that interface.
+    /// output moves to that interface. On ASIO this chooses the
+    /// interface, for output as well.
     pub fn set_device(&self, name: Option<String>) {
+        if driver::on_asio() {
+            let _ = self.output_cmd.send(OutputCmd::SetDevice(name));
+            return;
+        }
         if let Some(input) = &name
             && !self.output_chosen.load(Ordering::Relaxed)
         {
@@ -445,7 +458,10 @@ pub struct OutputController {
     /// zero-fill the output buffer (mute). Worker thread (and direct
     /// callers via `set_enabled`) update it.
     pub enabled: Arc<AtomicBool>,
-    cmd_tx: mpsc::SyncSender<OutputCmd>,
+    /// The worker's commands. Only the controllers hold it, so the worker
+    /// exits once they are all dropped. Bounded, so the audio callback can
+    /// queue a latency restart without allocating.
+    cmd_tx: Arc<mpsc::SyncSender<OutputCmd>>,
     current_name: Arc<Mutex<Option<String>>>,
     /// How the plugin's output bus maps onto device output channels,
     /// encoded per [`ChannelRoute`]. Read by the output callback when
@@ -465,8 +481,10 @@ pub struct OutputController {
 
 enum OutputCmd {
     /// A device the user chose; remembered, and it ends following the
-    /// input.
+    /// input. On ASIO, the interface.
     SetDevice(Option<String>),
+    /// Move both streams to this driver, and remember it.
+    SetDriver(AudioDriver),
     /// Move to the outputs of the interface this input belongs to, if it
     /// has any and no output has been chosen since the request was sent.
     FollowInput(String),
@@ -484,17 +502,22 @@ enum OutputCmd {
     /// plugin output onto it), so an asymmetric layout or a width the device
     /// can't open natively still works.
     SetLayout { index: usize },
+    /// The driver asked to be reset, which it does when its own settings
+    /// change, such as a buffer size set in its control panel.
+    Reset,
 }
 
 fn queue_latency_restart(
     requested_latency: u32,
     active_latency: &AtomicU32,
     restart_pending: &AtomicBool,
-    restart_tx: &mpsc::SyncSender<OutputCmd>,
+    commands: &Weak<mpsc::SyncSender<OutputCmd>>,
 ) {
     if requested_latency != active_latency.load(Ordering::Acquire)
         && !restart_pending.swap(true, Ordering::AcqRel)
-        && restart_tx.try_send(OutputCmd::RestartLatency).is_err()
+        && commands
+            .upgrade()
+            .is_none_or(|commands| commands.try_send(OutputCmd::RestartLatency).is_err())
     {
         restart_pending.store(false, Ordering::Release);
     }
@@ -555,6 +578,14 @@ impl OutputController {
     #[must_use]
     pub fn buffer_size(&self) -> Option<u32> {
         Some(self.buffer_frames.load(Ordering::Relaxed)).filter(|&n| n > 0)
+    }
+
+    /// Move both streams to `driver` (ASIO or WASAPI on Windows), onto the
+    /// device last chosen for it or else its default, and remember the
+    /// choice. A driver that fails to open leaves the streams where they
+    /// were, with a message.
+    pub fn set_driver(&self, driver: AudioDriver) {
+        let _ = self.cmd_tx.send(OutputCmd::SetDriver(driver));
     }
 
     /// Switch the plugin to the declared bus layout at `index`. The plugin is
@@ -618,6 +649,12 @@ pub fn list_devices() {
         };
         println!("  {name}{marker}");
     }
+    if driver::asio_built() {
+        println!("ASIO interfaces (input and output):");
+        for name in driver::asio_drivers() {
+            println!("  {name}");
+        }
+    }
 }
 
 /// Snapshot of available output devices (`(default_name, all_names)`).
@@ -633,7 +670,10 @@ pub fn list_input_devices() -> (Option<String>, Vec<String>) {
 }
 
 fn enumerate_devices(output: bool) -> (Option<String>, Vec<String>) {
-    let host = cpal::default_host();
+    if driver::on_asio() {
+        return (None, driver::asio_drivers());
+    }
+    let host = driver::host();
     let default_name = if output {
         host.default_output_device()
     } else {
@@ -641,19 +681,22 @@ fn enumerate_devices(output: bool) -> (Option<String>, Vec<String>) {
     }
     .and_then(|d| device_label(&d));
     let names = devices(&host, output)
-        .iter()
-        .filter_map(device_label)
+        .filter_map(|d| device_label(&d))
         .collect();
     (default_name, names)
 }
 
-fn devices(host: &cpal::Host, output: bool) -> Vec<cpal::Device> {
-    if output {
-        host.output_devices().map(Iterator::collect)
+/// The host's devices, listed as they are asked for: cpal loads each ASIO
+/// driver in turn to list it, so a search that stops early loads fewer.
+fn devices(host: &cpal::Host, output: bool) -> Box<dyn Iterator<Item = cpal::Device>> {
+    let found = if output {
+        host.output_devices()
+            .map(|d| Box::new(d) as Box<dyn Iterator<Item = cpal::Device>>)
     } else {
-        host.input_devices().map(Iterator::collect)
-    }
-    .unwrap_or_default()
+        host.input_devices()
+            .map(|d| Box::new(d) as Box<dyn Iterator<Item = cpal::Device>>)
+    };
+    found.unwrap_or_else(|_| Box::new(std::iter::empty()))
 }
 
 /// The name menus, flags and saved settings know a device by.
@@ -792,27 +835,25 @@ impl DeviceCache {
 /// Returns an error if the requested input/output device can't be
 /// found (or no default exists), the device's default stream config
 /// can't be queried, or any of the cpal stream-build calls fail.
+///
+/// # Panics
+///
+/// Panics if the plugin's mutex is poisoned while it is being set up.
 #[allow(clippy::too_many_lines)]
 pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, BoxErr> {
-    let audio_host = cpal::default_host();
     let is_effect = P::info().category == PluginCategory::Effect;
     let settings = SettingsStore::open(settings::path_for(P::info().vendor, P::info().name));
     let saved = settings.saved();
 
-    let (input_device, input_chosen) = if is_effect {
-        launch_input(&audio_host, opts, &saved)
-    } else {
-        (None, false)
-    };
+    driver::set_active(settings::launch_driver(
+        opts.driver,
+        saved.driver,
+        driver::asio_installed,
+    ));
     // Resolve initial output device synchronously so we can pull
     // its default config (sample rate, channels) before spawning
-    // the worker. The worker re-resolves by name on each switch.
-    let (initial_output, output_named) = launch_output(
-        &audio_host,
-        opts,
-        &saved,
-        input_device.as_ref().filter(|_| input_chosen),
-    )?;
+    // the worker, which opens it.
+    let (input_device, initial_output) = launch_devices(opts, &saved, is_effect)?;
     let output_chosen = Arc::new(AtomicBool::new(
         opts.output_device.is_some() || saved.output_device.is_some(),
     ));
@@ -828,17 +869,19 @@ pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, B
     let (num_in, num_out, num_main_in) = layout_at_index::<P>(layout_index);
     let requested_channels = u16::try_from(num_out).ok().filter(|&c| c > 0);
     let buffer_request = settings::launch_buffer_size(opts.buffer_size, saved.buffer_size);
-    let config: cpal::StreamConfig = resolve_config(
+    let config = resolve_config(
         &initial_output,
         &default_config,
         opts,
         requested_channels,
         buffer_request,
     );
-    let sample_format = default_config.sample_format();
     let sample_rate = f64::from(config.sample_rate);
     let channels = config.channels as usize;
     let buffer_frames = Arc::new(AtomicU32::new(buffer_request));
+    let stream_rate = Arc::new(AtomicU32::new(config.sample_rate));
+
+    let input_label = input_device.as_ref().and_then(device_label);
 
     // Capacity 256: covers a generous MIDI burst within a single
     // audio callback period. ArrayQueue is lock-free MPMC - the MIDI
@@ -873,7 +916,7 @@ pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, B
     }));
 
     let (output_cmd_tx, output_cmd_rx) = mpsc::sync_channel::<OutputCmd>(8);
-    let input_label = input_device.as_ref().and_then(device_label);
+    let output_cmd_tx = Arc::new(output_cmd_tx);
     let input_setup = setup_input_pipeline(
         input_label.as_deref(),
         opts,
@@ -882,7 +925,8 @@ pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, B
         sample_rate,
         InputLinks {
             buffer_frames: Arc::clone(&buffer_frames),
-            output_cmd: output_cmd_tx.clone(),
+            sample_rate: Arc::clone(&stream_rate),
+            output_cmd: Arc::clone(&output_cmd_tx),
             output_chosen: Arc::clone(&output_chosen),
             settings: settings.clone(),
         },
@@ -903,19 +947,7 @@ pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, B
 
     let transport = Transport::new(opts.bpm.unwrap_or(120.0), sample_rate);
 
-    // Initial output device name (may differ from the resolver's
-    // requested name if it matched by substring). When no device was
-    // named, leave this `None` so the worker re-resolves via
-    // `default_output_device()` on each open - the cpal ALSA backend's
-    // virtual default reports a description ("Default Audio Device")
-    // that doesn't appear in `output_devices()`, so a name-based
-    // re-resolve would fail.
-    let initial_output_name = if output_named {
-        device_label(&initial_output)
-    } else {
-        None
-    };
-    let output_current_name = Arc::new(Mutex::new(initial_output_name.clone()));
+    let output_current_name = Arc::new(Mutex::new(None));
     let (open_result_tx, open_result_rx) = mpsc::channel::<Result<(), String>>();
 
     // Output defaults to enabled - the user launched standalone to
@@ -937,7 +969,7 @@ pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, B
     let latency_restart_pending = Arc::new(AtomicBool::new(false));
     let output_controller = OutputController {
         enabled: Arc::clone(&output_enabled),
-        cmd_tx: output_cmd_tx.clone(),
+        cmd_tx: output_cmd_tx,
         current_name: Arc::clone(&output_current_name),
         channel_route: Arc::clone(&output_channel_route),
         layout: Arc::clone(&output_layout_shared),
@@ -1042,11 +1074,14 @@ pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, B
         input_channel_route: Arc::clone(&input_controller.channel_route),
         output_channel_route: Arc::clone(&output_channel_route),
         layout: Arc::clone(&output_layout_shared),
-        promised_max_frames: Arc::new(AtomicUsize::new(initial_max_frames)),
-        restart_tx: output_cmd_tx,
+        promised_max_frames: AtomicUsize::new(initial_max_frames),
+        promised_rate: AtomicU32::new(config.sample_rate),
         active_latency,
         latency_restart_pending,
         buffer_frames: Arc::clone(&buffer_frames),
+        sample_rate: stream_rate,
+        reset_pending: Arc::new(AtomicBool::new(false)),
+        commands: Arc::downgrade(&output_controller.cmd_tx),
         output_chosen,
         input_cmd: input_controller.cmd_tx.clone(),
         settings,
@@ -1058,24 +1093,19 @@ pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, B
         capture: capture.as_ref().map(super::playback::CaptureSink::pusher),
     };
 
-    let initial_output_name_for_worker = initial_output_name.clone();
+    let worker = OutputWorker {
+        res,
+        config,
+        num_in,
+        num_out,
+        num_main_in,
+        is_effect,
+        device: initial_output,
+        streams: None,
+    };
     std::thread::Builder::new()
         .name("truce-standalone-output".into())
-        .spawn(move || {
-            output_worker::<P>(
-                output_cmd_rx,
-                open_result_tx,
-                initial_output_name_for_worker,
-                config,
-                sample_format,
-                sample_rate,
-                num_in,
-                num_out,
-                num_main_in,
-                is_effect,
-                res,
-            );
-        })
+        .spawn(move || worker.run(&output_cmd_rx, &open_result_tx))
         .map_err(|e| format!("could not spawn output worker: {e}"))?;
 
     // Wait for the worker to confirm initial open so any error
@@ -1170,11 +1200,12 @@ where
     let active_latency = Arc::new(AtomicU32::new(active_before));
     let restart_pending = Arc::new(AtomicBool::new(false));
     let (restart_tx, restart_rx) = mpsc::sync_channel(1);
+    let restart_tx = Arc::new(restart_tx);
     queue_latency_restart(
         requested_after_process,
         &active_latency,
         &restart_pending,
-        &restart_tx,
+        &Arc::downgrade(&restart_tx),
     );
     let worker_plugin = Arc::clone(&plugin);
     let worker_latency = Arc::clone(&active_latency);
@@ -1221,9 +1252,74 @@ struct InputSetup {
 /// What the input side shares with the rest of the host.
 struct InputLinks {
     buffer_frames: Arc<AtomicU32>,
-    output_cmd: mpsc::SyncSender<OutputCmd>,
+    sample_rate: Arc<AtomicU32>,
+    output_cmd: Arc<mpsc::SyncSender<OutputCmd>>,
     output_chosen: Arc<AtomicBool>,
     settings: SettingsStore,
+}
+
+/// The devices a launch opens: the input (effects only) and the output.
+/// On ASIO the input and output are one interface, named by a flag, else
+/// the saved interface, else the first installed driver that loads; when
+/// none loads, the launch runs on WASAPI.
+fn launch_devices(
+    opts: &Options,
+    saved: &settings::Settings,
+    is_effect: bool,
+) -> Result<(Option<cpal::Device>, cpal::Device), String> {
+    if driver::on_asio() {
+        let host = driver::host();
+        if let Some(interface) = launch_asio_interface(&host, opts, saved) {
+            let input = (is_effect && interface.supports_input()).then(|| interface.clone());
+            return Ok((input, interface));
+        }
+        eprintln!("no ASIO driver could be opened; using Windows (WASAPI)");
+        driver::set_active(AudioDriver::Wasapi);
+    }
+    let host = driver::host();
+    let (input, input_chosen) = if is_effect {
+        launch_input(&host, opts, saved)
+    } else {
+        (None, false)
+    };
+    let output = launch_output(&host, opts, saved, input.as_ref().filter(|_| input_chosen))?;
+    Ok((input, output))
+}
+
+fn launch_asio_interface(
+    host: &cpal::Host,
+    opts: &Options,
+    saved: &settings::Settings,
+) -> Option<cpal::Device> {
+    let named = opts
+        .output_device
+        .as_ref()
+        .or(opts.input_device.as_ref())
+        .or(saved.asio_device.as_ref());
+    if let Some(name) = named {
+        if let Some(interface) = find_device(host, name, true) {
+            return Some(interface);
+        }
+        eprintln!("the ASIO interface '{name}' is not available; trying the others installed");
+    }
+    // The first own driver that loads ends the search, which loads each
+    // driver listed before it.
+    let mut generic = None;
+    for interface in devices(host, true) {
+        if device_label(&interface).is_some_and(|label| !driver::is_generic(&label)) {
+            return Some(interface);
+        }
+        generic.get_or_insert(interface);
+    }
+    generic
+}
+
+/// The installed ASIO interfaces whose drivers load, an interface's own
+/// drivers before the generic ones.
+fn asio_interfaces(host: &cpal::Host) -> Vec<cpal::Device> {
+    let mut interfaces: Vec<cpal::Device> = devices(host, true).collect();
+    interfaces.sort_by_key(|device| device_label(device).is_none_or(|l| driver::is_generic(&l)));
+    interfaces
 }
 
 /// The input device a launch opens, and whether it was chosen (by flag
@@ -1247,42 +1343,40 @@ fn launch_input(
     (host.default_input_device(), false)
 }
 
-/// The output device a launch opens, and whether it was named rather than
-/// left to the system default. A flag must match a device; a saved choice
-/// falls back to the default when its device is absent. With neither, a
-/// chosen input that belongs to an interface with outputs takes the
-/// output along, so both streams run on the interface's clock.
+/// The output device a launch opens. A flag must match a device; a saved
+/// choice falls back to the default when its device is absent. With
+/// neither, a chosen input that belongs to an interface with outputs takes
+/// the output along, so both streams run on the interface's clock.
 fn launch_output(
     host: &cpal::Host,
     opts: &Options,
     saved: &settings::Settings,
     chosen_input: Option<&cpal::Device>,
-) -> Result<(cpal::Device, bool), String> {
+) -> Result<cpal::Device, String> {
     if let Some(name) = &opts.output_device {
-        let device = find_device(host, name, true).ok_or_else(|| {
+        return find_device(host, name, true).ok_or_else(|| {
             format!(
                 "no output device matching '{name}'. \
                  Run with --list-devices to see available outputs."
             )
-        })?;
-        return Ok((device, true));
+        });
     }
     if let Some(name) = &saved.output_device {
         if let Some(device) = find_device(host, name, true) {
-            return Ok((device, true));
+            return Ok(device);
         }
         eprintln!("the saved output device '{name}' is not available; using the system default");
     } else if let Some(device) = chosen_input
         .and_then(|input| companion_output(host, input))
         .and_then(|label| find_device(host, &label, true))
     {
-        return Ok((device, true));
+        return Ok(device);
     }
-    let device = host.default_output_device().ok_or(
+    host.default_output_device().ok_or_else(|| {
         "no default audio output device. \
-         Plug in or enable an output, then retry.",
-    )?;
-    Ok((device, false))
+         Plug in or enable an output, then retry."
+            .to_string()
+    })
 }
 
 /// Allocate the input ring + control channels, and (for effects) spawn
@@ -1331,7 +1425,7 @@ fn setup_input_pipeline(
         let worker = InputWorker {
             ring: Arc::clone(&input_ring),
             ring_width: Arc::clone(&ring_width),
-            sample_rate,
+            sample_rate: links.sample_rate,
             enabled: Arc::clone(&input_enabled),
             current_name: Arc::clone(&input_current_name),
             buffer_frames: links.buffer_frames,
@@ -1412,12 +1506,11 @@ struct OutputResources<P: PluginExport> {
     /// shared with `OutputController` so the Bus Layout menu can mark the
     /// active entry. The worker updates it after a `SetLayout` switch.
     layout: Arc<AtomicUsize>,
-    /// The `max_frames` the plugin was last `reset()` with. A stream
-    /// whose block bound differs renews the promise before its first
-    /// callback.
-    promised_max_frames: Arc<AtomicUsize>,
-    /// Bounded callback-to-worker handoff for a dynamic-latency restart.
-    restart_tx: mpsc::SyncSender<OutputCmd>,
+    /// The `max_frames` and sample rate the plugin was last `reset()`
+    /// with. A stream that differs in either renews the promise before
+    /// its first callback.
+    promised_max_frames: AtomicUsize,
+    promised_rate: AtomicU32,
     /// Latency of the processing state prepared by the output worker.
     active_latency: Arc<AtomicU32>,
     /// Coalesces repeated callback observations until the worker reopens.
@@ -1425,10 +1518,19 @@ struct OutputResources<P: PluginExport> {
     /// Buffer size the streams run at (see [`OutputController`]); the
     /// input worker opens at it too.
     buffer_frames: Arc<AtomicU32>,
+    /// Sample rate the streams run at; the input worker opens at it too.
+    sample_rate: Arc<AtomicU32>,
+    /// Set while an ASIO driver's reset request waits for the worker, so a
+    /// burst of them, one from each stream, reopens the streams once.
+    reset_pending: Arc<AtomicBool>,
+    /// Where the streams send a reset request or a latency restart. Weak,
+    /// so the worker still exits when the controllers are dropped.
+    commands: Weak<mpsc::SyncSender<OutputCmd>>,
     /// Set once the user chooses an output, which ends following the
     /// input.
     output_chosen: Arc<AtomicBool>,
-    /// Reopens the input after a buffer size change.
+    /// Reopens the input after a buffer size change, and moves it with
+    /// the driver.
     input_cmd: mpsc::Sender<InputCmd>,
     settings: SettingsStore,
     /// Optional `.wav` playback source (gated on the `playback`
@@ -1448,392 +1550,473 @@ struct OutputResources<P: PluginExport> {
     capture: Option<crate::playback::CapturePusher>,
 }
 
-// Spawned-thread body - owns its state across the worker's lifetime.
-// Switching to refs would force the caller to outlive the thread.
-#[allow(
-    clippy::too_many_arguments,
-    clippy::needless_pass_by_value,
-    clippy::too_many_lines
-)]
-fn output_worker<P: PluginExport>(
-    cmd_rx: mpsc::Receiver<OutputCmd>,
-    open_result: mpsc::Sender<Result<(), String>>,
-    initial_device_name: Option<String>,
-    mut config: cpal::StreamConfig,
-    sample_format: cpal::SampleFormat,
-    sample_rate: f64,
-    // The plugin's bus dimensions. `config.channels` is the *device* stream
-    // width, which need not equal these - a mono plugin on a stereo-only
-    // device runs `num_out == 1` but the stream stays at 2.
-    mut num_in: usize,
-    mut num_out: usize,
+/// The streams the output worker holds open. On ASIO that includes the
+/// interface's input: cpal shares an ASIO driver's buffers between an
+/// input and an output built on one device at one buffer size, and the
+/// driver runs callbacks in the order they were added, so an input built
+/// first reaches the output within the same buffer.
+struct OpenStreams {
+    _duplex_input: Option<cpal::Stream>,
+    _output: cpal::Stream,
+}
+
+/// A stream opened by [`open_output_stream`], and the shape it runs at.
+struct Opened {
+    streams: OpenStreams,
+    config: cpal::StreamConfig,
+}
+
+/// The output worker's state: it owns the (`!Send`) cpal streams for its
+/// lifetime.
+struct OutputWorker<P: PluginExport> {
+    res: OutputResources<P>,
+    /// The device stream's channel count, the sample rate the plugin runs
+    /// at, and the buffer size chosen, which a device may fit to its own
+    /// range. `channels` is the *device* stream width, which need not
+    /// equal the plugin's bus - a mono plugin on a stereo-only device runs
+    /// `num_out == 1` but the stream stays at 2.
+    config: cpal::StreamConfig,
+    num_in: usize,
+    num_out: usize,
     // Main-input width of the active layout (channels past it are the
     // sidechain). Resolved by index from the selected layout, so it's
     // reassigned - not re-derived from ambiguous totals - on a runtime
     // `SetLayout` switch below.
-    mut num_main_in: usize,
+    num_main_in: usize,
     is_effect: bool,
-    res: OutputResources<P>,
-) {
-    let mut stream: Option<cpal::Stream> = None;
+    /// The device the streams last opened on. Changing the buffer size or
+    /// layout reopens it as it is, and a failed switch returns to it.
+    /// cpal finds an ASIO interface only by loading each driver listed
+    /// before it, so a device is looked up only when the interface or
+    /// driver changes, or the driver asks for a reset.
+    device: cpal::Device,
+    streams: Option<OpenStreams>,
+}
 
-    let mut initial = open_output_stream::<P>(
-        initial_device_name.as_deref(),
-        &config,
-        sample_format,
-        sample_rate,
-        config.channels as usize,
-        num_in,
-        num_out,
-        num_main_in,
-        is_effect,
-        false,
-        &res,
-        &mut stream,
-    );
-    if let (Err(e), cpal::BufferSize::Fixed(frames)) = (&initial, config.buffer_size) {
-        eprintln!(
-            "could not open the output with a {frames}-frame buffer ({e}); \
-             trying the device's own buffer size"
-        );
-        config.buffer_size = cpal::BufferSize::Default;
-        initial = open_output_stream::<P>(
-            initial_device_name.as_deref(),
-            &config,
-            sample_format,
-            sample_rate,
-            config.channels as usize,
-            num_in,
-            num_out,
-            num_main_in,
-            is_effect,
-            false,
-            &res,
-            &mut stream,
-        );
-    }
-    let _ = open_result.send(initial);
+impl<P: PluginExport> OutputWorker<P> {
+    fn run(
+        mut self,
+        cmd_rx: &mpsc::Receiver<OutputCmd>,
+        open_result: &mpsc::Sender<Result<(), String>>,
+    ) {
+        let requested_buffer = self.config.buffer_size;
+        let mut initial = self.reopen(false, false);
+        if let (Err(e), cpal::BufferSize::Fixed(frames)) = (&initial, self.config.buffer_size) {
+            eprintln!(
+                "could not open the output with a {frames}-frame buffer ({e}); \
+                 trying the device's own buffer size"
+            );
+            self.config.buffer_size = cpal::BufferSize::Default;
+            initial = self.reopen(false, false);
+        }
+        if let Err(e) = &initial
+            && driver::on_asio()
+        {
+            eprintln!("could not open the ASIO interface ({e}); using Windows (WASAPI)");
+            self.config.buffer_size = requested_buffer;
+            initial = self.switch_driver(AudioDriver::Wasapi);
+        }
+        let _ = open_result.send(initial);
 
-    while let Ok(cmd) = cmd_rx.recv() {
-        match cmd {
-            OutputCmd::SetDevice(name) => {
-                if switch_output_device::<P>(
-                    name.as_deref(),
-                    &config,
-                    sample_format,
-                    sample_rate,
-                    num_in,
-                    num_out,
-                    num_main_in,
-                    is_effect,
-                    &res,
-                    &mut stream,
-                ) {
-                    res.output_chosen.store(true, Ordering::Relaxed);
-                    let chosen = res.current_name.lock().ok().and_then(|g| g.clone());
-                    res.settings.update(|s| s.output_device = chosen);
-                }
-            }
-            OutputCmd::FollowInput(input) => {
-                if res.output_chosen.load(Ordering::Relaxed) {
-                    continue;
-                }
-                let host = cpal::default_host();
-                let Some(target) = find_device(&host, &input, false)
-                    .and_then(|device| companion_output(&host, &device))
-                else {
-                    continue;
-                };
-                let current = res.current_name.lock().ok().and_then(|g| g.clone());
-                if current.as_deref() == Some(target.as_str()) {
-                    continue;
-                }
-                vlog!("output device: {target} (follows the input)");
-                switch_output_device::<P>(
-                    Some(&target),
-                    &config,
-                    sample_format,
-                    sample_rate,
-                    num_in,
-                    num_out,
-                    num_main_in,
-                    is_effect,
-                    &res,
-                    &mut stream,
-                );
-            }
-            OutputCmd::SetBufferSize(frames) => {
-                let previous = config.buffer_size;
-                config.buffer_size = cpal::BufferSize::Fixed(frames);
-                let name = res.current_name.lock().ok().and_then(|g| g.clone());
-                stream = None;
-                if let Err(e) = open_output_stream::<P>(
-                    name.as_deref(),
-                    &config,
-                    sample_format,
-                    sample_rate,
-                    config.channels as usize,
-                    num_in,
-                    num_out,
-                    num_main_in,
-                    is_effect,
-                    false,
-                    &res,
-                    &mut stream,
-                ) {
-                    eprintln!(
-                        "the output device refused a {frames}-frame buffer ({e}); \
-                         keeping the previous size"
-                    );
-                    config.buffer_size = previous;
-                    if let Err(e2) = reopen_output_or_default::<P>(
-                        name.as_deref(),
-                        &config,
-                        sample_format,
-                        sample_rate,
-                        num_in,
-                        num_out,
-                        num_main_in,
-                        is_effect,
-                        false,
-                        &res,
-                        &mut stream,
-                    ) {
-                        eprintln!("failed to restore the output: {e2}");
-                    }
-                } else {
-                    let accepted =
-                        Some(res.buffer_frames.load(Ordering::Relaxed)).filter(|&n| n > 0);
-                    res.settings.update(|s| s.buffer_size = accepted);
-                    let _ = res.input_cmd.send(InputCmd::Reopen);
-                }
-            }
-            OutputCmd::SetLayout { index } => {
-                let host = cpal::default_host();
-                let name = res.current_name.lock().ok().and_then(|g| g.clone());
-                let device = match name.as_deref() {
-                    Some(n) => find_device(&host, n, true),
-                    None => host.default_output_device(),
-                };
-                let Some(dev) = device else {
-                    eprintln!("bus-layout: no output device");
-                    continue;
-                };
-                let (new_in, new_out, new_main_in) = layout_at_index::<P>(index);
-                let new_out_dev = u16::try_from(new_out).unwrap_or(u16::MAX);
-                // Snapshot the current widths so a failed switch can revert
-                // to them rather than leaving the host silent.
-                let (old_in, old_out, old_main_in, old_channels) =
-                    (num_in, num_out, num_main_in, config.channels);
-                // Keep the device stream at a width the hardware can open.
-                // Prefer the layout's output width (so a surround device
-                // plays surround), else keep the current stream width and
-                // map the plugin output onto it (a mono layout plays
-                // through a stereo-only device instead of being rejected).
-                config.channels = if device_supports_output_channels(&dev, new_out_dev) {
-                    new_out_dev
-                } else {
-                    config.channels
-                };
-                num_in = new_in;
-                num_out = new_out;
-                num_main_in = new_main_in;
-                stream = None;
-                if let Err(e) = open_output_stream::<P>(
-                    name.as_deref(),
-                    &config,
-                    sample_format,
-                    sample_rate,
-                    config.channels as usize,
-                    num_in,
-                    num_out,
-                    num_main_in,
-                    is_effect,
-                    true,
-                    &res,
-                    &mut stream,
-                ) {
-                    eprintln!("bus-layout switch failed: {e}; reverting to the previous layout");
-                    // Revert the widths and reopen at the previous layout so
-                    // audio keeps running (and the plugin is re-prepared for
-                    // the arrangement it's actually being handed).
-                    num_in = old_in;
-                    num_out = old_out;
-                    num_main_in = old_main_in;
-                    config.channels = old_channels;
-                    if let Err(e2) = reopen_output_or_default::<P>(
-                        name.as_deref(),
-                        &config,
-                        sample_format,
-                        sample_rate,
-                        num_in,
-                        num_out,
-                        num_main_in,
-                        is_effect,
-                        true,
-                        &res,
-                        &mut stream,
-                    ) {
-                        eprintln!("failed to restore the previous bus layout: {e2}");
-                    }
-                } else {
-                    res.layout.store(index, Ordering::Relaxed);
-                }
-            }
-            OutputCmd::RestartLatency => {
-                let requested_latency = res
-                    .plugin
-                    .lock()
-                    .expect("plugin mutex poisoned before latency restart")
-                    .latency();
-                if requested_latency == res.active_latency.load(Ordering::Acquire) {
-                    res.latency_restart_pending.store(false, Ordering::Release);
-                    continue;
-                }
-                let name = res.current_name.lock().ok().and_then(|g| g.clone());
-                stream = None;
-                if let Err(error) = reopen_output_or_default::<P>(
-                    name.as_deref(),
-                    &config,
-                    sample_format,
-                    sample_rate,
-                    num_in,
-                    num_out,
-                    num_main_in,
-                    is_effect,
-                    true,
-                    &res,
-                    &mut stream,
-                ) {
-                    res.latency_restart_pending.store(false, Ordering::Release);
-                    eprintln!("latency restart failed: {error}");
-                }
+        while let Ok(cmd) = cmd_rx.recv() {
+            match cmd {
+                OutputCmd::SetDevice(name) => self.set_device(name.as_deref()),
+                OutputCmd::SetDriver(target) => self.set_driver(target),
+                OutputCmd::FollowInput(input) => self.follow_input(&input),
+                OutputCmd::SetBufferSize(frames) => self.set_buffer_size(frames),
+                OutputCmd::SetLayout { index } => self.set_layout(index),
+                OutputCmd::RestartLatency => self.restart_latency(),
+                OutputCmd::Reset => self.reset(),
             }
         }
     }
-    drop(stream);
+
+    fn current_name(&self) -> Option<String> {
+        self.res.current_name.lock().ok().and_then(|g| g.clone())
+    }
+
+    /// Close the streams and open them on `device`. `fit` lets a device
+    /// that cannot run the current channel count or sample rate run at its
+    /// own, the plugin prepared again for it: a driver or ASIO interface
+    /// switch needs that, while a WASAPI device switch keeps the shape it
+    /// has.
+    fn open_on(&mut self, device: cpal::Device, force_reset: bool, fit: bool) -> Result<(), String> {
+        // Drop the old streams BEFORE building new ones - some backends
+        // won't open a second exclusive stream against the same device,
+        // and an ASIO driver's buffers are rebuilt under any stream left.
+        self.streams = None;
+        let opened = open_output_stream::<P>(
+            &device,
+            self.config,
+            self.num_in,
+            self.num_out,
+            self.num_main_in,
+            self.is_effect,
+            force_reset,
+            fit,
+            &self.res,
+        )?;
+        self.config.channels = opened.config.channels;
+        self.config.sample_rate = opened.config.sample_rate;
+        self.streams = Some(opened.streams);
+        self.device = device;
+        Ok(())
+    }
+
+    /// Close the streams and open `name`, or the default device for
+    /// `None`.
+    fn open(&mut self, name: Option<&str>, force_reset: bool, fit: bool) -> Result<(), String> {
+        // Closed before the lookup, since cpal lists no other ASIO driver
+        // while a stream holds one.
+        self.streams = None;
+        let host = driver::host();
+        let device = match name {
+            Some(n) => {
+                find_device(&host, n, true).ok_or_else(|| format!("no output device matching '{n}'"))?
+            }
+            None => host
+                .default_output_device()
+                .ok_or_else(|| "no default audio output device".to_string())?,
+        };
+        self.open_on(device, force_reset, fit)
+    }
+
+    /// Reopen the streams on the device they last opened on.
+    fn reopen(&mut self, force_reset: bool, fit: bool) -> Result<(), String> {
+        self.open_on(self.device.clone(), force_reset, fit)
+    }
+
+    /// Reopen the device that was playing, else the default device, so a
+    /// failed change never leaves the host silent.
+    fn restore(&mut self, force_reset: bool, fit: bool) {
+        if self.reopen(force_reset, fit).is_err()
+            && let Err(e) = self.open(None, force_reset, fit)
+        {
+            eprintln!("failed to restore the audio output: {e}");
+        }
+    }
+
+    /// Move the output to `name`, restoring the device that was playing
+    /// when the new one fails. Returns whether the switch took.
+    fn switch_device(&mut self, name: Option<&str>) -> bool {
+        let fit = driver::on_asio();
+        let Err(e) = self.open(name, false, fit) else {
+            return true;
+        };
+        eprintln!("output device switch failed: {e}; restoring previous device");
+        self.restore(false, fit);
+        false
+    }
+
+    fn set_device(&mut self, name: Option<&str>) {
+        if !self.switch_device(name) {
+            return;
+        }
+        let chosen = self.current_name();
+        if driver::on_asio() {
+            self.res.settings.update(|s| s.asio_device = chosen);
+        } else {
+            self.res.output_chosen.store(true, Ordering::Relaxed);
+            self.res.settings.update(|s| s.output_device = chosen);
+        }
+    }
+
+    fn set_driver(&mut self, target: AudioDriver) {
+        let previous = driver::active();
+        if target == previous {
+            return;
+        }
+        if target == AudioDriver::Asio && !driver::asio_installed() {
+            eprintln!("no ASIO driver is installed");
+            return;
+        }
+        match self.switch_driver(target) {
+            Ok(()) => {
+                vlog!("audio driver: {}", target.name());
+                self.res.settings.update(|s| s.driver = Some(target));
+            }
+            Err(e) => {
+                eprintln!(
+                    "could not open the {} driver ({e}); staying on {}",
+                    target.name(),
+                    previous.name()
+                );
+                driver::set_active(previous);
+                let _ = self.res.input_cmd.send(InputCmd::DriverChanged);
+                self.restore(false, true);
+            }
+        }
+    }
+
+    /// Move both streams to `target`, onto the device last chosen for it,
+    /// else its default. The input worker follows.
+    fn switch_driver(&mut self, target: AudioDriver) -> Result<(), String> {
+        let saved = self.res.settings.saved();
+        // Closed before the input moves, so an interface the old driver
+        // held is free when the input reopens on the new one.
+        self.streams = None;
+        driver::set_active(target);
+        let _ = self.res.input_cmd.send(InputCmd::DriverChanged);
+        match target {
+            AudioDriver::Asio => self.open_asio(saved.asio_device.as_deref()),
+            AudioDriver::Wasapi => {
+                self.res
+                    .output_chosen
+                    .store(saved.output_device.is_some(), Ordering::Relaxed);
+                self.open(saved.output_device.as_deref(), false, true)
+                    .or_else(|_| self.open(None, false, true))
+            }
+        }
+    }
+
+    /// Open the ASIO interface `saved`, else the first installed one that
+    /// opens.
+    fn open_asio(&mut self, saved: Option<&str>) -> Result<(), String> {
+        let host = driver::host();
+        if let Some(interface) = saved.and_then(|name| find_device(&host, name, true))
+            && self.open_on(interface, false, true).is_ok()
+        {
+            return Ok(());
+        }
+        let mut result = Err("no ASIO interface could be opened".to_string());
+        for interface in asio_interfaces(&host) {
+            if saved.is_some() && device_label(&interface).as_deref() == saved {
+                continue;
+            }
+            result = self.open_on(interface, false, true);
+            if result.is_ok() {
+                break;
+            }
+        }
+        result
+    }
+
+    fn follow_input(&mut self, input: &str) {
+        if self.res.output_chosen.load(Ordering::Relaxed) || driver::on_asio() {
+            return;
+        }
+        let host = driver::host();
+        let Some(target) =
+            find_device(&host, input, false).and_then(|device| companion_output(&host, &device))
+        else {
+            return;
+        };
+        if self.current_name().as_deref() == Some(target.as_str()) {
+            return;
+        }
+        vlog!("output device: {target} (follows the input)");
+        self.switch_device(Some(&target));
+    }
+
+    fn set_buffer_size(&mut self, frames: u32) {
+        let previous = self.config.buffer_size;
+        self.config.buffer_size = cpal::BufferSize::Fixed(frames);
+        let fit = driver::on_asio();
+        if let Err(e) = self.reopen(false, fit) {
+            eprintln!(
+                "the output device refused a {frames}-frame buffer ({e}); \
+                 keeping the previous size"
+            );
+            self.config.buffer_size = previous;
+            self.restore(false, fit);
+        } else {
+            let accepted = Some(self.res.buffer_frames.load(Ordering::Relaxed)).filter(|&n| n > 0);
+            self.res.settings.update(|s| s.buffer_size = accepted);
+            let _ = self.res.input_cmd.send(InputCmd::Reopen);
+        }
+    }
+
+    fn set_layout(&mut self, index: usize) {
+        let (new_in, new_out, new_main_in) = layout_at_index::<P>(index);
+        let new_out_dev = u16::try_from(new_out).unwrap_or(u16::MAX);
+        // Snapshot the current widths so a failed switch can revert
+        // to them rather than leaving the host silent.
+        let (old_in, old_out, old_main_in, old_channels) = (
+            self.num_in,
+            self.num_out,
+            self.num_main_in,
+            self.config.channels,
+        );
+        // Keep the device stream at a width the hardware can open.
+        // Prefer the layout's output width (so a surround device
+        // plays surround), else keep the current stream width and
+        // map the plugin output onto it (a mono layout plays
+        // through a stereo-only device instead of being rejected).
+        if device_supports_output_channels(&self.device, new_out_dev) {
+            self.config.channels = new_out_dev;
+        }
+        self.num_in = new_in;
+        self.num_out = new_out;
+        self.num_main_in = new_main_in;
+        if let Err(e) = self.reopen(true, false) {
+            eprintln!("bus-layout switch failed: {e}; reverting to the previous layout");
+            // Revert the widths and reopen at the previous layout so
+            // audio keeps running (and the plugin is re-prepared for
+            // the arrangement it's actually being handed).
+            self.num_in = old_in;
+            self.num_out = old_out;
+            self.num_main_in = old_main_in;
+            self.config.channels = old_channels;
+            self.restore(true, false);
+        } else {
+            self.res.layout.store(index, Ordering::Relaxed);
+        }
+    }
+
+    /// Prepare the plugin for the latency it now reports and reopen the
+    /// streams on the device they run on.
+    fn restart_latency(&mut self) {
+        let requested = self
+            .res
+            .plugin
+            .lock()
+            .expect("plugin mutex poisoned before latency restart")
+            .latency();
+        if requested == self.res.active_latency.load(Ordering::Acquire) {
+            self.res.latency_restart_pending.store(false, Ordering::Release);
+            return;
+        }
+        let fit = driver::on_asio();
+        if let Err(e) = self.reopen(true, fit) {
+            eprintln!("latency restart failed: {e}; restoring the output");
+            self.res.latency_restart_pending.store(false, Ordering::Release);
+            self.restore(true, fit);
+        }
+    }
+
+    /// Answer an ASIO driver's reset request. ASIO asks for the driver to
+    /// be initialised again, and its settings may have changed, so the
+    /// device is looked up again to learn them.
+    fn reset(&mut self) {
+        vlog!("the audio driver asked to be reset; reopening");
+        self.streams = None;
+        // What the closed streams asked for is answered; a request from
+        // the streams opened next is a new reset.
+        self.res.reset_pending.store(false, Ordering::Release);
+        let name = self.current_name();
+        let fit = driver::on_asio();
+        if let Err(e) = self.open(name.as_deref(), false, fit) {
+            eprintln!("could not reopen the audio device: {e}");
+            self.restore(false, fit);
+        }
+    }
 }
 
-/// Move the output to `name`, reopening the device that was playing when
-/// the new one fails so a failed switch never leaves the host silent.
-/// Returns whether the switch took.
-#[allow(clippy::too_many_arguments)]
-fn switch_output_device<P: PluginExport>(
-    name: Option<&str>,
-    config: &cpal::StreamConfig,
-    sample_format: cpal::SampleFormat,
-    sample_rate: f64,
-    num_in: usize,
+/// Fit `config` to a device that may not run its channel count or sample
+/// rate: keep what the device offers, else run at the device's own rate
+/// when it cannot run this one, at the current width if the device offers
+/// it at that rate, else the layout's, else the device's own.
+fn fit_to_device(
+    device: &cpal::Device,
+    supported: &cpal::SupportedStreamConfig,
+    config: &mut cpal::StreamConfig,
     num_out: usize,
-    num_main_in: usize,
-    is_effect: bool,
-    res: &OutputResources<P>,
-    stream: &mut Option<cpal::Stream>,
-) -> bool {
-    // `open_output_stream` leaves `current_name` untouched on failure,
-    // so it still names the device to restore.
-    let previous = res.current_name.lock().ok().and_then(|g| g.clone());
-    // Drop the old stream BEFORE building the new one - some backends
-    // won't open a second exclusive stream against the same device.
-    *stream = None;
-    let Err(e) = open_output_stream::<P>(
-        name,
-        config,
-        sample_format,
-        sample_rate,
-        config.channels as usize,
-        num_in,
-        num_out,
-        num_main_in,
-        is_effect,
-        false,
-        res,
-        stream,
-    ) else {
-        return true;
+) {
+    let ranges: Vec<cpal::SupportedStreamConfigRange> = device
+        .supported_output_configs()
+        .map(Iterator::collect)
+        .unwrap_or_default();
+    let offers = |channels: u16, rate: u32| {
+        ranges.iter().any(|r| {
+            (channels == 0 || r.channels() == channels)
+                && r.min_sample_rate() <= rate
+                && rate <= r.max_sample_rate()
+        })
     };
-    eprintln!("output device switch failed: {e}; restoring previous device");
-    if let Err(e2) = reopen_output_or_default::<P>(
-        previous.as_deref(),
-        config,
-        sample_format,
-        sample_rate,
-        num_in,
-        num_out,
-        num_main_in,
-        is_effect,
-        false,
-        res,
-        stream,
-    ) {
-        eprintln!("failed to restore previous output device: {e2}");
+    if offers(config.channels, config.sample_rate) {
+        return;
     }
-    false
+    if !offers(0, config.sample_rate) {
+        config.sample_rate = supported.sample_rate();
+    }
+    let layout = u16::try_from(num_out).unwrap_or(0);
+    config.channels = [config.channels, layout]
+        .into_iter()
+        .find(|&channels| channels > 0 && offers(channels, config.sample_rate))
+        .unwrap_or_else(|| supported.channels());
 }
 
-/// Reopen the output, falling back to the OS default when a *named*
-/// device can't be re-resolved. Used on the restore / revert paths: the
-/// ALSA virtual default reports a description ("Default Audio Device")
-/// that isn't in `output_devices()`, so re-resolving a previous name
-/// that was really the unnamed default fails there - and without this
-/// fallback the host stays silent, the exact outcome the restore exists
-/// to prevent.
-#[allow(clippy::too_many_arguments)]
-fn reopen_output_or_default<P: PluginExport>(
-    name: Option<&str>,
-    config: &cpal::StreamConfig,
-    sample_format: cpal::SampleFormat,
-    sample_rate: f64,
-    num_in: usize,
-    num_out: usize,
-    num_main_in: usize,
-    is_effect: bool,
-    force_reset: bool,
+/// The error handler for the output worker's streams. An ASIO driver asks
+/// for a reset when its own settings change, which the worker answers by
+/// reopening the streams; anything else is reported.
+fn stream_error_handler<P: PluginExport>(
     res: &OutputResources<P>,
-    stream: &mut Option<cpal::Stream>,
-) -> Result<(), String> {
-    let first = open_output_stream::<P>(
-        name,
-        config,
-        sample_format,
-        sample_rate,
-        config.channels as usize,
-        num_in,
-        num_out,
-        num_main_in,
-        is_effect,
-        force_reset,
-        res,
-        stream,
-    );
-    if first.is_ok() || name.is_none() {
-        return first;
+) -> impl FnMut(cpal::Error) + Send + 'static {
+    let asio = driver::on_asio();
+    let pending = Arc::clone(&res.reset_pending);
+    let commands = res.commands.clone();
+    move |err| {
+        if !asio || err.kind() != cpal::ErrorKind::StreamInvalidated {
+            report_stream_error("Audio error", &err);
+        } else if !pending.swap(true, Ordering::AcqRel)
+            && commands
+                .upgrade()
+                .is_none_or(|commands| commands.try_send(OutputCmd::Reset).is_err())
+        {
+            // A full queue drops this request; the next one is sent.
+            pending.store(false, Ordering::Release);
+        }
     }
-    open_output_stream::<P>(
-        None,
-        config,
-        sample_format,
-        sample_rate,
-        config.channels as usize,
-        num_in,
-        num_out,
-        num_main_in,
-        is_effect,
-        force_reset,
-        res,
-        stream,
-    )
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Report a stream error. Xruns are left out: cpal reports them from the
+/// audio thread, where printing would only cause more.
+fn report_stream_error(context: &str, err: &cpal::Error) {
+    if err.kind() != cpal::ErrorKind::Xrun {
+        eprintln!("{context}: {err}");
+    }
+}
+
+/// Build the interface's inputs on the ASIO `device` the output is about to
+/// open on, at the same rate and buffer size, capturing into the ring
+/// while the input is enabled once played. `None` when the interface has
+/// no inputs or they refuse to open, which leaves the input silent.
+fn build_duplex_input<P: PluginExport>(
+    device: &cpal::Device,
+    output: cpal::StreamConfig,
+    frame_bound: usize,
+    res: &OutputResources<P>,
+) -> Option<cpal::Stream> {
+    let supported = device
+        .default_input_config()
+        .ok()
+        .filter(|c| c.channels() > 0)?;
+    let config = cpal::StreamConfig {
+        channels: supported.channels(),
+        sample_rate: output.sample_rate,
+        buffer_size: output.buffer_size,
+    };
+    let channels = config.channels as usize;
+    let ring = Arc::clone(&res.input_ring);
+    let ring_width = Arc::clone(&res.ring_width);
+    let enabled = Arc::clone(&res.input_enabled);
+    let stream = build_input(
+        device,
+        config,
+        supported.sample_format(),
+        frame_bound * channels,
+        move |data| {
+            if enabled.load(Ordering::Relaxed) {
+                ring.capture(data, channels, ring_width.load(Ordering::Relaxed));
+            }
+        },
+        stream_error_handler(res),
+    );
+    match stream {
+        Ok(stream) => Some(stream),
+        Err(e) => {
+            eprintln!("the interface's inputs did not open ({e}); the input stays silent");
+            None
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 fn open_output_stream<P: PluginExport>(
-    name: Option<&str>,
-    config: &cpal::StreamConfig,
-    sample_format: cpal::SampleFormat,
-    sample_rate: f64,
-    // Device interleave stride (= `config.channels`); the plugin's bus is
-    // (`num_in`, `num_out`), mapped onto these device channels by the route.
-    channels: usize,
+    device: &cpal::Device,
+    mut config: cpal::StreamConfig,
+    // The plugin's bus is (`num_in`, `num_out`), mapped onto the device
+    // channels (`config.channels`) by the route.
     num_in: usize,
     num_out: usize,
     // Main-input width of the selected layout; channels [num_main_in,
@@ -1846,21 +2029,12 @@ fn open_output_stream<P: PluginExport>(
     // its per-channel DSP state; every format wrapper couples an arrangement
     // change to a reset. Device switches (same layout) pass `false`.
     force_reset: bool,
+    // Let a device that can't run `config`'s channel count or rate run at
+    // its own (see `OutputWorker::open`).
+    fit: bool,
     res: &OutputResources<P>,
-    stream_slot: &mut Option<cpal::Stream>,
-) -> Result<(), String> {
-    // Resolve fresh each open - hot-plug may have changed the
-    // device list since the last switch.
-    let host = cpal::default_host();
-    let device = match name {
-        Some(n) => {
-            find_device(&host, n, true).ok_or_else(|| format!("no output device matching '{n}'"))?
-        }
-        None => host
-            .default_output_device()
-            .ok_or_else(|| "no default audio output device".to_string())?,
-    };
-    let resolved_name = device_label(&device);
+) -> Result<Opened, String> {
+    let resolved_name = device_label(device);
 
     let plugin_a = Arc::clone(&res.plugin);
     let pending_a = Arc::clone(&res.pending);
@@ -1872,7 +2046,7 @@ fn open_output_stream<P: PluginExport>(
     let out_route_a = Arc::clone(&res.output_channel_route);
     let active_latency_a = Arc::clone(&res.active_latency);
     let latency_restart_pending_a = Arc::clone(&res.latency_restart_pending);
-    let restart_tx_a = res.restart_tx.clone();
+    let commands_a = res.commands.clone();
     let transport_a = res.transport.clone();
     #[cfg(feature = "playback")]
     let playback_a = res.playback.clone();
@@ -1880,6 +2054,20 @@ fn open_output_stream<P: PluginExport>(
     let sidechain_playback_a = res.sidechain_playback.clone();
     #[cfg(feature = "playback")]
     let capture_a = res.capture.clone();
+
+    // The bound for the scratch below comes from *this* device's reported
+    // range - hot-plug re-opens may land on a device with a different
+    // maximum - and so do the stream's sample format, and with `fit` its
+    // channel count and rate.
+    let supported = device
+        .default_output_config()
+        .map_err(|e| format!("could not query the output config for the scratch bound: {e}"))?;
+    if fit {
+        fit_to_device(device, &supported, &mut config, num_out);
+    }
+    // Device interleave stride.
+    let channels = config.channels as usize;
+    let sample_rate = f64::from(config.sample_rate);
 
     // Per-stream audio-callback scratch. Owned by the move-closure so
     // it lives across callbacks but never crosses threads - cpal calls
@@ -1922,12 +2110,6 @@ fn open_output_stream<P: PluginExport>(
     // plugin's first callback doesn't allocate its per-channel scratch
     // inside cpal's real-time callback. Every format wrapper does this
     // at its setup hook; the standalone was the one caller that didn't.
-    // The bound comes from *this* device's reported range - hot-plug
-    // re-opens may land on a device with a different maximum.
-    let supported = device
-        .default_output_config()
-        .map_err(|e| format!("could not query the output config for the scratch bound: {e}"))?;
-    let mut config = config.clone();
     let asked = config.buffer_size;
     config.buffer_size = fit_buffer_size(asked, supported.buffer_size());
     if let (
@@ -1943,18 +2125,22 @@ fn open_output_stream<P: PluginExport>(
         );
     }
     let frame_bound = max_block_frames(config.buffer_size, supported.buffer_size());
-    // The plugin sized its DSP for the bound it was last `reset()`
-    // with. A device whose maximum exceeds it could deliver blocks past
-    // that promise, and a plugin prepared for larger blocks than it gets
-    // may add latency it need not (a partitioned convolution, say), so
-    // any change renews the promise, as a host does when its buffer size
-    // changes. No callback is running - the old stream is already
-    // dropped. A layout switch also has to re-prepare the plugin for the
-    // new channel arrangement, so `force_reset` triggers it regardless.
-    let bound_changed = frame_bound != res.promised_max_frames.load(Ordering::Relaxed);
+    // The plugin sized its DSP for the bound and rate it was last
+    // `reset()` with. A device whose maximum exceeds the bound could
+    // deliver blocks past that promise, and a plugin prepared for larger
+    // blocks than it gets may add latency it need not (a partitioned
+    // convolution, say), so any change renews the promise, as a host does
+    // when its buffer size or rate changes. No callback is running - the
+    // old stream is already dropped. A layout switch also has to
+    // re-prepare the plugin for the new channel arrangement, so
+    // `force_reset` triggers it regardless.
+    let bound_changed = frame_bound != res.promised_max_frames.load(Ordering::Relaxed)
+        || config.sample_rate != res.promised_rate.load(Ordering::Relaxed);
     if bound_changed {
         res.promised_max_frames
             .store(frame_bound, Ordering::Relaxed);
+        res.promised_rate
+            .store(config.sample_rate, Ordering::Relaxed);
     }
     {
         let mut p = plugin_a
@@ -1975,68 +2161,75 @@ fn open_output_stream<P: PluginExport>(
     // resolved by the caller and passed in - the layout is fixed for the
     // stream's lifetime.
 
-    let mut reader = RingReader::new(sample_rate);
-    let stream = match sample_format {
-        cpal::SampleFormat::F32 => device
-            .build_output_stream(
-                &config,
-                move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                    audio_callback::<P>(
-                        data,
-                        channels,
-                        num_in,
-                        num_main_in,
-                        num_out,
-                        sample_rate,
-                        is_effect,
-                        &plugin_a,
-                        &pending_a,
-                        &pending_state_a,
-                        &ring_a,
-                        &mut reader,
-                        &enabled_a,
-                        &out_enabled_a,
-                        &in_route_a,
-                        &out_route_a,
-                        &active_latency_a,
-                        &latency_restart_pending_a,
-                        &restart_tx_a,
-                        &transport_a,
-                        &mut channel_bufs,
-                        &mut input_bufs,
-                        &mut event_list,
-                        &mut output_events,
-                        &mut sub_event_scratch,
-                        &param_infos,
-                        &params_arc,
-                        min_subblock_samples,
-                        &mut ptr_scratch,
-                        &mut scratch,
-                        #[cfg(feature = "playback")]
-                        playback_a.as_ref(),
-                        #[cfg(feature = "playback")]
-                        sidechain_playback_a.as_ref(),
-                        #[cfg(feature = "playback")]
-                        capture_a.as_ref(),
-                    );
-                },
-                |err| eprintln!("Audio error: {err}"),
-                None,
-            )
-            .map_err(|e| format!("could not build output stream: {e}"))?,
-        format => {
-            return Err(format!(
-                "audio output format {format:?} is not supported \
-                 (truce standalone handles f32 only)"
-            ));
-        }
+    let duplex_input = if driver::on_asio() && is_effect {
+        build_duplex_input(device, config, frame_bound, res)
+    } else {
+        None
     };
 
-    stream
+    let mut reader = RingReader::new(sample_rate);
+    let output = build_output(
+        device,
+        config,
+        supported.sample_format(),
+        frame_bound * channels,
+        move |data: &mut [f32]| {
+            audio_callback::<P>(
+                data,
+                channels,
+                num_in,
+                num_main_in,
+                num_out,
+                sample_rate,
+                is_effect,
+                &plugin_a,
+                &pending_a,
+                &pending_state_a,
+                &ring_a,
+                &mut reader,
+                &enabled_a,
+                &out_enabled_a,
+                &in_route_a,
+                &out_route_a,
+                &active_latency_a,
+                &latency_restart_pending_a,
+                &commands_a,
+                &transport_a,
+                &mut channel_bufs,
+                &mut input_bufs,
+                &mut event_list,
+                &mut output_events,
+                &mut sub_event_scratch,
+                &param_infos,
+                &params_arc,
+                min_subblock_samples,
+                &mut ptr_scratch,
+                &mut scratch,
+                #[cfg(feature = "playback")]
+                playback_a.as_ref(),
+                #[cfg(feature = "playback")]
+                sidechain_playback_a.as_ref(),
+                #[cfg(feature = "playback")]
+                capture_a.as_ref(),
+            );
+        },
+        stream_error_handler(res),
+    )?;
+
+    // Both play once both are built: building the output starts the driver
+    // again, and a reset request some drivers send while starting would
+    // otherwise reach an input already playing and reopen the streams.
+    let duplex_input = duplex_input.filter(|input| match input.play() {
+        Ok(()) => true,
+        Err(e) => {
+            eprintln!("the interface's inputs did not start ({e}); the input stays silent");
+            false
+        }
+    });
+    output
         .play()
         .map_err(|e| format!("could not start output stream: {e}"))?;
 
-    *stream_slot = Some(stream);
     // Publish the new stream's channel count as the mic-ring frame width
     // so the input producer normalizes onto it after a layout switch.
     res.ring_width.store(channels, Ordering::Relaxed);
@@ -2047,6 +2240,9 @@ fn open_output_stream<P: PluginExport>(
         },
         Ordering::Relaxed,
     );
+    if res.sample_rate.swap(config.sample_rate, Ordering::Relaxed) != config.sample_rate {
+        res.transport.set_sample_rate(sample_rate);
+    }
     if let Ok(mut g) = res.current_name.lock() {
         g.clone_from(&resolved_name);
     }
@@ -2058,7 +2254,13 @@ fn open_output_stream<P: PluginExport>(
         channels,
         config.buffer_size,
     );
-    Ok(())
+    Ok(Opened {
+        streams: OpenStreams {
+            _duplex_input: duplex_input,
+            _output: output,
+        },
+        config,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -2070,7 +2272,8 @@ fn open_output_stream<P: PluginExport>(
 struct InputWorker {
     ring: Arc<InputRing>,
     ring_width: Arc<AtomicUsize>,
-    sample_rate: f64,
+    /// The rate the output runs at, which the input opens at.
+    sample_rate: Arc<AtomicU32>,
     enabled: Arc<AtomicBool>,
     current_name: Arc<Mutex<Option<String>>>,
     buffer_frames: Arc<AtomicU32>,
@@ -2114,12 +2317,43 @@ impl InputWorker {
                         self.apply(&mut stream, true, device_name.as_deref());
                     }
                 }
+                InputCmd::DriverChanged => {
+                    stream = None;
+                    self.enabled.store(false, Ordering::Relaxed);
+                    self.ring.clear();
+                    if !driver::on_asio() {
+                        device_name = self.saved_device();
+                        if let Ok(mut g) = self.current_name.lock() {
+                            g.clone_from(&device_name);
+                        }
+                    }
+                    self.apply(&mut stream, want_enabled, device_name.as_deref());
+                }
             }
         }
         drop(stream);
     }
 
+    /// The input chosen for WASAPI, when it is present, else `None` for
+    /// the system default.
+    fn saved_device(&self) -> Option<String> {
+        let name = self.settings.saved().input_device?;
+        find_device(&driver::host(), &name, false)
+            .is_some()
+            .then_some(name)
+    }
+
     fn apply(&self, stream: &mut Option<cpal::Stream>, want: bool, device_name: Option<&str>) {
+        if driver::on_asio() {
+            // The output worker opens the interface's inputs with its
+            // outputs; this only lets what they capture through.
+            *stream = None;
+            if want != self.enabled.load(Ordering::Relaxed) {
+                self.ring.clear();
+            }
+            self.enabled.store(want, Ordering::Relaxed);
+            return;
+        }
         let currently = stream.is_some();
         if want == currently {
             return;
@@ -2131,7 +2365,7 @@ impl InputWorker {
             self.ring.clear();
             return;
         }
-        let host = cpal::default_host();
+        let host = driver::host();
         let device = match device_name {
             Some(name) => find_device(&host, name, false),
             None => host.default_input_device(),
@@ -2159,27 +2393,27 @@ impl InputWorker {
     /// Open `device` at the output's buffer size, or at its own size when
     /// it refuses that one.
     fn open(&self, device: &cpal::Device) -> Result<cpal::Stream, BoxErr> {
-        let mut config = resolve_input_config(
+        let mut input = resolve_input_config(
             device,
             self.ring_width.load(Ordering::Relaxed),
-            self.sample_rate,
+            f64::from(self.sample_rate.load(Ordering::Relaxed)),
             self.buffer_frames.load(Ordering::Relaxed),
         );
         match build_and_play_input_stream(
             device,
-            &config,
+            &input,
             Arc::clone(&self.ring_width),
             Arc::clone(&self.ring),
         ) {
-            Err(e) if config.buffer_size != cpal::BufferSize::Default => {
+            Err(e) if input.stream.buffer_size != cpal::BufferSize::Default => {
                 eprintln!(
                     "the input device refused a {:?} buffer ({e}); using its own buffer size",
-                    config.buffer_size
+                    input.stream.buffer_size
                 );
-                config.buffer_size = cpal::BufferSize::Default;
+                input.stream.buffer_size = cpal::BufferSize::Default;
                 build_and_play_input_stream(
                     device,
-                    &config,
+                    &input,
                     Arc::clone(&self.ring_width),
                     Arc::clone(&self.ring),
                 )
@@ -2187,6 +2421,14 @@ impl InputWorker {
             result => result,
         }
     }
+}
+
+/// How an input stream opens on a device: its shape, the sample format the
+/// device delivers, and the largest block it may deliver.
+struct InputConfig {
+    stream: cpal::StreamConfig,
+    format: cpal::SampleFormat,
+    frame_bound: usize,
 }
 
 /// Resolve an input `StreamConfig` for `device`. Prefers the render
@@ -2198,13 +2440,14 @@ impl InputWorker {
 /// not sample-rate-converted, so the ring drifts within what the reader
 /// sheds - opening at all beats a permanently-unusable mic. The buffer
 /// matches the output's (`buffer_frames`, 0 for the device's own size),
-/// fitted to what the device reports it takes.
+/// fitted to what the device reports it takes. The format is the device's
+/// preferred one where it offers that shape in it.
 fn resolve_input_config(
     device: &cpal::Device,
     channels: usize,
     sample_rate: f64,
     buffer_frames: u32,
-) -> cpal::StreamConfig {
+) -> InputConfig {
     let buffer_size = if buffer_frames > 0 {
         cpal::BufferSize::Fixed(buffer_frames)
     } else {
@@ -2219,34 +2462,49 @@ fn resolve_input_config(
         sample_rate: sample_rate_u32(sample_rate),
         buffer_size,
     };
-    let mut config = ideal.clone();
     // If the device advertises the ideal shape, trust it; else drop to
     // the device default. `supported_input_configs` ranges tell us
     // without a throwaway `build_input_stream`.
-    let supported = device.supported_input_configs().is_ok_and(|mut r| {
-        r.any(|c| {
-            c.channels() == ideal.channels
-                && c.min_sample_rate() <= ideal.sample_rate
-                && c.max_sample_rate() >= ideal.sample_rate
+    let ideal_formats: Vec<cpal::SampleFormat> = device
+        .supported_input_configs()
+        .map(|ranges| {
+            ranges
+                .filter(|c| {
+                    c.channels() == ideal.channels
+                        && c.min_sample_rate() <= ideal.sample_rate
+                        && c.max_sample_rate() >= ideal.sample_rate
+                })
+                .map(|c| c.sample_format())
+                .collect()
         })
-    });
+        .unwrap_or_default();
     let default = device.default_input_config().ok();
-    if !supported && let Some(def) = &default {
-        eprintln!(
-            "mic: device can't open {} ch @ {} Hz; using its default {} ch @ {} Hz",
-            ideal.channels,
-            ideal.sample_rate,
-            def.channels(),
-            def.sample_rate(),
-        );
-        config = def.config();
+    let (mut stream, format) = match &default {
+        Some(def) if ideal_formats.contains(&def.sample_format()) => (ideal, def.sample_format()),
+        _ if !ideal_formats.is_empty() => (ideal, ideal_formats[0]),
+        Some(def) => {
+            eprintln!(
+                "mic: device can't open {} ch @ {} Hz; using its default {} ch @ {} Hz",
+                ideal.channels,
+                ideal.sample_rate,
+                def.channels(),
+                def.sample_rate(),
+            );
+            (def.config(), def.sample_format())
+        }
+        None => (ideal, cpal::SampleFormat::F32),
+    };
+    let supported_buffer = default
+        .as_ref()
+        .map_or(cpal::SupportedBufferSize::Unknown, |def| *def.buffer_size());
+    stream.buffer_size = fit_buffer_size(buffer_size, &supported_buffer);
+    InputConfig {
+        stream,
+        format,
+        // Bounds the device's own size too, which a refused size falls
+        // back to.
+        frame_bound: max_block_frames(cpal::BufferSize::Default, &supported_buffer),
     }
-    if let Some(def) = &default {
-        config.buffer_size = fit_buffer_size(buffer_size, def.buffer_size());
-    } else {
-        config.buffer_size = buffer_size;
-    }
-    config
 }
 
 /// Build an input stream against the given device that hands captured
@@ -2255,48 +2513,48 @@ fn resolve_input_config(
 /// frames onto it. Called from the worker thread.
 fn build_and_play_input_stream(
     device: &cpal::Device,
-    config: &cpal::StreamConfig,
+    input: &InputConfig,
     ring_width: Arc<AtomicUsize>,
     ring: Arc<InputRing>,
 ) -> Result<cpal::Stream, BoxErr> {
     // The mic's channel count (`in_ch`) is fixed for the stream's life.
-    let in_ch = config.channels as usize;
-    let stream = device
-        .build_input_stream(
-            config,
-            move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                // Re-read the ring width each block so a `SetLayout`
-                // switch that changed the output channel count reaches
-                // the producer.
-                ring.capture(data, in_ch, ring_width.load(Ordering::Relaxed));
-            },
-            |err| eprintln!("Input error: {err}"),
-            None,
-        )
-        .map_err(|e| -> BoxErr { format!("could not build input stream: {e}").into() })?;
+    let in_ch = input.stream.channels as usize;
+    let stream = build_input(
+        device,
+        input.stream,
+        input.format,
+        input.frame_bound * in_ch,
+        move |data| {
+            // Re-read the ring width each block so a `SetLayout`
+            // switch that changed the output channel count reaches
+            // the producer.
+            ring.capture(data, in_ch, ring_width.load(Ordering::Relaxed));
+        },
+        |err| report_stream_error("Input error", &err),
+    )?;
     stream
         .play()
-        .map_err(|e| -> BoxErr { format!("could not start input stream: {e}").into() })?;
+        .map_err(|e| format!("could not start input stream: {e}"))?;
     Ok(stream)
 }
 
 /// The device labelled `name`, else the first whose label contains it,
 /// ignoring case, so a flag can name a device by part of its label.
 fn find_device(host: &cpal::Host, name: &str, output: bool) -> Option<cpal::Device> {
-    let labelled: Vec<(cpal::Device, String)> = devices(host, output)
-        .into_iter()
-        .filter_map(|d| device_label(&d).map(|label| (d, label)))
-        .collect();
     let needle = name.to_lowercase();
-    let index = labelled
-        .iter()
-        .position(|(_, label)| label == name)
-        .or_else(|| {
-            labelled
-                .iter()
-                .position(|(_, label)| label.to_lowercase().contains(&needle))
-        })?;
-    labelled.into_iter().nth(index).map(|(d, _)| d)
+    let mut partial = None;
+    for (index, device) in devices(host, output).enumerate() {
+        let Some(label) = device_label(&device) else {
+            continue;
+        };
+        if label == name {
+            return Some(device);
+        }
+        if partial.is_none() && label.to_lowercase().contains(&needle) {
+            partial = Some(index);
+        }
+    }
+    devices(host, output).nth(partial?)
 }
 
 /// The output side of the interface `input` belongs to, if it has one.
@@ -2309,7 +2567,7 @@ fn companion_output(host: &cpal::Host, input: &cpal::Device) -> Option<String> {
         .description()
         .ok()
         .and_then(|d| d.driver().map(str::to_owned));
-    devices(host, true).iter().find_map(|output| {
+    devices(host, true).find_map(|output| {
         let same_device = id.is_some() && output.id().ok() == id;
         let same_interface = interface.is_some()
             && output
@@ -2318,7 +2576,7 @@ fn companion_output(host: &cpal::Host, input: &cpal::Device) -> Option<String> {
                 .and_then(|d| d.driver().map(str::to_owned))
                 == interface;
         if same_device || same_interface {
-            device_label(output)
+            device_label(&output)
         } else {
             None
         }
@@ -2508,7 +2766,7 @@ fn audio_callback<P: PluginExport>(
     output_channel_route: &Arc<AtomicUsize>,
     active_latency: &Arc<AtomicU32>,
     latency_restart_pending: &Arc<AtomicBool>,
-    restart_tx: &mpsc::SyncSender<OutputCmd>,
+    commands: &Weak<mpsc::SyncSender<OutputCmd>>,
     transport: &Transport,
     channel_bufs: &mut Vec<Vec<f32>>,
     input_bufs: &mut Vec<Vec<f32>>,
@@ -2720,7 +2978,7 @@ fn audio_callback<P: PluginExport>(
         plugin.latency(),
         active_latency,
         latency_restart_pending,
-        restart_tx,
+        commands,
     );
     let _ = audio_buffer;
     // Narrow rendered f64 output back to host f32 when the plugin's

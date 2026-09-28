@@ -1,4 +1,4 @@
-# Standalone latency restart, input latency and remembered audio settings
+# Standalone latency restart, input latency, remembered audio settings and ASIO
 
 Source: crates.io `truce-standalone` 6.3.0, upstream commit
 `ff6b573c7d845638656b03bbe4b4436559dd9725`, `crates/truce-standalone` in
@@ -38,7 +38,29 @@ told apart and saved. The plugin is prepared again whenever the stream's block
 bound changes, as a host does when its buffer size changes, as well as when
 its latency changes.
 
-The buffer, device and ring changes follow the same fix in Swanky Amp Pro's
-copy of this crate. Keep these fixes here until a pinned upstream release
-includes equivalent handling; remove the Cargo patch and this directory
-together when upgrading to that release.
+The published standalone also runs only on cpal's default host, which on
+Windows is WASAPI shared mode, adding about 10 ms each way. With the fork's
+asio feature, which the Windows bundles enable, the Windows standalone runs on
+ASIO when an ASIO driver is installed (`driver.rs`). The Settings menu gains an
+Audio Driver submenu, ASIO or Windows (WASAPI), saved with the other choices;
+the --driver flag overrides it for one launch. An ASIO interface is one device
+for input and output: both device submenus list the installed ASIO drivers,
+and the interface is saved apart from the WASAPI devices. A buffer's input
+reaches the output in that same buffer. Streams convert to the device's sample
+format, which for ASIO is commonly 32-bit integers (`format.rs`); a driver's
+reset request reopens the streams; and a driver or interface switch that lands
+on a device that cannot run the current rate prepares the plugin again at the
+device's rate. The fork depends on cpal 0.18, whose ASIO backend fixes duplex
+streams and driver reloading, and so on midir 0.11, which shares its ALSA
+bindings; neither adds a crate to the macOS or Windows builds. ASIO is a
+trademark and software of Steinberg Media Technologies GmbH.
+
+A latency restart reaches the output worker the way a driver's reset request
+does, through the worker's bounded command queue by a weak handle, so the
+worker still ends with the host, and it reopens the device the streams run on
+rather than looking one up again.
+
+The buffer, device, ring and ASIO changes follow the same fixes in Swanky Amp
+Pro's copy of this crate. Keep these fixes here until a pinned upstream
+release includes equivalent handling; remove the Cargo patch and this
+directory together when upgrading to that release.

@@ -1,5 +1,6 @@
 //! Audio choices the standalone remembers on this machine: the input and
-//! output devices picked from the Settings menu, and the buffer size.
+//! output devices picked from the Settings menu, the buffer size, and on
+//! Windows the audio driver and the ASIO interface.
 //!
 //! Launch flags and their environment variables override the saved values
 //! for that launch and are never written back, so a one-off `--buffer 32`
@@ -15,6 +16,37 @@ pub const BUFFER_SIZES: [u32; 6] = [32, 64, 128, 256, 512, 1024];
 /// enough to play an instrument through, and within what interfaces accept.
 pub const DEFAULT_BUFFER_SIZE: u32 = 128;
 
+/// The audio driver the standalone plays through. Windows offers two:
+/// ASIO, an audio interface's own low-latency driver, and WASAPI shared
+/// mode, which every device supports at the cost of about 10 ms each way.
+/// Elsewhere the system has one driver and the choice has no effect.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AudioDriver {
+    Asio,
+    Wasapi,
+}
+
+impl AudioDriver {
+    /// Read the name a flag, the environment or the settings file uses.
+    #[must_use]
+    pub fn parse(name: &str) -> Option<Self> {
+        match name.trim().to_ascii_lowercase().as_str() {
+            "asio" => Some(Self::Asio),
+            "wasapi" => Some(Self::Wasapi),
+            _ => None,
+        }
+    }
+
+    /// The name [`Self::parse`] reads.
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Asio => "asio",
+            Self::Wasapi => "wasapi",
+        }
+    }
+}
+
 /// The saved choices. `None` means nothing was chosen, so the launch falls
 /// back to the system default device or [`DEFAULT_BUFFER_SIZE`].
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -22,11 +54,18 @@ pub struct Settings {
     pub input_device: Option<String>,
     pub output_device: Option<String>,
     pub buffer_size: Option<u32>,
+    pub driver: Option<AudioDriver>,
+    /// The interface chosen while on ASIO, one device for input and output.
+    /// It is kept apart from the WASAPI devices so that switching driver
+    /// returns to the device last used with each.
+    pub asio_device: Option<String>,
 }
 
 const INPUT_DEVICE: &str = "input_device";
 const OUTPUT_DEVICE: &str = "output_device";
 const BUFFER_SIZE: &str = "buffer_size";
+const DRIVER: &str = "driver";
+const ASIO_DEVICE: &str = "asio_device";
 
 impl Settings {
     /// Read the settings at `path`. A missing or unreadable file, and any
@@ -47,6 +86,8 @@ impl Settings {
                 INPUT_DEVICE => settings.input_device = name,
                 OUTPUT_DEVICE => settings.output_device = name,
                 BUFFER_SIZE => settings.buffer_size = value.trim().parse().ok().filter(|&n| n > 0),
+                DRIVER => settings.driver = AudioDriver::parse(value),
+                ASIO_DEVICE => settings.asio_device = name,
                 _ => {}
             }
         }
@@ -65,6 +106,8 @@ impl Settings {
             (INPUT_DEVICE, self.input_device.clone()),
             (OUTPUT_DEVICE, self.output_device.clone()),
             (BUFFER_SIZE, self.buffer_size.map(|n| n.to_string())),
+            (DRIVER, self.driver.map(|d| d.name().to_owned())),
+            (ASIO_DEVICE, self.asio_device.clone()),
         ];
         for (key, value) in lines {
             if let Some(value) = value {
@@ -92,6 +135,28 @@ pub fn launch_buffer_size(flag: Option<u32>, saved: Option<u32>) -> u32 {
     flag.filter(|&n| n > 0)
         .or(saved.filter(|&n| n > 0))
         .unwrap_or(DEFAULT_BUFFER_SIZE)
+}
+
+/// The driver a launch opens: the launch flag, else the saved choice, else
+/// ASIO when a driver for it is installed. ASIO without an installed driver
+/// falls back to WASAPI. `asio_installed` is asked only when ASIO is wanted,
+/// so choosing WASAPI never touches an ASIO driver.
+#[must_use]
+pub fn launch_driver(
+    flag: Option<AudioDriver>,
+    saved: Option<AudioDriver>,
+    asio_installed: impl FnOnce() -> bool,
+) -> AudioDriver {
+    match flag.or(saved) {
+        Some(AudioDriver::Wasapi) => AudioDriver::Wasapi,
+        Some(AudioDriver::Asio) | None => {
+            if asio_installed() {
+                AudioDriver::Asio
+            } else {
+                AudioDriver::Wasapi
+            }
+        }
+    }
 }
 
 /// Where a plugin's standalone keeps its settings: the machine-local
@@ -151,7 +216,7 @@ impl SettingsStore {
 
 #[cfg(test)]
 mod tests {
-    use super::{Settings, launch_buffer_size};
+    use super::{AudioDriver, Settings, launch_buffer_size, launch_driver};
 
     fn scratch_file(name: &str) -> std::path::PathBuf {
         std::env::temp_dir()
@@ -166,6 +231,8 @@ mod tests {
             input_device: Some("IN 1-2 (BEHRINGER UMC 202HD 192k) = Line".to_owned()),
             output_device: Some("Haut-parleurs (Réalité)".to_owned()),
             buffer_size: Some(64),
+            driver: Some(AudioDriver::Asio),
+            asio_device: Some("UMC ASIO Driver".to_owned()),
         };
         saved.save(&path).expect("settings write");
         assert_eq!(Settings::load(&path), saved);
@@ -174,6 +241,8 @@ mod tests {
             input_device: None,
             output_device: Some("UMC202HD 192k".to_owned()),
             buffer_size: None,
+            driver: Some(AudioDriver::Wasapi),
+            asio_device: None,
         };
         partly.save(&path).expect("settings write");
         assert_eq!(Settings::load(&path), partly);
@@ -193,5 +262,24 @@ mod tests {
         assert_eq!(launch_buffer_size(Some(32), Some(256)), 32);
         assert_eq!(launch_buffer_size(None, Some(256)), 256);
         assert_eq!(launch_buffer_size(None, None), 128);
+    }
+
+    #[test]
+    fn launch_driver_prefers_the_flag_then_the_saved_choice_then_asio() {
+        use AudioDriver::{Asio, Wasapi};
+        let installed = || true;
+        assert_eq!(launch_driver(Some(Wasapi), Some(Asio), installed), Wasapi);
+        assert_eq!(launch_driver(Some(Asio), Some(Wasapi), installed), Asio);
+        assert_eq!(launch_driver(None, Some(Wasapi), installed), Wasapi);
+        assert_eq!(launch_driver(None, None, installed), Asio);
+    }
+
+    #[test]
+    fn launch_driver_falls_back_to_wasapi_without_an_asio_driver() {
+        use AudioDriver::{Asio, Wasapi};
+        let missing = || false;
+        assert_eq!(launch_driver(None, None, missing), Wasapi);
+        assert_eq!(launch_driver(Some(Asio), None, missing), Wasapi);
+        assert_eq!(launch_driver(None, Some(Asio), missing), Wasapi);
     }
 }

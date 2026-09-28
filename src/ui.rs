@@ -560,6 +560,15 @@ fn information_overlay<'a, R: FreeRenderer + 'a>(
             snap: false,
         }))
         .push(links);
+    if let Some(notice) = asio_notice() {
+        content = content.push(line(
+            "information.asio",
+            notice.to_owned(),
+            11.0,
+            style::FONT,
+            DIM,
+        ));
+    }
     let panel = layout::mark(
         Component::new("information", "dialog", "native"),
         container(content)
@@ -589,6 +598,17 @@ fn information_overlay<'a, R: FreeRenderer + 'a>(
         )
         .on_press(Message::Plugin(Action::Information(false))),
     )
+}
+
+/// Steinberg's ASIO licence asks for this line in the About panel of a
+/// product that hosts ASIO drivers. Only the Windows standalone built with
+/// ASIO does; the plug-ins play through whatever driver their host has open.
+fn asio_notice() -> Option<&'static str> {
+    #[cfg(feature = "standalone")]
+    if truce_standalone::driver::asio_built() {
+        return Some("ASIO is a trademark and software of Steinberg Media Technologies GmbH.");
+    }
+    None
 }
 
 /// Plain text that acts, as Pro's panel links are, lit in the accent under
