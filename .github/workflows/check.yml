@@ -2,7 +2,7 @@ name: check
 
 on:
   push:
-    branches: [master, asio]
+    branches: [master]
   pull_request:
 
 concurrency:
@@ -71,7 +71,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-2025]
+        os: [macos-15, windows-2025]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         if: needs.changes.outputs.code == 'true'
