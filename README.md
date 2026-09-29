@@ -495,8 +495,9 @@ The editable artwork in `assets/artwork` is licensed under CC BY 4.0; see its
 Font License in `assets/fonts/PTSans-OFL.txt`.
 
 The information panel's Third-party licences link opens the third-party
-notices the plug-in embeds: the font's licence and every crate the shipped
-formats link, grouped by licence. `just notices` writes them
+notices the plug-in embeds: the font's licence, every crate the shipped
+formats link, grouped by licence, and the ASIO SDK's licences and source.
+`just notices` writes them
 to `THIRD-PARTY-NOTICES.txt` with a pinned cargo-about from `about.toml` and
 `about.hbs`. The candidate workflow runs it before packaging and names the file
 in `THIRD_PARTY_NOTICES`, which `build.rs` embeds; a build without that
