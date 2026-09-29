@@ -22,6 +22,8 @@ just render-model "high gain" /tmp/high-gain.wav
 
 `just model-check` runs the ten-preset comparison by itself. It checks every active triode plus the tone stack, power amp, cabinet, and final output. The fixed acceptance bounds are 0.2% relative waveform RMS, 0.65% relative peak error, and 0.02 dB in each low, mid, and high band. The peak bound covers the measured 0.627% level-11 power-stage difference from a noncontracting C++ build; RMS and band bounds remain unchanged and retain the timing, polarity, state, and voicing checks.
 
+The versioned reference corpus captures the released cold startup, including its 1024-sample output mute. The Rust path settles its configured nonlinear state for one second before audio begins, and stages re-enter warm when the continuous stage-count control brings them back into the signal path. Model comparison therefore applies the same one-second silent pre-roll to the released chain and excludes it from the measured WAVs. The cold corpus and warmed comparison remain separate so the startup difference is explicit.
+
 The shipping path applies Auto oversampling to the nonlinear tube stages while the cabinet remains at the host rate. Auto uses 2x at 44.1 and 48 kHz and 1x at 88.2 kHz and above; fixed 1x, 2x, and 4x choices are capped below 193.92 kHz internally. The header button cycles Auto, 1x, 2x and 4x and shows the factor the engine is running once audio has been prepared, such as "Auto 2×"; it is lit whenever the tube stages oversample or Auto is still choosing. The host receives the measured FIR delay: 32 samples at 2x and 48 samples at 4x. CLAP and VST3 changes request the host's deactivate/activate sequence; an Audio Unit host is told the new latency and the factor takes effect at its next reset; the standalone stops and rebuilds its output stream on the existing worker. An active CLAP reset clears processing history at the current factor with a bounded, allocation-free equilibrium calculation. Activation applies the pending factor off the audio thread. Choices that resolve to the active factor keep their state without a restart. The plate low-pass stays at 20 kHz as the tube rate changes and reproduces the released coefficients at 44.1 kHz.
 
 Regenerate the public factor, latency, seam-level, and aliasing measurements with:
@@ -202,16 +204,15 @@ just soak-check    # verdict so far, or the final one
 
 A shipping-path run passes when no sample is non-finite, its output RMS over the last 30 minutes is within 0.1 dB of the first 30 minutes, and its band modulation never exceeds the largest value of the first 10 minutes by more than 25% plus 0.005. Stationary noise alone reads about 0.06 through the estimator, so the margin covers its scatter while a coherent tremolo of about 0.4 dB depth still fails. The legacy run is reported for context and is not gated. `soak-check` also reports first-to-last-hour and per-seam drift and the slowest window against the median. On an Apple M-series core four hours of audio take about 25 minutes per run.
 
-The first four-hour soak, [`verification/soak/2026-09-22-summary.txt`](verification/soak/2026-09-22-summary.txt), reproduced issue #34 on the legacy path. On `level 11`, after about 3.7 hours (13,290 to 13,640 s) the tone-stack seam rose by 23 to 26 dB while the power amp, cabinet and output fell by 15 to 26 dB, with modulation indices of 9 to 17 against a baseline under 0.7. Every triode seam stayed within 0.002 dB, which places the instability in the released tone stack at 44.1 kHz rather than in the stages' drift and compression envelopes. The shipping path of that commit, which already ran the tube stages and tone stack at 2x, passed four hours on all three presets with at most 0.005 dB of drift, modulation at its baseline and no non-finite samples.
-
-The 12-hour soak of the shipping path at commit 318c8b5 found the same
-failure there: `level 11` at Auto (2x) collapsed after about ten hours of noise
-(tone-stack seam +43 dB, output -131 dB), while `level 11` at 1x and Init at 1x
-and 2x held within 0.002 dB. The cause was the tone stack's spurious Nyquist
-pole described under Tone stack, which also accounts for the legacy failure
-above. After the fix, 12-hour runs of Init at 2x and `level 11` at 2x and 4x
-passed, recorded in
-[`verification/soak/2026-09-23-summary.txt`](verification/soak/2026-09-23-summary.txt).
+The soak reproduced issue #34 on the legacy path: on `level 11`, after about
+3.7 hours the tone-stack seam rose by 23 to 26 dB while every later seam fell,
+and every triode seam held within 0.002 dB
+([`verification/soak/2026-09-22-summary.txt`](verification/soak/2026-09-22-summary.txt)).
+A 12-hour run found the same collapse on the shipping path after about ten
+hours at 2x. Both were the tone stack's spurious Nyquist pole described under
+Tone stack; after the fix, 12-hour runs of Init at 2x and `level 11` at 2x and
+4x passed
+([`verification/soak/2026-09-23-summary.txt`](verification/soak/2026-09-23-summary.txt)).
 Because that growth is a few parts in 10⁹ per sample, the pre-release check
 drives the shipping tone stack alone for 24 hours of samples in minutes:
 
@@ -229,7 +230,7 @@ worst hourly drift over all 21 cases is 0.005 dB. `just` includes a short test
 that the stack falls silent after its input stops at each of those rates,
 which the Nyquist pole prevents.
 
-The versioned reference corpus captures the released cold startup, including its 1024-sample output mute. The Rust path settles its configured nonlinear state for one second before audio begins, and stages re-enter warm when the continuous stage-count control brings them back into the signal path. Model comparison therefore applies the same one-second silent pre-roll to the released chain and excludes it from the measured WAVs. The cold corpus and warmed comparison remain separate so the startup difference is explicit.
+### Standalone
 
 After `just setup`, open the standalone shell with:
 
@@ -249,6 +250,8 @@ Settings menu chooses between ASIO and Windows (WASAPI); the `--driver` flag,
 device for input and output. The Windows recipes build the standalone with the
 Cargo feature `asio`, which compiles the ASIO SDK that `just setup` fetches
 into `tools/` and needs libclang; no other build compiles it.
+
+### Editor
 
 The editor uses one iced widget tree for the live controls and the artwork
 layout contract. As in 1.4, the six Free signal-flow groups (Levels, Cabinet,
@@ -278,10 +281,9 @@ just capture /tmp/swanky-capture
 that factory preset applied and named in the header, and
 `just capture-information /tmp/swanky-capture` with the information panel
 open; `just capture-information /tmp/swanky-capture 2.0.1` also announces
-that release in it. `capture` needs a
-working GPU adapter. The layout export remains available when
-the artwork package is missing or stale so a new bake can be produced from
-changed widget geometry.
+that release in it. `capture` needs a working GPU adapter. The layout export
+remains available when the artwork package is missing or stale so a new bake
+can be produced from changed widget geometry.
 
 The four live meter columns, captioned L and R, are local to each plugin
 instance. The blue input pair observes the signal after the Input control on
@@ -310,6 +312,8 @@ is descriptive, so replacement CC artwork does not depend on Blender or the
 original production sources. `just` validates that the checked-in package is
 the deterministic result of the editable layers.
 
+### Bundle validation
+
 Bundle validation is a separate platform check:
 
 ```sh
@@ -321,8 +325,9 @@ just validate
 checkout and downloads checksum-verified builds of pluginval and clap-validator,
 and on Windows the checksum-verified ASIO SDK.
 `validate` builds and installs the CLAP and VST3 bundles, and on macOS the
-Audio Unit, and runs the validators over them, auval among them on macOS. GitHub Actions builds the standalone and runs the same bundle
-validation on macOS and Windows without signing or repository secrets.
+Audio Unit, and runs the validators over them, auval among them on macOS.
+GitHub Actions builds the standalone and runs the same bundle validation on
+macOS and Windows without signing or repository secrets.
 
 ## Releasing
 
@@ -365,28 +370,21 @@ draft GitHub Release once. A rerun refuses to replace an existing draft, so any
 new bytes require a new RC number and a fresh review. Workflow artifacts are
 also retained for rehearsals and inspection.
 
-The public interface pull request must land before the first candidate. It owns
-`assets/artwork.pack` and the `just validate-assets` recipe invoked by every
-candidate platform; this release branch intentionally does not duplicate that
-format contract.
-
 ### Signing setup
 
 The repository's release-tag `v*` and `rehearsal/*` branch rules allow only
 administrators to create, update or delete those refs. The protected `signing`
 environment allows only `v*-rc.*` tags and `rehearsal/*` branches. Fork and
-pull-request runs have no path to it. The seven Windows variables below are
-configured for the Free-specific OIDC identity and shared Resonant DSP
-publisher profile. Apple secrets and the release environment's website token
-remain to be provisioned. Store the existing Apple material in `signing` as
-`APPLE_CERTIFICATES_P12`, `APPLE_CERTIFICATES_PASSWORD`, `APPLE_API_KEY_P8`,
-`APPLE_API_KEY_ID`, and `APPLE_API_ISSUER_ID`.
+pull-request runs have no path to it. `signing` holds the existing Apple
+material as `APPLE_CERTIFICATES_P12`, `APPLE_CERTIFICATES_PASSWORD`,
+`APPLE_API_KEY_P8`, `APPLE_API_KEY_ID`, and `APPLE_API_ISSUER_ID`.
 
-Create a Free-specific Azure application and service principal with a federated
-identity scoped to this repository's `signing` environment. Its signer-only
-role may use the existing Public Trust profile for the same Resonant DSP
-publisher; Free does not need a second certificate profile or access to Pro
-source and runtime resources. Configure these nonsecret repository variables:
+Windows signing uses a Free-specific Azure application and service principal
+with a federated identity scoped to this repository's `signing` environment.
+Its signer-only role uses the existing Public Trust profile for the same
+Resonant DSP publisher; Free needs no second certificate profile and no access
+to Pro source or runtime resources. These nonsecret repository variables
+configure it:
 
 - `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, and `AZURE_SUBSCRIPTION_ID`
 - `TRUCE_AZURE_ACCOUNT`, `TRUCE_AZURE_PROFILE`, and `TRUCE_AZURE_ENDPOINT`
@@ -434,7 +432,21 @@ that merge.
 `just promote-check CANDIDATE_TAG TAG RECORD_SHA256 DIRECTORY` runs the local,
 read-only identity and byte checks from the stable tag checkout.
 
-## Release notices
+## Information panel and release notices
+
+The header carries a small outlined information button to the left of the
+preset bar. A press opens the information panel over the dimmed editor: the
+product name and running version, such as "Swanky Amp Free 2.0.0", and links
+to the website's product page, the manual and support, each tagged
+`utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=information`. Escape,
+the button again or a press outside the panel closes it.
+
+Copy diagnostics, beside the links, puts a short block on the clipboard for a
+support request: product and version, operating system and architecture, the
+host application and plug-in format, the sample rate and buffer audio last ran
+at, and the licence. Nothing is sent anywhere; the player pastes it. The
+Third-party licences link and, in the Windows standalone, the ASIO Compatible
+logo are described under [Source and licences](#source-and-licences).
 
 Opening an editor starts a background check for the static current-release
 document at
@@ -445,31 +457,19 @@ most 4 KiB and has this schema:
 {"schemaVersion":1,"productId":"SwankyAmp","currentVersion":"2.0.1"}
 ```
 
-The website emits `"currentVersion":null` until `SwankyAmp` is available and
-has verified downloads for that same version. The endpoint does not exist yet;
-the website change that generates it from the promoted release catalogue is a
-separate deployment. A missing endpoint, an offline computer, an invalid
-document and a timeout are all silent.
+The website generates it from the promoted release catalogue and emits
+`"currentVersion":null` until `SwankyAmp` is available and has verified
+downloads for that same version. A missing endpoint, an offline computer, an
+invalid document and a timeout are all silent.
 
 The plugin accepts only a strict stable `major.minor.patch` version and
 compares it numerically, component by component, with the running version.
-The header carries a small outlined information button to the left of the
-preset bar. A press opens the information panel over the dimmed editor: the
-product name and running version, such as "Swanky Amp Free 2.0.0", and links
-to the website's product page, the manual and support, each tagged
-`utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=information`. Escape,
-the button again or a press outside the panel closes it. When the document
-names a strictly newer version, the button turns into a highlighted download
-arrow and the panel adds a line announcing that version with a Download link
-to the fixed tagged catalogue URL
+When the document names a strictly newer version, the information button turns
+into a highlighted download arrow and the panel adds a line announcing that
+version with a Download link to the fixed tagged catalogue URL
 `https://resonantdsp.com/products/swanky-amp/?utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=release-notice`,
 opened in the default browser only on an explicit press; the downloaded
 document cannot choose a link.
-
-Copy diagnostics, beside the links, puts a short block on the clipboard for a
-support request: product and version, operating system and architecture, the
-host application and plug-in format, the sample rate and buffer audio last ran
-at, and the licence. Nothing is sent anywhere; the player pastes it.
 
 The check has a three-second total timeout, follows no redirects and retains its
 last valid answer and last attempt time in the process. It also stores them
@@ -488,7 +488,7 @@ request-timing information needed to serve and operate the endpoint.
 
 ## Source and licences
 
-Swanky Amp is licensed under GPLv3 or later; see [LICENSE](LICENSE). The model authority is the exact Free 1.4.0 C++ wrapper and generated Faust headers preserved in `verification/reference/released` from the `juce-1.4.0` tag. The public legacy renderer retains the released control mappings, detuning, fitted constants, stage behavior, calibration tables, cubic knee, fixed digital plate filter, and old tone mapping. The shipping path adds tube-only oversampling, a rate-tracked 20 kHz plate filter, a unit-slope triode knee, the standard tone-stack mapping with refitted factory presets and level compensation recalibrated against the released path; later corrected-model work remains subject to measurement and player audition. Small equation and filter primitives were selectively adapted from the separately implemented Pro code only where comparison proved that they express the released Free equations.
+Swanky Amp is licensed under GPLv3 or later; see [LICENSE](LICENSE). The model authority is the exact Free 1.4.0 C++ wrapper and generated Faust headers preserved in `verification/reference/released` from the `juce-1.4.0` tag. The public legacy renderer retains the released control mappings, detuning, fitted constants, stage behavior, calibration tables, cubic knee, fixed digital plate filter, and old tone mapping. The shipping path adds tube-only oversampling, a rate-tracked 20 kHz plate filter, a unit-slope triode knee, the standard tone-stack mapping with refitted factory presets and level compensation recalibrated against the released path. Small equation and filter primitives were selectively adapted from the separately implemented Pro code only where comparison proved that they express the released Free equations.
 
 The editable artwork in `assets/artwork` is licensed under CC BY 4.0; see its
 `ARTWORK-LICENSE.txt`. The editor typography uses PT Sans under the SIL Open

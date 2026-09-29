@@ -1,8 +1,9 @@
 //! Steinberg's ASIO Compatible logo, which its ASIO usage guidelines ask for
-//! in the About (here information) panel of a product that runs on ASIO by default, as the
-//! Windows standalone does. The artwork is Steinberg's own file, the white
-//! version made for a dark background, drawn as the vector outlines it holds
-//! so it stays sharp at any interface scale without an image decoder.
+//! in the About (here information) panel of a product that runs on ASIO by
+//! default, as the Windows standalone does. The artwork is Steinberg's own
+//! file, the white version made for a dark background, drawn as the vector
+//! outlines it holds so it stays sharp at any display scale without an image
+//! decoder.
 use crate::widgets::{FreeRenderer, Msg};
 use iced_core::{
     Color, Element, Length, Point, Rectangle, Size, Theme, layout, mouse, renderer,
