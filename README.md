@@ -258,8 +258,8 @@ the live controls and the artwork layout contract. As in 1.4, the six Free signa
 Preamp, Staging, Power Amp and Tone) are separate rounded boxes with graphite
 between them, each outlined by its own V groove. Pro's material language
 carries over with 1.4's rose highlight as Free's accent on the lit rings,
-the selected outlines and the output meter. The bundled CC BY 4.0 material
-layers provide the graphite, brushed metal, shadows, and response lighting.
+the selected outlines and the output meter. The bundled CC BY 4.0 artwork
+package provides the graphite, brushed metal, shadows, and response lighting.
 The cabinet's on/off is a two-position vertical switch: a brushed aluminium
 disc in a V track baked into the faceplate, exactly one disc wide and two
 tall, the disc in the top half when on and the bottom half when off. The disc
@@ -312,10 +312,13 @@ L and R. Immediate attack and a half-second release settle to exact darkness,
 after which the editor has no meter change to redraw; the meters also go dark
 while the editor window has lost focus and the pointer is elsewhere.
 
-Artwork contributors can make a public, reproducible round trip without the
-production renderer. Unpack the deterministic RGB9E5 package to editable ZIP
-float32 RGB EXRs, edit them in a standard HDR image tool, refresh the receipt,
-then repack and validate:
+The repository carries the artwork as `assets/artwork.pack` with its
+`receipt.json` and `ARTWORK-LICENSE.txt` in `assets/artwork`; the editable
+layers are not committed, since each rebake would add some 30 MB of EXRs to
+the history. They come from the package itself. Artwork contributors can make a
+public, reproducible round trip without the production renderer: unpack the
+deterministic RGB9E5 package to editable ZIP float32 RGB EXRs, edit them in a
+standard HDR image tool, refresh the receipt, then repack and validate:
 
 ```sh
 just unpack-artwork assets/artwork.pack /tmp/swanky-artwork
@@ -324,6 +327,9 @@ just pack-artwork /tmp/swanky-artwork /tmp/swanky-artwork.pack
 just validate-assets /tmp/swanky-artwork.pack /tmp/swanky-artwork
 ```
 
+Packing the unpacked layers unedited reproduces the package byte for byte.
+To propose an edit, unpack into `assets/artwork` (the EXRs there are ignored by
+git) and commit the repacked package and refreshed receipt.
 The base and shadow layers are twice the editor's size in each direction. The
 package stores every layer as deflated RGB9E5 and adds two box-filtered
 halvings of the base, shadow and disc sprite, averaged in linear light, for
@@ -331,8 +337,10 @@ interface sizes that draw them smaller than their texels.
 The receipt records the scene-linear radiance and display-linear shadow
 semantics, dimensions, hashes, and public layout provenance. Producer metadata
 is descriptive, so replacement CC artwork does not depend on Blender or the
-original production sources. `just` validates that the checked-in package is
-the deterministic result of the editable layers.
+original production sources. `just` validates that the checked-in package
+describes its committed receipt and, when the layers are present in
+`assets/artwork` or a folder given to `validate-assets`, that it is the
+deterministic result of packing them.
 
 ### Bundle validation
 
@@ -515,8 +523,8 @@ request-timing information needed to serve and operate the endpoint.
 
 Swanky Amp is licensed under GPLv3 or later; see [LICENSE](LICENSE). The model authority is the exact Free 1.4.0 C++ wrapper and generated Faust headers preserved in `verification/reference/released` from the `juce-1.4.0` tag. The public legacy renderer retains the released control mappings, detuning, fitted constants, stage behavior, calibration tables, cubic knee, fixed digital plate filter, and old tone mapping. The shipping path adds tube-only oversampling, a rate-tracked 20 kHz plate filter, a unit-slope triode knee, the standard tone-stack mapping with refitted factory presets and level compensation recalibrated against the released path. Small equation and filter primitives were selectively adapted from the separately implemented Pro code only where comparison proved that they express the released Free equations.
 
-The editable artwork in `assets/artwork` is licensed under CC BY 4.0; see its
-`ARTWORK-LICENSE.txt`. The editor typography uses PT Sans under the SIL Open
+The artwork in `assets/artwork.pack`, and the layers unpacked from it, is
+licensed under CC BY 4.0; see `assets/artwork/ARTWORK-LICENSE.txt`. The editor typography uses PT Sans under the SIL Open
 Font License in `assets/fonts/PTSans-OFL.txt`.
 
 The information panel's Third-party licences link opens the third-party

@@ -104,6 +104,10 @@ installs beside Swanky Amp 1.4.0.
   computer, never in presets or host state. The faceplate artwork is baked at
   two texels per interface pixel with filtered levels, so it is sharp at 100 %
   on Retina and at 150 %.
+- Stopped committing the editable artwork layers: the repository keeps the
+  artwork package with its receipt and licence, and `just unpack-artwork`
+  recreates the EXR layers from the package, which pack back to it byte for
+  byte.
 - Added a bounded, cached release notice: the information button turns into a
   highlighted download arrow when a newer stable release is published, and the
   panel announces it with a link to the fixed catalogue page.

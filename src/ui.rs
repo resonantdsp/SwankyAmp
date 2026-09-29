@@ -163,7 +163,7 @@ impl FreeUi {
                     14.0,
                 ],
                 text(section.appearance.replace('-', " ").to_uppercase())
-                    .size(11)
+                    .size(12)
                     .font(style::BOLD)
                     .line_height(LineHeight::Absolute(12.0.into()))
                     .color(INK),

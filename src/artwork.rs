@@ -125,7 +125,6 @@ pub struct PackedLayer {
     pub width: u32,
     pub height: u32,
     pub semantics: String,
-    pub source_sha256: String,
     /// The layer and its box-filtered halvings, each RGB9E5 and deflated:
     /// every format's binary embeds the package, so its footprint is paid
     /// many times over.
@@ -140,8 +139,6 @@ pub struct PackedLayer {
     pub value: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<[f32; 2]>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub peak: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -832,6 +829,10 @@ fn upload(
     texture
 }
 
+/// The package is sound and describes what the committed receipt records.
+/// The editable layers are not committed; when a layers folder holds them, as
+/// after `unpack-artwork` or a production render, the package must also be
+/// exactly what packing them produces.
 pub fn validate_assets(
     package_path: &Path,
     layers_directory: &Path,
@@ -839,17 +840,36 @@ pub fn validate_assets(
     let bytes = std::fs::read(package_path)
         .map_err(|error| format!("cannot read {}: {error}", package_path.display()))?;
     let header = validate_package_bytes(&bytes, true, true)?;
-    let first = build_package(layers_directory)?;
-    let second = build_package(layers_directory)?;
-    if first != second {
-        return Err("packing the same artwork twice produced different bytes".into());
+    let receipt = read_receipt(layers_directory)?;
+    validate_receipt(&receipt)?;
+    let levels = header.layers.iter().map(|layer| layer.levels.clone());
+    if package_header(&receipt, levels.collect()) != header {
+        return Err("artwork package does not describe its committed receipt".into());
     }
-    if bytes != first {
-        return Err(
-            "artwork package is not the deterministic result of its editable layers".into(),
-        );
+    let present = receipt
+        .layers
+        .iter()
+        .any(|layer| layers_directory.join(&layer.file).exists());
+    if present {
+        let first = build_package(layers_directory)?;
+        let second = build_package(layers_directory)?;
+        if first != second {
+            return Err("packing the same artwork twice produced different bytes".into());
+        }
+        if bytes != first {
+            return Err(
+                "artwork package is not the deterministic result of its editable layers".into(),
+            );
+        }
     }
     Ok(header)
+}
+
+fn read_receipt(directory: &Path) -> Result<Receipt, String> {
+    let path = directory.join("receipt.json");
+    let bytes =
+        std::fs::read(&path).map_err(|error| format!("cannot read {}: {error}", path.display()))?;
+    serde_json::from_slice(&bytes).map_err(|error| format!("invalid {}: {error}", path.display()))
 }
 
 pub fn unpack(package_path: &Path, destination: &Path) -> Result<PackageHeader, String> {
@@ -905,9 +925,11 @@ pub fn unpack(package_path: &Path, destination: &Path) -> Result<PackageHeader, 
             "source_sha256": sha256(&bytes),
             "product_revision": header.physical_sha256,
         }),
+        // The pixels are still the ones this render made, so the record stays
+        // and packing them again reproduces the package.
         render: RenderReceipt {
-            blender: "not-used".into(),
-            engine: "public-rgb9e5-unpack".into(),
+            blender: header.render.blender.clone(),
+            engine: header.render.engine.clone(),
             samples: header.render.samples,
             seed: header.render.seed,
             max_bounces: header.render.max_bounces,
@@ -922,21 +944,16 @@ pub fn unpack(package_path: &Path, destination: &Path) -> Result<PackageHeader, 
 }
 
 fn build_package(directory: &Path) -> Result<Vec<u8>, String> {
-    let receipt_path = directory.join("receipt.json");
-    let receipt_bytes = std::fs::read(&receipt_path)
-        .map_err(|error| format!("cannot read {}: {error}", receipt_path.display()))?;
-    let receipt: Receipt = serde_json::from_slice(&receipt_bytes)
-        .map_err(|error| format!("invalid {}: {error}", receipt_path.display()))?;
+    let receipt = read_receipt(directory)?;
     validate_receipt(&receipt)?;
 
     let mut payload = Vec::new();
-    let mut layers = Vec::with_capacity(receipt.layers.len());
+    let mut levels_by_layer = Vec::with_capacity(receipt.layers.len());
     for source in &receipt.layers {
         let path = safe_layer_path(directory, &source.file)?;
         let source_bytes = std::fs::read(&path)
             .map_err(|error| format!("cannot read {}: {error}", path.display()))?;
-        let source_sha256 = sha256(&source_bytes);
-        if source_sha256 != source.sha256 {
+        if sha256(&source_bytes) != source.sha256 {
             return Err(format!("{} does not match its receipt hash", source.file));
         }
         let decoded = decode_exr(&path)?;
@@ -946,29 +963,46 @@ fn build_package(directory: &Path) -> Result<Vec<u8>, String> {
                 source.file, decoded.width, decoded.height, source.width, source.height
             ));
         }
+        let mut words = Vec::with_capacity(decoded.pixels.len());
+        for pixel in decoded.pixels {
+            let word = encode_rgb9e5(pixel)
+                .map_err(|error| format!("{} contains {error}", source.file))?;
+            if bounded(&source.role)
+                && decode_rgb9e5(word)
+                    .into_iter()
+                    .any(|channel| channel > 1.001)
+            {
+                return Err(format!(
+                    "{} values must stay between zero and one",
+                    source.role
+                ));
+            }
+            words.push(word);
+        }
+        // The halvings average the stored texels rather than the source's, so
+        // an unpacked package packs back to the same bytes.
         let count = if minified(&source.role) {
             MIP_LEVELS
         } else {
             1
         };
+        let stored_texels = words.iter().map(|&word| decode_rgb9e5(word)).collect();
         let mut levels = Vec::with_capacity(count);
-        for pixels in halvings(decoded.width, decoded.height, decoded.pixels, count) {
-            let mut encoded = Vec::with_capacity(pixels.len() * 4);
-            for pixel in pixels {
-                let word = encode_rgb9e5(pixel)
-                    .map_err(|error| format!("{} contains {error}", source.file))?;
-                if bounded(&source.role)
-                    && decode_rgb9e5(word)
-                        .into_iter()
-                        .any(|channel| channel > 1.001)
-                {
-                    return Err(format!(
-                        "{} values must stay between zero and one",
-                        source.role
-                    ));
+        for (index, pixels) in halvings(source.width, source.height, stored_texels, count)
+            .into_iter()
+            .enumerate()
+        {
+            let encoded: Vec<u8> = if index == 0 {
+                words.iter().flat_map(|word| word.to_le_bytes()).collect()
+            } else {
+                let mut encoded = Vec::with_capacity(pixels.len() * 4);
+                for pixel in pixels {
+                    let word = encode_rgb9e5(pixel)
+                        .map_err(|error| format!("{} contains {error}", source.file))?;
+                    encoded.extend_from_slice(&word.to_le_bytes());
                 }
-                encoded.extend_from_slice(&word.to_le_bytes());
-            }
+                encoded
+            };
             let stored = deflate(&encoded)?;
             levels.push(PackedLevel {
                 offset: payload.len(),
@@ -977,44 +1011,9 @@ fn build_package(directory: &Path) -> Result<Vec<u8>, String> {
             });
             payload.extend_from_slice(&stored);
         }
-        layers.push(PackedLayer {
-            role: source.role.clone(),
-            file: source.file.clone(),
-            width: source.width,
-            height: source.height,
-            semantics: source.semantics.clone(),
-            source_sha256,
-            levels,
-            family: source.family,
-            radius: source.radius,
-            step: source.step,
-            value: source.value,
-            size: source.size,
-            peak: source.peak,
-        });
+        levels_by_layer.push(levels);
     }
-    let header = PackageHeader {
-        schema: PACKAGE_SCHEMA,
-        view: receipt.manifest.view,
-        logical_size: [
-            receipt.manifest.logical_size[0] as u32,
-            receipt.manifest.logical_size[1] as u32,
-        ],
-        layout_content_sha256: receipt.manifest.content_sha256,
-        physical_sha256: receipt.manifest.physical_sha256,
-        surface_counts: receipt.manifest.surface_counts,
-        response_library: receipt.response_library,
-        render: PackedRender {
-            blender: receipt.render.blender,
-            engine: receipt.render.engine,
-            samples: receipt.render.samples,
-            seed: receipt.render.seed,
-            max_bounces: receipt.render.max_bounces,
-            base_denoised: receipt.render.base_denoised,
-            responses_denoised: receipt.render.responses_denoised,
-        },
-        layers,
-    };
+    let header = package_header(&receipt, levels_by_layer);
     let header_bytes = serde_json::to_vec(&header).map_err(|error| error.to_string())?;
     if header_bytes.len() > MAX_HEADER_BYTES {
         return Err("artwork header is too large".into());
@@ -1027,6 +1026,48 @@ fn build_package(directory: &Path) -> Result<Vec<u8>, String> {
     package.extend_from_slice(&header_bytes);
     package.extend_from_slice(&payload);
     Ok(package)
+}
+
+/// The header a package of the receipt's layers carries, given each layer's
+/// stored levels. It holds nothing about the editable files themselves, so a
+/// package unpacked and packed again is the same package.
+fn package_header(receipt: &Receipt, levels: Vec<Vec<PackedLevel>>) -> PackageHeader {
+    PackageHeader {
+        schema: PACKAGE_SCHEMA,
+        view: receipt.manifest.view.clone(),
+        logical_size: receipt.manifest.logical_size.map(|side| side as u32),
+        layout_content_sha256: receipt.manifest.content_sha256.clone(),
+        physical_sha256: receipt.manifest.physical_sha256.clone(),
+        surface_counts: receipt.manifest.surface_counts.clone(),
+        response_library: receipt.response_library.clone(),
+        render: PackedRender {
+            blender: receipt.render.blender.clone(),
+            engine: receipt.render.engine.clone(),
+            samples: receipt.render.samples,
+            seed: receipt.render.seed,
+            max_bounces: receipt.render.max_bounces,
+            base_denoised: receipt.render.base_denoised,
+            responses_denoised: receipt.render.responses_denoised,
+        },
+        layers: receipt
+            .layers
+            .iter()
+            .zip(levels)
+            .map(|(source, levels)| PackedLayer {
+                role: source.role.clone(),
+                file: source.file.clone(),
+                width: source.width,
+                height: source.height,
+                semantics: source.semantics.clone(),
+                levels,
+                family: source.family,
+                radius: source.radius,
+                step: source.step,
+                value: source.value,
+                size: source.size,
+            })
+            .collect(),
+    }
 }
 
 fn deflate(bytes: &[u8]) -> Result<Vec<u8>, String> {
@@ -1272,7 +1313,6 @@ fn validate_package_bytes(
         .ok_or("truncated artwork payload")?;
     let mut expected_offset = 0usize;
     for layer in &header.layers {
-        require_hash("source layer", &layer.source_sha256)?;
         // Every level halves the one above exactly, which is the chain a GPU
         // texture's levels must be.
         let halvings = layer.levels.len().saturating_sub(1) as u32;
@@ -1605,6 +1645,29 @@ mod tests {
         assert!(encode_rgb9e5([f32::NAN, 0.0, 0.0]).is_err());
         assert!(encode_rgb9e5([-0.1, 0.0, 0.0]).is_err());
         assert!(encode_rgb9e5([65_409.0, 0.0, 0.0]).is_err());
+    }
+
+    /// Without the editable layers, the committed receipt is what the package
+    /// answers to: a package that describes another render must fail.
+    #[test]
+    fn the_package_must_describe_its_committed_receipt() {
+        let package = Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/artwork.pack");
+        let committed = Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/artwork");
+        validate_assets(&package, &committed).unwrap();
+
+        let folder =
+            std::env::temp_dir().join(format!("swanky-amp-receipt-{}", std::process::id()));
+        std::fs::create_dir_all(&folder).unwrap();
+        let mut receipt = read_receipt(&committed).unwrap();
+        receipt.render.samples += 1;
+        write_receipt(&folder, &receipt).unwrap();
+        let outcome = validate_assets(&package, &folder);
+        let _ = std::fs::remove_dir_all(&folder);
+        assert!(
+            outcome
+                .unwrap_err()
+                .contains("does not describe its committed receipt")
+        );
     }
 
     #[test]
