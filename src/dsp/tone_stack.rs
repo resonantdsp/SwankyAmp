@@ -17,7 +17,7 @@ pub enum ToneMapping {
     /// compares with the frozen released renders.
     Released,
     /// The standard bilinear constant `c = 2·SR`, placing features where the
-    /// circuit has them. The shipping path uses it with refitted presets.
+    /// circuit has them. The shipping path uses it with presets voiced for it.
     Standard,
 }
 

@@ -51,14 +51,12 @@ installs beside Swanky Amp 1.4.0.
 - Recalibrated the level compensation for the corrected amplifier on real
   guitar recordings played at Input 0: with the tone controls at their
   defaults, playing drives the power stage within about 1 dB of 1.4.0 at every
-  Drive on every tone stack. Calibrated on a hot test clip instead, the
-  corrected stack had driven it up to 3.9 dB harder.
+  Drive on every tone stack.
 - Drive, Power Drive and Grit now change the sound without changing the
-  volume. At playing level 1.4.0 got louder as Drive and Power Drive rose,
-  by about 4.6 dB at Drive 10 and up to 8 dB at Power Drive 10, and Grit
-  silenced the amplifier at its top. Output gains measured by `just calibrate`
-  hold the loudness, averaged over the recordings, within 1 dB of Init at
-  each control's extremes.
+  volume. At playing level 1.4.0 got several dB louder as Drive and Power
+  Drive rose, and Grit silenced the amplifier at its top. Output gains
+  measured by `just calibrate` hold the loudness, averaged over the
+  recordings, close to Init's across each control.
 - Fixed Grit silencing the amplifier near its top: it raised a triode
   compressor's threshold past the stage's plate signal, collapsing the
   stage's output to a constant (-52 dB in 1.4.0, -100 dB after the knee

@@ -5,14 +5,16 @@
 //! the tone controls at their defaults, the level into the power stage is
 //! measured on the released path and the shipping path at every Drive table
 //! point for each tone stack. The corrected stack passes a guitar a different
-//! amount than the released one, by up to 1.7 dB between stacks and a little
-//! by Drive, so the tone-stack scale takes the mean gap and the preamp table
-//! each Drive point's departure from it. One scale leaves every stack within
-//! about 1 dB, and the Fender stack splits the pickups about as far again:
-//! the corrected Fender stack passes more of a humbucker's upper mids. The power table then normalises the power amp's output against
-//! Power Drive, transferred by the ratio of the released to the shipping seam.
+//! amount than the released one, differently for each stack and a little by
+//! Drive, so the tone-stack scale takes the mean gap and the preamp table each
+//! Drive point's departure from it. One scale serving three stacks leaves each
+//! off by up to half their spread. The corrected Fender stack also passes more
+//! of a humbucker's upper mids than 1.4.0's did, so its two pickups land either
+//! side of the average; one gain cannot serve both. The power table then
+//! normalises the power amp's output against Power Drive, transferred by the
+//! ratio of the released to the shipping seam.
 //!
-//! The second stage holds loudness. 1.4.0 lost level as Drive and Power
+//! The second stage holds loudness, which 1.4.0 let change as Drive and Power
 //! Drive rose. Loudness is ITU-R BS.1770-4 gated integrated loudness, averaged
 //! in LUFS over the two recordings, and the target is the factory defaults'
 //! loudness from the first stage, so Init keeps its level. In order, each with
@@ -503,63 +505,81 @@ mod tests {
         const TOLERANCE_DB: f64 = 1.;
         let clips = recordings();
         let defaults = AmpControls::default();
-        let target = loudness(defaults, &clips, LevelTables::CALIBRATED).blend();
-        for extreme in [-1., 1.] {
-            for (control, controls) in [
-                (
-                    "Drive",
-                    AmpControls {
-                        preamp_drive: extreme,
-                        ..defaults
-                    },
-                ),
-                (
-                    "Power Drive",
-                    AmpControls {
-                        power_drive: extreme,
-                        ..defaults
-                    },
-                ),
-                (
-                    "Grit",
-                    AmpControls {
-                        preamp_grit: extreme,
-                        ..defaults
-                    },
-                ),
-            ] {
-                let change = loudness(controls, &clips, LevelTables::CALIBRATED).blend() - target;
-                assert!(
-                    change.abs() <= TOLERANCE_DB,
-                    "{control} at {extreme:+} moves loudness {change:+.2} dB \
-                     (tolerance {TOLERANCE_DB} dB)"
-                );
-            }
+        let cases: Vec<(&str, f32, AmpControls)> = [-1., 1.]
+            .into_iter()
+            .flat_map(|extreme| {
+                [
+                    (
+                        "Drive",
+                        extreme,
+                        AmpControls {
+                            preamp_drive: extreme,
+                            ..defaults
+                        },
+                    ),
+                    (
+                        "Power Drive",
+                        extreme,
+                        AmpControls {
+                            power_drive: extreme,
+                            ..defaults
+                        },
+                    ),
+                    (
+                        "Grit",
+                        extreme,
+                        AmpControls {
+                            preamp_grit: extreme,
+                            ..defaults
+                        },
+                    ),
+                ]
+            })
+            .chain([("Init", 0., defaults)])
+            .collect();
+        let measured = parallel(&cases, |(_, _, controls)| {
+            loudness(*controls, &clips, LevelTables::CALIBRATED).blend()
+        });
+        let target = measured[cases.len() - 1];
+        for ((control, extreme, _), level) in cases.iter().zip(&measured) {
+            let change = level - target;
+            assert!(
+                change.abs() <= TOLERANCE_DB,
+                "{control} at {extreme:+} moves loudness {change:+.2} dB \
+                 (tolerance {TOLERANCE_DB} dB)"
+            );
         }
     }
 
     /// With the tone controls at their defaults, real playing drives the
     /// power stage as 1.4.0 did on every tone stack, clean to full Drive.
-    /// One tone-stack scale serves all three stacks, which leaves each up to
-    /// about 1 dB either side.
+    /// One tone-stack scale serves three stacks whose gaps to 1.4.0 lie
+    /// within about 2 dB of each other, so each may sit up to half that
+    /// spread from 1.4.0; the limit adds 0.5 dB for Drive's smaller part.
     #[test]
     fn default_tone_drives_the_power_stage_as_released() {
-        const TOLERANCE_DB: f64 = 1.5;
+        const TOLERANCE_DB: f64 = 1. + 0.5;
         let clips = recordings();
-        for tone_stack in [0., 1., 2.] {
-            for preamp_drive in [-1., AmpControls::default().preamp_drive, 1.] {
-                let controls = AmpControls {
+        let cells: Vec<AmpControls> = [0., 1., 2.]
+            .into_iter()
+            .flat_map(|tone_stack| {
+                [-1., AmpControls::default().preamp_drive, 1.].map(|preamp_drive| AmpControls {
                     tone_stack,
                     preamp_drive,
                     ..AmpControls::default()
-                };
-                let gap = feed_gap_db(controls, &clips, LevelTables::CALIBRATED);
-                assert!(
-                    gap.abs() <= TOLERANCE_DB,
-                    "tone stack {tone_stack}, Drive {preamp_drive:+}: power stage fed \
-                     {gap:+.2} dB from 1.4.0 (tolerance {TOLERANCE_DB} dB); run `just calibrate`"
-                );
-            }
+                })
+            })
+            .collect();
+        let gaps = parallel(&cells, |controls| {
+            feed_gap_db(*controls, &clips, LevelTables::CALIBRATED)
+        });
+        for (controls, gap) in cells.iter().zip(gaps) {
+            let (tone_stack, preamp_drive) = (controls.tone_stack, controls.preamp_drive);
+            assert!(
+                gap.abs() <= TOLERANCE_DB,
+                "tone stack {tone_stack}, Drive {preamp_drive:+}: power stage fed \
+                 {gap:+.2} dB from 1.4.0 (tolerance {TOLERANCE_DB} dB); run `just calibrate`"
+            );
         }
     }
 }

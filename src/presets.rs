@@ -13,7 +13,8 @@ use std::sync::{Arc, Mutex};
 use crate::dsp::amp::AmpControls;
 use crate::dsp::refit;
 
-/// The version 2 factory bank, refitted by `just refit`.
+/// The version 2 factory bank, voiced for the corrected tone stack by `just
+/// refit` and accepted by ear.
 pub const FACTORY_BANK: &str = include_str!("../presets/factory-2.0.xml");
 /// The bank 1.4.0 shipped, which it also copied into its preset folder.
 const RELEASED_BANK: &str =
@@ -568,8 +569,9 @@ impl Library {
     /// Tests keep user presets away from the real folder.
     pub fn with_user_root(user_root: Option<PathBuf>) -> Self {
         Self {
-            // The bank is refitted and checked by `just`, so a failure here
-            // is a build defect; an empty factory list keeps the editor up.
+            // The bank is embedded at build time and a test reads it, so a
+            // failure here is a build defect; an empty factory list keeps the
+            // editor up.
             factory: parse_bank(FACTORY_BANK).unwrap_or_default(),
             user_root,
         }
@@ -727,7 +729,7 @@ impl Library {
     /// to the standard tone stack. The 1.x files are only read. A preset
     /// whose name is already taken in the user folder is left alone, as is
     /// an unchanged copy of a 1.4.0 factory preset, which the version 2
-    /// factory bank already carries refitted.
+    /// factory bank already carries voiced for the corrected stack.
     pub fn import_legacy(&self, source: &Path) -> Result<ImportReport, String> {
         let mut report = ImportReport::default();
         let released = parse_bank(RELEASED_BANK).unwrap_or_default();

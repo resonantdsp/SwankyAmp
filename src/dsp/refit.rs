@@ -486,8 +486,8 @@ pub fn fit(controls: AmpControls, input: &[f32]) -> AmpControls {
 /// Third-octave bands from 80 Hz to 8 kHz, the range the factory voicing is
 /// judged over.
 const THIRDS: usize = 21;
-/// Cost in dB² of moving Low, Mid, High or Presence by a whole control range
-/// from the original, so a control moves only as far as the balance pays.
+/// Cost in dB² of moving Low, Mid, High or Presence by one stored unit, half
+/// the control's range, from the original, so a control moves only as far as the balance pays.
 pub const VOICING_RESTRAINT: f64 = 0.5;
 /// The search keeps the tone controls within this, 1 to 9 on the panel, so a
 /// preset leaves the player room either way.

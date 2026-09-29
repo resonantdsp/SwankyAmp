@@ -71,10 +71,13 @@ Known limits of the corrected stack against 1.4.0:
 - Init is the corrected stack at its default settings and is not revoiced:
   against 1.4.0 it has 3.5 to 7 dB less between 100 and 400 Hz and 4 to
   5.6 dB more between 0.8 and 1.6 kHz.
-- At playing level 1.4.0 got louder as Drive and Power Drive rose, by about
-  4.6 dB at Drive 10 and 2.3 to 8 dB at Power Drive 10 depending on the
-  pickup. Version 2 holds the level, so those settings are quieter than
-  1.4.0's by about 3 and 6 dB.
+- At playing level 1.4.0 got several dB louder as Drive and Power Drive rose
+  towards 10, by how much depending on the pickup. Version 2 holds Init's
+  level across both, so high Drive and Power Drive settings play quieter than
+  they did in 1.4.0.
+
+These levels are measured at 44.1 kHz with Auto oversampling and on the three
+tone stacks themselves, not on blends between them.
 
 The three treble sections are first-order circuits, but 1.4.0 discretised
 them as biquads with the second-order terms set to zero. That multiplies
@@ -181,14 +184,13 @@ driven. With the tone controls at their defaults, the level into the power
 stage is measured on both paths at each of Drive's eleven table points for
 each tone stack. The tone-stack scale takes the mean gap and the preamp table
 each Drive point's departure from it, so real playing drives the power stage
-as 1.4.0 did at every Drive: every stack lands within about 1 dB, the Fender
-stack furthest at 1 dB over at Drive 10. The Fender stack
-splits the pickups, the single coil 0.6 dB under 1.4.0 and the humbucker 1.9 dB
-over, because the corrected stack passes more of a humbucker's upper mids; one
-gain cannot serve both. The power table then normalises the power amp's output
-against Power Drive by the ratio of the released seam to the shipping one, and
-the cabinet keeps its own fixed scale. A test holds the power stage input at
-the default tone within 1.5 dB of 1.4.0 on every stack at Drive 0, default and 10.
+as 1.4.0 did at every Drive. One scale serves all three stacks, so each sits
+up to half their spread from 1.4.0. The corrected Fender stack also passes
+more of a humbucker's upper mids than 1.4.0's did, so the two pickups land
+either side of the average; one gain cannot serve both. The power table then
+normalises the power amp's output against Power Drive by the ratio of the
+released seam to the shipping one, and the cabinet keeps its own fixed scale.
+`calibrate` prints every measured point.
 
 The second stage keeps loudness. Loudness here is ITU-R BS.1770-4 gated
 integrated loudness, computed in the tool and averaged in LUFS over the
@@ -198,8 +200,7 @@ target, and then Drive and Grit each get an output gain table solved the same
 way. The two Drive points either side of the default absorb the default's own
 few tenths of a dB, so Init lands exactly. All three gains follow the cabinet,
 so they change level and nothing else. Stages stays uncompensated, as
-released. A test holds the extremes of all three within 1 dB of Init on the
-average.
+released.
 
 Regenerate the values in `src/dsp/calibration_data.rs` with:
 
