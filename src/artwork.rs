@@ -23,10 +23,17 @@ const MAX_HEADER_BYTES: usize = 4 * 1024 * 1024;
 const MAX_LAYERS: usize = 256;
 const MAX_DIMENSION: u32 = 16_384;
 /// Receipt and package schema 2 added the switch sprite after the response
-/// library; schema 3 replaces schema 2's pill cap with the disc, whose layers
-/// a schema-2 reader would mistake for the cap.
-const RECEIPT_SCHEMA: u32 = 3;
-const PACKAGE_SCHEMA: u32 = 3;
+/// library; schema 3 replaced schema 2's pill cap with the disc, whose layers
+/// a schema-2 reader would mistake for the cap. Schema 4 bakes the view at
+/// `style::SUPERSAMPLE` texels per interface pixel, and its package stores
+/// every layer deflated with the box-filtered levels a smaller interface
+/// size reads.
+const RECEIPT_SCHEMA: u32 = 4;
+const PACKAGE_SCHEMA: u32 = 4;
+/// Levels stored for an image the interface can minify: the smallest drawing,
+/// 75 % on a standard display, spans two and two thirds texels per device
+/// pixel, which reads between the second and third levels.
+const MIP_LEVELS: usize = 3;
 /// The disc sprite's three layers in package order: the disc's own
 /// premultiplied radiance, the shadow it casts, and the coverage that
 /// composites both.
@@ -49,10 +56,7 @@ fn bounded(role: &str) -> bool {
 /// The disc sprite's plan size in interface pixels and in texels.
 fn disc_sprite() -> ([f32; 2], [u32; 2]) {
     let sprite = style::PhysicalStyle::default().disc_sprite();
-    (
-        sprite,
-        sprite.map(|side| side as u32 * style::DISC_SUPERSAMPLE),
-    )
+    (sprite, sprite.map(|side| side as u32 * style::SUPERSAMPLE))
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -122,9 +126,10 @@ pub struct PackedLayer {
     pub height: u32,
     pub semantics: String,
     pub source_sha256: String,
-    pub encoded_sha256: String,
-    pub offset: usize,
-    pub length: usize,
+    /// The layer and its box-filtered halvings, each RGB9E5 and deflated:
+    /// every format's binary embeds the package, so its footprint is paid
+    /// many times over.
+    pub levels: Vec<PackedLevel>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub family: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -137,6 +142,80 @@ pub struct PackedLayer {
     pub size: Option<[f32; 2]>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub peak: Option<f32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PackedLevel {
+    pub offset: usize,
+    pub length: usize,
+    /// Of the stored, deflated bytes.
+    pub sha256: String,
+}
+
+impl PackedLayer {
+    fn level_size(&self, level: usize) -> (u32, u32) {
+        (self.width >> level, self.height >> level)
+    }
+
+    /// One level's RGB9E5 texels, inflated from the package payload.
+    fn texels(&self, payload: &[u8], level: usize) -> Result<Vec<u8>, String> {
+        use std::io::Read;
+        let stored = &self.levels[level];
+        let (width, height) = self.level_size(level);
+        let expected = width as usize * height as usize * 4;
+        let bytes = payload
+            .get(stored.offset..stored.offset + stored.length)
+            .ok_or("truncated artwork pixels")?;
+        let mut texels = Vec::with_capacity(expected);
+        flate2::read::ZlibDecoder::new(bytes)
+            .take(expected as u64 + 1)
+            .read_to_end(&mut texels)
+            .map_err(|error| format!("packed {} pixels do not inflate: {error}", self.role))?;
+        if texels.len() != expected {
+            return Err(format!(
+                "packed {} level {level} is not the size it declares",
+                self.role
+            ));
+        }
+        Ok(texels)
+    }
+}
+
+/// Minified images: the view's bake and the disc sprite, which a smaller
+/// interface size draws at fewer device pixels than they have texels. The
+/// responses are read through a polar remap, never on the texel grid.
+fn minified(role: &str) -> bool {
+    matches!(
+        role,
+        "base" | "shadow" | "disc-color" | "disc-shadow" | "disc-coverage"
+    )
+}
+
+/// The image and its box-filtered halvings, averaged in the light they hold,
+/// as long as both sides still halve exactly.
+fn halvings(width: u32, height: u32, pixels: Vec<[f32; 3]>, count: usize) -> Vec<Vec<[f32; 3]>> {
+    let mut levels = vec![pixels];
+    let (mut width, mut height) = (width as usize, height as usize);
+    while levels.len() < count && width % 2 == 0 && height % 2 == 0 {
+        let above = levels.last().unwrap();
+        let (half_width, half_height) = (width / 2, height / 2);
+        let mut level = Vec::with_capacity(half_width * half_height);
+        for y in 0..half_height {
+            for x in 0..half_width {
+                let mut sum = [0.0f32; 3];
+                for (dx, dy) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
+                    let texel = above[(2 * y + dy) * width + 2 * x + dx];
+                    for channel in 0..3 {
+                        sum[channel] += texel[channel];
+                    }
+                }
+                level.push(sum.map(|channel| channel * 0.25));
+            }
+        }
+        levels.push(level);
+        (width, height) = (half_width, half_height);
+    }
+    levels
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -171,7 +250,7 @@ struct DecodedExr {
 
 pub fn pack(layers_directory: &Path, package_path: &Path) -> Result<PackageHeader, String> {
     let bytes = build_package(layers_directory)?;
-    let header = validate_package_bytes(&bytes, true)?;
+    let header = validate_package_bytes(&bytes, true, true)?;
     if let Some(parent) = package_path
         .parent()
         .filter(|path| !path.as_os_str().is_empty())
@@ -185,7 +264,7 @@ pub fn pack(layers_directory: &Path, package_path: &Path) -> Result<PackageHeade
 pub fn validate_file(package_path: &Path) -> Result<PackageHeader, String> {
     let bytes = std::fs::read(package_path)
         .map_err(|error| format!("cannot read {}: {error}", package_path.display()))?;
-    validate_package_bytes(&bytes, true)
+    validate_package_bytes(&bytes, true, true)
 }
 
 #[derive(Debug)]
@@ -208,8 +287,11 @@ fn runtime_scene() -> Option<&'static RuntimeScene> {
     SCENE.get_or_init(load_runtime_scene).as_ref()
 }
 
+/// Loading checks the package's structure and checksums but inflates nothing:
+/// the editor inflates each level when it first draws, and `validate-assets`
+/// inflates and range-checks every level before a build ships.
 fn load_runtime_scene() -> Option<RuntimeScene> {
-    let header = validate_package_bytes(PACKAGE, true).ok()?;
+    let header = validate_package_bytes(PACKAGE, true, false).ok()?;
     let header_length = u32::from_le_bytes(PACKAGE.get(8..12)?.try_into().ok()?) as usize;
     let base = header
         .layers
@@ -318,6 +400,9 @@ struct Uniform {
     extent: [f32; 4],
     /// The disc sprite's top-left corner and size, in interface pixels.
     disc: [f32; 4],
+    /// The level of detail the bake and the disc sprite are read at, which the
+    /// viewport's scale decides, so it is written when a frame is prepared.
+    sampling: [f32; 4],
     meter_style: [f32; 4],
     meter_colors: [[f32; 4]; 2],
     meters: [Control; 4],
@@ -363,6 +448,7 @@ impl Uniform {
                 layout::SWITCH.bounds,
                 params.get(layout::CABINET_SWITCH) >= 0.5,
             ),
+            sampling: [0.0; 4],
             meter_style: [
                 physical.meter_bars as f32,
                 physical.meter_gap,
@@ -503,6 +589,7 @@ impl Pipeline for ScenePipeline {
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Linear,
             ..Default::default()
         });
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -598,8 +685,10 @@ impl Primitive for ScenePrimitive {
             });
             pipeline.binding = Some((self.scene.physical_sha256.clone(), binding));
         }
-        queue.write_buffer(&pipeline.controls, 0, bytemuck::bytes_of(&self.uniform));
         let scale = viewport.scale_factor();
+        let mut uniform = self.uniform;
+        uniform.sampling[0] = level_of_detail(scale);
+        queue.write_buffer(&pipeline.controls, 0, bytemuck::bytes_of(&uniform));
         pipeline.bounds = Some(Rectangle {
             x: bounds.x * scale,
             y: bounds.y * scale,
@@ -645,56 +734,21 @@ impl Primitive for ScenePrimitive {
     }
 }
 
+/// The level of detail that gives one texel per device pixel for the baked
+/// images, drawn at `style::SUPERSAMPLE` texels per interface pixel in a
+/// viewport at `scale` device pixels per interface pixel.
+fn level_of_detail(scale: f32) -> f32 {
+    (style::SUPERSAMPLE as f32 / scale).log2().max(0.0)
+}
+
 fn upload_layer(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     scene: &RuntimeScene,
     layer: &PackedLayer,
 ) -> wgpu::TextureView {
-    let texture = device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("Free artwork RGB9E5"),
-        size: wgpu::Extent3d {
-            width: layer.width,
-            height: layer.height,
-            depth_or_array_layers: 1,
-        },
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Rgb9e5Ufloat,
-        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-        view_formats: &[],
-    });
-    let start = scene.data_start + layer.offset;
-    let bytes = &PACKAGE[start..start + layer.length];
-    let source_stride = layer.width as usize * 4;
-    let stride = source_stride.div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize)
-        * wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize;
-    let padded;
-    let bytes = if stride == source_stride {
-        bytes
-    } else {
-        padded = bytes
-            .chunks_exact(source_stride)
-            .flat_map(|row| {
-                row.iter()
-                    .copied()
-                    .chain(std::iter::repeat_n(0, stride - source_stride))
-            })
-            .collect::<Vec<_>>();
-        &padded
-    };
-    queue.write_texture(
-        texture.as_image_copy(),
-        bytes,
-        wgpu::TexelCopyBufferLayout {
-            offset: 0,
-            bytes_per_row: Some(stride as u32),
-            rows_per_image: Some(layer.height),
-        },
-        texture.size(),
-    );
-    texture.create_view(&wgpu::TextureViewDescriptor::default())
+    upload(device, queue, scene, std::slice::from_ref(layer))
+        .create_view(&wgpu::TextureViewDescriptor::default())
 }
 
 fn upload_array(
@@ -703,46 +757,79 @@ fn upload_array(
     scene: &RuntimeScene,
     layers: &[PackedLayer],
 ) -> wgpu::TextureView {
+    upload(device, queue, scene, layers).create_view(&wgpu::TextureViewDescriptor {
+        dimension: Some(wgpu::TextureViewDimension::D2Array),
+        ..Default::default()
+    })
+}
+
+/// A texture holding `layers` as its array layers, with every level they store.
+fn upload(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    scene: &RuntimeScene,
+    layers: &[PackedLayer],
+) -> wgpu::Texture {
     let first = &layers[0];
+    let levels = layers
+        .iter()
+        .map(|layer| layer.levels.len())
+        .min()
+        .unwrap_or(1);
     let texture = device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("Free artwork response library"),
+        label: Some("Free artwork RGB9E5"),
         size: wgpu::Extent3d {
             width: first.width,
             height: first.height,
             depth_or_array_layers: layers.len() as u32,
         },
-        mip_level_count: 1,
+        mip_level_count: levels as u32,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
         format: wgpu::TextureFormat::Rgb9e5Ufloat,
         usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         view_formats: &[],
     });
-    let source_stride = first.width as usize * 4;
-    let stride = source_stride.div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize)
-        * wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize;
-    let mut data = Vec::with_capacity(stride * first.height as usize * layers.len());
-    for layer in layers {
-        let start = scene.data_start + layer.offset;
-        for row in PACKAGE[start..start + layer.length].chunks_exact(source_stride) {
-            data.extend_from_slice(row);
-            data.resize(data.len() + stride - source_stride, 0);
+    let payload = &PACKAGE[scene.data_start..];
+    for level in 0..levels {
+        let (width, height) = first.level_size(level);
+        let source_stride = width as usize * 4;
+        let stride = source_stride.div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize)
+            * wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize;
+        let mut data = Vec::with_capacity(stride * height as usize * layers.len());
+        for layer in layers {
+            // `validate-assets` inflates every level before a build ships; one
+            // that still fails is drawn black, never takes the host down.
+            let texels = layer.texels(payload, level).unwrap_or_else(|error| {
+                eprintln!("Artwork unavailable: {error}");
+                vec![0; source_stride * height as usize]
+            });
+            for row in texels.chunks_exact(source_stride) {
+                data.extend_from_slice(row);
+                data.resize(data.len() + stride - source_stride, 0);
+            }
         }
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &texture,
+                mip_level: level as u32,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            &data,
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(stride as u32),
+                rows_per_image: Some(height),
+            },
+            wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: layers.len() as u32,
+            },
+        );
     }
-    queue.write_texture(
-        texture.as_image_copy(),
-        &data,
-        wgpu::TexelCopyBufferLayout {
-            offset: 0,
-            bytes_per_row: Some(stride as u32),
-            rows_per_image: Some(first.height),
-        },
-        texture.size(),
-    );
-    texture.create_view(&wgpu::TextureViewDescriptor {
-        dimension: Some(wgpu::TextureViewDimension::D2Array),
-        ..Default::default()
-    })
+    texture
 }
 
 pub fn validate_assets(
@@ -751,7 +838,7 @@ pub fn validate_assets(
 ) -> Result<PackageHeader, String> {
     let bytes = std::fs::read(package_path)
         .map_err(|error| format!("cannot read {}: {error}", package_path.display()))?;
-    let header = validate_package_bytes(&bytes, true)?;
+    let header = validate_package_bytes(&bytes, true, true)?;
     let first = build_package(layers_directory)?;
     let second = build_package(layers_directory)?;
     if first != second {
@@ -768,7 +855,7 @@ pub fn validate_assets(
 pub fn unpack(package_path: &Path, destination: &Path) -> Result<PackageHeader, String> {
     let bytes = std::fs::read(package_path)
         .map_err(|error| format!("cannot read {}: {error}", package_path.display()))?;
-    let header = validate_package_bytes(&bytes, false)?;
+    let header = validate_package_bytes(&bytes, false, true)?;
     let header_length = u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
     let payload = &bytes[12 + header_length..];
     std::fs::create_dir_all(destination).map_err(|error| error.to_string())?;
@@ -778,8 +865,8 @@ pub fn unpack(package_path: &Path, destination: &Path) -> Result<PackageHeader, 
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
         }
-        let encoded = &payload[layer.offset..layer.offset + layer.length];
-        let pixels: Vec<[f32; 3]> = encoded
+        let pixels: Vec<[f32; 3]> = layer
+            .texels(payload, 0)?
             .chunks_exact(4)
             .map(|word| decode_rgb9e5(u32::from_le_bytes(word.try_into().unwrap())))
             .collect();
@@ -859,23 +946,37 @@ fn build_package(directory: &Path) -> Result<Vec<u8>, String> {
                 source.file, decoded.width, decoded.height, source.width, source.height
             ));
         }
-        let offset = payload.len();
-        for pixel in decoded.pixels {
-            let word = encode_rgb9e5(pixel)
-                .map_err(|error| format!("{} contains {error}", source.file))?;
-            if bounded(&source.role)
-                && decode_rgb9e5(word)
-                    .into_iter()
-                    .any(|channel| channel > 1.001)
-            {
-                return Err(format!(
-                    "{} values must stay between zero and one",
-                    source.role
-                ));
+        let count = if minified(&source.role) {
+            MIP_LEVELS
+        } else {
+            1
+        };
+        let mut levels = Vec::with_capacity(count);
+        for pixels in halvings(decoded.width, decoded.height, decoded.pixels, count) {
+            let mut encoded = Vec::with_capacity(pixels.len() * 4);
+            for pixel in pixels {
+                let word = encode_rgb9e5(pixel)
+                    .map_err(|error| format!("{} contains {error}", source.file))?;
+                if bounded(&source.role)
+                    && decode_rgb9e5(word)
+                        .into_iter()
+                        .any(|channel| channel > 1.001)
+                {
+                    return Err(format!(
+                        "{} values must stay between zero and one",
+                        source.role
+                    ));
+                }
+                encoded.extend_from_slice(&word.to_le_bytes());
             }
-            payload.extend_from_slice(&word.to_le_bytes());
+            let stored = deflate(&encoded)?;
+            levels.push(PackedLevel {
+                offset: payload.len(),
+                length: stored.len(),
+                sha256: sha256(&stored),
+            });
+            payload.extend_from_slice(&stored);
         }
-        let length = payload.len() - offset;
         layers.push(PackedLayer {
             role: source.role.clone(),
             file: source.file.clone(),
@@ -883,9 +984,7 @@ fn build_package(directory: &Path) -> Result<Vec<u8>, String> {
             height: source.height,
             semantics: source.semantics.clone(),
             source_sha256,
-            encoded_sha256: sha256(&payload[offset..offset + length]),
-            offset,
-            length,
+            levels,
             family: source.family,
             radius: source.radius,
             step: source.step,
@@ -928,6 +1027,15 @@ fn build_package(directory: &Path) -> Result<Vec<u8>, String> {
     package.extend_from_slice(&header_bytes);
     package.extend_from_slice(&payload);
     Ok(package)
+}
+
+fn deflate(bytes: &[u8]) -> Result<Vec<u8>, String> {
+    use std::io::Write;
+    let mut encoder = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::best());
+    encoder
+        .write_all(bytes)
+        .and_then(|_| encoder.finish())
+        .map_err(|error| format!("cannot deflate artwork: {error}"))
 }
 
 fn validate_receipt(receipt: &Receipt) -> Result<(), String> {
@@ -1005,18 +1113,19 @@ fn validate_receipt(receipt: &Receipt) -> Result<(), String> {
     if receipt.layers.len() != expected_layers || receipt.layers.len() > MAX_LAYERS {
         return Err("receipt response layer count is invalid".into());
     }
+    let baked = logical.map(|side| side as u32 * style::SUPERSAMPLE);
     validate_receipt_layer(
         &receipt.layers[0],
         "base",
         "base.exr",
-        [logical[0] as u32, logical[1] as u32],
+        baked,
         "scene-linear-radiance",
     )?;
     validate_receipt_layer(
         &receipt.layers[1],
         "shadow",
         "shadow.exr",
-        [logical[0] as u32, logical[1] as u32],
+        baked,
         "display-linear-multiplicative",
     )?;
     let mut index = 2;
@@ -1107,9 +1216,12 @@ fn validate_receipt_layer(
     require_hash(file, &layer.sha256)
 }
 
+/// The package's structure and checksums, and with `inflate` every level's
+/// size and values too.
 fn validate_package_bytes(
     bytes: &[u8],
     require_current_layout: bool,
+    inflate: bool,
 ) -> Result<PackageHeader, String> {
     if bytes.get(..8) != Some(SIGNATURE) {
         return Err("invalid artwork package signature".into());
@@ -1161,44 +1273,53 @@ fn validate_package_bytes(
     let mut expected_offset = 0usize;
     for layer in &header.layers {
         require_hash("source layer", &layer.source_sha256)?;
-        require_hash("encoded layer", &layer.encoded_sha256)?;
-        let expected_length = (layer.width as usize)
-            .checked_mul(layer.height as usize)
-            .and_then(|pixels| pixels.checked_mul(4))
-            .ok_or("artwork layer size overflow")?;
+        // Every level halves the one above exactly, which is the chain a GPU
+        // texture's levels must be.
+        let halvings = layer.levels.len().saturating_sub(1) as u32;
         if layer.width == 0
             || layer.height == 0
             || layer.width > MAX_DIMENSION
             || layer.height > MAX_DIMENSION
-            || layer.offset != expected_offset
-            || layer.length != expected_length
+            || layer.levels.is_empty()
+            || layer.levels.len() > MIP_LEVELS
+            || layer.width % (1 << halvings) != 0
+            || layer.height % (1 << halvings) != 0
         {
             return Err(format!("invalid packed {} layer geometry", layer.role));
         }
-        let end = layer
-            .offset
-            .checked_add(layer.length)
-            .ok_or("artwork layer end overflow")?;
-        let encoded = payload
-            .get(layer.offset..end)
-            .ok_or("truncated artwork pixels")?;
-        if sha256(encoded) != layer.encoded_sha256 {
-            return Err(format!("packed {} layer checksum mismatch", layer.role));
-        }
-        for word in encoded.chunks_exact(4) {
-            let decoded = decode_rgb9e5(u32::from_le_bytes(word.try_into().unwrap()));
-            if decoded
-                .into_iter()
-                .any(|channel| !channel.is_finite() || channel > 65_408.0)
-                || (bounded(&layer.role) && decoded.into_iter().any(|channel| channel > 1.001))
-            {
-                return Err(format!(
-                    "packed {} layer contains invalid values",
-                    layer.role
-                ));
+        for (index, level) in layer.levels.iter().enumerate() {
+            require_hash("packed level", &level.sha256)?;
+            let end = level
+                .offset
+                .checked_add(level.length)
+                .ok_or("artwork layer end overflow")?;
+            if level.offset != expected_offset || level.length == 0 {
+                return Err(format!("invalid packed {} layer geometry", layer.role));
             }
+            let stored = payload
+                .get(level.offset..end)
+                .ok_or("truncated artwork pixels")?;
+            if sha256(stored) != level.sha256 {
+                return Err(format!("packed {} layer checksum mismatch", layer.role));
+            }
+            if inflate {
+                for word in layer.texels(payload, index)?.chunks_exact(4) {
+                    let decoded = decode_rgb9e5(u32::from_le_bytes(word.try_into().unwrap()));
+                    if decoded
+                        .into_iter()
+                        .any(|channel| !channel.is_finite() || channel > 65_408.0)
+                        || (bounded(&layer.role)
+                            && decoded.into_iter().any(|channel| channel > 1.001))
+                    {
+                        return Err(format!(
+                            "packed {} layer contains invalid values",
+                            layer.role
+                        ));
+                    }
+                }
+            }
+            expected_offset = end;
         }
-        expected_offset = end;
     }
     if expected_offset != payload.len() {
         return Err("artwork package contains trailing or unreferenced payload bytes".into());
@@ -1216,6 +1337,7 @@ fn validate_packed_order(header: &PackageHeader) -> Result<(), String> {
             count.checked_add(header.response_library.meter_sizes.len() + DISC_LAYERS.len())
         })
         .ok_or("packed response count overflow")?;
+    let baked = header.logical_size.map(|side| side * style::SUPERSAMPLE);
     if header.layers.len() != expected
         || header.layers[0].role != "base"
         || header.layers[1].role != "shadow"
@@ -1223,6 +1345,15 @@ fn validate_packed_order(header: &PackageHeader) -> Result<(), String> {
         || header.layers[1].semantics != "display-linear-multiplicative"
     {
         return Err("packed artwork layer order is invalid".into());
+    }
+    // The compositor reads the bake at `style::SUPERSAMPLE` texels per
+    // interface pixel, and the base and shadow on one texel grid.
+    if header.layers[..2]
+        .iter()
+        .any(|layer| [layer.width, layer.height] != baked)
+        || header.layers[0].levels.len() != header.layers[1].levels.len()
+    {
+        return Err("packed view bake is not the size the interface reads".into());
     }
     let mut index = 2;
     for (family, radius) in header
@@ -1478,7 +1609,7 @@ mod tests {
 
     #[test]
     fn bundled_artwork_rejects_corrupt_and_unreferenced_payload_bytes() {
-        let header = validate_package_bytes(PACKAGE, true).unwrap();
+        let header = validate_package_bytes(PACKAGE, true, false).unwrap();
         // The bundle carries the switch disc the compositor stamps.
         assert!(
             DISC_LAYERS
@@ -1490,7 +1621,7 @@ mod tests {
         let header_length = u32::from_le_bytes(corrupt[8..12].try_into().unwrap()) as usize;
         corrupt[12 + header_length] ^= 1;
         assert!(
-            validate_package_bytes(&corrupt, true)
+            validate_package_bytes(&corrupt, true, false)
                 .unwrap_err()
                 .contains("checksum mismatch")
         );
@@ -1498,7 +1629,7 @@ mod tests {
         let mut trailing = PACKAGE.to_vec();
         trailing.push(0);
         assert!(
-            validate_package_bytes(&trailing, true)
+            validate_package_bytes(&trailing, true, false)
                 .unwrap_err()
                 .contains("trailing or unreferenced")
         );

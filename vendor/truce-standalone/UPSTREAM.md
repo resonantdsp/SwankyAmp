@@ -60,7 +60,12 @@ does, through the worker's bounded command queue by a weak handle, so the
 worker still ends with the host, and it reopens the device the streams run on
 rather than looking one up again.
 
-The buffer, device, ring and ASIO changes follow the same fixes in Swanky Amp
+A fixed-size editor may still ask for a new size, which is how an interface
+zoom resizes the window. The published standalone resizes the window but
+leaves its content size pinned where the editor opened, so on macOS the zoom
+button snapped it back; the pin now follows the size the editor asked for.
+
+The buffer, device, ring, ASIO and zoom-pin changes follow the same fixes in Swanky Amp
 Pro's copy of this crate. Keep these fixes here until a pinned upstream
 release includes equivalent handling; remove the Cargo patch and this
 directory together when upgrading to that release.

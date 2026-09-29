@@ -410,6 +410,11 @@ pub struct AuTransportSnapshot {
 
 // Functions implemented in the ObjC shim, called from Rust.
 unsafe extern "C" {
+    /// Resize the AU v2 container view the host parented the editor into;
+    /// the host observes its frame and resizes the plug-in window to match.
+    #[cfg(target_os = "macos")]
+    pub fn truce_au_resize_view(view: *mut c_void, width: u32, height: u32);
+
     /// Register the plugin with the AU system. Called once at load time.
     /// The descriptor and callbacks must remain valid for the lifetime of the process.
     pub fn truce_au_register_v2(

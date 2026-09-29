@@ -15,7 +15,9 @@ use truce_gui::layout::GridLayout;
 use truce_params::Params;
 
 use crate::param_cache::ParamCache;
-use crate::runtime::{AutoPlugin, IcedPlugin, IcedProgram, IcedRuntime, panic_message};
+use crate::runtime::{
+    AutoPlugin, IcedPlugin, IcedProgram, IcedRuntime, panic_message, viewport_scale, zoomed,
+};
 
 // IcedEditor - main entry point, implements truce_core::Editor
 
@@ -35,6 +37,13 @@ where
 {
     params: Arc<P>,
     size: (u32, u32),
+    /// The size the widget tree lays out at, for an editor whose whole
+    /// interface zooms (see [`Self::zoom`]); `None` for one that reflows.
+    design: Option<(u32, u32)>,
+    /// The zoom the window is at, as `f64` bits, shared with the window
+    /// handler: it changes the zoom when the plugin model asks, and
+    /// `size()` must report the new window to the host from then on.
+    zoom: Arc<std::sync::atomic::AtomicU64>,
     /// Live content-scale factor, shared with the runtime via
     /// [`truce_gui::EditorScale`]. Both `set_scale_factor` (host) and
     /// the baseview `Resized` handler write here; the runtime's
@@ -158,6 +167,8 @@ impl<P: Params + 'static> IcedEditor<P, AutoPlugin> {
         Self {
             params,
             size,
+            design: None,
+            zoom: Arc::new(std::sync::atomic::AtomicU64::new(1.0_f64.to_bits())),
             scale: EditorScale::new(truce_gui::backing_scale()),
             use_system_scale: false,
             host_scale_set: false,
@@ -182,6 +193,8 @@ impl<P: Params + 'static, M: IcedPlugin<P> + 'static> IcedEditor<P, M> {
         Self {
             params,
             size,
+            design: None,
+            zoom: Arc::new(std::sync::atomic::AtomicU64::new(1.0_f64.to_bits())),
             scale: EditorScale::new(truce_gui::backing_scale()),
             use_system_scale: false,
             host_scale_set: false,
@@ -211,6 +224,26 @@ impl<P: Params + 'static, M: IcedPlugin<P> + 'static> IcedEditor<P, M> {
     pub fn with_font(mut self, data: &'static [u8]) -> Self {
         self.font = Some(data);
         self
+    }
+
+    /// Zoom the whole interface instead of reflowing it. The size given to
+    /// [`Self::new`] becomes the design size the widget tree always lays out
+    /// at; the window is that size times the zoom, starting at `zoom`, and
+    /// follows [`IcedPlugin::zoom`] from then on. Text, vector drawing and
+    /// shaders render at the display scale times the zoom, so they stay
+    /// sharp rather than being stretched. The window resizes itself and asks
+    /// the host to follow, so the editor need not be host-resizable.
+    #[must_use]
+    pub fn zoom(mut self, zoom: f64) -> Self {
+        self.design = Some(self.size);
+        let zoom = if zoom.is_finite() && zoom > 0.0 { zoom } else { 1.0 };
+        self.zoom
+            .store(zoom.to_bits(), std::sync::atomic::Ordering::Release);
+        self
+    }
+
+    fn current_zoom(&self) -> f64 {
+        f64::from_bits(self.zoom.load(std::sync::atomic::Ordering::Acquire))
     }
 
     /// Set meter IDs to poll each tick.
@@ -293,6 +326,10 @@ struct IcedBaseviewHandler<P: Params + 'static, M: IcedPlugin<P>> {
     /// `runtime`); kept here too so `on_frame` can read it without
     /// borrowing `runtime`.
     scale: EditorScale,
+    /// The editor's design size when its interface zooms, and the zoom
+    /// cell `Editor::size` reads.
+    design: Option<(u32, u32)>,
+    zoom: Arc<std::sync::atomic::AtomicU64>,
     /// Whether the window's scale is host-driven (baseview
     /// `WindowScalePolicy::ScaleFactor`, i.e. an embedded plug-in) rather
     /// than OS-detected (`SystemScaleFactor`, i.e. the standalone). When
@@ -419,22 +456,25 @@ impl<P: Params + 'static, M: IcedPlugin<P>> baseview::WindowHandler for IcedBase
                 let new_h = (packed & 0xFFFF_FFFF) as u32;
                 if new_w > 0 && new_h > 0 {
                     window.resize(baseview::Size::new(f64::from(new_w), f64::from(new_h)));
-                    self.runtime.size = (new_w, new_h);
-                    // Reconfigured surface must be repainted next tick
-                    // even if the idle gate sees no other change.
-                    self.runtime.force_render = true;
-                    let scale = self.scale.get();
-                    let pw = truce_gui::to_physical_px(new_w, scale);
-                    let ph = truce_gui::to_physical_px(new_h, scale);
-                    if let Some(ref mut render) = self.runtime.render {
-                        #[allow(clippy::cast_possible_truncation)]
-                        let scale_f32 = scale as f32;
-                        render.viewport = iced_graphics::Viewport::with_physical_size(
-                            Size::new(pw, ph),
-                            scale_f32,
-                        );
-                    }
-                    self.runtime.reconfigure_surface_px(pw, ph);
+                    self.runtime.apply_logical_size(new_w, new_h);
+                }
+            }
+            // The plugin model asked for another zoom. `size()` reports the
+            // new window before the host is asked for it, because a host
+            // answering the request checks the size it is given against it.
+            if let Some(design) = self.design
+                && let Some(zoom) = self.runtime.wanted_zoom()
+            {
+                let (w, h) = zoomed(design, zoom);
+                self.zoom
+                    .store(zoom.to_bits(), std::sync::atomic::Ordering::Release);
+                self.runtime.zoom = zoom;
+                window.resize(baseview::Size::new(f64::from(w), f64::from(h)));
+                self.runtime.apply_logical_size(w, h);
+                if let Some(ref render) = self.runtime.render
+                    && !render.program.context.request_resize(w, h)
+                {
+                    log::warn!("host declined the editor resize to {w}x{h}");
                 }
             }
             // Belt-and-suspenders for the `Resized`-handler push: if the host
@@ -503,7 +543,8 @@ impl<P: Params + 'static, M: IcedPlugin<P>> baseview::WindowHandler for IcedBase
                             // hit-test in logical units against
                             // `viewport.logical_size()`, so forward as-is.
                             // Window dimensions stay well below 2^23 - the
-                            // f64 → f32 narrowing is invisible.
+                            // f64 → f32 narrowing is invisible. The runtime
+                            // divides out an interface zoom.
                             #[allow(clippy::cast_possible_truncation)]
                             let pos = (position.x as f32, position.y as f32);
                             runtime.queue_cursor_move(pos.0, pos.1);
@@ -540,9 +581,12 @@ impl<P: Params + 'static, M: IcedPlugin<P>> baseview::WindowHandler for IcedBase
                             ));
                         }
                         baseview::MouseEvent::WheelScrolled { delta, .. } => {
+                            // Pixel deltas are window points, which a zoomed
+                            // interface measures in design points.
+                            #[allow(clippy::cast_possible_truncation)]
                             let dy = match delta {
                                 baseview::ScrollDelta::Lines { y, .. } => y * 30.0,
-                                baseview::ScrollDelta::Pixels { y, .. } => y,
+                                baseview::ScrollDelta::Pixels { y, .. } => y / runtime.zoom as f32,
                             };
                             runtime.pending_events.push(Event::Mouse(
                                 crate::iced::mouse::Event::WheelScrolled {
@@ -641,11 +685,9 @@ impl<P: Params + 'static, M: IcedPlugin<P>> baseview::WindowHandler for IcedBase
                         let pw = info.physical_size().width;
                         let ph = info.physical_size().height;
                         if let Some(ref mut render) = runtime.render {
-                            #[allow(clippy::cast_possible_truncation)] // display DPI; bounded
-                            let scale_f32 = info.scale() as f32;
                             render.viewport = iced_graphics::Viewport::with_physical_size(
                                 Size::new(pw, ph),
-                                scale_f32,
+                                viewport_scale(info.scale(), runtime.zoom),
                             );
                         }
                         // Routed through the pump's client: on Windows the
@@ -715,11 +757,15 @@ impl<P: Params + 'static, M: IcedPlugin<P>> baseview::WindowHandler for IcedBase
 
 impl<P: Params + 'static, M: IcedPlugin<P>> Editor for IcedEditor<P, M> {
     fn size(&self) -> (u32, u32) {
-        self.size
+        match self.design {
+            Some(design) => zoomed(design, self.current_zoom()),
+            None => self.size,
+        }
     }
 
     fn open(&mut self, parent: truce_core::editor::RawWindowHandle, context: PluginContext) {
-        let (w, h) = self.size;
+        let (w, h) = self.size();
+        let zoom = self.design.map_or(1.0, |_| self.current_zoom());
         // Drop any stale `set_size` that fired before this
         // `open()` so the handler doesn't immediately re-resize
         // the freshly-built window to a previous request.
@@ -762,6 +808,8 @@ impl<P: Params + 'static, M: IcedPlugin<P>> Editor for IcedEditor<P, M> {
         let scale = self.scale.clone();
         let meter_ids = self.meter_ids.clone();
         let pending_size = Arc::clone(&self.pending_size);
+        let design = self.design;
+        let zoom_cell = Arc::clone(&self.zoom);
         let min_size = self.min_size;
         let max_size = self.max_size;
         let aspect_ratio = self.aspect_ratio;
@@ -793,6 +841,7 @@ impl<P: Params + 'static, M: IcedPlugin<P>> Editor for IcedEditor<P, M> {
                     meter_ids,
                 };
                 let mut runtime = IcedRuntime::new((w, h), scale.clone(), font, program);
+                runtime.zoom = zoom;
 
                 // GPU init + every blocking swapchain call run on the
                 // surface pump (off this thread on Windows, inline
@@ -806,6 +855,8 @@ impl<P: Params + 'static, M: IcedPlugin<P>> Editor for IcedEditor<P, M> {
                     runtime,
                     pending_size,
                     scale,
+                    design,
+                    zoom: zoom_cell,
                     host_driven_scale,
                     last_cursor: None,
                     min_size,
@@ -876,11 +927,16 @@ impl<P: Params + 'static, M: IcedPlugin<P>> Editor for IcedEditor<P, M> {
         // exercises the same render path the user sees. `EditorScale`
         // falls back to `backing_scale()` for pre-open / headless
         // calls.
-        let scale = self.scale.get();
+        // A zoomed editor is drawn at its design size and the zoomed
+        // scale, which is the same picture its window shows.
+        let (size, scale) = match self.design {
+            Some(design) => (design, self.scale.get() * self.current_zoom()),
+            None => (self.size, self.scale.get()),
+        };
         crate::screenshot::render_to_pixels::<P, M>(
             Arc::clone(&self.params),
             plugin,
-            self.size,
+            size,
             scale,
             self.font,
         )

@@ -48,7 +48,8 @@
 /// sizing slightly differently. We sidestep the whole mess by
 /// pinning the container to the editor's natural size from
 /// `gui_get_size` and ignoring any attempt by the host to resize
-/// us. Use AU v3 (or CLAP / VST3 / LV2) for resizable editors.
+/// us. The editor changes that size itself through
+/// `truce_au_resize_view` (an interface zoom), and the host follows.
 @interface TRUCE_AU_FIXED_CONTAINER_NAME : NSView
 @property(nonatomic, assign) void *rustCtx;
 @property(nonatomic, assign) const AuCallbacks *callbacks;
@@ -116,6 +117,15 @@
 }
 
 @end
+
+// Resize the container the host parented the editor into. The container pins
+// itself to the editor's reported size, which the editor has already changed,
+// and the host follows the container's frame.
+void truce_au_resize_view(void *view, uint32_t w, uint32_t h) {
+    if (view == NULL) return;
+    NSView *container = (__bridge NSView *)view;
+    [container setFrameSize:NSMakeSize((CGFloat)w, (CGFloat)h)];
+}
 
 // Stringify the class name for the v2 shim's `kAudioUnitProperty_CocoaUI`
 // response. Two-step macro so the argument is expanded before stringification.

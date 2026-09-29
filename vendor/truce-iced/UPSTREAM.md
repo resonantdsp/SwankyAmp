@@ -117,3 +117,28 @@ variable is unset.
 
 Remove the Cargo patch and this directory when a pinned upstream release
 answers input the same way.
+
+# Interface zoom
+
+The published editor either keeps a fixed size or reflows its widget tree
+into whatever size the host gives it. A player who needs a larger or smaller
+window gets neither: a fixed interface cannot grow, and a reflowed one changes
+its layout. `IcedEditor::zoom` makes the size given to `new` a design size the
+widget tree always lays out at, and the window that size times a zoom. The
+viewport's scale factor is the display's scale times the zoom, so iced
+rasterises text, vector drawing and shader primitives at the magnified size
+rather than stretching a finished frame, and every widget scales without
+knowing about it. Cursor positions and pixel wheel deltas are divided back to
+design points.
+
+`IcedPlugin::zoom` is how the plugin model chooses. When it changes, the
+window handler resizes its own window, reports the new size through
+`Editor::size`, and then calls `PluginContext::request_resize`, in that order,
+because a host answering the request compares the size it is given with the
+one the editor reports. The editor stays fixed-size to the host
+(`can_resize` false), so no host offers a drag handle or feeds a size back
+through `set_size`; CLAP and VST3 both let a fixed-size view request a resize.
+This is the same change as Swanky Amp Pro's copy of this crate.
+
+Remove the Cargo patch and this directory when a pinned upstream release
+offers an interface zoom.

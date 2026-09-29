@@ -97,6 +97,13 @@ installs beside Swanky Amp 1.4.0.
   rate and buffer for a support request, and its Third-party licences link
   opens the licences of the font and open-source code the product is built
   from, generated from its dependencies.
+- Added an interface size to the information panel: the whole editor at 75,
+  100, 125 or 150 %, with the same layout and native text drawn sharp at every
+  size. The editor resizes its window and asks the host to follow in CLAP,
+  VST3, the Audio Unit and the standalone. The size is remembered once per
+  computer, never in presets or host state. The faceplate artwork is baked at
+  two texels per interface pixel with filtered levels, so it is sharp at 100 %
+  on Retina and at 150 %.
 - Added a bounded, cached release notice: the information button turns into a
   highlighted download arrow when a newer stable release is published, and the
   panel announces it with a link to the fixed catalogue page.

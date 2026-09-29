@@ -25,10 +25,13 @@ pub const MUTED: Color = Color::from_rgb(0.53, 0.59, 0.61);
 pub const DISABLED_ALPHA: f32 = 0.35;
 /// Corner radius shared by every outlined control.
 pub const CONTROL_RADIUS: f32 = 5.0;
-/// Texels per interface pixel in the switch disc sprite: every edge the disc
-/// has comes from the sprite, so it is drawn sharper than the 1x bake to hold
-/// up on a Retina display.
-pub const DISC_SUPERSAMPLE: u32 = 2;
+/// Texels per interface pixel in the view's bake and the switch disc sprite.
+/// The interface is drawn from three quarters to one and a half times its
+/// design size, and a Retina display doubles that: two texels per pixel is
+/// exact at 100 % on Retina, and at 150 % on Retina magnifies the bake less
+/// than a single-texel bake already was at 100 % there. Smaller drawings read
+/// the box-filtered levels the package stores.
+pub const SUPERSAMPLE: u32 = 2;
 /// The cabinet switch's disc diameter, half a small knob's: the whole switch
 /// is a track two discs tall, about a small knob's height.
 pub const SWITCH_DIAMETER: f32 = 20.0;

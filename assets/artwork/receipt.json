@@ -1,5 +1,5 @@
 {
-  "schema": 3,
+  "schema": 4,
   "manifest": {
     "schema": 4,
     "view": "amp",
@@ -19,8 +19,8 @@
   },
   "producer": {
     "revision": "84f20c54673317a84208be29efb7f6f3421e522b",
-    "source_sha256": "b760105352354535accd09998dd8069c589d1a000bfebb8b10e94c61607b23a0",
-    "product_revision": "71f88ba68d1d4f15d142a75b1c30857a97510899+working-tree"
+    "source_sha256": "2e406dc9fd941b0a03d4571f6cbeb72d7e0aa1a41f15de75496e5eeadaffc95f",
+    "product_revision": "b47cfb97aa44d60dc9dffa2b27a68a76c4ee6d17+working-tree"
   },
   "render": {
     "blender": "5.2.1 LTS",
@@ -51,22 +51,22 @@
     {
       "role": "base",
       "file": "base.exr",
-      "width": 864,
-      "height": 512,
+      "width": 1728,
+      "height": 1024,
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "c35c197992be4b9b42d8e87b7cf55339fc855b192eea2ce44580a2d48837e36b"
+      "sha256": "77ac35d6122cb7b823c3cdbe882e58b614fbf87a90e71e89d274cb70b7fa6fd2"
     },
     {
       "role": "shadow",
       "file": "shadow.exr",
-      "width": 864,
-      "height": 512,
+      "width": 1728,
+      "height": 1024,
       "channels": "RGB",
       "semantics": "display-linear-multiplicative",
       "row_origin": "top-left",
-      "sha256": "b1231fdeb15e591193725a030f9c6bbfba722847611265d7d6b919b54bc83a80"
+      "sha256": "2edf3c7b3131cdaa84789649a4114d2ecc46d1bfce170b6c1fe3e118e3c1eab1"
     },
     {
       "role": "ring-response",
@@ -76,12 +76,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "a89b14464947bf2cb50766f95e659cf84d8449efd5f5602c631c9cfde88d487f",
+      "sha256": "ec2165accd872a7d19d6df03aa54dd03accdb739fe8ce2728bba6ce5b16271d8",
       "family": 0,
       "radius": 26.0,
       "step": 1,
       "value": 0.08333333333333333,
-      "peak": 0.07910814662966026
+      "peak": 0.07910814161419387
     },
     {
       "role": "ring-response",
@@ -91,12 +91,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "4707cbe3eb0626e4438df77e7b763cf243024503710134a486f3cc8562fe89ca",
+      "sha256": "a088d8574145506f8b992e668b4194d8a4bd91d5fcb29ae2c015185e1ae216cf",
       "family": 0,
       "radius": 26.0,
       "step": 2,
       "value": 0.16666666666666666,
-      "peak": 0.07949966586394172
+      "peak": 0.07949967070946243
     },
     {
       "role": "ring-response",
@@ -106,12 +106,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "89cdcd0eb8d55b74b97f3123de802b0b9a5dc0aba6e6480f451bdb78b430c6db",
+      "sha256": "f2413407b167713ff2f7989d1d9aac04fac32fe276351975b02b6871acd2d635",
       "family": 0,
       "radius": 26.0,
       "step": 3,
       "value": 0.25,
-      "peak": 0.07941537757977744
+      "peak": 0.07941538210778556
     },
     {
       "role": "ring-response",
@@ -121,12 +121,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "c010df029c60c5ccbec1be76af2fb80e9b22893e1aa3bfe78a7baa38f0a90b6f",
+      "sha256": "83664d3af6a70747708d26b6eb4f45a7a5511d7d9eb3ca7f02db9cbd40c4243a",
       "family": 0,
       "radius": 26.0,
       "step": 4,
       "value": 0.3333333333333333,
-      "peak": 0.07927670427293083
+      "peak": 0.07927672329118976
     },
     {
       "role": "ring-response",
@@ -136,12 +136,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "548241d5ad4cb5ed2d3485b17a45a90f3926d3397eed46a38f3b689bf7390ce2",
+      "sha256": "af1167aa3a3e40eed69abcd15beeab72d96149cf9e4895e7e618d70effd00652",
       "family": 0,
       "radius": 26.0,
       "step": 5,
       "value": 0.4166666666666667,
-      "peak": 0.07983633919519924
+      "peak": 0.07983634843638418
     },
     {
       "role": "ring-response",
@@ -151,12 +151,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "40912b2c775faf0a3a82342fdf06ff299283372d989b4e4b55e7efda4d194649",
+      "sha256": "1706df14bf01c0db21c3b67b651360fd415401bf33957ab2922955fe43290908",
       "family": 0,
       "radius": 26.0,
       "step": 6,
       "value": 0.5,
-      "peak": 0.07982357549638823
+      "peak": 0.07982357470605042
     },
     {
       "role": "ring-response",
@@ -166,12 +166,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "e7dca4e520dcdc39388ce1450517445d48c7cf30e743b368d9c8e5cca965a255",
+      "sha256": "e642cafe9b73bb013eb0ede9878f4c224989719c7933e298af3050030dc80b95",
       "family": 0,
       "radius": 26.0,
       "step": 7,
       "value": 0.5833333333333334,
-      "peak": 0.07937047899426783
+      "peak": 0.0793704875503605
     },
     {
       "role": "ring-response",
@@ -181,12 +181,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "d7cf24d53e6369ca113a5639b79c55d4a741c3c6a1644e2ca9c9f54bce3a26d4",
+      "sha256": "7cf26aa7a2432651488448c01259a751b0fc0fdb5da8b9eb4413704a37f7b3f8",
       "family": 0,
       "radius": 26.0,
       "step": 8,
       "value": 0.6666666666666666,
-      "peak": 0.07931845167928284
+      "peak": 0.07931844936543007
     },
     {
       "role": "ring-response",
@@ -196,12 +196,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "baf0bec546f0f39f6a2e2c242e6f8f6a4ec8dc8cf0ddff14b851ba6ff70338c5",
+      "sha256": "0bff3e87a30920e90078bf246a36bbf48ff0f43bad4eac846170cda8efcab747",
       "family": 0,
       "radius": 26.0,
       "step": 9,
       "value": 0.75,
-      "peak": 0.07953403041054376
+      "peak": 0.07953402458091707
     },
     {
       "role": "ring-response",
@@ -211,12 +211,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "1eaea9760185f0ea066d7302cf0a9f09af9d27201ba3325eccd6ffb0833e8a93",
+      "sha256": "9477ddf9cebac3dc48890aa22c3e4ca8d19751ef69dc01d925be297846c1b9f1",
       "family": 0,
       "radius": 26.0,
       "step": 10,
       "value": 0.8333333333333334,
-      "peak": 0.07958766321679064
+      "peak": 0.07958766961624231
     },
     {
       "role": "ring-response",
@@ -226,12 +226,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "b1b8ec358d2b413ba44abb0b19a5ffc847d64931f6f841566ef8286f0bd13d53",
+      "sha256": "a0ce3bce25a66c5671d9f8e524b183f2c1323caeffce2827d43e59145a0fa080",
       "family": 0,
       "radius": 26.0,
       "step": 11,
       "value": 0.9166666666666666,
-      "peak": 0.07936551854235527
+      "peak": 0.07936552119310253
     },
     {
       "role": "ring-response",
@@ -241,12 +241,12 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "d0e47f71234da1f72a83af0d82ce1b18e96592be22a04dc8c31a6670afac4895",
+      "sha256": "fa55ccd1ead3d5eec815d3a9b848bed6c3d3de8738dce1d369115d72e4f8f832",
       "family": 0,
       "radius": 26.0,
       "step": 12,
       "value": 1.0,
-      "peak": 0.07947198026739463
+      "peak": 0.0794719716464399
     },
     {
       "role": "meter-response",
@@ -256,13 +256,13 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "5d95b717828ffec9455573150b61c83388aafaf6c4287f39359c262e0eaa8849",
+      "sha256": "4c48703bc8604551294614887d7c5c963959222a7d3419e085b266976f3d15f0",
       "family": 0,
       "size": [
         16.0,
         6.375
       ],
-      "peak": 0.6471487879753113
+      "peak": 0.647148847579956
     },
     {
       "role": "disc-color",
@@ -272,7 +272,7 @@
       "channels": "RGB",
       "semantics": "scene-linear-radiance",
       "row_origin": "top-left",
-      "sha256": "d474aa5c17c9c7ed7974e16dc62bc5f835596c28ff6088e5fa39c76f697d0ae1",
+      "sha256": "507d0e868559c3985e2c8320bcc9a2c2b417a9783865d345f79e5cc99d2df3ed",
       "size": [
         40.0,
         40.0
@@ -286,7 +286,7 @@
       "channels": "RGB",
       "semantics": "display-linear-multiplicative",
       "row_origin": "top-left",
-      "sha256": "517645bff4863887522d5b1bca25669da74539c1cc96fc5246d235b3b32a4ab6",
+      "sha256": "b562ff8f765c2f7b13fd1100f59f3bf92dadb11df4d2bdd92133105a7ed03c36",
       "size": [
         40.0,
         40.0
@@ -300,7 +300,7 @@
       "channels": "RGB",
       "semantics": "coverage",
       "row_origin": "top-left",
-      "sha256": "80ab8ffa268656df87f88612ceebba6bcec54a8421bf92e9f8890e594d4b76b6",
+      "sha256": "28270710e8a829fc84f20d8eae71dc474bbd7c256dc2f81998610184587bf820",
       "size": [
         40.0,
         40.0

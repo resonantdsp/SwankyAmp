@@ -267,16 +267,34 @@ is a baked sprite the compositor places from the parameter. Knob markers are
 Pro's glossy black divots at the same proportions. While the cabinet is off, its
 three knobs, their labels and readouts are dimmed as Pro dims a bypassed
 section, and stay adjustable. Readouts show whole units at rest and tenths
-while a knob is dragged. Export the exact resolved
-geometry (layout manifest schema 4, which gives each section its outline
-radius and describes the switch track) or capture
-the editor at 1x and 2x with:
+while a knob is dragged.
+
+The information panel's Interface size draws the whole editor at 75, 100, 125
+or 150 %. The layout never changes: the widget tree always lays out at 864 by
+512, the window is that times the size, and native text, the knob rings,
+markers and meters render at the window's real resolution, so they stay sharp
+at every size. The editor resizes its own window and asks the host to follow,
+in CLAP, VST3, the Audio Unit and the standalone; it stays fixed-size to hosts,
+so none offers a drag handle. The size belongs to the computer, not to a sound:
+it is saved once per installation in `Swanky Amp 2 interface.json`, in
+`~/Library/Resonant DSP` on macOS, `%APPDATA%\Resonant DSP` on Windows and
+`$XDG_CONFIG_HOME/Resonant DSP` on Linux, and never in presets or host state.
+The baked faceplate is two texels per interface pixel, exact at 100 % on a
+Retina display, and the package stores box-filtered levels that smaller
+drawings read.
+
+Export the exact resolved geometry (layout manifest schema 4, which gives each
+section its outline radius and describes the switch track) or capture the
+editor at every interface size, at 1x and 2x, with:
 
 ```sh
 just export-layout /tmp/swanky-layout
 just capture /tmp/swanky-capture
 ```
 
+The 100 % captures are `amp-1x.png` and `amp-2x.png`; the other sizes add
+theirs, as in `amp-150-2x.png`. A capture always draws at the size it names,
+whatever size this machine has chosen.
 `just capture-preset "high gain" /tmp/swanky-capture` draws the editor with
 that factory preset applied and named in the header, and
 `just capture-information /tmp/swanky-capture` with the information panel
@@ -306,6 +324,10 @@ just pack-artwork /tmp/swanky-artwork /tmp/swanky-artwork.pack
 just validate-assets /tmp/swanky-artwork.pack /tmp/swanky-artwork
 ```
 
+The base and shadow layers are twice the editor's size in each direction. The
+package stores every layer as deflated RGB9E5 and adds two box-filtered
+halvings of the base, shadow and disc sprite, averaged in linear light, for
+interface sizes that draw them smaller than their texels.
 The receipt records the scene-linear radiance and display-linear shadow
 semantics, dimensions, hashes, and public layout provenance. Producer metadata
 is descriptive, so replacement CC artwork does not depend on Blender or the
@@ -438,8 +460,11 @@ The header carries a small outlined information button to the left of the
 preset bar. A press opens the information panel over the dimmed editor: the
 product name and running version, such as "Swanky Amp Free 2.0.0", and links
 to the website's product page, the manual and support, each tagged
-`utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=information`. Escape,
-the button again or a press outside the panel closes it.
+`utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=information`. Below
+them, Interface size offers 75, 100, 125 and 150 %; a press resizes the editor
+at once and is remembered for every later editor on the computer (see
+[Editor](#editor)). Escape, the button again or a press outside the panel
+closes it.
 
 Copy diagnostics, beside the links, puts a short block on the clipboard for a
 support request: product and version, operating system and architecture, the

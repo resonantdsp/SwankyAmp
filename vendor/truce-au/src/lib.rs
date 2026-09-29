@@ -1883,6 +1883,9 @@ unsafe extern "C" fn cb_gui_open<P: PluginExport>(
                 let pending_state_for_set = inst.pending_state.clone();
                 let transport_slot = inst.transport_slot.clone();
                 let ctx_for_begin = ctx_raw;
+                // The host's container view, which request_resize resizes.
+                #[cfg(target_os = "macos")]
+                let container = SendPtr::new(parent.cast_const());
                 let ctx_for_end = ctx_raw;
                 // iOS AU v3 hosts the editor inside an .appex; v2's
                 // `AUEventListener` doesn't exist there. Parameter
@@ -1955,6 +1958,15 @@ unsafe extern "C" fn cb_gui_open<P: PluginExport>(
                                 return false;
                             }
                             let inst = &*ctx_raw.as_ptr().cast::<AuInstance<P>>();
+                            // The host follows the frame of the view it was
+                            // handed, not the editor inside it, so that view
+                            // is resized once the editor has taken the size.
+                            #[cfg(target_os = "macos")]
+                            let resize_container = || {
+                                ffi::truce_au_resize_view(container.as_ptr().cast_mut(), w, h);
+                            };
+                            #[cfg(not(target_os = "macos"))]
+                            let resize_container = || {};
                             // An author can call this from inside an `Editor`
                             // method (`set_size`, `state_changed`) that a GUI
                             // callback invoked while holding the `gui` cell -
@@ -1964,7 +1976,13 @@ unsafe extern "C" fn cb_gui_open<P: PluginExport>(
                             // and otherwise stashes it for `cb_gui_get_size` to
                             // apply on the next size query.
                             if let Some(mut gui) = inst.gui.try_enter() {
-                                gui.editor.as_mut().is_some_and(|e| e.set_size(w, h))
+                                let accepted =
+                                    gui.editor.as_mut().is_some_and(|e| e.set_size(w, h));
+                                drop(gui);
+                                if accepted {
+                                    resize_container();
+                                }
+                                accepted
                             } else {
                                 inst.pending_resize
                                     .store((u64::from(w) << 32) | u64::from(h), Ordering::Relaxed);

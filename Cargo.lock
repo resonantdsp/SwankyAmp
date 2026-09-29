@@ -3577,6 +3577,7 @@ dependencies = [
  "clap-sys",
  "dirs",
  "exr",
+ "flate2",
  "iced_core",
  "iced_graphics",
  "iced_runtime",

@@ -11,6 +11,7 @@ struct Controls {
     polar: vec4<f32>,
     extent: vec4<f32>,
     disc: vec4<f32>,
+    sampling: vec4<f32>,
     meter_style: vec4<f32>,
     meter_colors: array<vec4<f32>, 2>,
     meters: array<Control, 4>,
@@ -88,16 +89,16 @@ fn divot_paint(outward: vec2<f32>, amount: f32, depth: f32) -> vec3<f32> {
 @fragment
 fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
     let point = input.uv * controls.scene.xy;
-    var multiplier = textureSampleLevel(shadow, linear_sampler, input.uv, 0.0).rgb;
+    var multiplier = textureSampleLevel(shadow, linear_sampler, input.uv, controls.sampling.x).rgb;
     // The switch disc moves, so neither it nor the shadow it casts is in the
     // view's bake: its sprite is stamped over the baked track here.
     let disc_uv = (point - controls.disc.xy) / controls.disc.zw;
     let on_disc = all(disc_uv >= vec2(0.0)) && all(disc_uv <= vec2(1.0));
     if on_disc {
-        multiplier *= textureSampleLevel(disc, linear_sampler, disc_uv, 1, 0.0).rgb;
+        multiplier *= textureSampleLevel(disc, linear_sampler, disc_uv, 1, controls.sampling.x).rgb;
     }
     let aa = max(length(fwidth(point)) * 0.7071, 0.001);
-    var radiance = textureSampleLevel(base, linear_sampler, input.uv, 0.0).rgb;
+    var radiance = textureSampleLevel(base, linear_sampler, input.uv, controls.sampling.x).rgb;
     var light = vec3(0.0);
 
     for (var index = 0u; index < 32u; index++) {
@@ -202,8 +203,8 @@ fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
     }
 
     if on_disc {
-        let sprite = textureSampleLevel(disc, linear_sampler, disc_uv, 0, 0.0).rgb;
-        let cover = textureSampleLevel(disc, linear_sampler, disc_uv, 2, 0.0).r;
+        let sprite = textureSampleLevel(disc, linear_sampler, disc_uv, 0, controls.sampling.x).rgb;
+        let cover = textureSampleLevel(disc, linear_sampler, disc_uv, 2, controls.sampling.x).r;
         radiance = radiance * (1.0 - cover) + sprite;
     }
 
