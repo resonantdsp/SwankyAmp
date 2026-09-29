@@ -151,7 +151,8 @@ impl FreeUi {
             layers.push(surface(section, None));
         }
         layers.push(surface(layout::SWITCH, None));
-        if baked && let Some(backdrop) = crate::artwork::backdrop::<R>(params, self.meter_levels) {
+        let fractions = self.meter_levels.map(crate::meters::meter_fraction);
+        if baked && let Some(backdrop) = crate::artwork::backdrop::<R>(params, fractions) {
             layers.push(backdrop);
         }
         for section in layout::SECTIONS {
@@ -422,6 +423,24 @@ fn footer<'a, R: iced_core::Renderer + 'a>(
     )
 }
 
+/// How wide a single line of text sets.
+pub(crate) fn text_width(body: &str, size: f32, font: iced_core::Font) -> f32 {
+    use iced_core::text::{Paragraph, Shaping, Text, Wrapping};
+    style::load_fonts();
+    iced_graphics::text::Paragraph::with_text(Text {
+        content: body,
+        bounds: iced_core::Size::INFINITE,
+        size: iced_core::Pixels(size),
+        line_height: LineHeight::default(),
+        font,
+        align_x: Default::default(),
+        align_y: iced_core::alignment::Vertical::Top,
+        shaping: Shaping::default(),
+        wrapping: Wrapping::None,
+    })
+    .min_width()
+}
+
 /// The group boxes' right edge, where the header's last action and the
 /// footer's mark end too.
 const RIGHT_EDGE: f32 = style::WIDTH - style::MARGIN;
@@ -430,9 +449,9 @@ const RIGHT_EDGE: f32 = style::WIDTH - style::MARGIN;
 /// group gap between header actions.
 const OVERSAMPLING_FIELD: [f32; 2] = [RIGHT_EDGE - 58.0, 58.0];
 const PRESET_FIELD: [f32; 4] = [
-    OVERSAMPLING_FIELD[0] - HEADER_GROUP_GAP - 128.0,
+    OVERSAMPLING_FIELD[0] - HEADER_GROUP_GAP - crate::preset_bar::FIELD_WIDTH,
     HEADER_CONTROL[0],
-    128.0,
+    crate::preset_bar::FIELD_WIDTH,
     HEADER_CONTROL[1],
 ];
 
@@ -971,13 +990,13 @@ fn levels_meters<'a, R: FreeRenderer + 'a>(levels: [f32; 4]) -> Vec<Element<'a, 
 fn meter_column<'a, R: FreeRenderer + 'a>(
     color: Color,
     height: f32,
-    level: f32,
+    amplitude: f32,
 ) -> Element<'a, Msg, Theme, R> {
     let pitch = height / style::METER_BARS as f32;
     let gap = pitch * style::METER_GAP;
     let bar_height = pitch - gap;
     let baked = R::LOAD_ARTWORK && crate::artwork::loaded();
-    let lit = (level.clamp(0.0, 1.0) * style::METER_BARS as f32).floor() as u32;
+    let lit = crate::meters::active_bars(amplitude, style::METER_BARS);
     let bars: Vec<Element<'a, Msg, Theme, R>> = (0..style::METER_BARS)
         .rev()
         .map(|bar| {

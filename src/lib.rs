@@ -59,12 +59,12 @@ impl PluginLogic for SwankyAmp {
         context: &mut ProcessContext,
     ) -> ProcessStatus {
         engine.process(params, buffer);
-        for (id, value) in params
+        for (id, amplitude) in params
             .display_meter_ids()
             .into_iter()
             .zip(engine.meter_levels())
         {
-            context.set_meter(id, value);
+            context.set_meter(id, meters::meter_fraction(amplitude));
         }
         params.meter_state.publish(engine.meter_levels());
         ProcessStatus::Normal
@@ -325,27 +325,37 @@ mod tests {
         );
     }
 
+    /// Direct guitar peaks around -23 dBFS from a single coil and -14.5 dBFS
+    /// from a humbucker, as the audition recordings do. With Input at 0 dB the
+    /// input meter must show them well up its column, and fall dark soon after
+    /// the playing stops.
     #[test]
-    fn input_meter_uses_the_released_gain_scale_and_time_based_release() {
+    fn input_meter_shows_direct_guitar_and_falls_dark_after_it() {
         let params = SwankyAmpParams::default();
-        params.input.set_value(1.);
-        let mut engine = engine::Engine::new(&params);
-        engine.reset(&params, 44_100., 22_050);
-        let signal = vec![vec![0.01; 64]];
-        let _ = render(&mut engine, &params, &signal, 64);
-        let active = engine.meter_levels()[0];
-        let expected = 21. / 34.;
-        assert!(
-            (active - expected).abs() < 1e-5,
-            "+35 dB Input mapped a -40 dBFS signal to {active}, expected {expected}"
+        let cells = |peak_db: f32| {
+            let mut engine = engine::Engine::new(&params);
+            engine.reset(&params, 48_000., 512);
+            let peak = 10_f32.powf(peak_db / 20.);
+            let _ = render(&mut engine, &params, &[vec![peak; 512]], 512);
+            let lit = meters::active_bars(engine.meter_levels()[0], style::METER_BARS);
+            (engine, lit)
+        };
+        let (mut engine, single_coil) = cells(-23.2);
+        assert_eq!(
+            single_coil, 6,
+            "a single-coil peak lit {single_coil} of 10 cells"
+        );
+        assert_eq!(
+            cells(-14.5).1,
+            7,
+            "a humbucker peak lit the wrong cell count"
         );
 
-        let silence = vec![vec![0.; 22_050]];
-        let _ = render(&mut engine, &params, &silence, 22_050);
-        let released = engine.meter_levels()[0];
-        assert!(
-            (released - active * 0.5).abs() < 1e-5,
-            "input meter released from {active} to {released} in 0.5 seconds"
+        let _ = render(&mut engine, &params, &[vec![0.; 96_000]], 512);
+        assert_eq!(
+            engine.meter_levels()[0],
+            0.,
+            "the input meter was still lit two seconds after the playing stopped"
         );
     }
 

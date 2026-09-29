@@ -361,7 +361,7 @@ pub fn loaded() -> bool {
 }
 
 /// The baked scene with the knobs at their values and each meter column
-/// lit to its level in `meter_levels` (input L/R, output L/R, 0..1).
+/// lit to its fraction in `meter_levels` (input L/R, output L/R).
 pub fn backdrop<'a, R>(
     params: &truce_iced::ParamCache<SwankyAmpParams>,
     meter_levels: [f32; 4],

@@ -20,14 +20,25 @@ use crate::style;
 use crate::widgets::{FreeRenderer, Msg};
 
 const DIM: Color = Color::from_rgb(0.49, 0.53, 0.56);
-const MENU_WIDTH: f32 = 164.0;
+/// The field's width, which its menu shares. It holds the longest factory
+/// name with its modified mark, with room to spare for a user's name.
+pub const FIELD_WIDTH: f32 = 164.0;
+/// Each arrow's share of the field, either side of the name.
+const ARROW_WIDTH: f32 = 22.0;
+/// What the name keeps clear of each arrow's share, so a name filling its
+/// room still reads apart from the arrows.
+const NAME_INSET: f32 = 4.0;
+/// The widest a name with its mark can set in the field.
+const NAME_ROOM: f32 = FIELD_WIDTH - 2.0 * (ARROW_WIDTH + NAME_INSET);
+const NAME_SIZE: f32 = 12.0;
+/// Marks a preset whose controls have moved since it was chosen.
+const MODIFIED: &str = " •";
 const ITEM_HEIGHT: f32 = 20.0;
+const ITEM_PADDING: f32 = 10.0;
 /// The menu stops short of the footer; a longer user list scrolls.
 const MENU_BOTTOM: f32 = style::HEIGHT - style::FOOTER_HEIGHT - 6.0;
 /// Long enough to read a sentence, short enough not to linger over playing.
 const STATUS_SECONDS: u64 = 6;
-/// Names longer than the field abbreviate; the menu shows them whole.
-const NAME_CHARS: usize = 13;
 
 #[derive(Debug, Clone)]
 pub enum PresetMsg {
@@ -398,10 +409,8 @@ impl PresetBar {
         &self,
         params: &ParamCache<SwankyAmpParams>,
     ) -> Element<'a, Msg, Theme, R> {
-        let mut name = abbreviate(&self.current.name);
-        if self.modified(params) {
-            name.push_str(" •");
-        }
+        let mark = if self.modified(params) { MODIFIED } else { "" };
+        let name = fitted(&self.current.name, mark, NAME_ROOM);
         let chevron = |glyph, message: Option<PresetMsg>| {
             let available = message.is_some();
             let glyph = container(text(glyph).size(17).color(DIM.scale_alpha(if available {
@@ -409,9 +418,8 @@ impl PresetBar {
             } else {
                 0.35
             })))
-            .width(22)
-            .height(Length::Fill)
-            .center(Length::Fill);
+            .center_x(ARROW_WIDTH)
+            .center_y(Length::Fill);
             match message {
                 Some(message) => mouse_area(glyph)
                     .on_press(preset(message))
@@ -429,7 +437,8 @@ impl PresetBar {
                 mouse_area(
                     container(
                         text(name)
-                            .size(12)
+                            .size(NAME_SIZE)
+                            .font(style::FONT)
                             .wrapping(iced_core::text::Wrapping::None)
                             .color(style::INK),
                     )
@@ -479,7 +488,11 @@ impl PresetBar {
         let user = self.current.scope == Scope::User;
         let confirming = self.removing.as_deref() == Some(self.current.key.as_str());
         let remove = if confirming {
-            format!("Remove {}?", abbreviate(&self.current.name))
+            let prefix = "Remove ";
+            let room = FIELD_WIDTH
+                - 2.0 * ITEM_PADDING
+                - crate::ui::text_width(prefix, NAME_SIZE, style::FONT);
+            format!("{prefix}{}", fitted(&self.current.name, "?", room))
         } else {
             "Remove".into()
         };
@@ -541,7 +554,7 @@ impl PresetBar {
                     .on_press(preset(PresetMsg::Close))
                     .on_right_press(preset(PresetMsg::Close)),
             ),
-            place([field[0], top, MENU_WIDTH, height], panel),
+            place([field[0], top, FIELD_WIDTH, height], panel),
         ]
     }
 }
@@ -553,13 +566,44 @@ fn preset(message: PresetMsg) -> Msg {
     Message::Plugin(crate::ui::Action::Preset(message))
 }
 
-fn abbreviate(name: &str) -> String {
-    if name.chars().count() <= NAME_CHARS {
-        return name.to_owned();
+/// A name, its mark and the room they set in.
+type FitRequest = (String, String, u32);
+
+/// The name followed by `mark`, set within `room`: whole when it fits, or
+/// cut to end in an ellipsis before the mark.
+fn fitted(name: &str, mark: &str, room: f32) -> String {
+    // The field is rebuilt with every display frame but its name changes only
+    // with the preset, so the last answer is kept rather than set again.
+    thread_local! {
+        static LAST: std::cell::RefCell<Option<(FitRequest, String)>> =
+            const { std::cell::RefCell::new(None) };
     }
-    let mut short: String = name.chars().take(NAME_CHARS - 1).collect();
-    short.push('…');
-    short
+    let key = (name.to_owned(), mark.to_owned(), room.to_bits());
+    LAST.with_borrow_mut(|last| match last {
+        Some((cached, shown)) if *cached == key => shown.clone(),
+        _ => {
+            let shown = set_within(name, mark, room);
+            *last = Some((key, shown.clone()));
+            shown
+        }
+    })
+}
+
+fn set_within(name: &str, mark: &str, room: f32) -> String {
+    let fits = |body: &str| crate::ui::text_width(body, NAME_SIZE, style::FONT) <= room;
+    let whole = format!("{name}{mark}");
+    if fits(&whole) {
+        return whole;
+    }
+    let characters: Vec<char> = name.chars().collect();
+    (0..characters.len())
+        .rev()
+        .map(|kept| {
+            let short: String = characters[..kept].iter().collect();
+            format!("{}…{mark}", short.trim_end())
+        })
+        .find(|short| fits(short))
+        .unwrap_or_else(|| format!("…{mark}"))
 }
 
 /// Pro's selector menu: a raised dark panel sharing the controls' corner
@@ -594,7 +638,7 @@ fn menu_item<'a, R: FreeRenderer + 'a>(
     )
     .width(Length::Fill)
     .height(ITEM_HEIGHT)
-    .padding(Padding::from([2.5, 10.0]))
+    .padding(Padding::from([2.5, ITEM_PADDING]))
     .style(move |_, status| {
         let hovered = matches!(status, button::Status::Hovered | button::Status::Pressed);
         button::Style {

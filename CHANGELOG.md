@@ -87,9 +87,10 @@ installs beside Swanky Amp 1.4.0.
   cabinet's Bright, Distance and Dynamic knobs, their labels and readouts dim
   while the cabinet is off, and stay adjustable.
 - Lit the level meters from each instance's own signal: input after the Input
-  control on the released -26 to +8 dB scale, output after the cabinet and
-  Output control on -30 to 0 dB, with instant attack and a half-second
-  release. Hosts that show plugin meters receive the same four levels.
+  control, output after the cabinet and Output control, both on Pro's -60 to
+  0 dBFS scale with instant attack and Pro's release, so direct guitar at
+  Input 0 dB lights about six input cells. Hosts that show plugin meters
+  receive the same four levels.
 - Added an information panel, opened from the header's information button:
   it names the product and its version, links to the website, the manual and
   support, and closes with Escape, the button again or a press outside. Its

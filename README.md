@@ -101,7 +101,8 @@ bit-identical and it still carries the defect.
 ### Presets
 
 The header's preset field shows the current preset's name between `‹` and
-`›`, which step through the factory presets and then the user's own. A press
+`›`, which step through the factory presets and then the user's own. A name
+too long for the field ends in an ellipsis short of the arrows. A press
 on the name opens the menu: Init, the ten factory presets, the user presets,
 then Save (a changed user preset), Save as…, Remove (user presets only),
 Import 1.x presets and Open folder. Remove deletes the preset's file, so its
@@ -304,11 +305,12 @@ remains available when the artwork package is missing or stale so a new bake
 can be produced from changed widget geometry.
 
 The four live meter columns, captioned L and R, are local to each plugin
-instance. The blue input pair observes the signal after the Input control on
-the released -26 to +8 dB scale; the output pair, in the accent, observes the
-final signal after the optional cabinet and Output control on a -30 to 0 dB
-scale. Cells light from the bottom up. A mono instance mirrors its reading into
-L and R. Immediate attack and a half-second release settle to exact darkness,
+instance. The blue input pair observes the signal after the Input control; the
+output pair, in the accent, observes the final signal after the optional
+cabinet and Output control. Both span -60 to 0 dBFS as Pro's do, one cell per
+6 dB, lit from the bottom up, so a single-coil DI at Input 0 dB lights about
+six input cells and a humbucker about seven. A mono instance mirrors its
+reading into L and R. Immediate attack and Pro's release settle to exact darkness,
 after which the editor has no meter change to redraw; the meters also go dark
 while the editor window has lost focus and the pointer is elsewhere.
 
