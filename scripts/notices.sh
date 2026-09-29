@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Write THIRD-PARTY-NOTICES.txt from the shipped dependency tree and the
-# bundled fonts. The candidate workflow runs this before packaging and names
-# the file in THIRD_PARTY_NOTICES, which build.rs embeds for the information
-# panel.
+# Write THIRD-PARTY-NOTICES.txt from the shipped dependency tree, the ASIO SDK
+# and the bundled fonts. The candidate workflow runs this before packaging
+# and names the file in THIRD_PARTY_NOTICES, which build.rs embeds for the
+# information panel.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -77,6 +77,34 @@ fi
 # the text of in the published crates; the vendored copy carries it unchanged.
 truce_version=$(grep -A1 '^name = "truce-core"$' Cargo.lock | sed -n 's/^version = "\(.*\)"$/\1/p')
 
+# The Windows standalone links Steinberg's ASIO SDK, which is not a crate, so
+# cargo-about never sees it. Taken under GPLv3, it must travel with that
+# licence and directions to its source; its host helpers are BSD-licensed.
+asio_sdk() {
+  local url sha
+  url=$(sed -n 's/^SDK_URL=//p' scripts/install-asio-sdk.sh)
+  sha=$(sed -n 's/^SDK_SHA256=//p' scripts/install-asio-sdk.sh)
+  echo "--------------------------------------------------------------------------------"
+  echo "Steinberg ASIO SDK"
+  echo
+  echo "Used by:"
+  echo "  the Windows standalone app, through asio-sys"
+  echo
+  echo "Its complete source is Steinberg's package at"
+  echo "  ${url}"
+  echo "  (SHA-256 ${sha})."
+  echo "Swanky Amp uses the SDK under the GNU General Public License, version 3,"
+  echo "the open-source option of the dual licence below; the text of that licence"
+  echo "follows, after the BSD licence of the SDK's host helpers."
+  echo
+  cat assets/asio-sdk/LICENSE.txt
+  echo
+  cat assets/asio-sdk/host-LICENSE.txt
+  echo
+  cat LICENSE
+  echo
+}
+
 generate() {
   cat <<'HEADER'
 Swanky Amp is free software under the GNU General Public License, version 3
@@ -93,6 +121,7 @@ HEADER
     echo
   done
   "$tool" generate --features asio,au about.hbs
+  asio_sdk
   echo "--------------------------------------------------------------------------------"
   echo "The Truce License 1.0"
   echo

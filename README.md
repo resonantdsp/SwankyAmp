@@ -495,8 +495,9 @@ The editable artwork in `assets/artwork` is licensed under CC BY 4.0; see its
 Font License in `assets/fonts/PTSans-OFL.txt`.
 
 The information panel's Third-party licences link opens the third-party
-notices the plug-in embeds: the font's licence and every crate the shipped
-formats link, grouped by licence. `just notices` writes them
+notices the plug-in embeds: the font's licence, every crate the shipped
+formats link, grouped by licence, and the ASIO SDK's licences and source.
+`just notices` writes them
 to `THIRD-PARTY-NOTICES.txt` with a pinned cargo-about from `about.toml` and
 `about.hbs`. The candidate workflow runs it before packaging and names the file
 in `THIRD_PARTY_NOTICES`, which `build.rs` embeds; a build without that
@@ -530,12 +531,16 @@ The dynamic-latency work adds narrow copies from the exact published Truce 6.3.0
 - `vendor/truce-core`, `vendor/truce-plugin`, `vendor/truce-loader`, and `vendor/truce`: the narrow real-time reset lifecycle hook and its forwarding bridge.
 - `vendor/truce-au`: a latency change reaches the Audio Unit host's property listeners.
 
-The Windows standalone is built with the ASIO SDK under Resonant DSP's
-Steinberg ASIO licence agreement. The SDK is fetched at build time and never
-committed or redistributed. ASIO is a registered trademark of Steinberg Media
-Technologies GmbH. Steinberg's usage guidelines for SDK 2.3.4 put the ASIO
-Compatible logo in the About panel of an application that runs on ASIO by
-default, as this one does, so its information panel shows it;
-`assets/asio-compatible.svg` is Steinberg's artwork, unchanged.
+The Windows standalone is built with Steinberg's ASIO SDK 2.3.4, which
+Steinberg licenses either under its proprietary agreement or under the GNU
+General Public License, version 3; Swanky Amp uses it under GPLv3. The SDK is
+fetched at build time, pinned by checksum, and not committed; the third-party
+notices carry its licence texts, from `assets/asio-sdk`, and name that package
+as its source. ASIO is a registered trademark of Steinberg Media Technologies
+GmbH. GPLv3 does not cover the name or logo, so their use follows Steinberg's
+usage guidelines for SDK 2.3.4, which put the ASIO Compatible logo in the About
+panel of an application that runs on ASIO by default, as this one does, so its
+information panel shows it; `assets/asio-compatible.svg` is Steinberg's
+artwork, unchanged.
 
 Each Truce directory carries the unchanged governing Truce licence and MIT and Apache texts, original manifest, source reference, and a focused `UPSTREAM.md` description of the local changes. `vendor/baseview-truce` carries its own MIT and Apache licence texts and provenance. Everything else resolves from the pinned Cargo lockfile.
