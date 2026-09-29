@@ -1,6 +1,7 @@
 //! The header's preset field and its menu: Pro's preset bar reduced to the
 //! single field Free has room for, with the actions in the menu.
 
+use std::cell::RefCell;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -20,14 +21,29 @@ use crate::style;
 use crate::widgets::{FreeRenderer, Msg};
 
 const DIM: Color = Color::from_rgb(0.49, 0.53, 0.56);
-const MENU_WIDTH: f32 = 164.0;
+/// The field's width, which its menu shares. It holds the longest factory
+/// name with its modified mark, with room to spare for a user's name.
+pub const FIELD_WIDTH: f32 = 164.0;
+/// Each arrow's share of the field, either side of the name.
+const ARROW_WIDTH: f32 = 22.0;
+/// What the name keeps clear of each arrow's share, so a name filling its
+/// room still reads apart from the arrows.
+const NAME_INSET: f32 = 4.0;
+/// The widest a name with its mark can set in the field.
+const NAME_ROOM: f32 = FIELD_WIDTH - 2.0 * (ARROW_WIDTH + NAME_INSET);
+/// The field's name and the menu's rows set at one size, which the fitting
+/// measures with.
+const TEXT_SIZE: f32 = 12.0;
+/// Marks a preset whose controls have moved since it was chosen.
+const MODIFIED: &str = " •";
+/// The menu's question before a user preset is removed: this, the name, "?".
+const REMOVE_PREFIX: &str = "Remove ";
 const ITEM_HEIGHT: f32 = 20.0;
+const ITEM_PADDING: f32 = 10.0;
 /// The menu stops short of the footer; a longer user list scrolls.
 const MENU_BOTTOM: f32 = style::HEIGHT - style::FOOTER_HEIGHT - 6.0;
 /// Long enough to read a sentence, short enough not to linger over playing.
 const STATUS_SECONDS: u64 = 6;
-/// Names longer than the field abbreviate; the menu shows them whole.
-const NAME_CHARS: usize = 13;
 
 #[derive(Debug, Clone)]
 pub enum PresetMsg {
@@ -59,6 +75,34 @@ pub struct PresetBar {
     /// The user preset a first press on Remove asked about. Deleting a file
     /// cannot be undone, so only a second press on the same preset does it.
     removing: Option<String>,
+    /// The current name as the field and the menu set it, kept until the
+    /// preset or its modified state changes, since the view is rebuilt with
+    /// every display frame.
+    shown: RefCell<Option<Shown>>,
+}
+
+/// The current preset's name fitted to the field and to the menu's Remove
+/// question, for one name and modified state.
+struct Shown {
+    name: String,
+    modified: bool,
+    field: String,
+    remove: String,
+}
+
+impl Shown {
+    fn new(name: &str, modified: bool) -> Self {
+        let mark = if modified { MODIFIED } else { "" };
+        let room = FIELD_WIDTH
+            - 2.0 * ITEM_PADDING
+            - crate::ui::text_width(REMOVE_PREFIX, TEXT_SIZE, style::FONT);
+        Self {
+            name: name.to_owned(),
+            modified,
+            field: fitted(name, mark, NAME_ROOM),
+            remove: format!("{REMOVE_PREFIX}{}", fitted(name, "?", room)),
+        }
+    }
 }
 
 impl PresetBar {
@@ -92,6 +136,7 @@ impl PresetBar {
             import: None,
             naming: None,
             removing: None,
+            shown: RefCell::new(None),
         }
     }
 
@@ -187,6 +232,20 @@ impl PresetBar {
                 listing.unreadable.join(", ")
             )));
         }
+    }
+
+    /// The current name fitted for the field, and for the Remove question.
+    fn shown(&self, params: &ParamCache<SwankyAmpParams>) -> (String, String) {
+        let modified = self.modified(params);
+        let mut shown = self.shown.borrow_mut();
+        let current = shown
+            .as_ref()
+            .is_some_and(|shown| shown.name == self.current.name && shown.modified == modified);
+        if !current {
+            *shown = Some(Shown::new(&self.current.name, modified));
+        }
+        let shown = shown.as_ref().expect("the fitted name was just set");
+        (shown.field.clone(), shown.remove.clone())
     }
 
     /// Init never reads as modified: it is the absence of a preset.
@@ -398,10 +457,7 @@ impl PresetBar {
         &self,
         params: &ParamCache<SwankyAmpParams>,
     ) -> Element<'a, Msg, Theme, R> {
-        let mut name = abbreviate(&self.current.name);
-        if self.modified(params) {
-            name.push_str(" •");
-        }
+        let (name, _) = self.shown(params);
         let chevron = |glyph, message: Option<PresetMsg>| {
             let available = message.is_some();
             let glyph = container(text(glyph).size(17).color(DIM.scale_alpha(if available {
@@ -409,9 +465,8 @@ impl PresetBar {
             } else {
                 0.35
             })))
-            .width(22)
-            .height(Length::Fill)
-            .center(Length::Fill);
+            .center_x(ARROW_WIDTH)
+            .center_y(Length::Fill);
             match message {
                 Some(message) => mouse_area(glyph)
                     .on_press(preset(message))
@@ -429,7 +484,8 @@ impl PresetBar {
                 mouse_area(
                     container(
                         text(name)
-                            .size(12)
+                            .size(TEXT_SIZE)
+                            .font(style::FONT)
                             .wrapping(iced_core::text::Wrapping::None)
                             .color(style::INK),
                     )
@@ -479,7 +535,7 @@ impl PresetBar {
         let user = self.current.scope == Scope::User;
         let confirming = self.removing.as_deref() == Some(self.current.key.as_str());
         let remove = if confirming {
-            format!("Remove {}?", abbreviate(&self.current.name))
+            self.shown(params).1
         } else {
             "Remove".into()
         };
@@ -541,7 +597,7 @@ impl PresetBar {
                     .on_press(preset(PresetMsg::Close))
                     .on_right_press(preset(PresetMsg::Close)),
             ),
-            place([field[0], top, MENU_WIDTH, height], panel),
+            place([field[0], top, FIELD_WIDTH, height], panel),
         ]
     }
 }
@@ -553,13 +609,23 @@ fn preset(message: PresetMsg) -> Msg {
     Message::Plugin(crate::ui::Action::Preset(message))
 }
 
-fn abbreviate(name: &str) -> String {
-    if name.chars().count() <= NAME_CHARS {
-        return name.to_owned();
+/// The name followed by `mark`, set within `room`: whole when it fits, or
+/// cut to end in an ellipsis before the mark.
+fn fitted(name: &str, mark: &str, room: f32) -> String {
+    let fits = |body: &str| crate::ui::text_width(body, TEXT_SIZE, style::FONT) <= room;
+    let whole = format!("{name}{mark}");
+    if fits(&whole) {
+        return whole;
     }
-    let mut short: String = name.chars().take(NAME_CHARS - 1).collect();
-    short.push('…');
-    short
+    let characters: Vec<char> = name.chars().collect();
+    (0..characters.len())
+        .rev()
+        .map(|kept| {
+            let short: String = characters[..kept].iter().collect();
+            format!("{}…{mark}", short.trim_end())
+        })
+        .find(|short| fits(short))
+        .unwrap_or_else(|| format!("…{mark}"))
 }
 
 /// Pro's selector menu: a raised dark panel sharing the controls' corner
@@ -589,12 +655,13 @@ fn menu_item<'a, R: FreeRenderer + 'a>(
     let available = message.is_some();
     button(
         text(label)
-            .size(12)
+            .size(TEXT_SIZE)
+            .font(style::FONT)
             .line_height(LineHeight::Absolute(15.0.into())),
     )
     .width(Length::Fill)
     .height(ITEM_HEIGHT)
-    .padding(Padding::from([2.5, 10.0]))
+    .padding(Padding::from([2.5, ITEM_PADDING]))
     .style(move |_, status| {
         let hovered = matches!(status, button::Status::Hovered | button::Status::Pressed);
         button::Style {
