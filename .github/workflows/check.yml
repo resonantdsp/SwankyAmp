@@ -1,10 +1,24 @@
 name: check
 
+# Prose cannot change what these jobs measure.
+#
+# The skip is decided by the `changes` job rather than by `paths-ignore`,
+# because a workflow filtered out by path never reports its checks at all, and
+# a required check that never reports leaves a pull request confined to prose
+# waiting forever. A skipped job satisfies a required check, so the jobs always
+# exist and decline to do the work instead.
+#
+# `checks` declines at the job level. `bundles` cannot: a matrix job whose
+# job-level `if` is false never expands its matrix, so it reports one check
+# named for the unresolved expression and the two per-platform names never
+# appear. Its legs therefore always start, and every step declines instead,
+# so each leg reports its real name and finishes in seconds.
 on:
   push:
     branches: [master]
   pull_request:
 
+# A newer push to the same ref makes the older answer irrelevant.
 concurrency:
   group: check-${{ github.ref }}
   cancel-in-progress: true
@@ -22,6 +36,9 @@ jobs:
     outputs:
       code: ${{ steps.filter.outputs.code }}
     steps:
+      # The base commit has to be in the clone for the diff below, and neither
+      # a pull request's base nor the commit a push started from is reachable
+      # from a shallow checkout of the head.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
@@ -30,19 +47,33 @@ jobs:
           BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         run: |
           set -euo pipefail
+          # A first push to a branch names no predecessor, and a force push can
+          # leave one that no longer exists; either way nothing can be ruled
+          # out, so everything counts as changed.
           if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ] \
             || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "No usable base commit; treating every path as changed."
             echo "code=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          # On a pull request HEAD is the merge of the head into the base, so
+          # this diff is the pull request's own changes.
+          files=$(git diff --name-only "$BASE" "$GITHUB_SHA")
+          echo "Changed files:"
+          echo "$files"
           code=false
           while IFS= read -r file; do
             [ -n "$file" ] || continue
             case "$file" in
               *.md) ;;
-              *) code=true; break ;;
+              *)
+                echo "Outside the ignored set: $file"
+                code=true
+                break
+                ;;
             esac
-          done < <(git diff --name-only "$BASE" "$GITHUB_SHA")
+          done <<< "$files"
+          echo "code=$code"
           echo "code=$code" >> "$GITHUB_OUTPUT"
 
   checks:
@@ -52,6 +83,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      # alsa-sys is the only dependency that resolves a system library at build
+      # time, and it reaches the default feature set through the standalone's
+      # audio backend, which clippy checks here. The window, GPU and portal
+      # libraries are opened at run time, so a check needs none of them.
       - run: sudo apt-get update && sudo apt-get install --no-install-recommends -y pkg-config libasound2-dev
       - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
         with:
@@ -61,6 +96,7 @@ jobs:
           node-version: "24.21.0"
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
+          # A failed check is the usual outcome, and it must not discard the dependency build.
           cache-on-failure: true
       - run: just ci-checks
 
@@ -82,7 +118,10 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         if: needs.changes.outputs.code == 'true'
         with:
+          # A failed check is the usual outcome, and it must not discard the dependency build.
           cache-on-failure: true
+          # One cache per platform rather than per job, so the candidate tier
+          # starts from the dependency build this tier already paid for.
           shared-key: bundles-${{ matrix.os }}
       # The ASIO SDK the Windows standalone builds with, which `just setup`
       # downloads on a miss. Restored unchanged, it leaves asio-sys built.
@@ -91,6 +130,8 @@ jobs:
         with:
           path: tools/ASIOSDK
           key: asio-sdk-${{ hashFiles('scripts/install-asio-sdk.sh') }}
+      # Windows has no POSIX shell by default; the recipes are written for bash,
+      # which the runner image provides.
       - run: just setup
         if: needs.changes.outputs.code == 'true'
         shell: bash
