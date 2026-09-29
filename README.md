@@ -130,11 +130,11 @@ User presets live in:
 | Windows | `%APPDATA%\Resonant DSP\Swanky Amp 2` | `%APPDATA%\Resonant DSP\Swanky Amp` |
 | Linux | `$XDG_DATA_HOME/Resonant DSP/Swanky Amp 2` (default `~/.local/share`) | `~/.config/Resonant DSP/Swanky Amp` |
 
-The version 2 folder is created on the first save or import, even an import
-that copies nothing. Each preset is
-one `<name>.xml` file in the 1.x schema, an `APVTSSwankyAmp` element listing
-`<PARAM id value/>` entries under the 1.x parameter ids, so 1.x and 2.0 presets
-stay one format: version 2 reads 1.4.0 files, including the version
+The version 2 folder is created when first needed: by a save, by Open folder,
+or by an import, even one that copies nothing. Each preset is one
+`<name>.xml` file in the 1.x schema, an `APVTSSwankyAmp` element listing
+`<PARAM id value/>` entries under the 1.x parameter ids, so 1.x and 2.0
+presets stay one format: version 2 reads 1.4.0 files, including the version
 migrations 1.4.0 applied to presets from earlier releases, and 1.4.0 can load
 a version 2 file. A file that is not well-formed or is not a Swanky Amp preset
 is left out of the menu and named in the footer.

@@ -1107,21 +1107,13 @@ mod tests {
     /// count as done, or every editor open imports again and says so.
     #[test]
     fn the_first_run_import_runs_once_when_it_copies_nothing() {
-        use std::time::{Duration, Instant};
-
         let root = scratch("first-run");
         let legacy = root.join("Swanky Amp");
         let library = Library::with_user_root(Some(root.join("Swanky Amp 2")));
         std::fs::create_dir_all(&legacy).unwrap();
         std::fs::write(legacy.join("01 clean.xml"), legacy_file("clean")).unwrap();
 
-        let job = ImportJob::first_run(&library, legacy.clone()).expect("the first run imports");
-        let deadline = Instant::now() + Duration::from_secs(30);
-        while !job.finished() {
-            assert!(Instant::now() < deadline, "the import never finished");
-            std::thread::sleep(Duration::from_millis(5));
-        }
-        let report = job.take().unwrap().unwrap();
+        let report = library.import_legacy(&legacy).unwrap();
         assert!(report.imported.is_empty());
         assert_eq!(report.factory_copies, 1);
 
