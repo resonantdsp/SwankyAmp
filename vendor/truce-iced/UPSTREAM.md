@@ -69,11 +69,11 @@ placeholder panel while the new layout is measured.
 # A clipboard for the widgets
 
 The published runtime hands iced's widgets `clipboard::Null`, so no editor can
-paste: a product key field a player is meant to paste into cannot be pasted
-into, and copy and cut from any text field are dropped as well. The source
+copy or paste: text copied, cut or pasted in a field is dropped. The source
 change adds `truce_iced::clipboard`, a text-only `iced_core::Clipboard` over
 [`arboard`](https://crates.io/crates/arboard) (MIT OR Apache-2.0), and hands it
-to both `UserInterface::update` calls in the runtime. The screenshot path keeps
+to both `UserInterface::update` calls in the runtime. The information panel's
+Copy diagnostics writes through the same module. The screenshot path keeps
 `Null`: it renders a frame and dispatches no input, so no widget there can ask.
 
 The connection is thread-local and kept open, because X11 serves a paste from

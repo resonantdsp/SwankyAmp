@@ -131,8 +131,9 @@ tone-stack-soak hours="24":
     cargo build --release --quiet --no-default-features --bin tone-stack-soak
     target/release/tone-stack-soak "{{ hours }}"
 
-# Start the release soak for issue #34 in the background: three presets on the
-# shipping path plus level 11 on the legacy path, logs under target/soak.
+# Start the long-run diagnostic soak (issue #34) in the background: three
+# presets on the shipping path plus level 11 on the legacy path, logs under
+# target/soak.
 soak hours="4":
     cargo build --release --quiet --no-default-features --bin soak
     bash scripts/soak.sh start "{{ hours }}"
