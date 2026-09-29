@@ -1,10 +1,10 @@
-//! Refits factory presets from the released octave-high tone mapping to the
-//! standard one. The aim is that each preset sounds roughly as it did, not a
-//! dB-exact replica: chasing exactness drives Low/Mid/High to their limits,
-//! so the objective weighs broad spectral shape and the level into the power
-//! stage together and the residuals are reported rather than forced to zero.
-
-use serde::{Deserialize, Serialize};
+//! Converts presets made on 1.4.0's octave-high tone stack to the corrected
+//! one. `voice` voices the factory bank at the output on the guitar
+//! recordings; it renders the whole amplifier for every candidate, so it
+//! runs offline. `fit` converts imported 1.x user presets inside the plugin:
+//! it fits the tone-stack seam on a synthetic pluck, which is fast enough to
+//! run there but judges the stack rather than the output, so imported presets
+//! can sound boxier than their originals.
 
 use super::amp::{AmpControls, ClipKnee, CorrectedPath, LevelTables, SeamOutput, ToneMapping};
 use super::mapping::AmpVoicing;
@@ -17,9 +17,9 @@ pub const SAMPLE_RATE: u32 = 48_000;
 const BLOCK: usize = 512;
 
 /// Seed of the pluck's excitation noise. Changing it changes every result.
-pub const PLUCK_SEED: u32 = 0x2450_7a11;
+const PLUCK_SEED: u32 = 0x2450_7a11;
 /// MIDI notes of the pluck, low E to high E across a guitar's range.
-pub const PLUCK_NOTES: [u8; 8] = [40, 45, 50, 55, 59, 64, 71, 76];
+const PLUCK_NOTES: [u8; 8] = [40, 45, 50, 55, 59, 64, 71, 76];
 const NOTE_SECONDS: f32 = 0.5;
 const PLUCK_PEAK: f32 = 0.17;
 
@@ -32,13 +32,13 @@ const OUTER_BANDS_PER_OCTAVE: f64 = 24.;
 /// Cost in dB² of moving Low, Mid or High by a whole control range, so a
 /// control moves only as far as the sound improvement pays for. Without it
 /// the fit trades fractions of a dB for Mid near its maximum on most presets.
-pub const RESTRAINT: f64 = 2.;
+const RESTRAINT: f64 = 2.;
 const FIT_STEPS: [f32; 3] = [0.25, 0.05, 0.01];
 const FIT_SPAN: [i32; 3] = [4, 5, 5];
 /// Leftover drive change below which Power Drive is left alone.
-pub const DRIVE_DEADBAND_DB: f64 = 0.5;
+const DRIVE_DEADBAND_DB: f64 = 0.5;
 /// The most Power Drive may move, in control units.
-pub const POWER_DRIVE_LIMIT: f32 = 0.15;
+const POWER_DRIVE_LIMIT: f32 = 0.15;
 
 /// A deterministic Karplus-Strong pluck, one decaying note per pitch in
 /// `PLUCK_NOTES`, peaking near the level of the reference single-coil DI.
@@ -284,10 +284,10 @@ impl Profile {
 }
 
 /// RMS difference of spectral shape in dB and signed level difference in dB.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct Residual {
-    pub shape_db: f64,
-    pub level_db: f64,
+#[derive(Debug, Clone, Copy)]
+struct Residual {
+    shape_db: f64,
+    level_db: f64,
 }
 
 impl Residual {
@@ -296,54 +296,8 @@ impl Residual {
     }
 }
 
-/// The four controls the refit may move.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct ToneSettings {
-    pub low: f32,
-    pub mid: f32,
-    pub high: f32,
-    pub power_drive: f32,
-}
-
-impl ToneSettings {
-    fn of(controls: AmpControls) -> Self {
-        Self {
-            low: controls.low,
-            mid: controls.mid,
-            high: controls.high,
-            power_drive: controls.power_drive,
-        }
-    }
-}
-
-/// One preset's fit and its before/after measurements, each against the
-/// preset rendered with the released mapping.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct PresetRefit {
-    pub name: String,
-    pub original: ToneSettings,
-    pub refit: ToneSettings,
-    /// The corrected mapping with the original controls.
-    pub unrefit: Measurement,
-    pub refitted: Measurement,
-    pub limits: Vec<String>,
-}
-
-/// Residuals at the tone-stack seam and the output, plus the drive change
-/// into the power stage (seam level with Power Drive's gain change).
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct Measurement {
-    pub tone_stack: Residual,
-    pub drive_db: f64,
-    pub output: Residual,
-}
-
-struct Render {
-    tone_stack: Banded,
-    output: Banded,
-}
-
-fn render(controls: AmpControls, tone_mapping: ToneMapping, input: &[f32]) -> Render {
+/// The tone-stack seam of a render at `SAMPLE_RATE`.
+fn render(controls: AmpControls, tone_mapping: ToneMapping, input: &[f32]) -> Banded {
     let doublings = doublings_for(0, f64::from(SAMPLE_RATE));
     let mut path = CorrectedPath::new(
         SAMPLE_RATE as f32,
@@ -360,10 +314,7 @@ fn render(controls: AmpControls, tone_mapping: ToneMapping, input: &[f32]) -> Re
         path.process_with_seams(block, &mut seams);
     }
     let internal = f64::from(SAMPLE_RATE) * path.factor() as f64;
-    Render {
-        tone_stack: Banded::measure(&seams.tone_stack, internal),
-        output: Banded::measure(&output, f64::from(SAMPLE_RATE)),
-    }
+    Banded::measure(&seams.tone_stack, internal)
 }
 
 fn power_gain_db(controls: AmpControls) -> f64 {
@@ -483,11 +434,10 @@ fn fit_tone(predictor: &Predictor, target: &Profile, controls: AmpControls) -> A
 }
 
 /// Moves Power Drive, within `POWER_DRIVE_LIMIT`, so its gain cancels the
-/// tone stack's level change into the power stage. Names the bound that
-/// stopped it short, if any.
-fn fit_power_drive(controls: AmpControls, level_change_db: f64) -> (AmpControls, Option<String>) {
+/// tone stack's level change into the power stage.
+fn fit_power_drive(controls: AmpControls, level_change_db: f64) -> AmpControls {
     if level_change_db.abs() <= DRIVE_DEADBAND_DB {
-        return (controls, None);
+        return controls;
     }
     let original = controls.power_drive;
     let target = power_gain_db(controls) - level_change_db;
@@ -499,17 +449,10 @@ fn fit_power_drive(controls: AmpControls, level_change_db: f64) -> (AmpControls,
             ..controls
         })
     };
-    let bound = |value: f32| {
-        Some(if value.abs() >= 1. {
-            format!("Power Drive {value:+}")
-        } else {
-            "Power Drive change cap".to_owned()
-        })
-    };
-    let (power_drive, limit) = if at(low) > target {
-        (low, bound(low))
+    let power_drive = if at(low) > target {
+        low
     } else if at(high) < target {
-        (high, bound(high))
+        high
     } else {
         for _ in 0..40 {
             let middle = 0.5 * (low + high);
@@ -519,86 +462,330 @@ fn fit_power_drive(controls: AmpControls, level_change_db: f64) -> (AmpControls,
                 high = middle;
             }
         }
-        (0.5 * (low + high), None)
+        0.5 * (low + high)
     };
-    let controls = AmpControls {
+    AmpControls {
         power_drive: (power_drive * 1000.).round() / 1000.,
         ..controls
-    };
-    (controls, limit)
-}
-
-fn measure(
-    reference: &Render,
-    render: &Render,
-    original: AmpControls,
-    controls: AmpControls,
-) -> Measurement {
-    let reference_seam = reference.tone_stack.profile();
-    let tone_stack = render.tone_stack.profile().against(&reference_seam);
-    Measurement {
-        tone_stack,
-        drive_db: tone_stack.level_db + power_gain_db(controls) - power_gain_db(original),
-        output: render.output.profile().against(&reference.output.profile()),
     }
 }
 
-fn limits(refit: ToneSettings, power_drive: Option<String>) -> Vec<String> {
-    [("Low", refit.low), ("Mid", refit.mid), ("High", refit.high)]
-        .into_iter()
-        .filter(|(_, value)| value.abs() >= 1.)
-        .map(|(name, value)| format!("{name} {value:+}"))
-        .chain(power_drive)
-        .collect()
-}
-
-fn fit_to(reference: &Render, controls: AmpControls) -> (AmpControls, Option<String>) {
+/// A 1.x preset converted for the corrected stack: Low, Mid, High and, where
+/// the level into the power stage needs it, Power Drive move so the stack's
+/// output on the pluck sounds roughly as it did; every other control is kept.
+pub fn fit(controls: AmpControls, input: &[f32]) -> AmpControls {
+    let tone_stack = render(controls, ToneMapping::Released, input);
     let internal_rate = SAMPLE_RATE as f32 * (1 << doublings_for(0, f64::from(SAMPLE_RATE))) as f32;
-    let target = reference.tone_stack.profile();
-    let predictor = Predictor::new(reference.tone_stack.clone(), controls, internal_rate);
+    let target = tone_stack.profile();
+    let predictor = Predictor::new(tone_stack, controls, internal_rate);
     let toned = fit_tone(&predictor, &target, controls);
     let level_change = predictor.predict(toned).profile().against(&target).level_db;
     fit_power_drive(toned, level_change)
 }
 
-/// A preset voiced on the released mapping, refitted to sound roughly as it
-/// did on the standard one: Low, Mid, High and, where the level into the
-/// power stage needs it, Power Drive move; every other control is kept.
-pub fn fit(controls: AmpControls, input: &[f32]) -> AmpControls {
-    fit_to(&render(controls, ToneMapping::Released, input), controls).0
+/// Third-octave bands from 80 Hz to 8 kHz, the range the factory voicing is
+/// judged over.
+const THIRDS: usize = 21;
+/// Cost in dB² of moving Low, Mid, High or Presence by one stored unit, half
+/// the control's range, from the original, so a control moves only as far as the balance pays.
+pub const VOICING_RESTRAINT: f64 = 0.5;
+/// The search keeps the tone controls within this, 1 to 9 on the panel, so a
+/// preset leaves the player room either way.
+pub const RAIL: f32 = 0.8;
+/// Cost in dB² per dB² the power stage's feed misses 1.4.0's when Power
+/// Drive runs out of range to restore it.
+pub const FEED_COST: f64 = 0.5;
+const SEARCH_STEPS: [f32; 4] = [0.2, 0.1, 0.05, 0.025];
+
+/// Band levels in dB about their mean: the tonal balance, not the level.
+fn balance(samples: &[f32], sample_rate: f64) -> [f64; THIRDS] {
+    let size = 8_192;
+    let power = power_spectrum(samples, size);
+    let bin_hz = sample_rate / size as f64;
+    let levels: [f64; THIRDS] = std::array::from_fn(|band| {
+        let centre = 80. * 2_f64.powf(band as f64 / 3.);
+        let (low, high) = (centre * 2_f64.powf(-1. / 6.), centre * 2_f64.powf(1. / 6.));
+        let energy: f64 = power
+            .iter()
+            .enumerate()
+            .filter(|(bin, _)| (low..high).contains(&(*bin as f64 * bin_hz)))
+            .map(|(_, value)| value)
+            .sum();
+        10. * energy.max(1e-30).log10()
+    });
+    let mean = levels.iter().sum::<f64>() / THIRDS as f64;
+    levels.map(|level| level - mean)
 }
 
-/// Fits one preset and measures it before and after through the full amp.
-pub fn refit(name: &str, controls: AmpControls, input: &[f32]) -> PresetRefit {
-    let reference = render(controls, ToneMapping::Released, input);
-    let unrefit = render(controls, ToneMapping::Standard, input);
-    let (fitted, power_drive_limit) = fit_to(&reference, controls);
-    let refitted = render(fitted, ToneMapping::Standard, input);
-    let original = ToneSettings::of(controls);
-    let refit = ToneSettings::of(fitted);
-    PresetRefit {
-        name: name.to_owned(),
-        original,
-        refit,
-        unrefit: measure(&reference, &unrefit, controls, controls),
-        refitted: measure(&reference, &refitted, controls, fitted),
-        limits: limits(refit, power_drive_limit),
+fn balance_error(balance: &[f64; THIRDS], reference: &[f64; THIRDS]) -> f64 {
+    balance
+        .iter()
+        .zip(reference)
+        .map(|(value, target)| (value - target).powi(2))
+        .sum::<f64>()
+        / THIRDS as f64
+}
+
+fn level_db(samples: &[f32]) -> f64 {
+    10. * (samples
+        .iter()
+        .map(|sample| f64::from(*sample).powi(2))
+        .sum::<f64>()
+        / samples.len() as f64)
+        .log10()
+}
+
+/// One recording through a path: its output balance, the level it feeds the
+/// power stage and the tone-stack seam's power spectrum.
+struct Heard {
+    balance: [f64; THIRDS],
+    feed_db: f64,
+    seam: Vec<f64>,
+    seam_rate: f64,
+}
+
+const SEAM_WINDOW: usize = 16_384;
+
+fn hear(controls: AmpControls, legacy: bool, clip: &[f32]) -> Heard {
+    let rate = super::calibration::SAMPLE_RATE;
+    let mut seams = SeamOutput::with_capacity(clip.len() * 2);
+    let mut audio = clip.to_vec();
+    let factor = if legacy {
+        let mut path = super::amp::AmpPath::new_legacy(rate as f32, controls);
+        for block in audio.chunks_mut(BLOCK) {
+            path.process_with_seams(block, &mut seams);
+        }
+        1
+    } else {
+        let mut path = CorrectedPath::shipping(
+            rate as f32,
+            BLOCK,
+            controls,
+            doublings_for(0, f64::from(rate)),
+        );
+        for block in audio.chunks_mut(BLOCK) {
+            path.process_with_seams(block, &mut seams);
+        }
+        path.factor()
+    };
+    Heard {
+        balance: balance(&audio, f64::from(rate)),
+        feed_db: level_db(&seams.power_input),
+        seam: if legacy {
+            Vec::new()
+        } else {
+            power_spectrum(&seams.tone_stack, SEAM_WINDOW)
+        },
+        seam_rate: f64::from(rate) * factor as f64,
     }
 }
 
-/// Measures candidate settings for a preset against the preset on the
-/// released mapping, by the same residuals the refit reports.
-pub fn measure_candidates(
-    original: AmpControls,
-    candidates: &[AmpControls],
-    input: &[f32],
-) -> Vec<Measurement> {
-    let reference = render(original, ToneMapping::Released, input);
-    candidates
-        .iter()
-        .map(|candidate| {
-            let rendered = render(*candidate, ToneMapping::Standard, input);
-            measure(&reference, &rendered, original, *candidate)
+/// The level change a tone setting makes at the tone-stack seam, predicted
+/// from the seam at the original setting: the stack is linear and nothing
+/// before it depends on its controls.
+fn seam_change_db(heard: &Heard, original: AmpControls, candidate: AmpControls) -> f64 {
+    let stack = |controls: AmpControls| {
+        let mut stack = ToneStack::new(heard.seam_rate as f32, ToneMapping::Standard);
+        stack.configure(AmpVoicing::from_controls(controls).tone);
+        stack
+    };
+    let (before, after) = (stack(original), stack(candidate));
+    let bin_hz = heard.seam_rate / SEAM_WINDOW as f64;
+    let (mut old, mut new) = (0., 0.);
+    for (bin, power) in heard.seam.iter().enumerate().skip(1) {
+        let frequency = bin as f64 * bin_hz;
+        let ratio = after.response(frequency).norm_squared()
+            / before.response(frequency).norm_squared().max(1e-300);
+        old += power;
+        new += power * ratio;
+    }
+    10. * (new / old).log10()
+}
+
+/// Power Drive that brings the power stage's feed back by `change_db`,
+/// within the control's range, and the dB it still misses by.
+fn power_drive_for(controls: AmpControls, change_db: f64) -> (f32, f64) {
+    let target = power_gain_db(controls) + change_db;
+    let at = |power_drive: f32| {
+        power_gain_db(AmpControls {
+            power_drive,
+            ..controls
         })
-        .collect()
+    };
+    let (mut low, mut high) = (-1_f32, 1_f32);
+    for _ in 0..40 {
+        let middle = 0.5 * (low + high);
+        if at(middle) < target {
+            low = middle;
+        } else {
+            high = middle;
+        }
+    }
+    let power_drive = (0.5 * (low + high) * 1000.).round() / 1000.;
+    (power_drive, target - at(power_drive))
+}
+
+/// The four tone controls the voicing moves, plus Power Drive, which follows
+/// them to keep the power stage's feed.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Voicing {
+    pub low: f32,
+    pub mid: f32,
+    pub high: f32,
+    pub presence: f32,
+    pub power_drive: f32,
+}
+
+impl Voicing {
+    pub fn of(controls: AmpControls) -> Self {
+        Self {
+            low: controls.low,
+            mid: controls.mid,
+            high: controls.high,
+            presence: controls.presence,
+            power_drive: controls.power_drive,
+        }
+    }
+
+    pub fn apply(self, controls: AmpControls) -> AmpControls {
+        AmpControls {
+            low: self.low,
+            mid: self.mid,
+            high: self.high,
+            presence: self.presence,
+            power_drive: self.power_drive,
+            ..controls
+        }
+    }
+
+    fn tone(self) -> [f32; 4] {
+        [self.low, self.mid, self.high, self.presence]
+    }
+
+    fn with_tone(self, tone: [f32; 4]) -> Self {
+        Self {
+            low: tone[0],
+            mid: tone[1],
+            high: tone[2],
+            presence: tone[3],
+            ..self
+        }
+    }
+}
+
+/// A preset voiced for the corrected stack: its settings and how far each
+/// version is from 1.4.0 on the recordings.
+#[derive(Debug, Clone)]
+pub struct Voiced {
+    pub original: Voicing,
+    pub voiced: Voicing,
+    /// RMS difference of the output balance from 1.4.0 in dB, per recording
+    /// (single coil, humbucker), with the original knobs and after voicing.
+    pub unvoiced_balance_db: [f64; 2],
+    pub voiced_balance_db: [f64; 2],
+    /// Output band levels minus 1.4.0's, averaged over the recordings.
+    pub voiced_bands_db: [f64; THIRDS],
+    /// The power stage's feed minus 1.4.0's, per recording.
+    pub unvoiced_feed_db: [f64; 2],
+    pub voiced_feed_db: [f64; 2],
+}
+
+/// Third-octave band centres of `Voiced::voiced_bands_db`, in Hz.
+pub fn band_centres() -> [f64; THIRDS] {
+    std::array::from_fn(|band| 80. * 2_f64.powf(band as f64 / 3.))
+}
+
+/// Voices `controls`, a preset made on 1.4.0's octave-high stack, for the
+/// corrected one. Low, Mid, High and Presence are searched so the output's
+/// tonal balance on real playing is as close to 1.4.0's as the restraint
+/// allows, and Power Drive follows so the power stage is driven as 1.4.0
+/// drove it.
+pub fn voice(controls: AmpControls, clips: &super::calibration::Clips) -> Voiced {
+    let clips = [clips.single_coil.as_slice(), clips.humbucker.as_slice()];
+    let reference = clips.map(|clip| hear(controls, true, clip));
+    let unvoiced = clips.map(|clip| hear(controls, false, clip));
+    let original = Voicing::of(controls);
+    let feed_for = |tone: [f32; 4]| {
+        let candidate = original.with_tone(tone).apply(controls);
+        let change = (0..2)
+            .map(|index| {
+                reference[index].feed_db
+                    - unvoiced[index].feed_db
+                    - seam_change_db(&unvoiced[index], controls, candidate)
+            })
+            .sum::<f64>()
+            / 2.;
+        let (power_drive, miss) = power_drive_for(candidate, change);
+        let voicing = Voicing {
+            power_drive,
+            ..original.with_tone(tone)
+        };
+        (voicing, miss)
+    };
+    let cost = |(voicing, miss): (Voicing, f64)| {
+        let candidate = voicing.apply(controls);
+        let heard = clips.map(|clip| hear(candidate, false, clip));
+        let sound = (0..2)
+            .map(|index| balance_error(&heard[index].balance, &reference[index].balance))
+            .sum::<f64>()
+            / 2.;
+        let moved: f64 = voicing
+            .tone()
+            .iter()
+            .zip(original.tone())
+            .map(|(new, old)| f64::from(new - old).powi(2))
+            .sum();
+        sound + VOICING_RESTRAINT * moved + FEED_COST * miss.powi(2)
+    };
+    let mut best = feed_for(original.tone().map(|value| value.clamp(-RAIL, RAIL)));
+    let mut best_cost = cost(best);
+    for step in SEARCH_STEPS {
+        loop {
+            let mut improved = false;
+            for control in 0..4 {
+                for direction in [-1., 1.] {
+                    let mut tone = best.0.tone();
+                    tone[control] = (tone[control] + direction * step).clamp(-RAIL, RAIL);
+                    tone[control] = (tone[control] * 1000.).round() / 1000.;
+                    if tone == best.0.tone() {
+                        continue;
+                    }
+                    let candidate = feed_for(tone);
+                    let candidate_cost = cost(candidate);
+                    if candidate_cost < best_cost - 1e-6 {
+                        best = candidate;
+                        best_cost = candidate_cost;
+                        improved = true;
+                    }
+                }
+            }
+            if !improved {
+                break;
+            }
+        }
+    }
+    let best = best.0;
+    let voiced = clips.map(|clip| hear(best.apply(controls), false, clip));
+    let rms = |heard: &[Heard; 2]| {
+        std::array::from_fn(|index| {
+            balance_error(&heard[index].balance, &reference[index].balance).sqrt()
+        })
+    };
+    let feed = |heard: &[Heard; 2]| {
+        std::array::from_fn(|index| heard[index].feed_db - reference[index].feed_db)
+    };
+    Voiced {
+        original,
+        voiced: best,
+        unvoiced_balance_db: rms(&unvoiced),
+        voiced_balance_db: rms(&voiced),
+        voiced_bands_db: std::array::from_fn(|band| {
+            (0..2)
+                .map(|index| voiced[index].balance[band] - reference[index].balance[band])
+                .sum::<f64>()
+                / 2.
+        }),
+        unvoiced_feed_db: feed(&unvoiced),
+        voiced_feed_db: feed(&voiced),
+    }
 }

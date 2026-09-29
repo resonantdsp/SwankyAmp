@@ -74,34 +74,28 @@ dsp-report output="verification/dsp/oversampling-plate.json":
     python3 verification/dsp/report.py \
         target/debug/render-model target/debug/dsp-probe "{{ output }}"
 
-# Refit the factory presets to the standard tone-stack mapping, apply the
-# factory loudness balance and rewrite the version 2 bank and its report.
-refit:
-    cargo build --quiet --no-default-features --bin refit-tone
-    target/debug/refit-tone --presets verification/reference/released/Resources/presets.xml \
-        --report-dir verification/tone-stack --factory presets/factory-2.0.xml \
-        --clip verification/reference/input/single-coil.wav
+recordings := "verification/reference/input"
+recording_args := "--single-coil " + recordings / "single-coil-plucks-strum-chord.wav" + " --humbucker " + recordings / "humbucker-plucks-strum-chord.wav"
 
-# Regenerates the refit and fails unless the committed bank and report match
-# it, which also proves the refit is reproducible.
-refit-check:
-    cargo build --quiet --no-default-features --bin refit-tone
-    target/debug/refit-tone --presets verification/reference/released/Resources/presets.xml \
-        --report-dir verification/tone-stack --factory presets/factory-2.0.xml \
-        --clip verification/reference/input/single-coil.wav --check
+# Voice the 1.4.0 factory presets for the corrected tone stack on the guitar
+# recordings and rewrite the version 2 bank and its report. A starting point
+# for listening; takes minutes in a release build.
+refit:
+    cargo build --release --quiet --no-default-features --bin refit-tone
+    target/release/refit-tone --presets verification/reference/released/Resources/presets.xml \
+        {{ recording_args }} --report verification/tone-stack/refit-report.md \
+        --factory presets/factory-2.0.xml
 
 # Measure the shipping path's preamp and output level tables against the
 # released path and rewrite them as source.
 calibrate:
     cargo build --quiet --no-default-features --bin calibrate
-    target/debug/calibrate --clip verification/reference/input/single-coil.wav \
-        --data src/dsp/calibration_data.rs
+    target/debug/calibrate {{ recording_args }} --data src/dsp/calibration_data.rs
 
 # Fails unless a fresh measurement reproduces the committed level tables.
 calibrate-check:
     cargo build --quiet --no-default-features --bin calibrate
-    target/debug/calibrate --clip verification/reference/input/single-coil.wav \
-        --data src/dsp/calibration_data.rs --check
+    target/debug/calibrate {{ recording_args }} --data src/dsp/calibration_data.rs --check
 
 # Regenerate the unit-knee seam residuals per factory preset and input level.
 knee-report output="verification/dsp/knee.json":
@@ -116,14 +110,6 @@ render-model preset="clean" output="verification/model-output.wav":
         --presets verification/reference/released/Resources/presets.xml \
         --preset "{{ preset }}" --sample-rate 44100 \
         --output "{{ output }}" --seams-dir "{{ output }}-seams"
-
-# Render the blind kit comparing each factory preset as released in 1.4.0
-# with version 2, level matched, plus its answer key. Output is not committed.
-# Flags: --inputs pluck, --high-steps 0.2,0.4,orig for High variants.
-listening-kit output *flags:
-    cargo build --quiet --no-default-features --bin render-model --bin refit-tone
-    python3 verification/listening/kit.py target/debug/render-model "{{ output }}" \
-        --refit-tone target/debug/refit-tone {{ flags }}
 
 # Pre-release: drive the shipping tone stack alone for 24 hours of samples at
 # 44.1, 88.2 and 176.4 kHz and fail on any drift. Minutes in a release build.
@@ -179,7 +165,7 @@ notices:
     bash scripts/notices.sh
 
 
-check: fmt clippy test release-tests reference-check model-check refit-check calibrate-check validate-assets
+check: fmt clippy test release-tests reference-check model-check calibrate-check validate-assets
 
 build:
     bash scripts/truce.sh build {{ bundle_formats }} {{ bundle_features }}

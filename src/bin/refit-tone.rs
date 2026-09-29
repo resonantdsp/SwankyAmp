@@ -1,50 +1,19 @@
-//! Refits the factory presets to the standard tone-stack mapping and writes
-//! the version 2 factory bank with its residual report. `--check` proves the
-//! committed files are what this tool produces. The bank also carries the
-//! factory loudness balance, an Output change per preset. `--high-steps` measures the
-//! committed bank with High moved, for listening comparisons.
+//! Voices the 1.4.0 factory presets for the corrected tone stack and writes
+//! the version 2 factory bank with a report. The result is a starting point
+//! for listening, not a contract: the bank is judged by ear and may be
+//! adjusted by hand afterwards.
 
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use serde::{Deserialize, Serialize};
 use swanky_amp::dsp::amp::{AmpControls, LevelTables};
 use swanky_amp::dsp::calibration::{self, Clips};
-use swanky_amp::dsp::refit::{
-    self, DRIVE_DEADBAND_DB, Measurement, POWER_DRIVE_LIMIT, PresetRefit, RESTRAINT, Residual,
-    ToneSettings,
-};
+use swanky_amp::dsp::refit::{self, FEED_COST, RAIL, VOICING_RESTRAINT, Voiced, Voicing};
 use swanky_amp::presets;
-
-/// Cross-platform libm differences move measurements by far less than this;
-/// a real change to the model or the fit moves them by more.
-const CONTROL_TOLERANCE: f32 = 0.011;
-const DB_TOLERANCE: f64 = 0.05;
 
 /// The Output control spans -35..+35 dB over its stored -1..+1.
 const OUTPUT_RANGE_DB: f64 = 35.;
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Report {
-    sample_rate: u32,
-    pluck_seed: u32,
-    pluck_notes: Vec<u8>,
-    presets: Vec<PresetRefit>,
-    balance: Vec<Balance>,
-}
-
-/// One preset's Output change and the loudness it produces, with Output as
-/// stored before and after.
-#[derive(Debug, Serialize, Deserialize)]
-struct Balance {
-    name: String,
-    change_db: f64,
-    output_before: f32,
-    output_after: f32,
-    di_lufs: f64,
-    pluck_lufs: f64,
-}
 
 fn option(name: &str) -> Result<String, String> {
     let arguments: Vec<String> = env::args().collect();
@@ -59,48 +28,26 @@ fn read(path: &Path) -> Result<String, String> {
     fs::read_to_string(path).map_err(|error| format!("{}: {error}", path.display()))
 }
 
-fn write(path: &Path, contents: &str) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|error| format!("{}: {error}", parent.display()))?;
-    }
-    fs::write(path, contents).map_err(|error| format!("{}: {error}", path.display()))
+fn clips() -> Result<Clips, String> {
+    let bytes = |name: &str| -> Result<Vec<u8>, String> {
+        let path = option(name)?;
+        fs::read(&path).map_err(|error| format!("{path}: {error}"))
+    };
+    Clips::new(&bytes("--single-coil")?, &bytes("--humbucker")?)
 }
 
-fn compute(xml: &str, clips: &Clips) -> Result<Report, String> {
-    let input = refit::pluck(refit::SAMPLE_RATE);
-    let names = presets::names(xml);
-    let controls = names
-        .iter()
-        .map(|name| presets::controls(xml, name))
-        .collect::<Result<Vec<_>, _>>()?;
-    let presets = std::thread::scope(|scope| {
-        let handles: Vec<_> = names
-            .iter()
-            .zip(&controls)
-            .map(|(name, controls)| {
-                let input = &input;
-                scope.spawn(move || refit::refit(name, *controls, input))
-            })
-            .collect();
-        handles
-            .into_iter()
-            .map(|handle| handle.join().expect("refit thread panicked"))
-            .collect::<Vec<_>>()
-    });
-    let balance = balance(xml, &presets, clips)?;
-    Ok(Report {
-        sample_rate: refit::SAMPLE_RATE,
-        pluck_seed: refit::PLUCK_SEED,
-        pluck_notes: refit::PLUCK_NOTES.to_vec(),
-        presets,
-        balance,
-    })
+struct Preset {
+    name: String,
+    voiced: Voiced,
+    /// Output as stored before and after bringing the preset to Init's
+    /// loudness, and the loudness that results on each recording.
+    output_before: f32,
+    output_after: f32,
+    lufs: [f64; 2],
 }
 
-/// Six decimals resolve Output to under 0.0001 dB, and match the bank the
-/// balance was auditioned as.
-fn balanced_output(output: f32, change_db: f64) -> String {
-    let text = format!("{:.6}", f64::from(output) + change_db / OUTPUT_RANGE_DB);
+fn xml_value(value: f32) -> String {
+    let text = format!("{value:.6}");
     let text = text.trim_end_matches('0');
     if text.ends_with('.') {
         format!("{text}0")
@@ -109,443 +56,198 @@ fn balanced_output(output: f32, change_db: f64) -> String {
     }
 }
 
-/// Moves each refitted preset's Output so its loudness, averaged over the
-/// single-coil DI and the pluck, matches the factory defaults'. The Output
-/// gain follows every nonlinear stage, so the change is exact.
-fn balance(released: &str, presets: &[PresetRefit], clips: &Clips) -> Result<Vec<Balance>, String> {
-    let unbalanced = factory_bank(released, presets, &[])?;
-    let target = calibration::loudness(AmpControls::default(), clips, LevelTables::CALIBRATED);
-    let jobs = presets::names(&unbalanced)
+fn voice_all(released: &str, clips: &Clips) -> Result<Vec<Preset>, String> {
+    let jobs = presets::names(released)
         .into_iter()
-        .map(|name| Ok((presets::controls(&unbalanced, &name)?, name)))
+        .map(|name| Ok((presets::controls(released, &name)?, name)))
         .collect::<Result<Vec<_>, String>>()?;
+    let target = calibration::loudness(AmpControls::default(), clips, LevelTables::CALIBRATED);
     Ok(std::thread::scope(|scope| {
         let handles: Vec<_> = jobs
             .into_iter()
             .map(|(controls, name)| {
                 scope.spawn(move || {
-                    let measured = calibration::loudness(controls, clips, LevelTables::CALIBRATED);
+                    let voiced = refit::voice(controls, clips);
+                    let voiced_controls = voiced.voiced.apply(controls);
+                    let measured =
+                        calibration::loudness(voiced_controls, clips, LevelTables::CALIBRATED);
                     let change_db = target.blend() - measured.blend();
-                    let output_after: f32 = balanced_output(controls.output, change_db)
-                        .parse()
-                        .expect("balanced Output is a number");
-                    // The stored Output is rounded; the loudness follows it.
+                    let output_after: f32 = xml_value(
+                        (f64::from(controls.output) + change_db / OUTPUT_RANGE_DB) as f32,
+                    )
+                    .parse()
+                    .expect("Output is a number");
                     let applied =
                         (f64::from(output_after) - f64::from(controls.output)) * OUTPUT_RANGE_DB;
-                    Balance {
+                    Preset {
                         name,
-                        change_db,
+                        voiced,
                         output_before: controls.output,
                         output_after,
-                        di_lufs: measured.di + applied,
-                        pluck_lufs: measured.pluck + applied,
+                        lufs: [measured.single_coil + applied, measured.humbucker + applied],
                     }
                 })
             })
             .collect();
         handles
             .into_iter()
-            .map(|handle| handle.join().expect("balance thread panicked"))
+            .map(|handle| handle.join().expect("voicing thread panicked"))
             .collect()
     }))
 }
 
-fn xml_value(value: f32) -> String {
-    if value.fract() == 0. {
-        format!("{value:.1}")
-    } else {
-        format!("{value}")
-    }
-}
-
-fn factory_bank(
-    released: &str,
-    presets: &[PresetRefit],
-    balance: &[Balance],
-) -> Result<String, String> {
+fn factory_bank(released: &str, presets: &[Preset]) -> Result<String, String> {
     let mut xml = released.to_owned();
     for preset in presets {
-        let (old, new) = (preset.original, preset.refit);
+        let (old, new) = (preset.voiced.original, preset.voiced.voiced);
         let mut values: Vec<(&str, String)> = [
             ("idTsLow", old.low, new.low),
             ("idTsMid", old.mid, new.mid),
             ("idTsHigh", old.high, new.high),
+            ("idTsPresence", old.presence, new.presence),
             ("idPowerAmpDrive", old.power_drive, new.power_drive),
         ]
         .into_iter()
         .filter(|(_, old, new)| old != new)
         .map(|(id, _, new)| (id, xml_value(new)))
         .collect();
-        if let Some(balanced) = balance.iter().find(|balanced| balanced.name == preset.name) {
-            values.push((
-                "idOutputLevel",
-                balanced_output(balanced.output_before, balanced.change_db),
-            ));
-        }
+        values.push(("idOutputLevel", xml_value(preset.output_after)));
         xml = presets::with_values(&xml, &preset.name, &values)?;
     }
     Ok(xml)
 }
 
-fn settings(settings: ToneSettings) -> String {
+/// A control as the panel shows it, 0 to 10.
+fn knob(value: f32) -> f32 {
+    (value + 1.) * 5.
+}
+
+fn settings(voicing: Voicing) -> String {
     format!(
-        "{:+.2} / {:+.2} / {:+.2} / {:+.3}",
-        settings.low, settings.mid, settings.high, settings.power_drive
+        "{:.1} / {:.1} / {:.1} / {:.1} / {:.2}",
+        knob(voicing.low),
+        knob(voicing.mid),
+        knob(voicing.high),
+        knob(voicing.presence),
+        knob(voicing.power_drive)
     )
 }
 
-fn residual(residual: Residual) -> String {
-    format!("{:.2} / {:+.2}", residual.shape_db, residual.level_db)
+fn pair(values: [f64; 2], signed: bool) -> String {
+    if signed {
+        format!("{:+.1} / {:+.1}", values[0], values[1])
+    } else {
+        format!("{:.1} / {:.1}", values[0], values[1])
+    }
 }
 
-fn markdown(report: &Report) -> String {
-    let mut text = String::from(
-        "# Tone-stack refit\n\n\
-         Generated by `just refit`; `just refit-check` proves it is current.\n\n\
+fn markdown(presets: &[Preset]) -> String {
+    let mut text = format!(
+        "# Factory voicing\n\n\
+         Generated by `just refit`.\n\n\
          Version 2 discretises the tone stack with the standard bilinear constant\n\
          `2·SR`. Swanky Amp 1.4.0 used `SR`, which voiced every tone-stack\n\
-         feature an octave above the circuit. The factory presets were voiced on\n\
-         that octave-high stack, so they are refitted to sound roughly as they\n\
-         did, not to replicate it: an exact match drives Low, Mid and High to\n\
-         their limits.\n\n\
-         ## Method\n\n",
-    );
-    text.push_str(&format!(
-        "- Input: a Karplus-Strong pluck generated in code from seed `{:#010x}`, \
-         one 0.5 s note at each of MIDI notes {:?}, peaking at the level of the \
-         reference single-coil DI.\n\
-         - Each preset is rendered through the shipping path at {} Hz with Auto \
-         oversampling, once with the released mapping (the reference) and once \
-         with the standard mapping.\n\
-         - Measurements use 48 points log-spaced from 80 Hz to 8 kHz. Shape is \
-         the band levels in dB about their mean; level is the total level. The \
-         error is the mean-squared shape difference plus the squared level \
-         difference, so one dB of level counts as one dB of shape. Moving Low, \
-         Mid or High from the preset's setting adds {RESTRAINT} dB² per control \
-         range squared, so a control moves only as far as the match improves: \
-         without it most presets end with Mid near its maximum.\n\
-         - Low, Mid and High are fitted on the tone-stack seam over a coarse \
-         0.25 grid and two refinements to 0.01. The stack is linear and nothing \
-         before it depends on its controls, so the seam for any setting is \
-         predicted from the reference render and the ratio of the two stack \
-         responses in slices of about 1/28 octave.\n\
-         - Power Drive moves only when the fitted stack still changes the level \
-         into the power stage by more than {DRIVE_DEADBAND_DB} dB, by bisection \
-         on its gain curve and never by more than {POWER_DRIVE_LIMIT} of its \
-         range.\n\
-         - Every fitted preset is then rendered through the whole amplifier; the \
-         table reports those renders against the reference.\n\n",
-        report.pluck_seed, report.pluck_notes, report.sample_rate,
-    ));
-    text.push_str(
-        "## Results\n\n\
-         Controls are Low / Mid / High / Power Drive. Residuals are shape dB RMS\n\
-         / level dB against the released mapping. Drive is the level change into\n\
-         the power stage: the seam level plus Power Drive's gain change.\n\n\
-         | Preset | Original | Refit | Seam unrefit | Seam refit | Drive refit dB | Output unrefit | Output refit | Limits |\n\
-         |---|---|---|---|---|---|---|---|---|\n",
-    );
-    for preset in &report.presets {
-        text.push_str(&format!(
-            "| {} | {} | {} | {} | {} | {:+.2} | {} | {} | {} |\n",
-            preset.name,
-            settings(preset.original),
-            settings(preset.refit),
-            residual(preset.unrefit.tone_stack),
-            residual(preset.refitted.tone_stack),
-            preset.refitted.drive_db,
-            residual(preset.unrefit.output),
-            residual(preset.refitted.output),
-            if preset.limits.is_empty() {
-                "none".to_owned()
-            } else {
-                preset.limits.join(", ")
-            },
-        ));
-    }
-    let limited: Vec<&str> = report
-        .presets
-        .iter()
-        .filter(|preset| !preset.limits.is_empty())
-        .map(|preset| preset.name.as_str())
-        .collect();
-    let worst = |select: fn(&PresetRefit) -> f64| {
-        report
-            .presets
-            .iter()
-            .map(|preset| (select(preset), preset.name.as_str()))
-            .fold(
-                (0., ""),
-                |worst, item| if item.0 > worst.0 { item } else { worst },
-            )
-    };
-    let (seam_shape, seam_case) = worst(|preset| preset.refitted.tone_stack.shape_db);
-    let (drive, drive_case) = worst(|preset| preset.refitted.drive_db.abs());
-    let (output_shape, output_case) = worst(|preset| preset.refitted.output.shape_db);
-    let (output_level, output_level_case) = worst(|preset| preset.refitted.output.level_db.abs());
-    text.push_str(&balance_markdown(&report.balance));
-    text.push_str(&format!(
-        "\n## Summary\n\n\
-         - Worst seam shape residual: {seam_shape:.2} dB RMS ({seam_case}).\n\
-         - Worst drive change into the power stage: {drive:.2} dB ({drive_case}).\n\
-         - Worst output shape residual: {output_shape:.2} dB RMS ({output_case}).\n\
-         - Worst output level change: {output_level:.2} dB ({output_level_case}).\n\
-         - Presets with a control at a limit: {}.\n\n\
-         The Swanky Amp 1.4.0 build stays installable beside version 2 for\n\
-         anyone who wants the original voicing exactly.\n",
-        if limited.is_empty() {
-            "none".to_owned()
-        } else {
-            limited.join(", ")
-        },
-    ));
-    text
-}
-
-fn balance_markdown(balance: &[Balance]) -> String {
-    let mut text = format!(
-        "\n## Factory balance\n\n\
-         Swanky Amp 1.4.0's factory presets were never balanced for loudness.\n\
-         Version 2 moves each preset's Output so its loudness matches the factory\n\
-         defaults'. Loudness is BS.1770-4 gated integrated loudness through the\n\
-         shipping path at {} Hz with Auto oversampling from a settled amplifier,\n\
-         averaged over the single-coil DI and the refit pluck, the measure `just\n\
-         calibrate` holds Drive, Power Drive and Grit to. Output stores -1..+1 for\n\
-         -35..+35 dB. The two clips disagree most on the clean presets, whose\n\
-         plucked attacks pass uncompressed, so each clip keeps some spread about\n\
-         the average.\n\n\
-         | Preset | Output change dB | Output before → after dB | DI LUFS | Pluck LUFS |\n\
-         |---|---|---|---|---|\n",
+         feature an octave above the circuit. The factory presets were made on\n\
+         that stack, so each is voiced again to keep its character: the same\n\
+         balance between bands at the output, and the power stage driven as\n\
+         hard. The corrected stack cannot reproduce the octave-high scoop\n\
+         exactly, so the aim is the right range, not a replica.\n\n\
+         ## Method\n\n\
+         - Input: the two guitar recordings in `verification/reference/input`, single\n\
+           coil and humbucker, as recorded at Input 0.\n\
+         - Each preset is rendered through 1.4.0 (the legacy path, which `just\n\
+           model-check` holds to the released renders) and through the shipping\n\
+           path at {} Hz with Auto oversampling.\n\
+         - Balance is the output's third-octave band levels from 80 Hz to 8 kHz,\n\
+           each render's bands taken about their own mean, so level does not\n\
+           count. The error is the mean squared band difference from 1.4.0,\n\
+           averaged over the recordings.\n\
+         - Low, Mid, High and Presence are searched from the 1.4.0 settings in\n\
+           steps of 1, 0.5, 0.25 and 0.125 on the 0 to 10 scale. Moving a\n\
+           control costs {VOICING_RESTRAINT} dB² per half range squared, and the\n\
+           controls stay within {:.0} to {:.0}, so presets leave room either way.\n\
+         - For every candidate, Power Drive is set so the power stage's input\n\
+           level, averaged over the recordings, matches 1.4.0's. Where Power\n\
+           Drive runs out of range, the miss costs {FEED_COST} dB² per dB².\n\
+         - Output then brings each preset to Init's loudness, BS.1770-4\n\
+           integrated loudness averaged over the recordings.\n\n\
+         ## Results\n\n\
+         Controls are Low / Mid / High / Presence / Power Drive on the panel's 0\n\
+         to 10 scale. Balance is the RMS band difference from 1.4.0 in dB and\n\
+         feed is the power stage's input level minus 1.4.0's in dB, each for the\n\
+         single coil / humbucker. Unvoiced is version 2 with the 1.4.0 settings.\n\n\
+         | Preset | 1.4.0 | Voiced | Balance unvoiced | Balance voiced | Feed unvoiced | Feed voiced | Output dB |\n\
+         |---|---|---|---|---|---|---|---|\n",
         calibration::SAMPLE_RATE,
+        knob(-RAIL),
+        knob(RAIL),
     );
-    for preset in balance {
+    for preset in presets {
+        let voiced = &preset.voiced;
         text.push_str(&format!(
-            "| {} | {:+.2} | {:+.2} → {:+.2} | {:.2} | {:.2} |\n",
+            "| {} | {} | {} | {} | {} | {} | {} | {:+.1} → {:+.1} |\n",
             preset.name,
-            preset.change_db,
+            settings(voiced.original),
+            settings(voiced.voiced),
+            pair(voiced.unvoiced_balance_db, false),
+            pair(voiced.voiced_balance_db, false),
+            pair(voiced.unvoiced_feed_db, true),
+            pair(voiced.voiced_feed_db, true),
             f64::from(preset.output_before) * OUTPUT_RANGE_DB,
             f64::from(preset.output_after) * OUTPUT_RANGE_DB,
-            preset.di_lufs,
-            preset.pluck_lufs,
         ));
     }
-    let spread = |levels: Vec<f64>| {
-        let (low, high) = levels
+    text.push_str(
+        "\n## Remaining balance\n\n\
+         Voiced output band levels minus 1.4.0's in dB, averaged over the\n\
+         recordings, at every other third-octave band.\n\n",
+    );
+    let centres = refit::band_centres();
+    let shown: Vec<usize> = (0..centres.len()).step_by(2).collect();
+    text.push_str("| Preset |");
+    for &band in &shown {
+        text.push_str(&format!(" {:.0} |", centres[band]));
+    }
+    text.push_str("\n|---|");
+    text.push_str(&"---|".repeat(shown.len()));
+    text.push('\n');
+    for preset in presets {
+        text.push_str(&format!("| {} |", preset.name));
+        for &band in &shown {
+            text.push_str(&format!(" {:+.1} |", preset.voiced.voiced_bands_db[band]));
+        }
+        text.push('\n');
+    }
+    let spread = |index: usize| {
+        let (low, high) = presets
             .iter()
+            .map(|preset| preset.lufs[index])
             .fold((f64::INFINITY, f64::NEG_INFINITY), |(low, high), level| {
-                (low.min(*level), high.max(*level))
+                (low.min(level), high.max(level))
             });
-        format!("{:.2} dB, from {low:.2} to {high:.2} LUFS", high - low)
+        format!("{low:.1} to {high:.1} LUFS")
     };
     text.push_str(&format!(
-        "\nSpread on the DI: {}. On the pluck: {}.\n",
-        spread(balance.iter().map(|preset| preset.di_lufs).collect()),
-        spread(balance.iter().map(|preset| preset.pluck_lufs).collect()),
+        "\nAfter the Output change the presets sit at {} on the single coil and \
+         {} on the humbucker.\n\n\
+         The Swanky Amp 1.4.0 build stays installable beside version 2 for\n\
+         anyone who wants the original voicing exactly.\n",
+        spread(0),
+        spread(1)
     ));
     text
-}
-
-fn close(left: f64, right: f64, tolerance: f64) -> bool {
-    (left - right).abs() <= tolerance
-}
-
-fn compare(committed: &Report, fresh: &Report) -> Vec<String> {
-    let mut failures = Vec::new();
-    if committed.presets.len() != fresh.presets.len() {
-        failures.push("preset count differs".into());
-    }
-    for (old, new) in committed.presets.iter().zip(&fresh.presets) {
-        let controls = [
-            (old.refit.low, new.refit.low),
-            (old.refit.mid, new.refit.mid),
-            (old.refit.high, new.refit.high),
-            (old.refit.power_drive, new.refit.power_drive),
-        ];
-        if old.name != new.name
-            || old.original != new.original
-            || controls
-                .iter()
-                .any(|(old, new)| (old - new).abs() > CONTROL_TOLERANCE)
-        {
-            failures.push(format!(
-                "{}: refit {} is now {}",
-                old.name,
-                settings(old.refit),
-                settings(new.refit)
-            ));
-            continue;
-        }
-        for (label, before, after) in [
-            ("unrefit", old.unrefit, new.unrefit),
-            ("refitted", old.refitted, new.refitted),
-        ] {
-            let pairs = [
-                (before.tone_stack.shape_db, after.tone_stack.shape_db),
-                (before.tone_stack.level_db, after.tone_stack.level_db),
-                (before.drive_db, after.drive_db),
-                (before.output.shape_db, after.output.shape_db),
-                (before.output.level_db, after.output.level_db),
-            ];
-            if pairs
-                .iter()
-                .any(|(before, after)| !close(*before, *after, DB_TOLERANCE))
-            {
-                failures.push(format!("{}: {label} residuals moved", old.name));
-            }
-        }
-    }
-    if committed.balance.len() != fresh.balance.len() {
-        failures.push("balanced preset count differs".into());
-    }
-    for (old, new) in committed.balance.iter().zip(&fresh.balance) {
-        if old.name != new.name
-            || old.output_before != new.output_before
-            || !close(old.change_db, new.change_db, DB_TOLERANCE)
-        {
-            failures.push(format!(
-                "{}: factory balance {:+.2} dB is now {:+.2}",
-                old.name, old.change_db, new.change_db
-            ));
-        } else if !close(old.di_lufs, new.di_lufs, DB_TOLERANCE)
-            || !close(old.pluck_lufs, new.pluck_lufs, DB_TOLERANCE)
-        {
-            failures.push(format!("{}: balanced loudness moved", old.name));
-        }
-    }
-    failures
-}
-
-#[derive(Serialize)]
-struct Variant {
-    variant: String,
-    high: f32,
-    measurement: Measurement,
-}
-
-#[derive(Serialize)]
-struct PresetVariants {
-    name: String,
-    variants: Vec<Variant>,
-}
-
-/// Each step is a signed change to the refitted High or `orig` for the
-/// released value; `as-is` always comes first.
-fn high_variants(released: &str, factory: &str, steps: &str) -> Result<String, String> {
-    let input = refit::pluck(refit::SAMPLE_RATE);
-    let steps: Vec<&str> = std::iter::once("as-is")
-        .chain(
-            steps
-                .split(',')
-                .map(str::trim)
-                .filter(|step| !step.is_empty()),
-        )
-        .collect();
-    let mut jobs = Vec::new();
-    for name in presets::names(released) {
-        let original = presets::controls(released, &name)?;
-        let fitted = presets::controls(factory, &name)?;
-        let highs = steps
-            .iter()
-            .map(|step| match *step {
-                "as-is" => Ok(fitted.high),
-                "orig" => Ok(original.high),
-                step => step
-                    .parse::<f32>()
-                    .map(|change| (fitted.high + change).clamp(-1., 1.))
-                    .map_err(|_| format!("unknown High step: {step}")),
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        jobs.push((name, original, fitted, highs));
-    }
-    let presets: Vec<PresetVariants> = std::thread::scope(|scope| {
-        let handles: Vec<_> = jobs
-            .iter()
-            .map(|(name, original, fitted, highs)| {
-                let (input, steps) = (&input, &steps);
-                scope.spawn(move || {
-                    let candidates: Vec<_> = highs
-                        .iter()
-                        .map(|&high| swanky_amp::dsp::amp::AmpControls { high, ..*fitted })
-                        .collect();
-                    let measurements = refit::measure_candidates(*original, &candidates, input);
-                    PresetVariants {
-                        name: name.clone(),
-                        variants: steps
-                            .iter()
-                            .zip(highs)
-                            .zip(measurements)
-                            .map(|((step, high), measurement)| Variant {
-                                variant: (*step).to_owned(),
-                                high: *high,
-                                measurement,
-                            })
-                            .collect(),
-                    }
-                })
-            })
-            .collect();
-        handles
-            .into_iter()
-            .map(|handle| handle.join().expect("measurement thread panicked"))
-            .collect()
-    });
-    serde_json::to_string_pretty(&presets).map_err(|error| error.to_string())
 }
 
 fn run() -> Result<(), String> {
-    if let Ok(steps) = option("--high-steps") {
-        let released = read(&PathBuf::from(option("--presets")?))?;
-        let factory = read(&PathBuf::from(option("--factory")?))?;
-        println!("{}", high_variants(&released, &factory, &steps)?);
-        return Ok(());
-    }
-    let presets_path = PathBuf::from(option("--presets")?);
-    let report_dir = PathBuf::from(option("--report-dir")?);
-    let factory_path = PathBuf::from(option("--factory")?);
-    let json_path = report_dir.join("refit.json");
-    let markdown_path = report_dir.join("refit-report.md");
-    let released = read(&presets_path)?;
-    let clip_path = option("--clip")?;
-    let clip_bytes = fs::read(&clip_path).map_err(|error| format!("{clip_path}: {error}"))?;
-    let clips = Clips::new(&clip_bytes)?;
-
-    if env::args().any(|argument| argument == "--check") {
-        let committed: Report = serde_json::from_str(&read(&json_path)?)
-            .map_err(|error| format!("{}: {error}", json_path.display()))?;
-        let mut failures = Vec::new();
-        if read(&markdown_path)? != markdown(&committed) {
-            failures.push(format!(
-                "{} is not generated from refit.json",
-                markdown_path.display()
-            ));
-        }
-        if read(&factory_path)? != factory_bank(&released, &committed.presets, &committed.balance)?
-        {
-            failures.push(format!(
-                "{} is not generated from refit.json",
-                factory_path.display()
-            ));
-        }
-        failures.extend(compare(&committed, &compute(&released, &clips)?));
-        if !failures.is_empty() {
-            return Err(format!(
-                "refit is stale; run `just refit`:\n  {}",
-                failures.join("\n  ")
-            ));
-        }
-        println!("tone-stack refit is current");
-        return Ok(());
-    }
-
-    let report = compute(&released, &clips)?;
-    let json = serde_json::to_string_pretty(&report).map_err(|error| error.to_string())? + "\n";
-    write(&json_path, &json)?;
-    write(&markdown_path, &markdown(&report))?;
-    write(
-        &factory_path,
-        &factory_bank(&released, &report.presets, &report.balance)?,
-    )?;
-    print!("{}", markdown(&report));
+    let released = read(&PathBuf::from(option("--presets")?))?;
+    let report = PathBuf::from(option("--report")?);
+    let factory = PathBuf::from(option("--factory")?);
+    let presets = voice_all(&released, &clips()?)?;
+    let text = markdown(&presets);
+    fs::write(&report, &text).map_err(|error| format!("{}: {error}", report.display()))?;
+    fs::write(&factory, factory_bank(&released, &presets)?)
+        .map_err(|error| format!("{}: {error}", factory.display()))?;
+    print!("{text}");
     Ok(())
 }
 

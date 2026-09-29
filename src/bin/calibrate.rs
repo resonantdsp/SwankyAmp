@@ -1,12 +1,12 @@
 //! Measures the shipping path's level compensation (the preamp and power
-//! tables, the tone-stack scale and the Drive and Grit output gains) and
-//! writes it as source. `--check` fails unless the committed values match a fresh
+//! tables, the tone-stack scales and the Drive and Grit output gains) on the
+//! guitar recordings and writes it as source. `--check` fails unless the committed values match a fresh
 //! measurement.
 
 use std::env;
 use std::fs;
 
-use swanky_amp::dsp::amp::{LevelTables, TABLE_POINTS};
+use swanky_amp::dsp::amp::{LevelTables, TABLE_POINTS, TONE_STACKS};
 use swanky_amp::dsp::calibration::{self, Calibration, Point};
 
 /// Platform libm differences move a table point by far less than this; a
@@ -34,10 +34,11 @@ fn literal(value: f32) -> String {
     format!("{}_{}e{exponent}", &mantissa[..5], &mantissa[5..])
 }
 
-fn table(name: &str, values: &[f32; TABLE_POINTS]) -> String {
+fn table(name: &str, values: &[f32]) -> String {
     let mut text = format!(
         "#[allow(clippy::excessive_precision)] // Written to seven significant digits.\n\
-         pub(super) const {name}: [f32; {TABLE_POINTS}] = [\n"
+         pub(super) const {name}: [f32; {}] = [\n",
+        values.len()
     );
     for value in values {
         text.push_str(&format!("    {},\n", literal(*value)));
@@ -79,19 +80,17 @@ fn sweep(title: &str, seam: &str, points: &[Point; TABLE_POINTS], released: &[f3
 
 fn report(calibration: &Calibration) {
     let released = LevelTables::RELEASED;
-    sweep(
-        "Drive, last active triode",
-        "triode",
-        &calibration.drive,
-        &released.preamp,
-        &calibration.tables.preamp,
-    );
-    let tone_stack = calibration.tone_stack;
+    for stack in 0..TONE_STACKS {
+        sweep(
+            &format!("Drive, power stage input, tone stack {stack}, released tables on both"),
+            "input",
+            &calibration.feed[stack],
+            &released.preamp,
+            &calibration.tables.preamp,
+        );
+    }
     println!(
-        "Tone stack at the factory defaults, power stage input: released {:.2} dB, \
-         shipping {:.2} dB; scale {:.6e} -> {:.6e} ({:+.2} dB)",
-        tone_stack.released_db,
-        tone_stack.shipping_db,
+        "Tone-stack scale {:.6e} -> {:.6e} ({:+.2} dB)",
         released.tone_stack,
         calibration.tables.tone_stack,
         db(f64::from(calibration.tables.tone_stack) / f64::from(released.tone_stack)),
@@ -105,9 +104,10 @@ fn report(calibration: &Calibration) {
     );
     let target = calibration.target;
     println!(
-        "Loudness target, factory defaults: DI {:.2} LUFS, pluck {:.2} LUFS, blend {:.2} LUFS",
-        target.di,
-        target.pluck,
+        "Loudness target, factory defaults: single coil {:.2} LUFS, humbucker {:.2} LUFS, \
+         blend {:.2} LUFS",
+        target.single_coil,
+        target.humbucker,
         target.blend()
     );
     for (title, measured, gains) in [
@@ -129,13 +129,13 @@ fn report(calibration: &Calibration) {
             calibration.tables.grit,
         ),
     ] {
-        println!("{title}\n  point  DI LUFS  pluck LUFS  blend  gain dB");
+        println!("{title}\n  point  single coil LUFS  humbucker LUFS  blend  gain dB");
         for (index, loudness) in measured.iter().enumerate() {
             println!(
-                "  {:+.1}  {:>7.2}  {:>10.2}  {:>5.2}  {:+7.2}",
+                "  {:+.1}  {:>16.2}  {:>14.2}  {:>5.2}  {:+7.2}",
                 -1. + 0.2 * index as f64,
-                loudness.di,
-                loudness.pluck,
+                loudness.single_coil,
+                loudness.humbucker,
                 loudness.blend(),
                 db(f64::from(gains[index])),
             );
@@ -149,6 +149,15 @@ fn report(calibration: &Calibration) {
     );
 }
 
+/// The recordings named by `--single-coil` and `--humbucker`.
+fn clips() -> Result<calibration::Clips, String> {
+    let read = |name: &str| -> Result<Vec<u8>, String> {
+        let path = option(name)?;
+        fs::read(&path).map_err(|error| format!("{path}: {error}"))
+    };
+    calibration::Clips::new(&read("--single-coil")?, &read("--humbucker")?)
+}
+
 fn drift(committed: &[f32], fresh: &[f32]) -> f64 {
     committed
         .iter()
@@ -158,10 +167,8 @@ fn drift(committed: &[f32], fresh: &[f32]) -> f64 {
 }
 
 fn run() -> Result<(), String> {
-    let clip_path = option("--clip")?;
     let data_path = option("--data")?;
-    let bytes = fs::read(&clip_path).map_err(|error| format!("{clip_path}: {error}"))?;
-    let calibration = calibration::measure(&calibration::Clips::new(&bytes)?);
+    let calibration = calibration::measure(&clips()?);
     report(&calibration);
     if env::args().any(|argument| argument == "--check") {
         let committed = LevelTables::CALIBRATED;
