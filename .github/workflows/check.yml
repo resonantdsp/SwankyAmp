@@ -1,7 +1,6 @@
 name: check
 
-# Prose cannot change what these jobs measure, except the committed refit
-# report, which `refit-check` compares with a fresh refit.
+# Prose cannot change what these jobs measure.
 #
 # The skip is decided by the `changes` job rather than by `paths-ignore`,
 # because a workflow filtered out by path never reports its checks at all, and
@@ -66,12 +65,13 @@ jobs:
           while IFS= read -r file; do
             [ -n "$file" ] || continue
             case "$file" in
-              verification/tone-stack/refit-report.md) ;;
-              *.md) continue ;;
+              *.md) ;;
+              *)
+                echo "Outside the ignored set: $file"
+                code=true
+                break
+                ;;
             esac
-            echo "Outside the ignored set: $file"
-            code=true
-            break
           done <<< "$files"
           echo "code=$code"
           echo "code=$code" >> "$GITHUB_OUTPUT"

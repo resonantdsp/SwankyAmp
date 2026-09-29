@@ -12,7 +12,7 @@ Install Rust through [rustup](https://rustup.rs/) and install [just](https://git
 just
 ```
 
-The gate checks formatting, lints with and without the plugin-format features, runs the behavioral tests, verifies the [released reference renderer](verification/reference/README.md), compares the Rust amplifier's legacy path against all ten released factory presets at 44.1 kHz and 1x processing, proves the committed [tone-stack refit](verification/tone-stack/refit-report.md) is current, and proves the committed level calibration reproduces.
+The gate checks formatting, lints with and without the plugin-format features, runs the behavioral tests, verifies the [released reference renderer](verification/reference/README.md), compares the Rust amplifier's legacy path against all ten released factory presets at 44.1 kHz and 1x processing, and proves the committed level calibration reproduces.
 
 Render one preset and its internal comparison seams with:
 
