@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Download the pinned ASIO SDK into tools/ASIOSDK, where the Justfile points
-# CPAL_ASIO_DIR, for the Windows standalone's ASIO driver support. Pinned by
-# file and checksum so a build names the SDK it compiled, and kept out of the
-# repository, since Steinberg's licence does not let it be redistributed.
+# CPAL_ASIO_DIR, for the Windows standalone's ASIO driver support. Steinberg
+# licenses this package under GPLv3 or its proprietary agreement; Swanky Amp,
+# being GPL, takes the GPLv3 option. Pinned by file and checksum because the
+# build's third-party notices name this exact package as the SDK's source.
 # Other platforms never build it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
