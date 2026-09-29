@@ -53,7 +53,7 @@ factory bank, and GPLv3 licence from the released commit. `frozen/manifest.json`
 records a SHA-256 digest for every extracted file, the renderer, the DI, every
 WAV, and every seam report.
 
-The mono DI is Garrin McGoldrick's versioned single-coil performance, copied
+The mono DI is a versioned single-coil performance, copied
 from `code/SwankyAmpPro/verification/calibration/single-coil.wav`. That location
 is provenance only; no Pro processing is used. It is 48 kHz mono 24-bit PCM and
 is fed at 0 dB. This is an explicit fresh-session fixture: Input Level `0.0`
