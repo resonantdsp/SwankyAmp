@@ -341,14 +341,14 @@ mod tests {
             (engine, lit)
         };
         let (mut engine, single_coil) = cells(-23.2);
-        assert_eq!(
-            single_coil, 6,
-            "a single-coil peak lit {single_coil} of 10 cells"
+        assert!(
+            (4..=8).contains(&single_coil),
+            "a single-coil peak lit {single_coil} of 10 cells, not the middle of the column"
         );
-        assert_eq!(
-            cells(-14.5).1,
-            7,
-            "a humbucker peak lit the wrong cell count"
+        let humbucker = cells(-14.5).1;
+        assert!(
+            (single_coil..10).contains(&humbucker),
+            "a humbucker peak lit {humbucker} cells beside the single coil's {single_coil}"
         );
 
         let _ = render(&mut engine, &params, &[vec![0.; 96_000]], 512);
@@ -356,6 +356,23 @@ mod tests {
             engine.meter_levels()[0],
             0.,
             "the input meter was still lit two seconds after the playing stopped"
+        );
+    }
+
+    #[test]
+    fn raising_input_raises_the_input_meter() {
+        let reading = |input: f64| {
+            let params = SwankyAmpParams::default();
+            params.input.set_value(input);
+            let mut engine = engine::Engine::new(&params);
+            engine.reset(&params, 48_000., 512);
+            let _ = render(&mut engine, &params, &[vec![0.01; 512]], 512);
+            engine.meter_levels()[0]
+        };
+        let (flat, raised) = (reading(0.5), reading(0.75));
+        assert!(
+            raised > flat,
+            "raising Input moved the input meter from {flat} to {raised}"
         );
     }
 

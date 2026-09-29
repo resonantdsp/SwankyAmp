@@ -1,6 +1,7 @@
 //! The header's preset field and its menu: Pro's preset bar reduced to the
 //! single field Free has room for, with the actions in the menu.
 
+use std::cell::RefCell;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -30,9 +31,13 @@ const ARROW_WIDTH: f32 = 22.0;
 const NAME_INSET: f32 = 4.0;
 /// The widest a name with its mark can set in the field.
 const NAME_ROOM: f32 = FIELD_WIDTH - 2.0 * (ARROW_WIDTH + NAME_INSET);
-const NAME_SIZE: f32 = 12.0;
+/// The field's name and the menu's rows set at one size, which the fitting
+/// measures with.
+const TEXT_SIZE: f32 = 12.0;
 /// Marks a preset whose controls have moved since it was chosen.
 const MODIFIED: &str = " •";
+/// The menu's question before a user preset is removed: this, the name, "?".
+const REMOVE_PREFIX: &str = "Remove ";
 const ITEM_HEIGHT: f32 = 20.0;
 const ITEM_PADDING: f32 = 10.0;
 /// The menu stops short of the footer; a longer user list scrolls.
@@ -70,6 +75,34 @@ pub struct PresetBar {
     /// The user preset a first press on Remove asked about. Deleting a file
     /// cannot be undone, so only a second press on the same preset does it.
     removing: Option<String>,
+    /// The current name as the field and the menu set it, kept until the
+    /// preset or its modified state changes, since the view is rebuilt with
+    /// every display frame.
+    shown: RefCell<Option<Shown>>,
+}
+
+/// The current preset's name fitted to the field and to the menu's Remove
+/// question, for one name and modified state.
+struct Shown {
+    name: String,
+    modified: bool,
+    field: String,
+    remove: String,
+}
+
+impl Shown {
+    fn new(name: &str, modified: bool) -> Self {
+        let mark = if modified { MODIFIED } else { "" };
+        let room = FIELD_WIDTH
+            - 2.0 * ITEM_PADDING
+            - crate::ui::text_width(REMOVE_PREFIX, TEXT_SIZE, style::FONT);
+        Self {
+            name: name.to_owned(),
+            modified,
+            field: fitted(name, mark, NAME_ROOM),
+            remove: format!("{REMOVE_PREFIX}{}", fitted(name, "?", room)),
+        }
+    }
 }
 
 impl PresetBar {
@@ -103,6 +136,7 @@ impl PresetBar {
             import: None,
             naming: None,
             removing: None,
+            shown: RefCell::new(None),
         }
     }
 
@@ -198,6 +232,20 @@ impl PresetBar {
                 listing.unreadable.join(", ")
             )));
         }
+    }
+
+    /// The current name fitted for the field, and for the Remove question.
+    fn shown(&self, params: &ParamCache<SwankyAmpParams>) -> (String, String) {
+        let modified = self.modified(params);
+        let mut shown = self.shown.borrow_mut();
+        let current = shown
+            .as_ref()
+            .is_some_and(|shown| shown.name == self.current.name && shown.modified == modified);
+        if !current {
+            *shown = Some(Shown::new(&self.current.name, modified));
+        }
+        let shown = shown.as_ref().expect("the fitted name was just set");
+        (shown.field.clone(), shown.remove.clone())
     }
 
     /// Init never reads as modified: it is the absence of a preset.
@@ -409,8 +457,7 @@ impl PresetBar {
         &self,
         params: &ParamCache<SwankyAmpParams>,
     ) -> Element<'a, Msg, Theme, R> {
-        let mark = if self.modified(params) { MODIFIED } else { "" };
-        let name = fitted(&self.current.name, mark, NAME_ROOM);
+        let (name, _) = self.shown(params);
         let chevron = |glyph, message: Option<PresetMsg>| {
             let available = message.is_some();
             let glyph = container(text(glyph).size(17).color(DIM.scale_alpha(if available {
@@ -437,7 +484,7 @@ impl PresetBar {
                 mouse_area(
                     container(
                         text(name)
-                            .size(NAME_SIZE)
+                            .size(TEXT_SIZE)
                             .font(style::FONT)
                             .wrapping(iced_core::text::Wrapping::None)
                             .color(style::INK),
@@ -488,11 +535,7 @@ impl PresetBar {
         let user = self.current.scope == Scope::User;
         let confirming = self.removing.as_deref() == Some(self.current.key.as_str());
         let remove = if confirming {
-            let prefix = "Remove ";
-            let room = FIELD_WIDTH
-                - 2.0 * ITEM_PADDING
-                - crate::ui::text_width(prefix, NAME_SIZE, style::FONT);
-            format!("{prefix}{}", fitted(&self.current.name, "?", room))
+            self.shown(params).1
         } else {
             "Remove".into()
         };
@@ -566,31 +609,10 @@ fn preset(message: PresetMsg) -> Msg {
     Message::Plugin(crate::ui::Action::Preset(message))
 }
 
-/// A name, its mark and the room they set in.
-type FitRequest = (String, String, u32);
-
 /// The name followed by `mark`, set within `room`: whole when it fits, or
 /// cut to end in an ellipsis before the mark.
 fn fitted(name: &str, mark: &str, room: f32) -> String {
-    // The field is rebuilt with every display frame but its name changes only
-    // with the preset, so the last answer is kept rather than set again.
-    thread_local! {
-        static LAST: std::cell::RefCell<Option<(FitRequest, String)>> =
-            const { std::cell::RefCell::new(None) };
-    }
-    let key = (name.to_owned(), mark.to_owned(), room.to_bits());
-    LAST.with_borrow_mut(|last| match last {
-        Some((cached, shown)) if *cached == key => shown.clone(),
-        _ => {
-            let shown = set_within(name, mark, room);
-            *last = Some((key, shown.clone()));
-            shown
-        }
-    })
-}
-
-fn set_within(name: &str, mark: &str, room: f32) -> String {
-    let fits = |body: &str| crate::ui::text_width(body, NAME_SIZE, style::FONT) <= room;
+    let fits = |body: &str| crate::ui::text_width(body, TEXT_SIZE, style::FONT) <= room;
     let whole = format!("{name}{mark}");
     if fits(&whole) {
         return whole;
@@ -633,7 +655,8 @@ fn menu_item<'a, R: FreeRenderer + 'a>(
     let available = message.is_some();
     button(
         text(label)
-            .size(12)
+            .size(TEXT_SIZE)
+            .font(style::FONT)
             .line_height(LineHeight::Absolute(15.0.into())),
     )
     .width(Length::Fill)

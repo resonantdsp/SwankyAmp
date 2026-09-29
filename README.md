@@ -307,11 +307,11 @@ can be produced from changed widget geometry.
 The four live meter columns, captioned L and R, are local to each plugin
 instance. The blue input pair observes the signal after the Input control; the
 output pair, in the accent, observes the final signal after the optional
-cabinet and Output control. Both span -60 to 0 dBFS as Pro's do, one cell per
-6 dB, lit from the bottom up, so a single-coil DI at Input 0 dB lights about
-six input cells and a humbucker about seven. A mono instance mirrors its
-reading into L and R. Immediate attack and Pro's release settle to exact darkness,
-after which the editor has no meter change to redraw; the meters also go dark
+cabinet and Output control. Both span -60 to 0 dBFS, one cell per 6 dB, lit
+from the bottom up, so a single-coil DI at Input 0 dB lights about six input
+cells and a humbucker about seven. A mono instance mirrors its reading into L
+and R. Levels rise immediately and fall to 1/e in 0.3 s, settling to exact
+darkness, after which the editor has no meter change to redraw; the meters also go dark
 while the editor window has lost focus and the pointer is elsewhere.
 
 The repository carries the artwork as `assets/artwork.pack` with its

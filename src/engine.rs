@@ -7,7 +7,7 @@ use truce::prelude::AudioBuffer;
 const INITIAL_BLOCK: usize = 1024;
 const AUTO_TARGET_RATE: f64 = 88_200.;
 const MAX_INTERNAL_RATE: f64 = 192_000. * 1.01;
-/// Pro's meter release: a level falls to 1/e of itself in this time.
+/// A meter level falls to 1/e of itself in this time.
 const METER_RELEASE_SECONDS: f64 = 0.3;
 
 pub(crate) fn doublings_cap(sample_rate: f64) -> usize {
@@ -165,11 +165,11 @@ impl Engine {
     }
 
     fn observe_input(&mut self, channel: usize, peak: f32) {
-        self.block_peaks[channel] = self.block_peaks[channel].max(peak);
+        self.block_peaks[channel] = self.block_peaks[channel].max(finite(peak));
     }
 
     fn observe_output(&mut self, channel: usize, peak: f32) {
-        self.block_peaks[2 + channel] = self.block_peaks[2 + channel].max(peak);
+        self.block_peaks[2 + channel] = self.block_peaks[2 + channel].max(finite(peak));
     }
 
     fn finish(&mut self, frames: usize) {
@@ -177,8 +177,8 @@ impl Engine {
             (-(frames as f64) / (f64::from(self.sample_rate) * METER_RELEASE_SECONDS)).exp() as f32;
         for (level, peak) in self.levels.iter_mut().zip(self.block_peaks) {
             // A meter too quiet to light a cell is already a still picture.
-            // Reporting the remainder of its release would have the editor
-            // redrawing a dark meter for another half minute.
+            // Reporting the remainder of its release would keep the editor
+            // redrawing a meter that shows nothing.
             *level = peak.max(*level * release);
             if *level < METER_FLOOR {
                 *level = 0.;
@@ -195,6 +195,12 @@ impl Engine {
     pub fn latency(&self) -> u32 {
         u32::try_from(self.paths[0].latency(self.requested_doublings)).unwrap_or(u32::MAX)
     }
+}
+
+/// An overflowing peak would hold a meter full for good, since an infinite
+/// level never releases.
+fn finite(value: f32) -> f32 {
+    if value.is_finite() { value } else { 0. }
 }
 
 fn peak(samples: &[f32]) -> f32 {
