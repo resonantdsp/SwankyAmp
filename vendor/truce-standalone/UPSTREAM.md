@@ -65,6 +65,11 @@ zoom resizes the window. The published standalone resizes the window but
 leaves its content size pinned where the editor opened, so on macOS the zoom
 button snapped it back; the pin now follows the size the editor asked for.
 
+The published help text gave `--input-enabled` a default of off, although an
+application can set its own through `Defaults`, as Swanky Amp does to open
+with its input on. The help now names the application's default first
+(`cli.rs`).
+
 The buffer, device, ring, ASIO and zoom-pin changes follow the same fixes in Swanky Amp
 Pro's copy of this crate. Keep these fixes here until a pinned upstream
 release includes equivalent handling; remove the Cargo patch and this

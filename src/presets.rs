@@ -733,6 +733,9 @@ impl Library {
     pub fn import_legacy(&self, source: &Path) -> Result<ImportReport, String> {
         let mut report = ImportReport::default();
         let released = parse_bank(RELEASED_BANK).unwrap_or_default();
+        // The folder marks the first-run import done, even when every 1.x
+        // preset is a factory copy and nothing is written.
+        self.root()?;
         let mut pluck = None;
         for path in xml_files(source) {
             let stem = path.file_stem().unwrap_or_default().to_string_lossy();
@@ -883,10 +886,9 @@ impl ImportJob {
         Some(Self { result })
     }
 
-    /// The first-run import: only while version 2 has no preset folder yet
-    /// and 1.4.0 left one behind.
-    pub fn first_run(library: &Library) -> Option<Self> {
-        let source = legacy_root()?;
+    /// The first-run import from 1.4.0's folder, `source`: only while version
+    /// 2 has no preset folder yet and 1.4.0 left one behind.
+    pub fn first_run(library: &Library, source: PathBuf) -> Option<Self> {
         if library.user_root()?.exists() || !source.is_dir() {
             return None;
         }
@@ -1097,6 +1099,28 @@ mod tests {
         let again = library.import_legacy(&legacy).unwrap();
         assert!(again.imported.is_empty());
         assert_eq!(again.existing, ["mine", "kept"]);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// A 1.4.0 player who never saved a preset of their own has only
+    /// factory copies, which are not imported; the first run must still
+    /// count as done, or every editor open imports again and says so.
+    #[test]
+    fn the_first_run_import_runs_once_when_it_copies_nothing() {
+        let root = scratch("first-run");
+        let legacy = root.join("Swanky Amp");
+        let library = Library::with_user_root(Some(root.join("Swanky Amp 2")));
+        std::fs::create_dir_all(&legacy).unwrap();
+        std::fs::write(legacy.join("01 clean.xml"), legacy_file("clean")).unwrap();
+
+        let report = library.import_legacy(&legacy).unwrap();
+        assert!(report.imported.is_empty());
+        assert_eq!(report.factory_copies, 1);
+
+        assert!(
+            ImportJob::first_run(&library, legacy).is_none(),
+            "the next editor open imports the 1.x presets again"
+        );
         std::fs::remove_dir_all(root).unwrap();
     }
 }

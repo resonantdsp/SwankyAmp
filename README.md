@@ -12,7 +12,7 @@ Install Rust through [rustup](https://rustup.rs/) and install [just](https://git
 just
 ```
 
-The gate checks formatting, lints with and without the plugin-format features, runs the behavioral tests, verifies the [released reference renderer](verification/reference/README.md), compares the Rust amplifier's legacy path against all ten released factory presets at 44.1 kHz and 1x processing, proves the committed [tone-stack refit](verification/tone-stack/refit-report.md) is current, and proves the committed level calibration reproduces.
+The gate checks formatting, lints with and without the plugin-format features, runs the behavioral tests, verifies the [released reference renderer](verification/reference/README.md), compares the Rust amplifier's legacy path against all ten released factory presets at 44.1 kHz and 1x processing, and proves the committed level calibration reproduces.
 
 Render one preset and its internal comparison seams with:
 
@@ -131,10 +131,11 @@ User presets live in:
 | Windows | `%APPDATA%\Resonant DSP\Swanky Amp 2` | `%APPDATA%\Resonant DSP\Swanky Amp` |
 | Linux | `$XDG_DATA_HOME/Resonant DSP/Swanky Amp 2` (default `~/.local/share`) | `~/.config/Resonant DSP/Swanky Amp` |
 
-The version 2 folder is created on the first save or import. Each preset is
-one `<name>.xml` file in the 1.x schema, an `APVTSSwankyAmp` element listing
-`<PARAM id value/>` entries under the 1.x parameter ids, so 1.x and 2.0 presets
-stay one format: version 2 reads 1.4.0 files, including the version
+The version 2 folder is created when first needed: by a save, by Open folder,
+or by an import, even one that copies nothing. Each preset is one
+`<name>.xml` file in the 1.x schema, an `APVTSSwankyAmp` element listing
+`<PARAM id value/>` entries under the 1.x parameter ids, so 1.x and 2.0
+presets stay one format: version 2 reads 1.4.0 files, including the version
 migrations 1.4.0 applied to presets from earlier releases, and 1.4.0 can load
 a version 2 file. A file that is not well-formed or is not a Swanky Amp preset
 is left out of the menu and named in the footer.
@@ -258,9 +259,10 @@ After `just setup`, open the standalone shell with:
 just run
 ```
 
-The standalone's Settings menu chooses the input, the output and the buffer
-size (128 samples unless chosen), and remembers them on the machine; the
-`--input`, `--output` and `--buffer` flags override them for one launch
+The standalone opens with its input on, since an amplifier with its input off
+is silent; `--input-enabled off` opts out. Its Settings menu chooses the input,
+the output and the buffer size (128 samples unless chosen), and remembers them
+on the machine; the `--input`, `--output` and `--buffer` flags override them for one launch
 (`cargo run --release -- --help` lists every option). Choosing an audio
 interface as the input takes the output to it too, unless an output has been
 chosen, and the input is kept within about one buffer of the output.

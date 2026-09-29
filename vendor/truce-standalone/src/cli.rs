@@ -146,7 +146,8 @@ OPTIONS:
                             choice, else ASIO when a driver is installed).
                             With ASIO, --input and --output name the
                             interface.
-  --input-enabled <on|off>  Enable mic input at launch (default: off).
+  --input-enabled <on|off>  Enable mic input at launch (default: the
+                            application's own, else off).
                             Press `I` in the window to toggle live.
   --output-enabled <on|off> Enable speaker output at launch (default: on).
                             Toggle live from the Plugin menu (Cmd+O / Ctrl+O).

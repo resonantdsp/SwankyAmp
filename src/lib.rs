@@ -135,6 +135,25 @@ mod tests {
     use truce::core::PluginRuntime;
     use truce_test::{InputSource, MeterReadings};
 
+    /// Hosts file sessions, presets and plug-in lists under these identities,
+    /// never under the display name, so a changed `truce.toml` must leave
+    /// every one where the release candidates put it.
+    #[test]
+    fn the_identities_hosts_saved_the_plugin_under_hold() {
+        let info = <crate::Plugin as PluginRuntime>::info();
+        assert_eq!(info.clap_id, "com.resonantdsp.swanky-amp-2", "CLAP id");
+        let cid: String = truce::core::state::vst3_cid(info.vst3_id)
+            .iter()
+            .map(|byte| format!("{byte:02X}"))
+            .collect();
+        assert_eq!(cid, "8A6576C4F236F2EFE439EED75C81BA10", "VST3 class ID");
+        assert_eq!(
+            [info.au_type, info.fourcc, info.au_manufacturer],
+            [*b"aufx", *b"SwA2", *b"Rsnt"],
+            "Audio Unit type, subtype and manufacturer"
+        );
+    }
+
     fn signal(frames: usize, phase: f32) -> Vec<f32> {
         (0..frames)
             .map(|frame| {
