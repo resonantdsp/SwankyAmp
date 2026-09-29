@@ -26,10 +26,16 @@ installs beside Swanky Amp 1.4.0.
   1x at 88.2 kHz and above, and the header's oversampling button cycles Auto,
   1x, 2x and 4x and names the factor the engine resolved.
 - Corrected the tone stack's discretisation: 1.4.0 voiced every tone-stack
-  feature an octave above the circuit. The ten factory presets are refitted to
-  sound roughly as they did, with the residuals recorded in
-  `verification/tone-stack/refit-report.md`; Swanky Amp 1.4.0 remains
-  available for the original voicing.
+  feature an octave above the circuit. The ten factory presets are voiced
+  again on real guitar recordings, judged by the balance between bands at the
+  output, with Power Drive keeping each one's drive into the power stage; the
+  results are in `verification/tone-stack/refit-report.md`, and Swanky Amp
+  1.4.0 remains available for the original voicing. Imported 1.x user
+  presets use a faster conversion and can sound boxier than their originals.
+- Balanced the factory presets to equal loudness, which 1.4.0's never were:
+  each preset's Output moves so that all ten match Init's loudness averaged
+  over the two guitar recordings.
+  Imported 1.x presets are not rebalanced.
 - Fixed a slow tone-stack instability that silenced high-gain presets after
   hours of continuous play (issue #34). The first-order treble sections were
   discretised as biquads with a spurious pole at Nyquist, which f32 rounding
@@ -41,23 +47,22 @@ installs beside Swanky Amp 1.4.0.
   released seam levels over the ten factory presets, keeping every seam at 0 dB
   input within 0.6 dB of 1.4.0 (tone stack 1.05 dB, output 0.5 dB). The
   tetrode keeps the released curve, which sets its bias and gain rather than a
-  knee. The preset refit is measured with the new knee.
-- Recalibrated the level compensation for the corrected amplifier, so the
-  factory defaults land on 1.4.0's level into the power stage and at the
-  output with the cabinet off.
+  knee.
+- Recalibrated the level compensation for the corrected amplifier on real
+  guitar recordings played at Input 0: with the tone controls at their
+  defaults, playing drives the power stage within about 1 dB of 1.4.0 at every
+  Drive on every tone stack. Calibrated on a hot test clip instead, the
+  corrected stack had driven it up to 3.9 dB harder.
 - Drive, Power Drive and Grit now change the sound without changing the
-  volume. 1.4.0 got quieter as each rose: on plucked notes Power Drive cost
-  9 dB from 0 to 10 (15 dB after the corrections) and Drive 5 dB. Output gains
-  hold the loudness, averaged over a played DI and a pluck, within 0.6 dB of
-  Init across each control, and Init is unchanged.
+  volume. At playing level 1.4.0 got louder as Drive and Power Drive rose,
+  by about 4.6 dB at Drive 10 and up to 8 dB at Power Drive 10, and Grit
+  silenced the amplifier at its top. Output gains measured by `just calibrate`
+  hold the loudness, averaged over the recordings, within 1 dB of Init at
+  each control's extremes.
 - Fixed Grit silencing the amplifier near its top: it raised a triode
   compressor's threshold past the stage's plate signal, collapsing the
   stage's output to a constant (-52 dB in 1.4.0, -100 dB after the knee
   correction). The threshold now stops just short of that point.
-- Balanced the factory presets to equal loudness, which 1.4.0's never were:
-  each preset's Output moves by -6.4 to +2.7 dB so that all ten match Init's
-  loudness averaged over the single-coil DI and a plucked test signal.
-  Imported 1.x presets are not rebalanced.
 - Input, Output and the level gains Drive and Power Drive derive now glide
   linearly across the block in which they change instead of stepping, so
   sweeping or automating them no longer clicks or zippers. The tube stages,

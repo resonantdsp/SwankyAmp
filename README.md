@@ -43,45 +43,38 @@ above the circuit. Version 2 ships the standard mapping. The legacy path, which
 mapping so that comparison still proves the port. Anyone who wants the old
 voicing exactly can keep Swanky Amp 1.4.0 installed beside version 2.
 
-The factory presets were voiced on the octave-high stack, so their Low, Mid
-and High, and Power Drive where the level into the power stage needed it, are
-refitted to sound roughly as they did on a generated pluck, measured through the shipping path including the unit-slope knee below. The fit balances
-spectral shape and level into the power stage and deliberately stops short of
-an exact match, which would push the controls to their limits; the report
-records each preset's residuals. Regenerate the version 2 bank and its report
-with:
+The factory presets were voiced on the octave-high stack, so each is voiced
+again for the corrected one on the guitar recordings in
+`verification/reference/input`, judged at the output: Low, Mid, High and
+Presence are searched from the 1.4.0 settings so the balance between
+third-octave bands from 80 Hz to 8 kHz is as close to 1.4.0's as a light cost
+on moving each control allows, with the controls kept between 1 and 9, and
+Power Drive follows so each preset drives the power stage as 1.4.0 did. The
+search is a starting point; the bank is accepted by ear. Regenerate the version
+2 bank and its report, which records each preset's settings, balance and
+power-stage level against 1.4.0, with:
 
 ```sh
 just refit
 ```
 
-`just refit-check`, part of `just`, fails if `presets/factory-2.0.xml` or
-`verification/tone-stack/` differ from what the code produces. The plugin
-embeds that file as its factory bank at build time.
+It takes a few minutes in a release build, so it is not part of `just`. The
+plugin embeds `presets/factory-2.0.xml` as its factory bank at build time.
 
-The refit is accepted by ear, so a blind listening kit renders every factory
-preset both ways:
+Known limits of the corrected stack against 1.4.0:
 
-```sh
-just listening-kit /path/outside/the/repository
-```
-
-For the single-coil DI and the refit's pluck it writes a pair of 24-bit
-44.1 kHz WAVs per preset: Swanky Amp 1.4.0 from the C++ reference renderer
-with the released bank, and the version 2 shipping path with Auto
-oversampling and the refitted bank, both from a settled amplifier and aligned
-for the oversampler's latency. Version 2 is trimmed to the released RMS so
-loudness does not identify it, and a pair shares one headroom trim if either
-would peak above -1.1 dBFS. Each pair's files are named `X` and `Y` in a
-seeded random order; `KEY.txt` says which is which and lists the trims, which
-are the remaining output level differences, the factory balance below
-included, and `pairs.md` adds the controls
-the refit moved. `--inputs pluck` limits it to one input, and
-`--high-steps 0.2,0.4,orig` adds variants of the refitted bank with High
-raised by each step or restored to its 1.4.0 value. Each preset then becomes a
-group of files lettered A onwards, and `groups.md` lists each variant's
-tone-stack residuals as the refit measures them. The kit is review material
-and is never committed.
+- 1.4.0's scoop sat an octave higher than any setting of the corrected stack
+  can place it, and the corrected Low acts only below about 125 Hz. The
+  voiced presets keep 150 to 400 Hz 1 to 2 dB under 1.4.0 and 1 to 1.6 kHz
+  about 1 dB over; the [voicing report](verification/tone-stack/refit-report.md)
+  lists the remainder per preset.
+- Init is the corrected stack at its default settings and is not revoiced:
+  against 1.4.0 it has 3.5 to 7 dB less between 100 and 400 Hz and 4 to
+  5.6 dB more between 0.8 and 1.6 kHz.
+- At playing level 1.4.0 got louder as Drive and Power Drive rose, by about
+  4.6 dB at Drive 10 and 2.3 to 8 dB at Power Drive 10 depending on the
+  pickup. Version 2 holds the level, so those settings are quieter than
+  1.4.0's by about 3 and 6 dB.
 
 The three treble sections are first-order circuits, but 1.4.0 discretised
 them as biquads with the second-order terms set to zero. That multiplies
@@ -115,15 +108,12 @@ menu capitalises the factory presets like Init; the bank, the saved state and
 the tools such as `just capture-preset` name them in lower case, as 1.4.0 did.
 
 Version 2's factory presets are balanced to equal loudness: each one's
-Output is set so that its loudness, averaged over the single-coil DI and the
-refit pluck, matches Init's, by the measure the level calibration below
-holds. The clips disagree most on the clean presets, whose plucked attacks
-pass uncompressed, so each clip on its own spreads by 5.7 dB across the
-bank. Swanky Amp 1.4.0's factory presets were not balanced, and imported 1.x
-presets keep their Output as it was. `just refit` measures the balance and
-applies it when it writes the bank, and the
-[refit report](verification/tone-stack/refit-report.md) lists each preset's
-Output change and loudness.
+Output is set so that its loudness, averaged over the two recordings, matches
+Init's, by the measure the level calibration below holds. Swanky Amp 1.4.0's
+factory presets were not balanced, and imported 1.x presets keep their Output
+as it was. `just refit` measures the balance and applies it when it writes
+the bank, and the [voicing report](verification/tone-stack/refit-report.md)
+lists each preset's Output change.
 
 As in 1.4.0, Input and the cabinet switch belong to the session: a preset
 stores them, but choosing one leaves them as they are and changing them does
@@ -148,16 +138,18 @@ is left out of the menu and named in the footer.
 The first time version 2 runs without a preset folder, and on Import 1.x
 presets, it copies the user's presets from the 1.4.0 folder, which it never
 modifies. Each imported preset keeps its name and every control except Low,
-Mid, High and Power Drive, which are refitted by the same objective as the
-factory set above: rendered on the released octave-high tone stack and fitted
-on the corrected one to match its spectral shape and level into the power
-stage, with Power Drive moving at most 0.15 and only when the level would
-otherwise change by more than 0.5 dB. The result is an approximation, closest
-on moderate tone settings and furthest where a preset relied on extreme
-Low, Mid or High; the file records `importedFrom` and `refit` attributes. A
-name already taken in the version 2 folder is kept as it is, and unchanged
-copies of the 1.4.0 factory presets, which 1.4.0 wrote into its folder, are not
-copied because the refitted factory set already carries them.
+Mid, High and Power Drive, which are converted by a faster fit than the factory
+voicing, one the plugin can run itself: rendered on the released octave-high
+tone stack and fitted on the corrected one to match the stack's own output on
+a generated pluck, with Power Drive moving at most 0.15 and only when the
+level into the power stage would otherwise change by more than 0.5 dB. That
+fit judges the stack rather than the output and a pluck rather than a guitar,
+so imported presets can sound boxier and less scooped than their originals,
+most where a preset relied on extreme Low, Mid or High; the file records
+`importedFrom` and `refit` attributes. A name already taken in the version 2
+folder is kept as it is, and unchanged copies of the 1.4.0 factory presets,
+which 1.4.0 wrote into its folder, are not copied because the voiced factory
+set already carries them.
 
 ### Soft-clip knee
 
@@ -177,11 +169,37 @@ Grit lowers each triode's grid clip and raises the threshold of its plate compre
 
 ### Level calibration
 
-The level compensation has two stages. The first keeps 1.4.0's structure and sets how hard the power stage is driven. The preamp table normalises the last active triode's output against Drive, the tone-stack scale normalises the stack's gain at the factory defaults, the power table normalises the power amp's output against Power Drive, and the cabinet keeps its own fixed scale. Oversampling, the unit-slope knee and the standard tone-stack mapping change the level reaching each of these, so `calibrate` measures them against the released path, which `just model-check` holds to the frozen 1.4.0 renders. It renders the single-coil DI at 44.1 kHz with Auto oversampling from a settled amplifier, every control but the swept one at its default. It multiplies each released value by the RMS ratio of the released seam to the shipping seam: Drive over the eleven table points at the last active triode, then the tone-stack scale on the power stage input at the defaults, then Power Drive at the power amp. The tone-stack scale moves by +2.14 dB, because the standard mapping's stack is quieter at its default settings.
+The level compensation has two stages, both measured by `calibrate` on the
+guitar recordings in `verification/reference/input`, played as recorded at
+Input 0 and averaged over the two pickups, at 44.1 kHz with Auto oversampling
+from a settled amplifier, every control but the swept one at its default. The
+reference is the released path, which `just model-check` holds to the frozen
+1.4.0 renders.
 
-The second stage keeps loudness. 1.4.0 got quieter as Drive and Power Drive rose, by an amount that depends on what is played. Heavy compression flattens a plucked note's attack, so on the refit's pluck Power Drive cost 15 dB of loudness from 0 to 10 in the shipping path and 9 dB in 1.4.0, while on the played DI it cost 2 dB. Loudness here is ITU-R BS.1770-4 gated integrated loudness, computed in the tool and averaged in LUFS over the DI and the pluck. The target is the factory defaults' loudness from the first stage, so Init plays exactly as loud as before. The power table is rescaled point by point to that target, and then Drive and Grit each get an output gain table solved the same way. The two Drive points either side of the default absorb the default's own few tenths of a dB, so Init lands exactly. All three gains follow the cabinet, so they change level and nothing else. Stages stays uncompensated, as released.
+The first stage keeps 1.4.0's structure and sets how hard the power stage is
+driven. With the tone controls at their defaults, the level into the power
+stage is measured on both paths at each of Drive's eleven table points for
+each tone stack. The tone-stack scale takes the mean gap and the preamp table
+each Drive point's departure from it, so real playing drives the power stage
+as 1.4.0 did at every Drive: every stack lands within about 1 dB, the Fender
+stack furthest at 1 dB over at Drive 10. The Fender stack
+splits the pickups, the single coil 0.6 dB under 1.4.0 and the humbucker 1.9 dB
+over, because the corrected stack passes more of a humbucker's upper mids; one
+gain cannot serve both. The power table then normalises the power amp's output
+against Power Drive by the ratio of the released seam to the shipping one, and
+the cabinet keeps its own fixed scale. A test holds the power stage input at
+the default tone within 1.5 dB of 1.4.0 on every stack at Drive 0, default and 10.
 
-The two clips disagree on how much Power Drive compresses, so no gain holds both. Across knob 0 to 10 the average stays within 0.6 dB of Init for Drive, 0.3 dB for Power Drive and 0.1 dB for Grit. Each clip on its own stays within 1.5 dB for Drive, 4.0 dB for Power Drive (the pluck louder at low settings, the DI at high ones) and 2.7 dB for Grit. A test holds the extremes of all three within 1 dB of Init on the average. At the factory defaults the power stage input lands on 1.4.0's level and the output with the cabinet off within 0.1 dB, which another test holds. With the cabinet on the default output is 1.26 dB quieter than 1.4.0, because the cabinet responds to the default tone controls' changed voicing.
+The second stage keeps loudness. Loudness here is ITU-R BS.1770-4 gated
+integrated loudness, computed in the tool and averaged in LUFS over the
+recordings. The target is the factory defaults' loudness from the first stage,
+so Init keeps its level. The power table is rescaled point by point to that
+target, and then Drive and Grit each get an output gain table solved the same
+way. The two Drive points either side of the default absorb the default's own
+few tenths of a dB, so Init lands exactly. All three gains follow the cabinet,
+so they change level and nothing else. Stages stays uncompensated, as
+released. A test holds the extremes of all three within 1 dB of Init on the
+average.
 
 Regenerate the values in `src/dsp/calibration_data.rs` with:
 
@@ -189,7 +207,7 @@ Regenerate the values in `src/dsp/calibration_data.rs` with:
 just calibrate
 ```
 
-`just calibrate-check`, part of `just`, fails if a fresh measurement moves any committed value by more than 0.05 dB. The factory balance uses the same loudness, so rerun `just refit` after a calibration change.
+`just calibrate-check`, part of `just`, fails if a fresh measurement moves any committed value by more than 0.05 dB. The factory voicing and balance use the same levels, so rerun `just refit` after a calibration change and listen to the result.
 
 ### Soak
 

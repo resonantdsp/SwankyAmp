@@ -87,6 +87,8 @@ impl LevelTables {
 }
 
 pub const TABLE_POINTS: usize = 11;
+/// Fender, Marshall and AC30.
+pub const TONE_STACKS: usize = 3;
 
 /// Keeps the compressor threshold just below the collapse at about 0.72,
 /// where it still reaches the plate signal at every input level measured.
@@ -140,6 +142,9 @@ impl Ramp {
 pub struct SeamOutput {
     pub triodes: [Vec<f32>; STAGES],
     pub tone_stack: Vec<f32>,
+    /// What the power stage is fed: the tone-stack seam with the level
+    /// compensation and Power Drive's gain applied.
+    pub power_input: Vec<f32>,
     pub power_amp: Vec<f32>,
     pub cabinet: Vec<f32>,
     pub raw_output: Vec<f32>,
@@ -150,6 +155,7 @@ impl SeamOutput {
         Self {
             triodes: std::array::from_fn(|_| Vec::with_capacity(frames)),
             tone_stack: Vec::with_capacity(frames),
+            power_input: Vec::with_capacity(frames),
             power_amp: Vec::with_capacity(frames),
             cabinet: Vec::with_capacity(frames),
             raw_output: Vec::with_capacity(frames),
@@ -282,6 +288,9 @@ impl TubePath {
                 output.tone_stack.push(value);
             }
             value *= power_gain;
+            if let Some(output) = seams.as_deref_mut() {
+                output.power_input.push(value);
+            }
             value = self.tetrode.process(value);
             if let Some(output) = seams.as_deref_mut() {
                 output.power_amp.push(value);

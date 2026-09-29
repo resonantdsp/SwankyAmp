@@ -4,3 +4,4 @@
 # Editable artwork layers are not committed: the package, its receipt and
 # licence are. `just unpack-artwork` recreates the layers from the package.
 /assets/artwork/**/*.exr
+/verification/listening/

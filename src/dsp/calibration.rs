@@ -1,29 +1,30 @@
-//! Measures the shipping path's level compensation.
+//! Measures the shipping path's level compensation on the guitar recordings in
+//! `verification/reference/input`, played as recorded at Input 0.
 //!
-//! The first stage keeps the released structure against the released 1.4.0
-//! path on the single-coil DI: the preamp table normalises the last active
-//! triode's output against Drive, the tone-stack scale normalises the stack's
-//! gain at the factory defaults, and the power table normalises the power
-//! amp's output against Power Drive. Each is transferred to the shipping path
-//! by the RMS ratio of the released seam to the shipping seam, so the power
-//! stage is driven as 1.4.0 drove it.
+//! The first stage makes real playing drive the power stage as 1.4.0 did. With
+//! the tone controls at their defaults, the level into the power stage is
+//! measured on the released path and the shipping path at every Drive table
+//! point for each tone stack. The corrected stack passes a guitar a different
+//! amount than the released one, by up to 1.7 dB between stacks and a little
+//! by Drive, so the tone-stack scale takes the mean gap and the preamp table
+//! each Drive point's departure from it. One scale leaves every stack within
+//! about 1 dB, and the Fender stack splits the pickups about as far again:
+//! the corrected Fender stack passes more of a humbucker's upper mids. The power table then normalises the power amp's output against
+//! Power Drive, transferred by the ratio of the released to the shipping seam.
 //!
 //! The second stage holds loudness. 1.4.0 lost level as Drive and Power
-//! Drive rose, by amounts that depend on the material: on a plucked note
-//! heavy compression flattens the attack, so RMS falls further than on a
-//! played DI. Loudness is ITU-R BS.1770-4 gated integrated loudness, averaged
-//! in LUFS over the single-coil DI and the refit pluck, and the target is the
-//! factory defaults' loudness from the first stage, so Init keeps its level.
-//! In order, each with the values found so far in place: the power table is
-//! rescaled point by point to the target, then an output gain against Drive,
-//! then one against Grit, all applied after the cabinet so they change level
-//! and nothing else. Stages stays uncompensated, as released. Every render
-//! starts from a settled amplifier with the other controls at their
-//! defaults.
+//! Drive rose. Loudness is ITU-R BS.1770-4 gated integrated loudness, averaged
+//! in LUFS over the two recordings, and the target is the factory defaults'
+//! loudness from the first stage, so Init keeps its level. In order, each with
+//! the values found so far in place: the power table is rescaled point by
+//! point to the target, then an output gain against Drive, then one against
+//! Grit, all applied after the cabinet so they change level and nothing else.
+//! Stages stays uncompensated, as released. Every render starts from a settled
+//! amplifier with the other controls at their defaults.
 
 use super::amp::{
     AmpControls, AmpPath, ClipKnee, CorrectedPath, GRIT_COMPRESSION_LIMIT, LevelTables, SeamOutput,
-    TABLE_POINTS, ToneMapping, interpolate,
+    TABLE_POINTS, TONE_STACKS, ToneMapping,
 };
 use super::mapping::{AmpVoicing, drive_setting, power_drive_setting};
 use crate::engine::doublings_for;
@@ -32,91 +33,81 @@ use crate::engine::doublings_for;
 pub const SAMPLE_RATE: u32 = 44_100;
 const BLOCK: usize = 512;
 
-/// RMS levels at the seams around the level compensation for one render.
+/// Seam levels in dB of RMS, averaged over the recordings.
 #[derive(Debug, Clone, Copy)]
 struct Levels {
-    last_triode: f64,
-    tone_stack: f64,
+    power_input: f64,
     power_amp: f64,
     output: f64,
 }
 
-fn rms(samples: &[f32]) -> f64 {
+fn rms_db(samples: &[f32]) -> f64 {
     let sum: f64 = samples
         .iter()
         .map(|sample| f64::from(*sample) * f64::from(*sample))
         .sum();
-    (sum / samples.len() as f64).sqrt()
+    10. * (sum / samples.len() as f64).log10()
 }
 
-fn db(ratio: f64) -> f64 {
-    20. * ratio.log10()
-}
-
-fn levels(seams: &SeamOutput) -> Levels {
-    let last_triode = seams
-        .triodes
-        .iter()
-        .rev()
-        .find(|samples| !samples.is_empty())
-        .expect("at least one triode is active");
+fn seam_levels(seams: &SeamOutput) -> Levels {
     Levels {
-        last_triode: rms(last_triode),
-        tone_stack: rms(&seams.tone_stack),
-        power_amp: rms(&seams.power_amp),
-        output: rms(&seams.raw_output),
+        power_input: rms_db(&seams.power_input),
+        power_amp: rms_db(&seams.power_amp),
+        output: rms_db(&seams.raw_output),
+    }
+}
+
+fn averaged(each: impl Iterator<Item = Levels>) -> Levels {
+    let each: Vec<Levels> = each.collect();
+    let mean =
+        |select: fn(&Levels) -> f64| each.iter().map(select).sum::<f64>() / each.len() as f64;
+    Levels {
+        power_input: mean(|levels| levels.power_input),
+        power_amp: mean(|levels| levels.power_amp),
+        output: mean(|levels| levels.output),
     }
 }
 
 /// The released path, which `just model-check` holds to the frozen 1.4.0
 /// renders.
-fn released(controls: AmpControls, clip: &[f32]) -> Levels {
-    let mut path = AmpPath::new_legacy(SAMPLE_RATE as f32, controls);
-    let mut seams = SeamOutput::with_capacity(clip.len());
-    let mut audio = clip.to_vec();
-    for block in audio.chunks_mut(BLOCK) {
-        path.process_with_seams(block, &mut seams);
-    }
-    levels(&seams)
+fn released(controls: AmpControls, clips: &Clips) -> Levels {
+    averaged(clips.each().map(|clip| {
+        let mut path = AmpPath::new_legacy(SAMPLE_RATE as f32, controls);
+        let mut seams = SeamOutput::with_capacity(clip.len());
+        let mut audio = clip.to_vec();
+        for block in audio.chunks_mut(BLOCK) {
+            path.process_with_seams(block, &mut seams);
+        }
+        seam_levels(&seams)
+    }))
 }
 
-fn shipping(controls: AmpControls, clip: &[f32], tables: LevelTables) -> Levels {
-    let doublings = doublings_for(0, f64::from(SAMPLE_RATE));
-    let mut path = CorrectedPath::new(
+fn shipping_path(controls: AmpControls, tables: LevelTables) -> CorrectedPath {
+    CorrectedPath::new(
         SAMPLE_RATE as f32,
         BLOCK,
         controls,
-        doublings,
+        doublings_for(0, f64::from(SAMPLE_RATE)),
         ToneMapping::Standard,
         ClipKnee::UnitSlope,
         tables,
-    );
-    let mut seams = SeamOutput::with_capacity(clip.len() << doublings);
-    let mut audio = clip.to_vec();
-    for block in audio.chunks_mut(BLOCK) {
-        path.process_with_seams(block, &mut seams);
-    }
-    levels(&seams)
+    )
 }
 
-/// The level into the power stage: the tone-stack seam with its gain
-/// compensation and the preamp table applied.
-fn power_input(levels: Levels, controls: AmpControls, tables: &LevelTables) -> f64 {
-    let drive = AmpVoicing::from_controls(controls).preamp_drive;
-    levels.tone_stack * f64::from(tables.tone_stack * interpolate(drive, &tables.preamp))
+fn shipping(controls: AmpControls, clips: &Clips, tables: LevelTables) -> Levels {
+    averaged(clips.each().map(|clip| {
+        let mut path = shipping_path(controls, tables);
+        let mut seams = SeamOutput::with_capacity(clip.len() * path.factor());
+        let mut audio = clip.to_vec();
+        for block in audio.chunks_mut(BLOCK) {
+            path.process_with_seams(block, &mut seams);
+        }
+        seam_levels(&seams)
+    }))
 }
 
 fn shipping_output(controls: AmpControls, clip: &[f32], tables: LevelTables) -> Vec<f32> {
-    let doublings = doublings_for(0, f64::from(SAMPLE_RATE));
-    let mut path = CorrectedPath::new(
-        SAMPLE_RATE as f32,
-        BLOCK,
-        controls,
-        doublings,
-        ToneMapping::Standard,
-        ClipKnee::UnitSlope,
-        tables,
-    );
+    let mut path = shipping_path(controls, tables);
     let mut audio = clip.to_vec();
     for block in audio.chunks_mut(BLOCK) {
         path.process(block);
@@ -124,43 +115,44 @@ fn shipping_output(controls: AmpControls, clip: &[f32], tables: LevelTables) -> 
     audio
 }
 
-/// The two calibration inputs at `SAMPLE_RATE`: a played single-coil DI and
-/// the refit's synthetic pluck, whose attacks the amplifier compresses harder.
+/// The two recordings at `SAMPLE_RATE`, as recorded: the humbucker plays
+/// about 8.7 dB hotter, and that difference is part of what is measured.
 pub struct Clips {
-    pub di: Vec<f32>,
-    pub pluck: Vec<f32>,
+    pub single_coil: Vec<f32>,
+    pub humbucker: Vec<f32>,
 }
 
 impl Clips {
-    pub fn new(di_wav: &[u8]) -> Result<Self, String> {
+    pub fn new(single_coil_wav: &[u8], humbucker_wav: &[u8]) -> Result<Self, String> {
         Ok(Self {
-            di: clip(di_wav)?,
-            pluck: resample(
-                &super::refit::pluck(super::refit::SAMPLE_RATE),
-                super::refit::SAMPLE_RATE,
-            ),
+            single_coil: clip(single_coil_wav)?,
+            humbucker: clip(humbucker_wav)?,
         })
+    }
+
+    fn each(&self) -> impl Iterator<Item = &[f32]> {
+        [self.single_coil.as_slice(), self.humbucker.as_slice()].into_iter()
     }
 }
 
-/// Loudness on each clip and their mean, in LUFS.
+/// Loudness on each recording and their mean, in LUFS.
 #[derive(Debug, Clone, Copy)]
 pub struct Loudness {
-    pub di: f64,
-    pub pluck: f64,
+    pub single_coil: f64,
+    pub humbucker: f64,
 }
 
 impl Loudness {
     pub fn blend(self) -> f64 {
-        (self.di + self.pluck) / 2.
+        (self.single_coil + self.humbucker) / 2.
     }
 }
 
 /// The shipping path's loudness with `tables` in place.
 pub fn loudness(controls: AmpControls, clips: &Clips, tables: LevelTables) -> Loudness {
     Loudness {
-        di: integrated_loudness(&shipping_output(controls, &clips.di, tables)),
-        pluck: integrated_loudness(&shipping_output(controls, &clips.pluck, tables)),
+        single_coil: integrated_loudness(&shipping_output(controls, &clips.single_coil, tables)),
+        humbucker: integrated_loudness(&shipping_output(controls, &clips.humbucker, tables)),
     }
 }
 
@@ -239,18 +231,21 @@ fn table_point(index: usize) -> f32 {
     -1. + 2. * index as f32 / (TABLE_POINTS - 1) as f32
 }
 
-/// Seam levels at one table point, in dB of RMS.
+/// Seam levels at one measured point, in dB of RMS.
 #[derive(Debug, Clone, Copy)]
 pub struct Point {
     pub released_db: f64,
     pub shipping_db: f64,
 }
 
+impl Point {
+    fn gap_db(self) -> f64 {
+        self.released_db - self.shipping_db
+    }
+}
+
 /// Shipping minus released level at the factory defaults, in dB, with the
-/// measured compensation in place. The cabinet-on output also carries the
-/// cabinet's response to the default tone controls, which the standard
-/// mapping voices differently; no level compensation is fitted to it because
-/// the refitted factory presets already sit at the released stack's shape.
+/// measured compensation in place.
 #[derive(Debug, Clone, Copy)]
 pub struct Anchor {
     pub power_input_db: f64,
@@ -262,11 +257,9 @@ pub struct Anchor {
 #[derive(Debug, Clone)]
 pub struct Calibration {
     pub tables: LevelTables,
-    /// Last active triode over the Drive sweep.
-    pub drive: [Point; TABLE_POINTS],
-    /// Power stage input at the factory defaults before the tone-stack
+    /// Power stage input per tone stack over the Drive sweep, before the
     /// compensation is measured.
-    pub tone_stack: Point,
+    pub feed: [[Point; TABLE_POINTS]; TONE_STACKS],
     /// Power amp seam over the Power Drive sweep.
     pub power: [Point; TABLE_POINTS],
     /// The power table the first stage transferred, before loudness.
@@ -280,25 +273,44 @@ pub struct Calibration {
     pub anchor: Anchor,
 }
 
-/// Measures `controls_at(index)` at every table point in parallel.
+/// Runs `job` over `inputs` on every available core, keeping order.
+fn parallel<T: Sync, R: Send>(inputs: &[T], job: impl Fn(&T) -> R + Sync) -> Vec<R> {
+    let workers = std::thread::available_parallelism().map_or(4, usize::from);
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let results = std::sync::Mutex::new(Vec::with_capacity(inputs.len()));
+    std::thread::scope(|scope| {
+        for _ in 0..workers.min(inputs.len()) {
+            scope.spawn(|| {
+                loop {
+                    let index = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    let Some(input) = inputs.get(index) else {
+                        break;
+                    };
+                    let result = job(input);
+                    results
+                        .lock()
+                        .expect("no job panicked")
+                        .push((index, result));
+                }
+            });
+        }
+    });
+    let mut results = results.into_inner().expect("no job panicked");
+    results.sort_by_key(|(index, _)| *index);
+    results.into_iter().map(|(_, result)| result).collect()
+}
+
+/// Loudness at every table point of the control `controls_at` sets.
 fn sweep(
     clips: &Clips,
     tables: LevelTables,
     controls_at: impl Fn(usize) -> AmpControls + Sync,
 ) -> [Loudness; TABLE_POINTS] {
-    std::thread::scope(|scope| {
-        let handles: Vec<_> = (0..TABLE_POINTS)
-            .map(|index| {
-                let controls = controls_at(index);
-                scope.spawn(move || loudness(controls, clips, tables))
-            })
-            .collect();
-        let measured: Vec<Loudness> = handles
-            .into_iter()
-            .map(|handle| handle.join().expect("calibration render panicked"))
-            .collect();
-        std::array::from_fn(|index| measured[index])
-    })
+    let indices: Vec<usize> = (0..TABLE_POINTS).collect();
+    let measured = parallel(&indices, |&index| {
+        loudness(controls_at(index), clips, tables)
+    });
+    std::array::from_fn(|index| measured[index])
 }
 
 /// The gain that brings `measured` to `target`.
@@ -306,74 +318,61 @@ fn to_target(target: Loudness, measured: Loudness) -> f64 {
     10_f64.powf((target.blend() - measured.blend()) / 20.)
 }
 
-fn gain(point: Point) -> f64 {
-    10_f64.powf((point.released_db - point.shipping_db) / 20.)
+fn gain(gap_db: f64) -> f64 {
+    10_f64.powf(gap_db / 20.)
 }
 
-fn point(released: f64, shipping: f64) -> Point {
-    Point {
-        released_db: db(released),
-        shipping_db: db(shipping),
-    }
-}
-
-/// Transfers each released table point to the shipping path by the ratio of
-/// the two paths' seam levels there.
-fn transfer(
-    released_table: &[f32; TABLE_POINTS],
-    mut measure: impl FnMut(usize) -> (f64, f64),
-) -> ([f32; TABLE_POINTS], [Point; TABLE_POINTS]) {
-    let points: [Point; TABLE_POINTS] = std::array::from_fn(|index| {
-        let (released, shipping) = measure(index);
-        point(released, shipping)
-    });
-    let table = std::array::from_fn(|index| {
-        (f64::from(released_table[index]) * gain(points[index])) as f32
-    });
-    (table, points)
+fn mean(values: impl Iterator<Item = f64>) -> f64 {
+    let values: Vec<f64> = values.collect();
+    values.iter().sum::<f64>() / values.len() as f64
 }
 
 /// Measures the compensation on `clips`.
 pub fn measure(clips: &Clips) -> Calibration {
-    let clip = &clips.di;
     let defaults = AmpControls::default();
     let mut tables = LevelTables::RELEASED;
-    let (preamp, drive) = transfer(&tables.preamp, |index| {
-        let controls = AmpControls {
-            preamp_drive: drive_setting(table_point(index)),
-            ..defaults
-        };
-        (
-            released(controls, clip).last_triode,
-            shipping(controls, clip, tables).last_triode,
-        )
-    });
-    tables.preamp = preamp;
 
-    let tone_stack = point(
-        power_input(released(defaults, clip), defaults, &LevelTables::RELEASED),
-        power_input(shipping(defaults, clip, tables), defaults, &tables),
-    );
-    tables.tone_stack = (f64::from(tables.tone_stack) * gain(tone_stack)) as f32;
-
-    let (power, power_points) = transfer(&tables.power, |index| {
-        let controls = AmpControls {
-            power_drive: power_drive_setting(table_point(index)),
-            ..defaults
-        };
-        (
-            released(controls, clip).power_amp,
-            shipping(controls, clip, tables).power_amp,
-        )
+    let cells: Vec<AmpControls> = (0..TONE_STACKS)
+        .flat_map(|stack| {
+            (0..TABLE_POINTS).map(move |index| AmpControls {
+                tone_stack: stack as f32,
+                preamp_drive: drive_setting(table_point(index)),
+                ..defaults
+            })
+        })
+        .collect();
+    let measured = parallel(&cells, |&controls| Point {
+        released_db: released(controls, clips).power_input,
+        shipping_db: shipping(controls, clips, tables).power_input,
     });
-    tables.power = power;
+    let feed: [[Point; TABLE_POINTS]; TONE_STACKS] = std::array::from_fn(|stack| {
+        std::array::from_fn(|index| measured[stack * TABLE_POINTS + index])
+    });
+    let overall = mean(feed.iter().flatten().map(|point| point.gap_db()));
+    tables.tone_stack = (f64::from(tables.tone_stack) * gain(overall)) as f32;
+    tables.preamp = std::array::from_fn(|index| {
+        let drive_gap = mean(feed.iter().map(|row| row[index].gap_db())) - overall;
+        (f64::from(tables.preamp[index]) * gain(drive_gap)) as f32
+    });
+
+    let indices: Vec<usize> = (0..TABLE_POINTS).collect();
+    let power_controls = |index: usize| AmpControls {
+        power_drive: power_drive_setting(table_point(index)),
+        ..defaults
+    };
+    let power_points = parallel(&indices, |&index| Point {
+        released_db: released(power_controls(index), clips).power_amp,
+        shipping_db: shipping(power_controls(index), clips, tables).power_amp,
+    });
+    let power: [Point; TABLE_POINTS] = std::array::from_fn(|index| power_points[index]);
+    tables.power = std::array::from_fn(|index| {
+        (f64::from(tables.power[index]) * gain(power[index].gap_db())) as f32
+    });
+    let power_transfer = tables.power;
     tables.grit_compression = GRIT_COMPRESSION_LIMIT;
 
     let target = loudness(defaults, clips, tables);
-    let power_loudness = sweep(clips, tables, |index| AmpControls {
-        power_drive: power_drive_setting(table_point(index)),
-        ..defaults
-    });
+    let power_loudness = sweep(clips, tables, power_controls);
     tables.power = std::array::from_fn(|index| {
         (f64::from(tables.power[index]) * to_target(target, power_loudness[index])) as f32
     });
@@ -398,37 +397,40 @@ pub fn measure(clips: &Clips) -> Calibration {
 
     Calibration {
         tables,
-        drive,
-        tone_stack,
-        power: power_points,
-        power_transfer: power,
+        feed,
+        power,
+        power_transfer,
         target,
         power_loudness,
         drive_loudness,
         grit_loudness,
-        anchor: anchor(clip, tables),
+        anchor: anchor(clips, tables),
     }
 }
 
 /// How far the shipping path with `tables` lands from the released level at
 /// the factory defaults.
-pub fn anchor(clip: &[f32], tables: LevelTables) -> Anchor {
+pub fn anchor(clips: &Clips, tables: LevelTables) -> Anchor {
     let defaults = AmpControls::default();
-    let reference = released(defaults, clip);
-    let actual = shipping(defaults, clip, tables);
+    let reference = released(defaults, clips);
+    let actual = shipping(defaults, clips, tables);
     let cabinet_off = AmpControls {
         cabinet_on: false,
         ..defaults
     };
     Anchor {
-        power_input_db: db(power_input(actual, defaults, &tables)
-            / power_input(reference, defaults, &LevelTables::RELEASED)),
-        power_amp_db: db(actual.power_amp / reference.power_amp),
-        output_db: db(actual.output / reference.output),
-        output_cabinet_off_db: db(
-            shipping(cabinet_off, clip, tables).output / released(cabinet_off, clip).output
-        ),
+        power_input_db: actual.power_input - reference.power_input,
+        power_amp_db: actual.power_amp - reference.power_amp,
+        output_db: actual.output - reference.output,
+        output_cabinet_off_db: shipping(cabinet_off, clips, tables).output
+            - released(cabinet_off, clips).output,
     }
+}
+
+/// How far the shipping path feeds the power stage from 1.4.0 with
+/// `controls`, in dB averaged over the recordings.
+pub fn feed_gap_db(controls: AmpControls, clips: &Clips, tables: LevelTables) -> f64 {
+    shipping(controls, clips, tables).power_input - released(controls, clips).power_input
 }
 
 /// Reads mono 24-bit PCM WAV and resamples it linearly to `SAMPLE_RATE`, as
@@ -486,20 +488,20 @@ fn resample(source: &[f32], rate: u32) -> Vec<f32> {
 mod tests {
     use super::*;
 
-    /// How far the committed compensation may leave the factory defaults
-    /// from the released level. Power Drive's default sits between table
-    /// points, so this bounds the interpolation error.
-    const ANCHOR_TOLERANCE_DB: f64 = 0.1;
+    fn recordings() -> Clips {
+        Clips::new(
+            include_bytes!("../../verification/reference/input/single-coil-plucks-strum-chord.wav"),
+            include_bytes!("../../verification/reference/input/humbucker-plucks-strum-chord.wav"),
+        )
+        .expect("recordings read")
+    }
 
     /// Drive, Power Drive and Grit change the sound, not the volume: their
-    /// extremes keep the defaults' loudness averaged over the two clips.
+    /// extremes keep the defaults' loudness averaged over the recordings.
     #[test]
     fn drive_power_drive_and_grit_extremes_keep_the_default_loudness() {
         const TOLERANCE_DB: f64 = 1.;
-        let clips = Clips::new(include_bytes!(
-            "../../verification/reference/input/single-coil.wav"
-        ))
-        .expect("calibration clip reads");
+        let clips = recordings();
         let defaults = AmpControls::default();
         let target = loudness(defaults, &clips, LevelTables::CALIBRATED).blend();
         for extreme in [-1., 1.] {
@@ -536,22 +538,28 @@ mod tests {
         }
     }
 
+    /// With the tone controls at their defaults, real playing drives the
+    /// power stage as 1.4.0 did on every tone stack, clean to full Drive.
+    /// One tone-stack scale serves all three stacks, which leaves each up to
+    /// about 1 dB either side.
     #[test]
-    fn factory_defaults_land_on_the_released_level() {
-        let clip = clip(include_bytes!(
-            "../../verification/reference/input/single-coil.wav"
-        ))
-        .expect("calibration clip reads");
-        let anchor = anchor(&clip, LevelTables::CALIBRATED);
-        for (seam, residual) in [
-            ("power stage input", anchor.power_input_db),
-            ("output with the cabinet off", anchor.output_cabinet_off_db),
-        ] {
-            assert!(
-                residual.abs() <= ANCHOR_TOLERANCE_DB,
-                "{seam} is {residual:+.3} dB from 1.4.0 at the defaults \
-                 (tolerance {ANCHOR_TOLERANCE_DB} dB); run `just calibrate`"
-            );
+    fn default_tone_drives_the_power_stage_as_released() {
+        const TOLERANCE_DB: f64 = 1.5;
+        let clips = recordings();
+        for tone_stack in [0., 1., 2.] {
+            for preamp_drive in [-1., AmpControls::default().preamp_drive, 1.] {
+                let controls = AmpControls {
+                    tone_stack,
+                    preamp_drive,
+                    ..AmpControls::default()
+                };
+                let gap = feed_gap_db(controls, &clips, LevelTables::CALIBRATED);
+                assert!(
+                    gap.abs() <= TOLERANCE_DB,
+                    "tone stack {tone_stack}, Drive {preamp_drive:+}: power stage fed \
+                     {gap:+.2} dB from 1.4.0 (tolerance {TOLERANCE_DB} dB); run `just calibrate`"
+                );
+            }
         }
     }
 }
