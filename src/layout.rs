@@ -67,29 +67,29 @@ impl ControlSpec {
 
 /// One inventory is used by the UI, host bindings, and exported artwork geometry.
 pub const CONTROLS: [ControlSpec; 20] = [
-    ControlSpec::knob(0, "INPUT", "LEVELS", [176.0, 148.0], true),
-    ControlSpec::knob(1, "OUTPUT", "LEVELS", [378.0, 148.0], true),
+    ControlSpec::knob(0, "INPUT", "LEVELS", [140.0, 118.0], true),
+    ControlSpec::knob(1, "OUTPUT", "LEVELS", [302.0, 118.0], true),
     // The switch leads the Cabinet row: whether the cabinet is in at all is
     // read before the knobs that shape it, and it takes the same first
     // column as Staging and Tone below.
-    ControlSpec::toggle(10, "CABINET", "CABINET", [573.0, 148.0]),
-    ControlSpec::knob(11, "BRIGHT", "CABINET", [709.0, 148.0], false),
-    ControlSpec::knob(12, "DISTANCE", "CABINET", [845.0, 148.0], false),
-    ControlSpec::knob(13, "DYNAMIC", "CABINET", [981.0, 148.0], false),
-    ControlSpec::knob(14, "DRIVE", "PREAMP", [101.0, 324.0], true),
-    ControlSpec::knob(15, "TIGHT", "PREAMP", [245.0, 324.0], false),
-    ControlSpec::knob(16, "GRIT", "PREAMP", [389.0, 324.0], false),
-    ControlSpec::knob(7, "STAGES", "STAGING", [573.0, 324.0], false),
-    ControlSpec::knob(8, "OVERHEAD", "STAGING", [709.0, 324.0], false),
-    ControlSpec::knob(9, "LOW CUT", "STAGING", [845.0, 324.0], false),
-    ControlSpec::knob(6, "TONE STACK", "STAGING", [981.0, 324.0], false),
-    ControlSpec::knob(17, "DRIVE", "POWER AMP", [101.0, 500.0], true),
-    ControlSpec::knob(18, "TIGHT", "POWER AMP", [245.0, 500.0], false),
-    ControlSpec::knob(19, "SAG", "POWER AMP", [389.0, 500.0], false),
-    ControlSpec::knob(2, "LOW", "TONE", [573.0, 500.0], false),
-    ControlSpec::knob(3, "MID", "TONE", [709.0, 500.0], false),
-    ControlSpec::knob(4, "HIGH", "TONE", [845.0, 500.0], false),
-    ControlSpec::knob(5, "PRESENCE", "TONE", [981.0, 500.0], false),
+    ControlSpec::toggle(10, "CABINET", "CABINET", [458.0, 118.0]),
+    ControlSpec::knob(11, "BRIGHT", "CABINET", [567.0, 118.0], false),
+    ControlSpec::knob(12, "DISTANCE", "CABINET", [676.0, 118.0], false),
+    ControlSpec::knob(13, "DYNAMIC", "CABINET", [785.0, 118.0], false),
+    ControlSpec::knob(14, "DRIVE", "PREAMP", [79.0, 259.0], true),
+    ControlSpec::knob(15, "TIGHT", "PREAMP", [195.0, 259.0], false),
+    ControlSpec::knob(16, "GRIT", "PREAMP", [311.0, 259.0], false),
+    ControlSpec::knob(7, "STAGES", "STAGING", [458.0, 259.0], false),
+    ControlSpec::knob(8, "OVERHEAD", "STAGING", [567.0, 259.0], false),
+    ControlSpec::knob(9, "LOW CUT", "STAGING", [676.0, 259.0], false),
+    ControlSpec::knob(6, "TONE STACK", "STAGING", [785.0, 259.0], false),
+    ControlSpec::knob(17, "DRIVE", "POWER AMP", [79.0, 400.0], true),
+    ControlSpec::knob(18, "TIGHT", "POWER AMP", [195.0, 400.0], false),
+    ControlSpec::knob(19, "SAG", "POWER AMP", [311.0, 400.0], false),
+    ControlSpec::knob(2, "LOW", "TONE", [458.0, 400.0], false),
+    ControlSpec::knob(3, "MID", "TONE", [567.0, 400.0], false),
+    ControlSpec::knob(4, "HIGH", "TONE", [676.0, 400.0], false),
+    ControlSpec::knob(5, "PRESENCE", "TONE", [785.0, 400.0], false),
 ];
 
 #[derive(Debug, Clone, Copy)]
@@ -135,24 +135,34 @@ pub const PANELS: [SurfaceSpec; 3] = [
         "panel.header",
         "panel",
         "graphite-header",
-        [0.0, 0.0, 1080.0, 64.0],
+        [0.0, 0.0, style::WIDTH, style::HEADER_HEIGHT],
     ),
     SurfaceSpec::plain(
         "panel.main",
         "panel",
         "graphite",
-        [0.0, 64.0, 1080.0, 544.0],
+        [
+            0.0,
+            style::HEADER_HEIGHT,
+            style::WIDTH,
+            style::HEIGHT - style::HEADER_HEIGHT - style::FOOTER_HEIGHT,
+        ],
     ),
     SurfaceSpec::plain(
         "panel.footer",
         "panel",
         "graphite-header",
-        [0.0, 608.0, 1080.0, 32.0],
+        [
+            0.0,
+            style::HEIGHT - style::FOOTER_HEIGHT,
+            style::WIDTH,
+            style::FOOTER_HEIGHT,
+        ],
     ),
 ];
 
 /// The right column ends at the window margin.
-const RIGHT_COLUMN_WIDTH: f32 = style::WIDTH - style::MARGIN - 488.0;
+const RIGHT_COLUMN_WIDTH: f32 = style::WIDTH - style::MARGIN - 389.0;
 
 /// The six Free groups as separate rounded boxes, after 1.4.0: a gap of
 /// graphite between them, each traced by its own groove, so no group has to
@@ -162,32 +172,32 @@ pub const SECTIONS: [SurfaceSpec; 6] = [
     SurfaceSpec::section(
         "section.levels",
         "levels",
-        [style::MARGIN, 78.0, 462.0, 164.0],
+        [style::MARGIN, 62.0, 370.0, 132.0],
     ),
     SurfaceSpec::section(
         "section.cabinet",
         "cabinet",
-        [488.0, 78.0, RIGHT_COLUMN_WIDTH, 164.0],
+        [389.0, 62.0, RIGHT_COLUMN_WIDTH, 132.0],
     ),
     SurfaceSpec::section(
         "section.preamp",
         "preamp",
-        [style::MARGIN, 254.0, 462.0, 164.0],
+        [style::MARGIN, 203.0, 370.0, 132.0],
     ),
     SurfaceSpec::section(
         "section.staging",
         "staging",
-        [488.0, 254.0, RIGHT_COLUMN_WIDTH, 164.0],
+        [389.0, 203.0, RIGHT_COLUMN_WIDTH, 132.0],
     ),
     SurfaceSpec::section(
         "section.power",
         "power-amp",
-        [style::MARGIN, 430.0, 462.0, 164.0],
+        [style::MARGIN, 344.0, 370.0, 132.0],
     ),
     SurfaceSpec::section(
         "section.tone",
         "tone",
-        [488.0, 430.0, RIGHT_COLUMN_WIDTH, 164.0],
+        [389.0, 344.0, RIGHT_COLUMN_WIDTH, 132.0],
     ),
 ];
 
@@ -200,39 +210,39 @@ pub const SWITCH: SurfaceSpec = SurfaceSpec::plain(
     "switch",
     "v-slot",
     [
-        573.0 - style::SWITCH_DIAMETER / 2.0,
-        148.0 - style::SWITCH_DIAMETER,
+        458.0 - style::SWITCH_DIAMETER / 2.0,
+        118.0 - style::SWITCH_DIAMETER,
         style::SWITCH_DIAMETER,
         2.0 * style::SWITCH_DIAMETER,
     ],
 );
 
-/// Pro's meter columns: 20 px wide, 4 px apart, rising from the top of the
+/// Pro's meter columns: 16 px wide, 4 px apart, rising from the top of the
 /// lit ring to the knob's label row so the L/R captions share the readout line.
 pub const METERS: [SurfaceSpec; 4] = [
     SurfaceSpec::plain(
         "meter.input.left",
         "meter",
         "input-left",
-        [72.0, 108.0, 20.0, 104.0],
+        [56.0, 86.0, 16.0, 85.0],
     ),
     SurfaceSpec::plain(
         "meter.input.right",
         "meter",
         "input-right",
-        [96.0, 108.0, 20.0, 104.0],
+        [76.0, 86.0, 16.0, 85.0],
     ),
     SurfaceSpec::plain(
         "meter.output.left",
         "meter",
         "output-left",
-        [274.0, 108.0, 20.0, 104.0],
+        [218.0, 86.0, 16.0, 85.0],
     ),
     SurfaceSpec::plain(
         "meter.output.right",
         "meter",
         "output-right",
-        [298.0, 108.0, 20.0, 104.0],
+        [238.0, 86.0, 16.0, 85.0],
     ),
 ];
 

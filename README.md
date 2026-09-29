@@ -253,13 +253,13 @@ into `tools/` and needs libclang; no other build compiles it.
 
 ### Editor
 
-The editor uses one iced widget tree for the live controls and the artwork
-layout contract. As in 1.4, the six Free signal-flow groups (Levels, Cabinet,
+The editor is 864 by 512 interface pixels and uses one iced widget tree for
+the live controls and the artwork layout contract. As in 1.4, the six Free signal-flow groups (Levels, Cabinet,
 Preamp, Staging, Power Amp and Tone) are separate rounded boxes with graphite
 between them, each outlined by its own V groove. Pro's material language
 carries over with 1.4's rose highlight as Free's accent on the lit rings,
-the selected outlines and the output meter. The bundled CC BY 4.0 material
-layers provide the graphite, brushed metal, shadows, and response lighting.
+the selected outlines and the output meter. The bundled CC BY 4.0 artwork
+package provides the graphite, brushed metal, shadows, and response lighting.
 The cabinet's on/off is a two-position vertical switch: a brushed aluminium
 disc in a V track baked into the faceplate, exactly one disc wide and two
 tall, the disc in the top half when on and the bottom half when off. The disc
@@ -267,16 +267,34 @@ is a baked sprite the compositor places from the parameter. Knob markers are
 Pro's glossy black divots at the same proportions. While the cabinet is off, its
 three knobs, their labels and readouts are dimmed as Pro dims a bypassed
 section, and stay adjustable. Readouts show whole units at rest and tenths
-while a knob is dragged. Export the exact resolved
-geometry (layout manifest schema 4, which gives each section its outline
-radius and describes the switch track) or capture
-the editor at 1x and 2x with:
+while a knob is dragged.
+
+The information panel's Interface size draws the whole editor at 75, 100, 125
+or 150 %. The layout never changes: the widget tree always lays out at 864 by
+512, the window is that times the size, and native text, the knob rings,
+markers and meters render at the window's real resolution, so they stay sharp
+at every size. The editor resizes its own window and asks the host to follow,
+in CLAP, VST3, the Audio Unit and the standalone; it stays fixed-size to hosts,
+so none offers a drag handle. The size belongs to the computer, not to a sound:
+it is saved once per installation in `Swanky Amp 2 interface.json`, in
+`~/Library/Resonant DSP` on macOS, `%APPDATA%\Resonant DSP` on Windows and
+`$XDG_CONFIG_HOME/Resonant DSP` on Linux, and never in presets or host state.
+The baked faceplate is two texels per interface pixel, exact at 100 % on a
+Retina display, and the package stores box-filtered levels that smaller
+drawings read.
+
+Export the exact resolved geometry (layout manifest schema 4, which gives each
+section its outline radius and describes the switch track) or capture the
+editor at every interface size, at 1x and 2x, with:
 
 ```sh
 just export-layout /tmp/swanky-layout
 just capture /tmp/swanky-capture
 ```
 
+The 100 % captures are `amp-1x.png` and `amp-2x.png`; the other sizes add
+theirs, as in `amp-150-2x.png`. A capture always draws at the size it names,
+whatever size this machine has chosen.
 `just capture-preset "high gain" /tmp/swanky-capture` draws the editor with
 that factory preset applied and named in the header, and
 `just capture-information /tmp/swanky-capture` with the information panel
@@ -294,10 +312,13 @@ L and R. Immediate attack and a half-second release settle to exact darkness,
 after which the editor has no meter change to redraw; the meters also go dark
 while the editor window has lost focus and the pointer is elsewhere.
 
-Artwork contributors can make a public, reproducible round trip without the
-production renderer. Unpack the deterministic RGB9E5 package to editable ZIP
-float32 RGB EXRs, edit them in a standard HDR image tool, refresh the receipt,
-then repack and validate:
+The repository carries the artwork as `assets/artwork.pack` with its
+`receipt.json` and `ARTWORK-LICENSE.txt` in `assets/artwork`; the editable
+layers are not committed, since each rebake would add some 30 MB of EXRs to
+the history. They come from the package itself. Artwork contributors can make a
+public, reproducible round trip without the production renderer: unpack the
+deterministic RGB9E5 package to editable ZIP float32 RGB EXRs, edit them in a
+standard HDR image tool, refresh the receipt, then repack and validate:
 
 ```sh
 just unpack-artwork assets/artwork.pack /tmp/swanky-artwork
@@ -306,11 +327,20 @@ just pack-artwork /tmp/swanky-artwork /tmp/swanky-artwork.pack
 just validate-assets /tmp/swanky-artwork.pack /tmp/swanky-artwork
 ```
 
+Packing the unpacked layers unedited reproduces the package byte for byte.
+To propose an edit, unpack into `assets/artwork` (the EXRs there are ignored by
+git) and commit the repacked package and refreshed receipt.
+The base and shadow layers are twice the editor's size in each direction. The
+package stores every layer as deflated RGB9E5 and adds two box-filtered
+halvings of the base, shadow and disc sprite, averaged in linear light, for
+interface sizes that draw them smaller than their texels.
 The receipt records the scene-linear radiance and display-linear shadow
 semantics, dimensions, hashes, and public layout provenance. Producer metadata
 is descriptive, so replacement CC artwork does not depend on Blender or the
-original production sources. `just` validates that the checked-in package is
-the deterministic result of the editable layers.
+original production sources. `just` validates that the checked-in package
+describes its committed receipt and, when the layers are present in
+`assets/artwork` or a folder given to `validate-assets`, that it is the
+deterministic result of packing them.
 
 ### Bundle validation
 
@@ -438,8 +468,11 @@ The header carries a small outlined information button to the left of the
 preset bar. A press opens the information panel over the dimmed editor: the
 product name and running version, such as "Swanky Amp Free 2.0.0", and links
 to the website's product page, the manual and support, each tagged
-`utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=information`. Escape,
-the button again or a press outside the panel closes it.
+`utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=information`. Below
+them, Interface size offers 75, 100, 125 and 150 %; a press resizes the editor
+at once and is remembered for every later editor on the computer (see
+[Editor](#editor)). Escape, the button again or a press outside the panel
+closes it.
 
 Copy diagnostics, beside the links, puts a short block on the clipboard for a
 support request: product and version, operating system and architecture, the
@@ -490,8 +523,8 @@ request-timing information needed to serve and operate the endpoint.
 
 Swanky Amp is licensed under GPLv3 or later; see [LICENSE](LICENSE). The model authority is the exact Free 1.4.0 C++ wrapper and generated Faust headers preserved in `verification/reference/released` from the `juce-1.4.0` tag. The public legacy renderer retains the released control mappings, detuning, fitted constants, stage behavior, calibration tables, cubic knee, fixed digital plate filter, and old tone mapping. The shipping path adds tube-only oversampling, a rate-tracked 20 kHz plate filter, a unit-slope triode knee, the standard tone-stack mapping with refitted factory presets and level compensation recalibrated against the released path. Small equation and filter primitives were selectively adapted from the separately implemented Pro code only where comparison proved that they express the released Free equations.
 
-The editable artwork in `assets/artwork` is licensed under CC BY 4.0; see its
-`ARTWORK-LICENSE.txt`. The editor typography uses PT Sans under the SIL Open
+The artwork in `assets/artwork.pack`, and the layers unpacked from it, is
+licensed under CC BY 4.0; see `assets/artwork/ARTWORK-LICENSE.txt`. The editor typography uses PT Sans under the SIL Open
 Font License in `assets/fonts/PTSans-OFL.txt`.
 
 The information panel's Third-party licences link opens the third-party

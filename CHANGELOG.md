@@ -80,7 +80,7 @@ installs beside Swanky Amp 1.4.0.
   by a V groove, with Pro's outlined header controls, knob markers and
   uncluttered ten-cell meters, and the one-line "SWANKY AMP FREE" wordmark.
   1.4's rose highlight is the accent for lit rings, lit outlines, the
-  edition tag and the output meter.
+  edition tag and the output meter. The editor is 864 by 512 pixels.
 - Replaced the cabinet toggle with a vertical two-position switch in its own
   column of the Cabinet row: a brushed aluminium disc that sits in either end
   of a V track two discs tall, with the ON label lit in the accent. The
@@ -97,6 +97,17 @@ installs beside Swanky Amp 1.4.0.
   rate and buffer for a support request, and its Third-party licences link
   opens the licences of the font and open-source code the product is built
   from, generated from its dependencies.
+- Added an interface size to the information panel: the whole editor at 75,
+  100, 125 or 150 %, with the same layout and native text drawn sharp at every
+  size. The editor resizes its window and asks the host to follow in CLAP,
+  VST3, the Audio Unit and the standalone. The size is remembered once per
+  computer, never in presets or host state. The faceplate artwork is baked at
+  two texels per interface pixel with filtered levels, so it is sharp at 100 %
+  on Retina and at 150 %.
+- Stopped committing the editable artwork layers: the repository keeps the
+  artwork package with its receipt and licence, and `just unpack-artwork`
+  recreates the EXR layers from the package, which pack back to it byte for
+  byte.
 - Added a bounded, cached release notice: the information button turns into a
   highlighted download arrow when a newer stable release is published, and the
   panel announces it with a link to the fixed catalogue page.

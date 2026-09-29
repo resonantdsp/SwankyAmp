@@ -8,6 +8,7 @@ use crate::{
     widgets::{FreeRenderer, Knob, Msg, NoticeGlyph, Target},
 };
 use iced_core::{Element, Length, Padding, Theme, mouse, text::LineHeight};
+use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 use truce::prelude::Params;
 use truce_iced::iced::widget::{
@@ -26,12 +27,12 @@ const HEADER: Color = Color::from_rgb(0.007, 0.010, 0.013);
 const GROOVE: Color = Color::from_rgb(0.002, 0.004, 0.006);
 const ACCENT: Color = style::ACCENT;
 /// Every header action shares one height and one centre line.
-const HEADER_CONTROL: [f32; 2] = [17.0, 30.0];
+const HEADER_CONTROL: [f32; 2] = [14.0, 24.0];
 /// Pro's gap between header groups, wider than any gap inside a group.
-const HEADER_GROUP_GAP: f32 = 14.0;
+const HEADER_GROUP_GAP: f32 = 10.0;
 const OVERSAMPLING_ID: u32 = 21;
-const CONTROL_WIDTH: f32 = 104.0;
-const KNOB_ROW_HEIGHT: f32 = 84.0;
+const CONTROL_WIDTH: f32 = 88.0;
+const KNOB_ROW_HEIGHT: f32 = 68.0;
 
 #[derive(Debug, Clone)]
 pub enum Action {
@@ -44,6 +45,8 @@ pub enum Action {
     Preset(PresetMsg),
     Focus(bool),
     Pointer(bool),
+    /// The interface size, in percent, for this installation.
+    InterfaceSize(u16),
 }
 
 pub struct FreeUi {
@@ -62,6 +65,13 @@ pub struct FreeUi {
     owner: Option<Arc<SwankyAmpParams>>,
     /// The knob a pointer gesture is turning, whose readout shows tenths.
     turning: Option<u32>,
+    /// How large this installation draws the interface, in percent.
+    interface_size: u16,
+    /// Where the size is remembered, or nothing for an editor that must not
+    /// touch the machine's settings.
+    settings: Option<PathBuf>,
+    /// Why the last chosen size could not be remembered.
+    size_error: Option<String>,
 }
 
 impl FreeUi {
@@ -81,6 +91,19 @@ impl FreeUi {
             presets: PresetBar::offline(),
             owner: None,
             turning: None,
+            interface_size: crate::interface::DEFAULT,
+            settings: None,
+            size_error: None,
+        }
+    }
+
+    /// The resting editor at the size the installation in `settings` chose,
+    /// remembering a new choice there.
+    fn installed(settings: Option<PathBuf>) -> Self {
+        Self {
+            interface_size: crate::interface::load(settings.as_deref()),
+            settings,
+            ..Self::resting()
         }
     }
 
@@ -134,15 +157,15 @@ impl FreeUi {
         for section in layout::SECTIONS {
             layers.push(place(
                 [
-                    section.bounds[0] + 16.0,
-                    section.bounds[1] + 12.0,
-                    180.0,
-                    18.0,
+                    section.bounds[0] + 12.0,
+                    section.bounds[1] + 9.0,
+                    150.0,
+                    14.0,
                 ],
                 text(section.appearance.replace('-', " ").to_uppercase())
-                    .size(13)
+                    .size(12)
                     .font(style::BOLD)
-                    .line_height(LineHeight::Absolute(14.0.into()))
+                    .line_height(LineHeight::Absolute(12.0.into()))
                     .color(INK),
             ));
         }
@@ -185,6 +208,8 @@ impl FreeUi {
             layers.push(information_overlay(
                 self.notice.as_ref(),
                 self.diagnostics_copied,
+                self.interface_size,
+                self.size_error.as_deref(),
             ));
         }
         stack(layers)
@@ -205,7 +230,7 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
             owner: Some(Arc::clone(&params)),
             // Some hosts never send focus to an embedded editor, so it
             // starts live until a focus or pointer event says otherwise.
-            ..Self::resting()
+            ..Self::installed(crate::interface::folder())
         };
         if let Some(release) = CAPTURED_INFORMATION.get() {
             ui.releases = None;
@@ -258,6 +283,14 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
             Message::Plugin(Action::Information(open)) => {
                 self.information = open;
                 self.diagnostics_copied = false;
+                self.size_error = None;
+            }
+            Message::Plugin(Action::InterfaceSize(size)) => {
+                self.interface_size = size;
+                self.size_error = self
+                    .settings
+                    .as_deref()
+                    .and_then(|folder| crate::interface::save(folder, size).err());
             }
             Message::Plugin(Action::CopyDiagnostics) => {
                 truce_iced::clipboard::write(
@@ -305,6 +338,10 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
 
     fn title(&self) -> String {
         "Swanky Amp 2".into()
+    }
+
+    fn zoom(&self) -> f64 {
+        crate::interface::zoom(self.interface_size)
     }
 
     fn view<'a>(
@@ -391,11 +428,11 @@ const RIGHT_EDGE: f32 = style::WIDTH - style::MARGIN;
 
 /// Where the preset field sits: right to left from the boxes' edge, one
 /// group gap between header actions.
-const OVERSAMPLING_FIELD: [f32; 2] = [RIGHT_EDGE - 72.0, 72.0];
+const OVERSAMPLING_FIELD: [f32; 2] = [RIGHT_EDGE - 58.0, 58.0];
 const PRESET_FIELD: [f32; 4] = [
-    OVERSAMPLING_FIELD[0] - HEADER_GROUP_GAP - 150.0,
+    OVERSAMPLING_FIELD[0] - HEADER_GROUP_GAP - 128.0,
     HEADER_CONTROL[0],
-    150.0,
+    128.0,
     HEADER_CONTROL[1],
 ];
 
@@ -409,10 +446,10 @@ fn header<'a, R: FreeRenderer + 'a>(
     // Pro's wordmark: the name in bold ink and the edition beside it at the
     // same size in the product's accent, rose here where Pro's is orange.
     let wordmark = row![
-        text("SWANKY AMP").size(29).font(style::BOLD).color(INK),
-        text("FREE").size(29).font(style::FONT).color(ACCENT),
+        text("SWANKY AMP").size(25).font(style::BOLD).color(INK),
+        text("FREE").size(25).font(style::FONT).color(ACCENT),
     ]
-    .spacing(8)
+    .spacing(6)
     .align_y(Alignment::Center);
     let oversampling = OVERSAMPLING_FIELD;
     let notice_x = PRESET_FIELD[0] - HEADER_GROUP_GAP - height;
@@ -459,7 +496,7 @@ fn oversampling_toggle<'a, R: FreeRenderer + 'a>(
     let (label, lit) = oversampling_label(choice, params.params().resolved_oversampling.get());
     let next = (choice + 1) % OVERSAMPLING_CHOICES;
     mouse_area(
-        container(text(label).size(14).color(if lit { INK } else { DIM }))
+        container(text(label).size(12).color(if lit { INK } else { DIM }))
             .width(Length::Fill)
             .height(Length::Fill)
             .center(Length::Fill)
@@ -522,14 +559,16 @@ pub fn capture_information(release: Option<String>) {
     let _ = CAPTURED_INFORMATION.set(release);
 }
 
-const INFORMATION_WIDTH: f32 = 400.0;
+const INFORMATION_WIDTH: f32 = 340.0;
 
-/// Pro's About panel without its licensing: what this is, a newer release
-/// when there is one, and where to find more. It dims the editor behind it,
-/// and a press anywhere outside closes it.
+/// Pro's Settings panel without its licensing: what this is, a newer release
+/// when there is one, the interface size, and where to find more. It dims the
+/// editor behind it, and a press anywhere outside closes it.
 fn information_overlay<'a, R: FreeRenderer + 'a>(
     notice: Option<&Notice>,
     diagnostics_copied: bool,
+    interface_size: u16,
+    size_error: Option<&str>,
 ) -> Element<'a, Msg, Theme, R> {
     let line = |id: &str, body: String, size: f32, font, color| {
         let mut spec = Component::new(id, "text", "native");
@@ -539,14 +578,14 @@ fn information_overlay<'a, R: FreeRenderer + 'a>(
             text(body)
                 .size(size)
                 .font(font)
-                .line_height(LineHeight::Absolute(20.0.into()))
+                .line_height(LineHeight::Absolute(17.0.into()))
                 .color(color),
         )
     };
-    let mut content = Column::new().spacing(14).push(line(
+    let mut content = Column::new().spacing(11).push(line(
         "information.product",
         format!("Swanky Amp Free {}", env!("CARGO_PKG_VERSION")),
-        17.0,
+        15.0,
         style::BOLD,
         INK,
     ));
@@ -556,15 +595,25 @@ fn information_overlay<'a, R: FreeRenderer + 'a>(
                 line(
                     "information.release",
                     format!("Swanky Amp Free {} is available", notice.version),
-                    15.0,
+                    13.0,
                     style::FONT,
                     ACCENT,
                 ),
                 link("Download", Action::Browse(notice.url)),
             ]
-            .spacing(10)
+            .spacing(8)
             .align_y(Alignment::Center),
         );
+    }
+    content = content.push(size_selector(interface_size));
+    if let Some(error) = size_error {
+        content = content.push(line(
+            "information.size-error",
+            error.to_owned(),
+            12.0,
+            style::FONT,
+            ACCENT,
+        ));
     }
     let copy = if diagnostics_copied {
         "Copied"
@@ -580,7 +629,7 @@ fn information_overlay<'a, R: FreeRenderer + 'a>(
         Component::new("information.diagnostics", "button", "native"),
         link(copy, Action::CopyDiagnostics),
     ))
-    .spacing(18);
+    .spacing(14);
     content = content
         .push(rule::horizontal(1).style(|_| rule::Style {
             color: style::MUTED.scale_alpha(0.25),
@@ -596,16 +645,16 @@ fn information_overlay<'a, R: FreeRenderer + 'a>(
     if let Some(notice) = asio_notice() {
         content = content.push(
             row![
-                crate::asio_logo::AsioLogo { height: 32.0 },
+                crate::asio_logo::AsioLogo { height: 26.0 },
                 line(
                     "information.asio",
                     notice.to_owned(),
-                    11.0,
+                    10.0,
                     style::FONT,
                     DIM,
                 )
             ]
-            .spacing(12)
+            .spacing(9)
             .align_y(Alignment::Center),
         );
     }
@@ -613,7 +662,7 @@ fn information_overlay<'a, R: FreeRenderer + 'a>(
         Component::new("information", "dialog", "native"),
         container(content)
             .width(INFORMATION_WIDTH)
-            .padding(20)
+            .padding(15)
             .style(|_| truce_iced::iced::widget::container::Style {
                 background: Some(Color::from_rgb(0.085, 0.095, 0.105).into()),
                 border: Border {
@@ -623,8 +672,8 @@ fn information_overlay<'a, R: FreeRenderer + 'a>(
                 },
                 shadow: iced_core::Shadow {
                     color: Color::BLACK.scale_alpha(0.45),
-                    offset: iced_core::Vector::new(0.0, 6.0),
-                    blur_radius: 18.0,
+                    offset: iced_core::Vector::new(0.0, 5.0),
+                    blur_radius: 14.0,
                 },
                 ..Default::default()
             }),
@@ -637,6 +686,45 @@ fn information_overlay<'a, R: FreeRenderer + 'a>(
             }),
         )
         .on_press(Message::Plugin(Action::Information(false))),
+    )
+}
+
+/// Every size on offer at once, the chosen one outlined in the accent as a
+/// lit header action is: there are few enough that one press should do.
+fn size_selector<'a, R: FreeRenderer + 'a>(chosen: u16) -> Element<'a, Msg, Theme, R> {
+    let choices = crate::interface::SIZES.map(|size| {
+        let lit = size == chosen;
+        let mut spec = Component::new(format!("information.size.{size}"), "button", "native");
+        spec.text = Some(crate::interface::label(size));
+        layout::mark(
+            spec,
+            mouse_area(
+                container(text(crate::interface::label(size)).size(12).color(if lit {
+                    INK
+                } else {
+                    DIM
+                }))
+                .center_x(48.0)
+                .center_y(HEADER_CONTROL[1])
+                .style(move |_| style::outlined(lit)),
+            )
+            .on_press(Message::Plugin(Action::InterfaceSize(size)))
+            .interaction(mouse::Interaction::Pointer),
+        )
+    });
+    let mut spec = Component::new("information.interface-size", "selector", "native");
+    spec.text = Some(crate::interface::label(chosen));
+    layout::mark(
+        spec,
+        row![
+            text("Interface size")
+                .size(13)
+                .font(style::FONT)
+                .color(INK)
+                .width(Length::Fill),
+            Row::with_children(choices).spacing(4),
+        ]
+        .align_y(Alignment::Center),
     )
 }
 
@@ -658,8 +746,8 @@ fn link<'a, R: FreeRenderer + 'a>(
     body: &'static str,
     action: Action,
 ) -> Element<'a, Msg, Theme, R> {
-    button(text(body).size(14).font(style::FONT))
-        .padding([4, 0])
+    button(text(body).size(12).font(style::FONT))
+        .padding([3, 0])
         .style(link_style)
         .on_press(Message::Plugin(action))
         .into()
@@ -703,13 +791,13 @@ fn control_column<'a, R: FreeRenderer + 'a>(
     };
     let label = text(spec.label)
         .size(13)
-        .line_height(LineHeight::Absolute(18.0.into()))
+        .line_height(LineHeight::Absolute(16.0.into()))
         .width(Length::Fill)
         .align_x(iced_core::text::Alignment::Center)
         .color(INK.scale_alpha(fade));
     let value = text(display_value(spec.id, params.get(spec.id) as f32, turning))
-        .size(14)
-        .line_height(LineHeight::Absolute(20.0.into()))
+        .size(13)
+        .line_height(LineHeight::Absolute(16.0.into()))
         .width(Length::Fill)
         .align_x(iced_core::text::Alignment::Center)
         .color(DIM.scale_alpha(fade));
@@ -720,14 +808,14 @@ fn control_column<'a, R: FreeRenderer + 'a>(
         label,
         value,
     ]
-    .spacing(4)
+    .spacing(3)
     .width(CONTROL_WIDTH);
     place(
         [
             spec.center[0] - CONTROL_WIDTH / 2.0,
             spec.center[1] - KNOB_ROW_HEIGHT / 2.0,
             CONTROL_WIDTH,
-            KNOB_ROW_HEIGHT + 46.0,
+            KNOB_ROW_HEIGHT + 38.0,
         ],
         body,
     )
@@ -775,13 +863,13 @@ fn cabinet_switch<'a, R: FreeRenderer + 'a>(
     layers.push(place(
         [
             cx - CONTROL_WIDTH / 2.0,
-            cy + KNOB_ROW_HEIGHT / 2.0 + 4.0,
+            cy + KNOB_ROW_HEIGHT / 2.0 + 3.0,
             CONTROL_WIDTH,
-            18.0,
+            16.0,
         ],
         text(if on { "ON" } else { "OFF" })
             .size(13)
-            .line_height(LineHeight::Absolute(18.0.into()))
+            .line_height(LineHeight::Absolute(16.0.into()))
             .width(Length::Fill)
             .align_x(iced_core::text::Alignment::Center)
             .color(if on { ACCENT } else { DIM }),
@@ -793,7 +881,7 @@ fn cabinet_switch<'a, R: FreeRenderer + 'a>(
             cx - CONTROL_WIDTH / 2.0,
             cy - KNOB_ROW_HEIGHT / 2.0,
             CONTROL_WIDTH,
-            KNOB_ROW_HEIGHT + 22.0,
+            KNOB_ROW_HEIGHT + 19.0,
         ],
         layout::mark(
             component,
@@ -865,11 +953,11 @@ fn levels_meters<'a, R: FreeRenderer + 'a>(levels: [f32; 4]) -> Vec<Element<'a, 
             "R"
         };
         layers.push(place(
-            [x - 4.0, y + height + 4.0, width + 8.0, 20.0],
+            [x - 4.0, y + height + 3.0, width + 8.0, 16.0],
             text(caption)
-                .size(11)
+                .size(10)
                 .font(style::BOLD)
-                .line_height(LineHeight::Absolute(20.0.into()))
+                .line_height(LineHeight::Absolute(16.0.into()))
                 .width(Length::Fill)
                 .align_x(iced_core::text::Alignment::Center)
                 .color(DIM),
@@ -987,6 +1075,13 @@ mod tests {
             }
         }
 
+        fn centre(&self, id: &str) -> [f32; 2] {
+            let [x, y, width, height] = self
+                .bounds(id)
+                .unwrap_or_else(|| panic!("{id} must be on screen"));
+            [x + width / 2.0, y + height / 2.0]
+        }
+
         fn press_button(&mut self) {
             let [x, y, width, height] = self.bounds("action.information").unwrap();
             self.press([x + width / 2.0, y + height / 2.0]);
@@ -1030,6 +1125,58 @@ mod tests {
             &editor.ctx,
         );
         assert_eq!(editor.bounds("information"), None, "Escape");
+    }
+
+    #[test]
+    fn an_interface_size_is_the_installations_and_opens_every_later_editor_at_it() {
+        use truce::prelude::Params;
+        let folder =
+            std::env::temp_dir().join(format!("swanky-amp-interface-size-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        let mut editor = Editor::new(None);
+        editor.ui = FreeUi::installed(Some(folder.clone()));
+        editor.press_button();
+        assert_eq!(
+            editor.text("information.interface-size").as_deref(),
+            Some("100%"),
+            "the information panel must offer the interface size, starting at 100 %"
+        );
+        let state = (
+            editor.params.params().collect_values(),
+            editor.params.params().serialize_persist(),
+        );
+        editor.press(editor.centre("information.size.150"));
+        assert_eq!(
+            editor.ui.zoom(),
+            1.5,
+            "the editor must ask for the chosen size"
+        );
+        assert_eq!(
+            editor.text("information.interface-size").as_deref(),
+            Some("150%")
+        );
+        assert_eq!(
+            (
+                editor.params.params().collect_values(),
+                editor.params.params().serialize_persist(),
+            ),
+            state,
+            "the size belongs to the computer, never to host state or presets"
+        );
+
+        let next = FreeUi::installed(Some(folder.clone()));
+        assert_eq!(next.zoom(), 1.5, "a later editor must open at the size");
+        let window = crate::editor_at(
+            Arc::new(SwankyAmpParams::default()),
+            crate::interface::load(Some(&folder)),
+        )
+        .size();
+        assert_eq!(
+            window,
+            (1296, 768),
+            "the host must be told the window of the chosen size"
+        );
+        let _ = std::fs::remove_dir_all(&folder);
     }
 
     #[test]

@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use swanky_amp::{Plugin, artwork, layout, presets};
+use swanky_amp::{Plugin, artwork, interface, layout, presets};
 use truce::core::{
     AudioBuffer, AudioConfig, EventList, PluginExport, PluginRuntime, ProcessContext,
 };
@@ -33,25 +33,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             _ => None,
         };
         std::fs::create_dir_all(&destination)?;
-        for scale in [1.0, 2.0] {
-            let (pixels, width, height) = if fixture == Some("live") {
-                truce::core::screenshot::render_pixels_for_at_scale(&mut playing(), scale)
-            } else if let Some(name) = preset {
-                let mut plugin = Plugin::create();
-                plugin.init();
-                presets::apply_offline(
-                    &presets::Library::with_user_root(None),
-                    &format!("factory:{name}"),
-                    plugin.params(),
-                )?;
-                truce::core::screenshot::render_pixels_for_at_scale(&mut plugin, scale)
-            } else {
-                truce::core::screenshot::render_with_state_at_scale::<Plugin>(None, scale)
-            };
-            let suffix = scale as u32;
-            let path = destination.join(format!("amp-{suffix}x.png"));
-            truce::core::screenshot::save_png(&path, &pixels, width, height);
-            println!("{} {width}x{height}", path.display());
+        // Every interface size at a standard and a Retina display scale; the
+        // 100 % files keep their plain names.
+        for size in interface::SIZES {
+            interface::hold(size);
+            for scale in [1.0, 2.0] {
+                let (pixels, width, height) = if fixture == Some("live") {
+                    truce::core::screenshot::render_pixels_for_at_scale(&mut playing(), scale)
+                } else if let Some(name) = preset {
+                    let mut plugin = Plugin::create();
+                    plugin.init();
+                    presets::apply_offline(
+                        &presets::Library::with_user_root(None),
+                        &format!("factory:{name}"),
+                        plugin.params(),
+                    )?;
+                    truce::core::screenshot::render_pixels_for_at_scale(&mut plugin, scale)
+                } else {
+                    truce::core::screenshot::render_with_state_at_scale::<Plugin>(None, scale)
+                };
+                let suffix = scale as u32;
+                let name = if size == interface::DEFAULT {
+                    format!("amp-{suffix}x.png")
+                } else {
+                    format!("amp-{size}-{suffix}x.png")
+                };
+                let path = destination.join(name);
+                truce::core::screenshot::save_png(&path, &pixels, width, height);
+                println!("{} {width}x{height}", path.display());
+            }
         }
     } else if arguments.first().map(String::as_str) == Some("pack-artwork") {
         let layers = PathBuf::from(

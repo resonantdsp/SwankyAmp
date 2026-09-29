@@ -8,6 +8,7 @@ mod asio_logo;
 pub mod diagnostics;
 pub mod dsp;
 pub mod engine;
+pub mod interface;
 pub mod layout;
 pub mod meters;
 pub mod params;
@@ -74,14 +75,21 @@ impl PluginLogic for SwankyAmp {
     }
 
     fn editor(params: Arc<Self::Params>) -> Box<dyn Editor> {
-        style::load_fonts();
-        truce_iced::IcedEditor::<_, ui::FreeUi>::new(
-            params,
-            (style::WIDTH as u32, style::HEIGHT as u32),
-        )
-        .with_font(style::FONT_BYTES)
-        .into_editor()
+        editor_at(params, interface::load(interface::folder().as_deref()))
     }
+}
+
+/// The editor opened at an interface size: it lays out at the design size and
+/// its window, which the host is told, is that size magnified.
+pub(crate) fn editor_at(params: Arc<SwankyAmpParams>, size: u16) -> Box<dyn Editor> {
+    style::load_fonts();
+    truce_iced::IcedEditor::<_, ui::FreeUi>::new(
+        params,
+        (style::WIDTH as u32, style::HEIGHT as u32),
+    )
+    .zoom(interface::zoom(size))
+    .with_font(style::FONT_BYTES)
+    .into_editor()
 }
 
 truce::plugin! { logic: SwankyAmp, params: SwankyAmpParams }

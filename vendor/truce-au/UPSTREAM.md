@@ -15,5 +15,23 @@ callback when the Oversampling choice moved the reported latency from 32 to
 from `truce_au_v2_host_latency_changed`, on the notifier thread that already
 runs it, off the audio thread.
 
+# Editor-requested resize in the Audio Unit v2
+
+An AU v2 host such as Logic sizes its plug-in window from the frame of the view
+the plug-in hands it, and the published wrapper pins that container view to
+the size it had when it was opened. `PluginContext::request_resize` resized
+only the editor inside it, so an editor that changes its own size (the
+interface zoom) was clipped by the old container. The request now also sets
+the container's frame through `truce_au_resize_view` in `shim/au_v2_view.m`,
+after the editor has taken the size, and the container still pins itself to
+what the editor reports. Logic, and any host that observes the view's frame,
+follows. AU v2 has no resize protocol, so a host that ignores frame changes
+keeps the old window. The change touches `shim/au_v2_view.m` (the new function
+and the container's doc comment), its declaration in `src/ffi.rs`, and
+`cb_gui_open` in `src/lib.rs`, which captures the container and resizes it once
+the editor has accepted the size. It is the same change as Swanky Amp Pro's
+copy of this crate.
+
 Keep this copy until a pinned upstream release notifies property listeners of
-a latency change; remove the Cargo patch and this directory together then.
+a latency change and lets an AU v2 editor resize its container; remove the
+Cargo patch and this directory together then.

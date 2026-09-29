@@ -567,6 +567,16 @@ where
             if (w, h) != self.current_size && w > 0 && h > 0 {
                 resize_outer_window(window, w, h);
                 self.current_size = (w, h);
+                // A fixed-size editor that asks for a new size (an interface
+                // zoom) is pinned there, or the zoom button would restore the
+                // size it was opened at.
+                #[cfg(target_os = "macos")]
+                if !self.editor.can_resize()
+                    && let RwhHandle::AppKit(handle) = window.raw_window_handle()
+                {
+                    // SAFETY: live `ns_window`, main thread (`on_frame`).
+                    unsafe { crate::windowed_macos::pin_content_size(handle.ns_window, w, h) };
+                }
                 let accepted = self.editor.set_size(w, h);
                 #[cfg(target_os = "macos")]
                 {

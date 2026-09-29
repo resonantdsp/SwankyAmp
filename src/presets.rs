@@ -472,7 +472,7 @@ fn preset_base() -> Option<PathBuf> {
 /// as GarageBand points HOME at its own container, where the presets the
 /// standalone and the other formats share are not, so on macOS the folder
 /// comes from the account record instead.
-fn home() -> Option<PathBuf> {
+pub(crate) fn home() -> Option<PathBuf> {
     #[cfg(target_os = "macos")]
     if let Some(home) = account_home() {
         return Some(home);

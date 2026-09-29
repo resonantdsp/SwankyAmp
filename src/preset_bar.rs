@@ -20,10 +20,10 @@ use crate::style;
 use crate::widgets::{FreeRenderer, Msg};
 
 const DIM: Color = Color::from_rgb(0.49, 0.53, 0.56);
-const MENU_WIDTH: f32 = 196.0;
-const ITEM_HEIGHT: f32 = 24.0;
+const MENU_WIDTH: f32 = 164.0;
+const ITEM_HEIGHT: f32 = 20.0;
 /// The menu stops short of the footer; a longer user list scrolls.
-const MENU_BOTTOM: f32 = style::HEIGHT - style::FOOTER_HEIGHT - 8.0;
+const MENU_BOTTOM: f32 = style::HEIGHT - style::FOOTER_HEIGHT - 6.0;
 /// Long enough to read a sentence, short enough not to linger over playing.
 const STATUS_SECONDS: u64 = 6;
 /// Names longer than the field abbreviate; the menu shows them whole.
@@ -404,12 +404,12 @@ impl PresetBar {
         }
         let chevron = |glyph, message: Option<PresetMsg>| {
             let available = message.is_some();
-            let glyph = container(text(glyph).size(20).color(DIM.scale_alpha(if available {
+            let glyph = container(text(glyph).size(17).color(DIM.scale_alpha(if available {
                 1.0
             } else {
                 0.35
             })))
-            .width(28)
+            .width(22)
             .height(Length::Fill)
             .center(Length::Fill);
             match message {
@@ -429,7 +429,7 @@ impl PresetBar {
                 mouse_area(
                     container(
                         text(name)
-                            .size(14)
+                            .size(12)
                             .wrapping(iced_core::text::Wrapping::None)
                             .color(style::INK),
                     )
@@ -504,7 +504,7 @@ impl PresetBar {
             .filter(|pair| pair[0].scope != pair[1].scope)
             .count();
         let list_height = self.entries.len() as f32 * ITEM_HEIGHT + dividers as f32 * DIVIDER;
-        let top = field[1] + field[3] + 4.0;
+        let top = field[1] + field[3] + 3.0;
         let chrome = 2.0 * MENU_PADDING + DIVIDER + actions.len() as f32 * ITEM_HEIGHT;
         let list_room = MENU_BOTTOM - top - chrome;
         let list: Element<'a, Msg, Theme, R> = if list_height > list_room {
@@ -546,8 +546,8 @@ impl PresetBar {
     }
 }
 
-const MENU_PADDING: f32 = 4.0;
-const DIVIDER: f32 = 9.0;
+const MENU_PADDING: f32 = 3.0;
+const DIVIDER: f32 = 7.0;
 
 fn preset(message: PresetMsg) -> Msg {
     Message::Plugin(crate::ui::Action::Preset(message))
@@ -574,8 +574,8 @@ fn menu_style() -> truce_iced::iced::widget::container::Style {
         },
         shadow: Shadow {
             color: Color::BLACK.scale_alpha(0.3),
-            offset: Vector::new(0.0, 4.0),
-            blur_radius: 10.0,
+            offset: Vector::new(0.0, 3.0),
+            blur_radius: 8.0,
         },
         ..Default::default()
     }
@@ -589,12 +589,12 @@ fn menu_item<'a, R: FreeRenderer + 'a>(
     let available = message.is_some();
     button(
         text(label)
-            .size(14)
-            .line_height(LineHeight::Absolute(18.0.into())),
+            .size(12)
+            .line_height(LineHeight::Absolute(15.0.into())),
     )
     .width(Length::Fill)
     .height(ITEM_HEIGHT)
-    .padding(Padding::from([3.0, 12.0]))
+    .padding(Padding::from([2.5, 10.0]))
     .style(move |_, status| {
         let hovered = matches!(status, button::Status::Hovered | button::Status::Pressed);
         button::Style {
@@ -624,7 +624,7 @@ fn divider<'a, R: FreeRenderer + 'a>() -> Element<'a, Msg, Theme, R> {
             }),
     )
     .height(DIVIDER)
-    .padding(Padding::from([4.0, 8.0]))
+    .padding(Padding::from([3.0, 6.0]))
     .into()
 }
 

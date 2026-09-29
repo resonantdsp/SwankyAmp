@@ -93,6 +93,20 @@ pub(crate) fn editor_backends() -> wgpu::Backends {
     }
 }
 
+/// The viewport's scale factor: device pixels per design point.
+// Display DPI times an interface zoom; both bounded, so the narrowing is safe.
+#[allow(clippy::cast_possible_truncation)]
+pub(crate) fn viewport_scale(display: f64, zoom: f64) -> f32 {
+    (display * zoom) as f32
+}
+
+/// A design size magnified by a zoom, in whole logical points.
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+pub(crate) fn zoomed(design: (u32, u32), zoom: f64) -> (u32, u32) {
+    let side = |v: u32| ((f64::from(v) * zoom).round() as u32).max(1);
+    (side(design.0), side(design.1))
+}
+
 // IcedPlugin trait - what plugin authors implement
 
 /// Trait for plugin-specific iced UI logic.
@@ -136,6 +150,16 @@ pub trait IcedPlugin<P: Params>: Sized + 'static {
     /// Custom theme (default: truce dark).
     fn theme(&self) -> crate::iced::Theme {
         crate::theme::truce_dark_theme()
+    }
+
+    /// How far this model wants the whole interface magnified: the window
+    /// is the editor's design size times this, and every widget, text run
+    /// and shader draws at the design size and the display's scale times
+    /// this. Only an editor built with [`crate::IcedEditor::zoom`] follows
+    /// it; it may change from frame to frame, and the editor resizes its
+    /// window and asks the host to follow. Default: 1.
+    fn zoom(&self) -> f64 {
+        1.0
     }
 
     /// Window title.
@@ -270,6 +294,11 @@ pub(crate) struct IcedRuntime<P: Params, M: IcedPlugin<P>> {
     /// every render path; written by `Editor::set_scale_factor` and
     /// the baseview `Resized` handler, observed each `tick()`.
     pub(crate) scale: EditorScale,
+    /// The interface zoom the window is at (see [`IcedPlugin::zoom`]).
+    /// Physical pixels come from the window's logical size and `scale`;
+    /// the viewport's scale factor is `scale * zoom`, so the widget tree
+    /// keeps laying out at the design size.
+    pub(crate) zoom: f64,
     /// Last scale value the surface/viewport were configured for. When
     /// `scale.get()` diverges from this, `tick()` reconfigures and
     /// updates this snapshot.
@@ -436,6 +465,7 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
             // init_render writes the real value; this placeholder never
             // reaches a render call.
             last_applied_scale: 0.0,
+            zoom: 1.0,
             font,
             device_lost: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             sub_runtime: iced_runtime::futures::Runtime::new(sub_executor, sub_tx),
@@ -704,9 +734,10 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
         if let Some(surface) = &render.surface {
             surface.configure(&render.device, &render.surface_config);
         }
-        #[allow(clippy::cast_possible_truncation)] // display DPI; bounded
-        let scale_f32 = render_scale as f32;
-        render.viewport = iced_graphics::Viewport::with_physical_size(Size::new(pw, ph), scale_f32);
+        render.viewport = iced_graphics::Viewport::with_physical_size(
+            Size::new(pw, ph),
+            viewport_scale(render_scale, self.zoom),
+        );
         // The idle gate is exempt on iOS (every tick renders), but flag a
         // forced paint so the reflow lands even if that ever changes.
         self.force_render = true;
@@ -773,8 +804,10 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
         // narrowing here is a documented host convention loss, not a
         // numeric overflow.
         #[allow(clippy::cast_possible_truncation)]
-        let viewport =
-            iced_graphics::Viewport::with_physical_size(Size::new(w, h), render_scale as f32);
+        let viewport = iced_graphics::Viewport::with_physical_size(
+            Size::new(w, h),
+            viewport_scale(render_scale, self.zoom),
+        );
         let theme = program.plugin.theme();
 
         let bg = crate::theme::truce_dark_theme().palette().background;
@@ -873,10 +906,10 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
             {
                 client.resize(pw.max(1), ph.max(1));
             }
-            #[allow(clippy::cast_possible_truncation)] // display DPI; bounded
-            let scale_f32 = cur_scale as f32;
-            render.viewport =
-                iced_graphics::Viewport::with_physical_size(Size::new(pw, ph), scale_f32);
+            render.viewport = iced_graphics::Viewport::with_physical_size(
+                Size::new(pw, ph),
+                viewport_scale(cur_scale, self.zoom),
+            );
             self.last_applied_scale = cur_scale;
         }
 
@@ -1175,13 +1208,43 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
         }
     }
 
-    /// Queue a cursor move event. Coordinates are in logical points.
+    /// Queue a cursor move event. Coordinates are in the window's logical
+    /// points, which a zoomed interface divides back to its design points.
+    #[allow(clippy::cast_possible_truncation)]
     pub(crate) fn queue_cursor_move(&mut self, x: f32, y: f32) {
-        self.cursor_position = Point::new(x, y);
+        let zoom = self.zoom as f32;
+        self.cursor_position = Point::new(x / zoom, y / zoom);
         self.pending_events
             .push(Event::Mouse(crate::iced::mouse::Event::CursorMoved {
                 position: self.cursor_position,
             }));
+    }
+
+    /// The zoom the plugin model now asks for, when it is not the one the
+    /// window is at.
+    #[cfg(not(target_os = "ios"))]
+    pub(crate) fn wanted_zoom(&self) -> Option<f64> {
+        let wanted = self.render.as_ref()?.program.plugin.zoom();
+        (wanted.is_finite() && wanted > 0.0 && (wanted - self.zoom).abs() > 1.0e-9)
+            .then_some(wanted)
+    }
+
+    /// Take a new logical window size: the viewport, the surface and the
+    /// next frame all follow it.
+    #[cfg(not(target_os = "ios"))]
+    pub(crate) fn apply_logical_size(&mut self, w: u32, h: u32) {
+        self.size = (w, h);
+        self.force_render = true;
+        let scale = self.scale.get();
+        let pw = truce_gui::to_physical_px(w, scale);
+        let ph = truce_gui::to_physical_px(h, scale);
+        if let Some(ref mut render) = self.render {
+            render.viewport = iced_graphics::Viewport::with_physical_size(
+                Size::new(pw, ph),
+                viewport_scale(scale, self.zoom),
+            );
+        }
+        self.reconfigure_surface_px(pw, ph);
     }
 
     /// Whether the UI's last frame had a focused widget wanting keyboard

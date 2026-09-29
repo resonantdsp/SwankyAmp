@@ -24,16 +24,19 @@ pub const MUTED: Color = Color::from_rgb(0.53, 0.59, 0.61);
 /// dims a bypassed section.
 pub const DISABLED_ALPHA: f32 = 0.35;
 /// Corner radius shared by every outlined control.
-pub const CONTROL_RADIUS: f32 = 6.0;
-/// Texels per interface pixel in the switch disc sprite: every edge the disc
-/// has comes from the sprite, so it is drawn sharper than the 1x bake to hold
-/// up on a Retina display.
-pub const DISC_SUPERSAMPLE: u32 = 2;
+pub const CONTROL_RADIUS: f32 = 5.0;
+/// Texels per interface pixel in the view's bake and the switch disc sprite.
+/// The interface is drawn from three quarters to one and a half times its
+/// design size, and a Retina display doubles that: two texels per pixel is
+/// exact at 100 % on Retina, and at 150 % on Retina magnifies the bake less
+/// than a single-texel bake already was at 100 % there. Smaller drawings read
+/// the box-filtered levels the package stores.
+pub const SUPERSAMPLE: u32 = 2;
 /// The cabinet switch's disc diameter, half a small knob's: the whole switch
 /// is a track two discs tall, about a small knob's height.
-pub const SWITCH_DIAMETER: f32 = 24.0;
+pub const SWITCH_DIAMETER: f32 = 20.0;
 /// Corner radius of a group's groove outline.
-pub const SECTION_RADIUS: f32 = 10.0;
+pub const SECTION_RADIUS: f32 = 8.0;
 /// How much brighter than the accent a lit ring reads, before the display
 /// compression in the compositor.
 const RING_GLOW: f32 = 1.25;
@@ -47,17 +50,16 @@ pub fn load_fonts() {
     });
 }
 
-pub const WIDTH: f32 = 1080.0;
-pub const HEIGHT: f32 = 640.0;
-pub const HEADER_HEIGHT: f32 = 64.0;
-pub const FOOTER_HEIGHT: f32 = 32.0;
+pub const WIDTH: f32 = 864.0;
+pub const HEIGHT: f32 = 512.0;
+pub const HEADER_HEIGHT: f32 = 52.0;
+pub const FOOTER_HEIGHT: f32 = 26.0;
 /// The window's side inset to the group boxes; whatever sits at the right
 /// edge of the header or footer ends on the same line as the boxes.
-pub const MARGIN: f32 = 14.0;
-pub const UTILITY_X: f32 = 760.0;
+pub const MARGIN: f32 = 10.0;
 
-pub const KNOB_LARGE_RADIUS: f32 = 32.0;
-pub const KNOB_SMALL_RADIUS: f32 = 24.0;
+pub const KNOB_LARGE_RADIUS: f32 = 26.0;
+pub const KNOB_SMALL_RADIUS: f32 = 20.0;
 pub const METER_BARS: u32 = 10;
 pub const METER_GAP: f32 = 0.25;
 
@@ -129,8 +131,8 @@ impl Default for PhysicalStyle {
             groove_depth: 2.2,
             groove_bevel: 0.12,
             groove_width: 2.0,
-            knob_height: 32.91,
-            knob_bevel: 1.7,
+            knob_height: 26.33,
+            knob_bevel: 1.36,
             collar_radius: 1.09,
             ring_radius: 1.22,
             ring_half_width: 0.046,
@@ -146,20 +148,20 @@ impl Default for PhysicalStyle {
             diffuser_roughness: 0.42,
             diffuser_transmission: 1.0,
             diffuser_ior: 1.46,
-            meter_recess: 4.2,
-            meter_diffuser_depth: 1.4,
-            meter_diffuser_thickness: 0.8,
-            meter_emitter_depth: 2.8,
-            meter_cell_inset: 0.7,
+            meter_recess: 3.36,
+            meter_diffuser_depth: 1.12,
+            meter_diffuser_thickness: 0.64,
+            meter_emitter_depth: 2.24,
+            meter_cell_inset: 0.56,
             meter_bars: METER_BARS,
             meter_gap: METER_GAP,
-            meter_reflection_extent: 20.0,
+            meter_reflection_extent: 16.0,
             meter_radiance: [[0.084, 1.512, METER_PEAK], meter_radiance(METER_OUTPUT)],
             switch_diameter: SWITCH_DIAMETER,
-            disc_height: 4.0,
-            disc_bevel: 1.2,
-            disc_margin: 12.0,
-            slot_depth: 10.0,
+            disc_height: 3.2,
+            disc_bevel: 0.96,
+            disc_margin: 10.0,
+            slot_depth: 8.0,
         }
     }
 }
