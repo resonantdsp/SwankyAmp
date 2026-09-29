@@ -532,7 +532,10 @@ The dynamic-latency work adds narrow copies from the exact published Truce 6.3.0
 
 The Windows standalone is built with the ASIO SDK under Resonant DSP's
 Steinberg ASIO licence agreement. The SDK is fetched at build time and never
-committed or redistributed. ASIO is a trademark and software of Steinberg
-Media Technologies GmbH.
+committed or redistributed. ASIO is a registered trademark of Steinberg Media
+Technologies GmbH. Steinberg's usage guidelines for SDK 2.3.4 put the ASIO
+Compatible logo in the About panel of an application that runs on ASIO by
+default, as this one does, so its information panel shows it;
+`assets/asio-compatible.svg` is Steinberg's artwork, unchanged.
 
 Each Truce directory carries the unchanged governing Truce licence and MIT and Apache texts, original manifest, source reference, and a focused `UPSTREAM.md` description of the local changes. `vendor/baseview-truce` carries its own MIT and Apache licence texts and provenance. Everything else resolves from the pinned Cargo lockfile.

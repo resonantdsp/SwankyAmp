@@ -13,6 +13,13 @@ pub trait FreeRenderer:
 {
     const LOAD_ARTWORK: bool;
 
+    fn graphic(
+        &mut self,
+        _bounds: Rectangle,
+        _draw: impl FnOnce(&mut iced_graphics::geometry::Frame<iced_wgpu::Renderer>),
+    ) {
+    }
+
     fn knob(&mut self, bounds: Rectangle, radius: f32, value: f32, ring: bool, enabled: bool) {
         draw_knob(self, bounds, radius, value, ring, enabled);
     }
@@ -25,6 +32,21 @@ impl FreeRenderer for crate::layout::Measure {
 }
 impl FreeRenderer for iced_wgpu::Renderer {
     const LOAD_ARTWORK: bool = true;
+
+    fn graphic(
+        &mut self,
+        bounds: Rectangle,
+        draw: impl FnOnce(&mut iced_graphics::geometry::Frame<iced_wgpu::Renderer>),
+    ) {
+        use iced_graphics::geometry::Renderer;
+        let mut frame = iced_graphics::geometry::Frame::new(self, bounds.size());
+        draw(&mut frame);
+        iced_core::Renderer::with_translation(
+            self,
+            iced_core::Vector::new(bounds.x, bounds.y),
+            |r| r.draw_geometry(frame.into_geometry()),
+        );
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
