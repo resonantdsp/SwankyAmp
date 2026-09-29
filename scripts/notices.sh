@@ -92,7 +92,7 @@ HEADER
     cat "$font"
     echo
   done
-  "$tool" generate --features asio,au about.hbs 2>/dev/null
+  "$tool" generate --features asio,au about.hbs
   echo "--------------------------------------------------------------------------------"
   echo "The Truce License 1.0"
   echo
