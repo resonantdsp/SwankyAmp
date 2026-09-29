@@ -530,12 +530,16 @@ The dynamic-latency work adds narrow copies from the exact published Truce 6.3.0
 - `vendor/truce-core`, `vendor/truce-plugin`, `vendor/truce-loader`, and `vendor/truce`: the narrow real-time reset lifecycle hook and its forwarding bridge.
 - `vendor/truce-au`: a latency change reaches the Audio Unit host's property listeners.
 
-The Windows standalone is built with the ASIO SDK under Resonant DSP's
-Steinberg ASIO licence agreement. The SDK is fetched at build time and never
-committed or redistributed. ASIO is a registered trademark of Steinberg Media
-Technologies GmbH. Steinberg's usage guidelines for SDK 2.3.4 put the ASIO
-Compatible logo in the About panel of an application that runs on ASIO by
-default, as this one does, so its information panel shows it;
-`assets/asio-compatible.svg` is Steinberg's artwork, unchanged.
+The Windows standalone is built with Steinberg's ASIO SDK 2.3.4, which
+Steinberg licenses either under its proprietary agreement or under the GNU
+General Public License, version 3; Swanky Amp uses it under GPLv3. The SDK is
+fetched at build time, pinned by checksum, and not committed; the third-party
+notices carry its licence texts, from `assets/asio-sdk`, and name that package
+as its source. ASIO is a registered trademark of Steinberg Media Technologies
+GmbH. GPLv3 does not cover the name or logo, so their use follows Steinberg's
+usage guidelines for SDK 2.3.4, which put the ASIO Compatible logo in the About
+panel of an application that runs on ASIO by default, as this one does, so its
+information panel shows it; `assets/asio-compatible.svg` is Steinberg's
+artwork, unchanged.
 
 Each Truce directory carries the unchanged governing Truce licence and MIT and Apache texts, original manifest, source reference, and a focused `UPSTREAM.md` description of the local changes. `vendor/baseview-truce` carries its own MIT and Apache licence texts and provenance. Everything else resolves from the pinned Cargo lockfile.

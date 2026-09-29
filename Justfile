@@ -173,8 +173,8 @@ validate-assets package="assets/artwork.pack" layers="assets/artwork":
 refresh-artwork layers="assets/artwork":
     cargo run --quiet --bin swanky-amp-2 -- refresh-artwork "{{ layers }}"
 
-# Write THIRD-PARTY-NOTICES.txt from the shipped dependency tree and the
-# bundled fonts; candidates embed it for the information panel.
+# Write THIRD-PARTY-NOTICES.txt from the shipped dependency tree, the ASIO SDK
+# and the bundled fonts; candidates embed it for the information panel.
 notices:
     bash scripts/notices.sh
 
