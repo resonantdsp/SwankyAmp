@@ -72,7 +72,7 @@ impl PresetBar {
     pub fn live(params: &SwankyAmpParams) -> Self {
         let mut bar = Self::with_library(Library::default());
         bar.entries = bar.library.list().entries;
-        bar.import = ImportJob::first_run(&bar.library);
+        bar.import = legacy_root().and_then(|source| ImportJob::first_run(&bar.library, source));
         bar.sync(params);
         bar
     }

@@ -1,6 +1,15 @@
-/target/
+/target
 /tools/
 /THIRD-PARTY-NOTICES.txt
+/.claude/
+__pycache__/
+# What the review recipes write by default: layouts, captures, unpacked
+# layers and model renders.
+/assets/layout/
+/verification/interface*/
+/verification/artwork-unpacked/
+/verification/model-output.wav
+/verification/model-output.wav-seams/
 # Editable artwork layers are not committed: the package, its receipt and
 # licence are. `just unpack-artwork` recreates the layers from the package.
 /assets/artwork/**/*.exr

@@ -123,6 +123,8 @@ installs beside Swanky Amp 1.4.0.
   them for one launch. Choosing an audio interface as the input takes the
   output to it as well, unless an output has been chosen. On Windows, devices
   are listed by their full names, such as "Speakers (UMC202HD 192k)".
+- Opened the standalone app with its input on, since an amplifier with its
+  input off is silent; `--input-enabled off` opts out for one launch.
 - The Windows standalone app plays through an audio interface's own ASIO®
   driver when one is installed, instead of the Windows shared audio path,
   which adds about 10 ms in each direction. The Settings menu gains an Audio

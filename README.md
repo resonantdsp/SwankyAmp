@@ -130,7 +130,8 @@ User presets live in:
 | Windows | `%APPDATA%\Resonant DSP\Swanky Amp 2` | `%APPDATA%\Resonant DSP\Swanky Amp` |
 | Linux | `$XDG_DATA_HOME/Resonant DSP/Swanky Amp 2` (default `~/.local/share`) | `~/.config/Resonant DSP/Swanky Amp` |
 
-The version 2 folder is created on the first save or import. Each preset is
+The version 2 folder is created on the first save or import, even an import
+that copies nothing. Each preset is
 one `<name>.xml` file in the 1.x schema, an `APVTSSwankyAmp` element listing
 `<PARAM id value/>` entries under the 1.x parameter ids, so 1.x and 2.0 presets
 stay one format: version 2 reads 1.4.0 files, including the version
@@ -257,9 +258,10 @@ After `just setup`, open the standalone shell with:
 just run
 ```
 
-The standalone's Settings menu chooses the input, the output and the buffer
-size (128 samples unless chosen), and remembers them on the machine; the
-`--input`, `--output` and `--buffer` flags override them for one launch
+The standalone opens with its input on, since an amplifier with its input off
+is silent; `--input-enabled off` opts out. Its Settings menu chooses the input,
+the output and the buffer size (128 samples unless chosen), and remembers them
+on the machine; the `--input`, `--output` and `--buffer` flags override them for one launch
 (`cargo run --release -- --help` lists every option). Choosing an audio
 interface as the input takes the output to it too, unless an output has been
 chosen, and the input is kept within about one buffer of the output.

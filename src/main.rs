@@ -128,7 +128,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         artwork::refresh_receipt(&layers)?;
         println!("{}", layers.join("receipt.json").display());
     } else {
-        truce_standalone::run::<Plugin>();
+        // An amplifier with its input off makes no sound, so the standalone
+        // opens listening; `--input-enabled off` still opts out.
+        truce_standalone::run_with::<Plugin>(truce_standalone::Defaults {
+            input_enabled: Some(true),
+            ..Default::default()
+        });
     }
     Ok(())
 }

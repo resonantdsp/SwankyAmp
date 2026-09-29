@@ -1,5 +1,18 @@
 name: check
 
+# Prose cannot change what these jobs measure, except the committed refit
+# report, which `refit-check` compares with a fresh refit.
+#
+# The skip is decided by the `changes` job rather than by `paths-ignore`,
+# because a workflow filtered out by path never reports its checks at all, and
+# a required check that never reports leaves a pull request confined to prose
+# waiting forever. A skipped job satisfies a required check, so the jobs always
+# exist and decline to do the work instead.
+#
+# `checks` declines at the job level. `bundles` cannot: a matrix job whose
+# job-level `if` is false never expands its matrix, so it reports one check
+# named for the unresolved expression and the two per-platform names never
+# appear. Its legs therefore always start, and every step declines instead.
 on:
   push:
     branches: [master]
@@ -30,19 +43,32 @@ jobs:
           BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         run: |
           set -euo pipefail
+          # A first push to a branch names no predecessor, and a force push can
+          # leave one that no longer exists; either way nothing can be ruled
+          # out, so everything counts as changed.
           if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ] \
             || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "No usable base commit; treating every path as changed."
             echo "code=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          # Assigned rather than read from a process substitution, whose
+          # failure would list no files and skip every check green.
+          files=$(git diff --name-only "$BASE" "$GITHUB_SHA")
+          echo "Changed files:"
+          echo "$files"
           code=false
           while IFS= read -r file; do
             [ -n "$file" ] || continue
             case "$file" in
-              *.md) ;;
-              *) code=true; break ;;
+              verification/tone-stack/refit-report.md) ;;
+              *.md) continue ;;
             esac
-          done < <(git diff --name-only "$BASE" "$GITHUB_SHA")
+            echo "Outside the ignored set: $file"
+            code=true
+            break
+          done <<< "$files"
+          echo "code=$code"
           echo "code=$code" >> "$GITHUB_OUTPUT"
 
   checks:
