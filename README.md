@@ -253,8 +253,8 @@ into `tools/` and needs libclang; no other build compiles it.
 
 ### Editor
 
-The editor uses one iced widget tree for the live controls and the artwork
-layout contract. As in 1.4, the six Free signal-flow groups (Levels, Cabinet,
+The editor is 864 by 512 interface pixels and uses one iced widget tree for
+the live controls and the artwork layout contract. As in 1.4, the six Free signal-flow groups (Levels, Cabinet,
 Preamp, Staging, Power Amp and Tone) are separate rounded boxes with graphite
 between them, each outlined by its own V groove. Pro's material language
 carries over with 1.4's rose highlight as Free's accent on the lit rings,

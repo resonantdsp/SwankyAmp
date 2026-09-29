@@ -82,7 +82,7 @@ impl Knob {
     }
 
     fn height(&self) -> f32 {
-        if self.large { 84.0 } else { 58.0 }
+        if self.large { 68.0 } else { 48.0 }
     }
 
     fn hit(&self, bounds: Rectangle, cursor: mouse::Cursor) -> bool {
@@ -329,19 +329,24 @@ impl<R: iced_core::Renderer> Widget<Msg, Theme, R> for NoticeGlyph {
         let c = layout.bounds().center();
         let at = |dx: f32, dy: f32| Point::new(c.x + dx, c.y + dy);
         if self.download {
-            stroke(renderer, &[at(0.0, -6.5), at(0.0, 2.5)], self.color);
+            stroke(renderer, &[at(0.0, -5.5), at(0.0, 2.0)], self.color);
             stroke(
                 renderer,
-                &[at(-3.75, -1.25), at(0.0, 2.5), at(3.75, -1.25)],
+                &[at(-3.25, -1.0), at(0.0, 2.0), at(3.25, -1.0)],
                 self.color,
             );
             stroke(
                 renderer,
-                &[at(-5.5, 3.75), at(-5.5, 6.0), at(5.5, 6.0), at(5.5, 3.75)],
+                &[
+                    at(-4.75, 3.25),
+                    at(-4.75, 5.25),
+                    at(4.75, 5.25),
+                    at(4.75, 3.25),
+                ],
                 self.color,
             );
         } else {
-            let radius = 7.0;
+            let radius = 6.0;
             renderer.fill_quad(
                 renderer::Quad {
                     bounds: Rectangle::new(
@@ -350,15 +355,15 @@ impl<R: iced_core::Renderer> Widget<Msg, Theme, R> for NoticeGlyph {
                     ),
                     border: iced_core::Border {
                         color: self.color,
-                        width: 1.25,
+                        width: 1.1,
                         radius: radius.into(),
                     },
                     ..Default::default()
                 },
                 Color::TRANSPARENT,
             );
-            disk(renderer, at(0.0, -3.25), 1.0, self.color);
-            stroke(renderer, &[at(0.0, -0.75), at(0.0, 3.75)], self.color);
+            disk(renderer, at(0.0, -2.75), 0.9, self.color);
+            stroke(renderer, &[at(0.0, -0.5), at(0.0, 3.25)], self.color);
         }
     }
 }

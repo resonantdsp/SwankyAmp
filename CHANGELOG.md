@@ -80,7 +80,7 @@ installs beside Swanky Amp 1.4.0.
   by a V groove, with Pro's outlined header controls, knob markers and
   uncluttered ten-cell meters, and the one-line "SWANKY AMP FREE" wordmark.
   1.4's rose highlight is the accent for lit rings, lit outlines, the
-  edition tag and the output meter.
+  edition tag and the output meter. The editor is 864 by 512 pixels.
 - Replaced the cabinet toggle with a vertical two-position switch in its own
   column of the Cabinet row: a brushed aluminium disc that sits in either end
   of a V track two discs tall, with the ON label lit in the accent. The
