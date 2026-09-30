@@ -120,7 +120,7 @@ fn shipping_output(controls: AmpControls, clip: &[f32], tables: LevelTables) -> 
 
 /// The gain both recordings are played at. The takes were recorded a little
 /// under the level 1.x staged a guitar for: on its input meter a light strum
-/// peaks about one third of the way up with a single coil, -16.5 dBFS, and
+/// peaked about one third of the way up with a single coil, -16.5 dBFS, and
 /// about two thirds with a humbucker, -2.5 dBFS. The same gain on both keeps
 /// the player's own gap between the pickups.
 pub const RECORDING_GAIN_DB: f32 = 2.;

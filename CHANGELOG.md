@@ -97,9 +97,8 @@ installs beside Swanky Amp 1.4.0.
   falling to 1/e in 0.3 s: input after the Input control on 1.4.0's -26 to
   +8 dBFS scale, where a light strum peaks about one third of the way up with
   a single coil, about two thirds with a humbucker, and output after the
-  cabinet and Output
-  control on -60 to 0 dBFS. Hosts that show plugin meters receive the same
-  four levels.
+  cabinet and Output control on -60 to 0 dBFS. Hosts that show plugin meters
+  receive the same four levels.
 - Added an information panel, opened from the header's cog button: it
   names the product and its version, links to the website, the manual and
   support, and closes with Escape, the button again or a press outside. Its

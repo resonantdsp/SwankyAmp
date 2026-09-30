@@ -362,12 +362,18 @@ impl<'a, R: FreeRenderer + 'a> From<NoticeGlyph> for Element<'a, Msg, Theme, R> 
 // A cog: a ring with six stubby teeth, the mark players read as settings.
 // Square teeth traced around a hub close up into a blot at the header's
 // size; a stroked ring keeps its hole and radial strokes keep their gaps.
+// Its centre sits on a pixel centre, as Pro's fixed glyph box places it:
+// centred on a pixel edge, the teeth smear into a plain ring at 1x.
 fn draw_cog<R: FreeRenderer>(renderer: &mut R, bounds: Rectangle, color: Color) {
     use iced_core::Vector;
     use iced_graphics::geometry::{LineCap, LineJoin, Path, Stroke};
     let scale = COG_SIZE / 20.;
     renderer.graphic(bounds, move |frame| {
-        let c = frame.center();
+        let centre = bounds.center();
+        let c = Point::new(
+            centre.x.floor() + 0.5 - bounds.x,
+            centre.y.floor() + 0.5 - bounds.y,
+        );
         let stroke = Stroke::default()
             .with_width(1.6)
             .with_color(color)

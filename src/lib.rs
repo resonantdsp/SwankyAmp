@@ -342,7 +342,7 @@ mod tests {
     }
 
     /// 1.x staged a guitar by its input meter: at Input 0 dB a light strum
-    /// peaks about one third of the way up with a single coil, -16.5 dBFS,
+    /// peaked about one third of the way up with a single coil, -16.5 dBFS,
     /// and about two thirds with a humbucker, -2.5 dBFS. At Input 0 the meter
     /// must read the injected peak unchanged, and fall dark soon after the
     /// playing stops.
