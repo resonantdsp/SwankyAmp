@@ -17,13 +17,14 @@ recorded, with no gain applied; the humbucker is 10 dB hotter at its peak.
 Keep that difference, never raise the two to the same level.
 
 A take is staged by the released 1.x input meter, which reads the block's
-sample peak plus Input: a light strum from a single coil should peak at its S
-notch, −16.5 dBFS, and one from a humbucker at its H notch, −2.5 dBFS, at
-Input 0. These chords peak at −16.7 and −6.7 dBFS, 0.2 dB under S and 4.2 dB
-under H. The level measurements play both files 2 dB louder,
+sample peak plus Input: at Input 0 a light strum peaks about one third of the
+way up with a single coil, −16.5 dBFS, and about two thirds with a humbucker,
+−2.5 dBFS. These chords peak at −16.7 and −6.7 dBFS, 0.2 dB and 4.2 dB under
+those levels. The level measurements play both files 2 dB louder,
 `RECORDING_GAIN_DB` in `src/dsp/calibration.rs`, which puts the chords at
-−14.7 and −4.7 dBFS, 1.8 dB over S and 2.2 dB under H, and keeps the player's
-own gap between the pickups rather than forcing each onto its notch.
+−14.7 and −4.7 dBFS, 1.8 dB over the single coil's level and 2.2 dB under the
+humbucker's, and keeps the player's own gap between the pickups rather than
+forcing each onto its level.
 
 `just calibrate` and `just refit` measure through them, as do the level tests.
 Half their energy lies below 263 Hz (single coil) and 392 Hz (humbucker); a
