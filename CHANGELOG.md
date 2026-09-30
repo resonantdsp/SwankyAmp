@@ -52,7 +52,8 @@ installs beside Swanky Amp 1.4.0.
   tetrode keeps the released curve, which sets its bias and gain rather than a
   knee.
 - Recalibrated the level compensation for the corrected amplifier on real
-  guitar recordings played at Input 0: with the tone controls at their
+  guitar recordings, staged as 1.4.0's input meter asks and played at
+  Input 0: with the tone controls at their
   defaults, playing drives the power stage within about 1 dB of 1.4.0 at every
   Drive on every tone stack.
 - Drive, Power Drive and Grit now change the sound without changing the
@@ -92,11 +93,12 @@ installs beside Swanky Amp 1.4.0.
   of a V track two discs tall, with the ON label lit in the accent. The
   cabinet's Bright, Distance and Dynamic knobs, their labels and readouts dim
   while the cabinet is off, and stay adjustable.
-- Lit the level meters from each instance's own signal: input after the Input
-  control, output after the cabinet and Output control, both on a -60 to
-  0 dBFS scale, rising instantly and falling to 1/e in 0.3 s, so direct
-  guitar at Input 0 dB lights about six input cells. Hosts that show plugin
-  meters receive the same four levels.
+- Lit the level meters from each instance's own signal, rising instantly and
+  falling to 1/e in 0.3 s: input after the Input control on 1.4.0's -26 to
+  +8 dBFS scale with its S and H notches, where a light strum from a single
+  coil or a humbucker should peak, and output after the cabinet and Output
+  control on -60 to 0 dBFS. Hosts that show plugin meters receive the same
+  four levels.
 - Added an information panel, opened from the header's information button:
   it names the product and its version, links to the website, the manual and
   support, and closes with Escape, the button again or a press outside. Its

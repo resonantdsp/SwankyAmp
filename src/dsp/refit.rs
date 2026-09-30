@@ -487,7 +487,8 @@ pub fn fit(controls: AmpControls, input: &[f32]) -> AmpControls {
 /// judged over.
 const THIRDS: usize = 21;
 /// Cost in dB² of moving Low, Mid, High or Presence by one stored unit, half
-/// the control's range, from the original, so a control moves only as far as the balance pays.
+/// the control's range, from where the search starts, so a control moves only
+/// as far as the balance pays.
 pub const VOICING_RESTRAINT: f64 = 0.5;
 /// The search keeps the tone controls within this, 1 to 9 on the panel, so a
 /// preset leaves the player room either way.
@@ -678,10 +679,13 @@ impl Voicing {
 #[derive(Debug, Clone)]
 pub struct Voiced {
     pub original: Voicing,
+    /// Where the search started, the bank's current voicing when it has one.
+    pub start: Voicing,
     pub voiced: Voicing,
     /// RMS difference of the output balance from 1.4.0 in dB, per recording
     /// (single coil, humbucker), with the original knobs and after voicing.
     pub unvoiced_balance_db: [f64; 2],
+    pub start_balance_db: [f64; 2],
     pub voiced_balance_db: [f64; 2],
     /// Output band levels minus 1.4.0's, averaged over the recordings.
     pub voiced_bands_db: [f64; THIRDS],
@@ -696,11 +700,12 @@ pub fn band_centres() -> [f64; THIRDS] {
 }
 
 /// Voices `controls`, a preset made on 1.4.0's octave-high stack, for the
-/// corrected one. Low, Mid, High and Presence are searched so the output's
-/// tonal balance on real playing is as close to 1.4.0's as the restraint
-/// allows, and Power Drive follows so the power stage is driven as 1.4.0
-/// drove it.
-pub fn voice(controls: AmpControls, clips: &super::calibration::Clips) -> Voiced {
+/// corrected one. Low, Mid, High and Presence are searched from `start`, a
+/// voicing already accepted by ear or else 1.4.0's, so the output's tonal
+/// balance on real playing is as close to 1.4.0's as the restraint toward
+/// `start` allows, and Power Drive follows so the power stage is driven as
+/// 1.4.0 drove it.
+pub fn voice(controls: AmpControls, start: [f32; 4], clips: &super::calibration::Clips) -> Voiced {
     let clips = [clips.single_coil.as_slice(), clips.humbucker.as_slice()];
     let reference = clips.map(|clip| hear(controls, true, clip));
     let unvoiced = clips.map(|clip| hear(controls, false, clip));
@@ -732,12 +737,13 @@ pub fn voice(controls: AmpControls, clips: &super::calibration::Clips) -> Voiced
         let moved: f64 = voicing
             .tone()
             .iter()
-            .zip(original.tone())
+            .zip(start)
             .map(|(new, old)| f64::from(new - old).powi(2))
             .sum();
         sound + VOICING_RESTRAINT * moved + FEED_COST * miss.powi(2)
     };
-    let mut best = feed_for(original.tone().map(|value| value.clamp(-RAIL, RAIL)));
+    let begun = feed_for(start.map(|value| value.clamp(-RAIL, RAIL)));
+    let mut best = begun;
     let mut best_cost = cost(best);
     for step in SEARCH_STEPS {
         loop {
@@ -766,6 +772,7 @@ pub fn voice(controls: AmpControls, clips: &super::calibration::Clips) -> Voiced
     }
     let best = best.0;
     let voiced = clips.map(|clip| hear(best.apply(controls), false, clip));
+    let started = clips.map(|clip| hear(begun.0.apply(controls), false, clip));
     let rms = |heard: &[Heard; 2]| {
         std::array::from_fn(|index| {
             balance_error(&heard[index].balance, &reference[index].balance).sqrt()
@@ -776,8 +783,10 @@ pub fn voice(controls: AmpControls, clips: &super::calibration::Clips) -> Voiced
     };
     Voiced {
         original,
+        start: begun.0,
         voiced: best,
         unvoiced_balance_db: rms(&unvoiced),
+        start_balance_db: rms(&started),
         voiced_balance_db: rms(&voiced),
         voiced_bands_db: std::array::from_fn(|band| {
             (0..2)

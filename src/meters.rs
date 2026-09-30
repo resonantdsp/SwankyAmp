@@ -1,21 +1,52 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
-/// The quietest amplitude a meter can show anything at, -60 dBFS. Below it the
-/// meter is dark, so a level that has fallen this far is a still picture and
-/// the audio side is free to call it silence.
-pub const METER_FLOOR: f32 = 0.001;
+/// The released 1.x input meter, in dBFS after the Input control. Its notches
+/// are where 1.x staged a guitar: a light strum from a single coil peaks at S
+/// and one from a humbucker at H, so a player sets Input by eye.
+pub const INPUT_SCALE_DB: (f32, f32) = (-26., 8.);
+pub const INPUT_NOTCHES: [(f32, &str); 2] = [(-16.5, "S"), (-2.5, "H")];
 
-/// Silence must stay dark, and 0 dBFS must occupy the full meter.
-pub fn meter_fraction(amplitude: f32) -> f32 {
-    ((20. * amplitude.max(METER_FLOOR).log10() + 60.) / 60.).clamp(0., 1.)
+/// The output meter, in dBFS after the cabinet and Output control.
+pub const OUTPUT_SCALE_DB: (f32, f32) = (-60., 0.);
+
+/// The scale of each meter, input L/R then output L/R.
+pub const SCALES_DB: [(f32, f32); 4] = [
+    INPUT_SCALE_DB,
+    INPUT_SCALE_DB,
+    OUTPUT_SCALE_DB,
+    OUTPUT_SCALE_DB,
+];
+
+/// Where `db` falls on a meter spanning `scale`, 0 at its foot and 1 at its
+/// top.
+pub fn scale_fraction(db: f32, (low, high): (f32, f32)) -> f32 {
+    ((db - low) / (high - low)).clamp(0., 1.)
 }
 
-pub fn active_bars(amplitude: f32, bars: u32) -> u32 {
-    (meter_fraction(amplitude) * bars as f32).floor() as u32
+/// The quietest amplitude the meter on `scale` shows anything at. Below it
+/// the meter is dark, so a level that has fallen this far is a still picture
+/// and the audio side is free to call it silence.
+pub fn floor_amplitude((low, _): (f32, f32)) -> f32 {
+    10_f32.powf(low / 20.)
 }
 
-/// Peak amplitudes, input L/R then output L/R. The packing holds 0 to 1,
-/// which is all a meter ending at 0 dBFS can show.
+/// Peak amplitudes, input L/R then output L/R, as fractions of their meters.
+pub fn fractions(amplitudes: [f32; 4]) -> [f32; 4] {
+    std::array::from_fn(|meter| {
+        let amplitude = amplitudes[meter];
+        if amplitude > 0. {
+            scale_fraction(20. * amplitude.log10(), SCALES_DB[meter])
+        } else {
+            0.
+        }
+    })
+}
+
+pub fn active_bars(fraction: f32, bars: u32) -> u32 {
+    (fraction.clamp(0., 1.) * bars as f32).floor() as u32
+}
+
+/// Meter fractions, input L/R then output L/R.
 #[derive(Debug, Clone, Copy)]
 pub struct Snapshot {
     pub levels: [f32; 4],
@@ -60,20 +91,4 @@ fn unpack(packed: u64) -> [f32; 4] {
         let value = ((packed >> (index * 16)) & u64::from(u16::MAX)) as u16;
         f32::from(value) / f32::from(u16::MAX)
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn meter_changes_only_at_whole_bar_boundaries() {
-        assert_eq!(active_bars(0., 10), 0);
-        assert_eq!(active_bars(1., 10), 10);
-        for bar in 1..10 {
-            let threshold = 10_f32.powf((-60. + bar as f32 * 6.) / 20.);
-            assert_eq!(active_bars(threshold * 0.999, 10), bar - 1);
-            assert_eq!(active_bars(threshold * 1.001, 10), bar);
-        }
-    }
 }

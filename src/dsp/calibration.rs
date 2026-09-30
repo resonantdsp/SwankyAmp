@@ -1,5 +1,6 @@
 //! Measures the shipping path's level compensation on the guitar recordings in
-//! `verification/reference/input`, played as recorded at Input 0.
+//! `verification/reference/input`, played at Input 0 with `RECORDING_GAIN_DB`
+//! applied to both.
 //!
 //! The first stage makes real playing drive the power stage as 1.4.0 did. With
 //! the tone controls at their defaults, the level into the power stage is
@@ -117,8 +118,16 @@ fn shipping_output(controls: AmpControls, clip: &[f32], tables: LevelTables) -> 
     audio
 }
 
-/// The two recordings at `SAMPLE_RATE`, as recorded: the humbucker plays
-/// about 8.7 dB hotter, and that difference is part of what is measured.
+/// The gain both recordings are played at. The takes were recorded a little
+/// under the level 1.x staged a guitar for: its input meter put a light strum
+/// from a single coil at the S notch, -16.5 dBFS, and one from a humbucker at
+/// the H notch, -2.5 dBFS. The same gain on both keeps the player's own gap
+/// between the pickups.
+pub const RECORDING_GAIN_DB: f32 = 2.;
+
+/// The two recordings at `SAMPLE_RATE` with `RECORDING_GAIN_DB` applied: the
+/// humbucker plays about 10 dB hotter, and that difference is part of what is
+/// measured.
 pub struct Clips {
     pub single_coil: Vec<f32>,
     pub humbucker: Vec<f32>,
@@ -126,9 +135,13 @@ pub struct Clips {
 
 impl Clips {
     pub fn new(single_coil_wav: &[u8], humbucker_wav: &[u8]) -> Result<Self, String> {
+        let played = |wav: &[u8]| -> Result<Vec<f32>, String> {
+            let gain = 10_f32.powf(RECORDING_GAIN_DB / 20.);
+            Ok(clip(wav)?.into_iter().map(|sample| sample * gain).collect())
+        };
         Ok(Self {
-            single_coil: clip(single_coil_wav)?,
-            humbucker: clip(humbucker_wav)?,
+            single_coil: played(single_coil_wav)?,
+            humbucker: played(humbucker_wav)?,
         })
     }
 
@@ -551,8 +564,10 @@ mod tests {
 
     fn recordings() -> Clips {
         Clips::new(
-            include_bytes!("../../verification/reference/input/single-coil-plucks-strum-chord.wav"),
-            include_bytes!("../../verification/reference/input/humbucker-plucks-strum-chord.wav"),
+            include_bytes!(
+                "../../verification/reference/input/single-coil-plucks-strum-chord-2.wav"
+            ),
+            include_bytes!("../../verification/reference/input/humbucker-plucks-strum-chord-2.wav"),
         )
         .expect("recordings read")
     }
