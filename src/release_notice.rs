@@ -465,16 +465,14 @@ mod tests {
             let captured = Arc::clone(&request);
             let stop = Arc::new(AtomicBool::new(false));
             let should_stop = Arc::clone(&stop);
+            // Serves until told to stop rather than for a fixed time, because a
+            // loaded machine can start the client arbitrarily late.
             let thread = std::thread::spawn(move || {
-                let deadline = Instant::now() + Duration::from_millis(750);
-                while Instant::now() < deadline && !should_stop.load(Ordering::Relaxed) {
+                while !should_stop.load(Ordering::Relaxed) {
                     match listener.accept() {
                         Ok((mut stream, _)) => {
                             request_count.fetch_add(1, Ordering::Relaxed);
-                            let mut bytes = [0; 8 * 1024];
-                            let read = stream.read(&mut bytes).unwrap_or(0);
-                            *captured.lock().unwrap() =
-                                String::from_utf8_lossy(&bytes[..read]).into_owned();
+                            *captured.lock().unwrap() = read_request_head(&mut stream);
                             let _ = write!(
                                 stream,
                                 "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
@@ -511,6 +509,27 @@ mod tests {
                 thread.join().unwrap();
             }
         }
+    }
+
+    /// Waits for the whole head, because macOS hands out accepted streams
+    /// non-blocking like their listener, and the client may not have written
+    /// anything yet when the connection is accepted.
+    fn read_request_head(stream: &mut std::net::TcpStream) -> String {
+        let mut head = Vec::new();
+        if stream.set_nonblocking(false).is_ok()
+            && stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .is_ok()
+        {
+            let mut bytes = [0; 1024];
+            while !head.windows(4).any(|window| window == b"\r\n\r\n") {
+                match stream.read(&mut bytes) {
+                    Ok(0) | Err(_) => break,
+                    Ok(read) => head.extend_from_slice(&bytes[..read]),
+                }
+            }
+        }
+        String::from_utf8_lossy(&head).into_owned()
     }
 
     fn document(version: Option<&str>) -> Vec<u8> {
