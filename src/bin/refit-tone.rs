@@ -56,8 +56,8 @@ fn xml_value(value: f32) -> String {
     }
 }
 
-/// Voices every 1.4.0 factory preset, keeping the tone controls `current`,
-/// the bank as accepted by ear, gives it.
+/// Voices every 1.4.0 factory preset, keeping the tone controls of the
+/// accepted bank `current`, when given.
 fn voice_all(
     released: &str,
     current: Option<&str>,
@@ -68,7 +68,9 @@ fn voice_all(
         .into_iter()
         .map(|name| {
             let accepted = current
-                .and_then(|bank| presets::controls(bank, &name).ok())
+                .map(|bank| presets::controls(bank, &name))
+                .transpose()
+                .map_err(|error| format!("accepted bank: {error}"))?
                 .map(|bank| [bank.low, bank.mid, bank.high, bank.presence]);
             Ok((presets::controls(released, &name)?, accepted, name))
         })
@@ -290,7 +292,13 @@ fn run() -> Result<(), String> {
     let report = PathBuf::from(option("--report")?);
     let factory = PathBuf::from(option("--factory")?);
     let clips = clips()?;
-    let current = fs::read_to_string(&factory).ok();
+    // Without a bank there is nothing accepted to keep; any other failure
+    // must stop the run rather than fall back to searching the tone controls.
+    let current = match fs::read_to_string(&factory) {
+        Ok(bank) => Some(bank),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => return Err(format!("{}: {error}", factory.display())),
+    };
     let init = calibration::preset_levels(AmpControls::default(), &clips, LevelTables::CALIBRATED);
     let presets = voice_all(&released, current.as_deref(), &clips, init)?;
     let text = markdown(&presets, init);

@@ -53,9 +53,8 @@ drives the power stage as 1.4.0 did. Once a bank is accepted by ear, `just
 refit` keeps its Low, Mid, High and Presence and sets only Power Drive and
 Output again: moving the tone controls bought a few tenths of a dB of balance,
 less than the ear or the recordings resolve. It searches only a preset the
-bank lacks. The bank is accepted by ear. Regenerate the version 2 bank and its
-report, which records each preset's settings, balance and power-stage level
-against 1.4.0, with:
+bank lacks. Regenerate the version 2 bank and its report, which records each
+preset's settings, balance and power-stage level against 1.4.0, with:
 
 ```sh
 just refit
@@ -186,10 +185,10 @@ Grit lowers each triode's grid clip and raises the threshold of its plate compre
 
 The level compensation has two stages, both measured by `calibrate` on the
 guitar recordings in `verification/reference/input`, played at Input 0 with
-`RECORDING_GAIN_DB` (2 dB) applied to both and averaged over the two pickups, at 44.1 kHz with Auto oversampling
-from a settled amplifier, every control but the swept one at its default. The
-reference is the released path, which `just model-check` holds to the frozen
-1.4.0 renders.
+`RECORDING_GAIN_DB` (2 dB) applied to both and averaged over the two pickups,
+at 44.1 kHz with Auto oversampling from a settled amplifier, every control but
+the swept one at its default. The reference is the released path, which `just
+model-check` holds to the frozen 1.4.0 renders.
 
 The first stage keeps 1.4.0's structure and sets how hard the power stage is
 driven. With the tone controls at their defaults, the level into the power

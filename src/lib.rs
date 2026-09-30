@@ -343,22 +343,20 @@ mod tests {
 
     /// 1.x staged a guitar by its input meter: at Input 0 dB a light strum
     /// from a single coil peaks at the S notch and one from a humbucker at H.
-    /// A peak at a notch's level must read at that notch, and the meter must
-    /// fall dark soon after the playing stops.
+    /// At Input 0 the meter must read the injected peak unchanged, and fall
+    /// dark soon after the playing stops.
     #[test]
-    fn input_meter_reads_a_peak_at_its_notch_and_falls_dark_after_it() {
+    fn input_meter_reads_the_injected_peak_at_input_0_and_falls_dark_after_it() {
         let params = SwankyAmpParams::default();
         for (db, letter) in meters::INPUT_NOTCHES {
             let mut engine = engine::Engine::new(&params);
             engine.reset(&params, 48_000., 512);
             let peak = 10_f32.powf(db / 20.);
             let _ = render(&mut engine, &params, &[vec![peak; 512]], 512);
-            let reading = meters::fractions(engine.meter_levels())[0];
-            let notch = meters::scale_fraction(db, meters::INPUT_SCALE_DB);
+            let reading = 20. * engine.meter_levels()[0].log10();
             assert!(
-                (reading - notch).abs() < 0.01,
-                "a {db} dBFS peak read {reading:.3} of the input meter; the {letter} notch \
-                 is drawn at {notch:.3}"
+                (reading - db).abs() < 0.05,
+                "a {db} dBFS peak at Input 0 read {reading:.2} dBFS on the input meter"
             );
 
             let _ = render(&mut engine, &params, &[vec![0.; 96_000]], 512);
