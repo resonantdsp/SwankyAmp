@@ -10,7 +10,9 @@ use std::path::{Path, PathBuf};
 
 use swanky_amp::dsp::amp::{AmpControls, LevelTables};
 use swanky_amp::dsp::calibration::{self, Clips, PresetLevels, RECORDING_GAIN_DB};
-use swanky_amp::dsp::refit::{self, FEED_COST, RAIL, VOICING_RESTRAINT, Voiced, Voicing};
+use swanky_amp::dsp::refit::{
+    self, Comparison, FEED_COST, RAIL, RESOLUTION_DB, STRIKE_FRACTION, Voiced, Voicing,
+};
 use swanky_amp::presets;
 
 /// The Output control spans -35..+35 dB over its stored -1..+1.
@@ -57,8 +59,8 @@ fn xml_value(value: f32) -> String {
     }
 }
 
-/// Voices every 1.4.0 factory preset, keeping the tone controls of the
-/// accepted bank `current`, when given.
+/// Voices every 1.4.0 factory preset, starting from the accepted bank
+/// `current`, when given.
 fn voice_all(
     released: &str,
     current: Option<&str>,
@@ -72,7 +74,7 @@ fn voice_all(
                 .map(|bank| presets::controls(bank, &name))
                 .transpose()
                 .map_err(|error| format!("accepted bank: {error}"))?
-                .map(|bank| [bank.low, bank.mid, bank.high, bank.presence]);
+                .map(Voicing::of);
             Ok((presets::controls(released, &name)?, accepted, name))
         })
         .collect::<Result<Vec<_>, String>>()?;
@@ -144,13 +146,24 @@ fn knob(value: f32) -> f32 {
 
 fn settings(voicing: Voicing) -> String {
     format!(
-        "{:.1} / {:.1} / {:.1} / {:.1} / {:.2}",
-        knob(voicing.low),
-        knob(voicing.mid),
-        knob(voicing.high),
-        knob(voicing.presence),
-        knob(voicing.power_drive)
+        "{} / {} / {} / {} / {}",
+        panel(voicing.low),
+        panel(voicing.mid),
+        panel(voicing.high),
+        panel(voicing.presence),
+        panel(voicing.power_drive)
     )
+}
+
+/// A panel value with as many decimals as it needs, up to two.
+fn panel(value: f32) -> String {
+    let text = format!("{:.2}", knob(value));
+    let text = text.trim_end_matches('0');
+    if text.ends_with('.') {
+        format!("{text}0")
+    } else {
+        text.to_owned()
+    }
 }
 
 fn pair(values: [f64; 2], signed: bool) -> String {
@@ -159,6 +172,33 @@ fn pair(values: [f64; 2], signed: bool) -> String {
     } else {
         format!("{:.1} / {:.1}", values[0], values[1])
     }
+}
+
+fn change(before: [f64; 2], after: [f64; 2], signed: bool) -> String {
+    format!("{} → {}", pair(before, signed), pair(after, signed))
+}
+
+fn band_table(title: &str, presets: &[Preset]) -> String {
+    let centres = refit::band_centres();
+    let shown: Vec<usize> = (0..centres.len())
+        .step_by(4)
+        .chain([centres.len() - 1])
+        .collect();
+    let mut text = format!("{title}\n\n| Preset |");
+    for &band in &shown {
+        text.push_str(&format!(" {:.0} |", centres[band]));
+    }
+    text.push_str("\n|---|");
+    text.push_str(&"---|".repeat(shown.len()));
+    text.push('\n');
+    for preset in presets {
+        text.push_str(&format!("| {} |", preset.name));
+        for &band in &shown {
+            text.push_str(&format!(" {:+.1} |", preset.voiced.strike_bands_db[band]));
+        }
+        text.push('\n');
+    }
+    text
 }
 
 fn markdown(presets: &[Preset], init: PresetLevels) -> String {
@@ -179,19 +219,27 @@ fn markdown(presets: &[Preset], init: PresetLevels) -> String {
          - Each preset is rendered through 1.4.0 (the legacy path, which `just\n\
            model-check` holds to the released renders) and through the shipping\n\
            path at {} Hz with Auto oversampling.\n\
-         - Balance is the output's third-octave band levels from 80 Hz to 8 kHz,\n\
+         - Balance is the output's sixth-octave band levels from 80 Hz to 16 kHz,\n\
            each render's bands taken about their own mean, so level does not\n\
-           count. The error is the mean squared band difference from 1.4.0,\n\
-           averaged over the recordings.\n\
-         - Low, Mid, High and Presence keep the values of the bank being\n\
-           rewritten, the voicing accepted by ear. Only for a preset it lacks are\n\
-           they searched, from the 1.4.0 settings in\n\
-           steps of 1, 0.5, 0.25 and 0.125 on the 0 to 10 scale. Moving a\n\
-           control costs {VOICING_RESTRAINT} dB² per half range squared, and the\n\
-           controls stay within {:.0} to {:.0}, so presets leave room either way.\n\
-         - For every candidate, Power Drive is set so the power stage's input\n\
-           level, averaged over the recordings, matches 1.4.0's. Where Power\n\
-           Drive runs out of range, the miss costs {FEED_COST} dB² per dB².\n\
+           count. It is judged at the strikes: the loudest {:.0} % of each\n\
+           recording's momentary-loudness blocks (the blocks the strike level\n\
+           ranks, below), picked on the recording, where the player struck, so\n\
+           every render is measured over the same stretches. That share takes in\n\
+           the first plucks as well as the strum and the chord. The error is the\n\
+           band difference from 1.4.0 averaged at the fourth power, so a narrow\n\
+           peak counts, averaged over the recordings. The whole-recording error,\n\
+           which the ring-out dominates, is reported beside it.\n\
+         - Low, Mid, High, Presence and Power Drive sit on a grid of half marks\n\
+           on the 0 to 10 scale. The tone controls start from the bank being\n\
+           replaced, the voicing accepted by ear, on whichever neighbouring grid\n\
+           values match best; among roundings within {RESOLUTION_DB} dB of the best,\n\
+           the one off the rails and nearest 1.4.0's settings. They then move a\n\
+           step at a time while a step lowers the error by {RESOLUTION_DB} dB or more,\n\
+           and stay within {:.0} to {:.0}, so presets leave room either way.\n\
+         - Every candidate is judged with Power Drive set so the power stage's\n\
+           input level, averaged over the recordings, matches 1.4.0's; where it\n\
+           runs out of range, the miss costs {FEED_COST} dB² per dB². The bank\n\
+           then takes the grid value nearest that setting in gain.\n\
          - Output then brings each preset's strike level on the humbucker to\n\
            Init's. The strike level is the 95th percentile of momentary\n\
            loudness (BS.1770-4 K-weighted 400 ms blocks at a 100 ms hop, those\n\
@@ -202,52 +250,42 @@ fn markdown(presets: &[Preset], init: PresetLevels) -> String {
            so on the single coil the driven presets come out louder than Init.\n\n\
          ## Results\n\n\
          Controls are Low / Mid / High / Presence / Power Drive on the panel's 0\n\
-         to 10 scale. Balance is the RMS band difference from 1.4.0 in dB and\n\
+         to 10 scale. Errors are the band difference from 1.4.0 in dB and\n\
          feed is the power stage's input level minus 1.4.0's in dB, each for the\n\
-         single coil / humbucker. Unvoiced is version 2 with the 1.4.0 settings.\n\
-         Output is 1.4.0's and then version 2's, in dB.\n\n\
-         | Preset | 1.4.0 | Voiced | Balance unvoiced | Balance voiced | Feed unvoiced | Feed voiced | Output dB |\n\
-         |---|---|---|---|---|---|---|---|\n",
+         single coil / humbucker, from the bank replaced to the voiced one.\n\
+         Exact feed is the voiced tone with Power Drive off the grid, set to\n\
+         restore the feed exactly. Output is 1.4.0's and then version 2's, in dB.\n\n\
+         | Preset | 1.4.0 | Replaced | Voiced | Strike error | Whole error | Feed | Exact feed | Output dB |\n\
+         |---|---|---|---|---|---|---|---|---|\n",
         calibration::SAMPLE_RATE,
+        STRIKE_FRACTION * 100.,
         knob(-RAIL),
         knob(RAIL),
     );
     for preset in presets {
         let voiced = &preset.voiced;
+        let (before, after): (Comparison, Comparison) =
+            (voiced.current_comparison, voiced.voiced_comparison);
         text.push_str(&format!(
-            "| {} | {} | {} | {} | {} | {} | {} | {:+.1} → {:+.1} |\n",
+            "| {} | {} | {} | {} | {} | {} | {} | {} | {:+.1} → {:+.1} |\n",
             preset.name,
             settings(voiced.original),
+            settings(voiced.current),
             settings(voiced.voiced),
-            pair(voiced.unvoiced_balance_db, false),
-            pair(voiced.voiced_balance_db, false),
-            pair(voiced.unvoiced_feed_db, true),
-            pair(voiced.voiced_feed_db, true),
+            change(before.strike_db, after.strike_db, false),
+            change(before.whole_db, after.whole_db, false),
+            change(before.feed_db, after.feed_db, true),
+            pair(voiced.exact_feed_db, true),
             f64::from(preset.output_before) * OUTPUT_RANGE_DB,
             f64::from(preset.output_after) * OUTPUT_RANGE_DB,
         ));
     }
-    text.push_str(
+    text.push_str(&band_table(
         "\n## Remaining balance\n\n\
-         Voiced output band levels minus 1.4.0's in dB, averaged over the\n\
-         recordings, at every other third-octave band.\n\n",
-    );
-    let centres = refit::band_centres();
-    let shown: Vec<usize> = (0..centres.len()).step_by(2).collect();
-    text.push_str("| Preset |");
-    for &band in &shown {
-        text.push_str(&format!(" {:.0} |", centres[band]));
-    }
-    text.push_str("\n|---|");
-    text.push_str(&"---|".repeat(shown.len()));
-    text.push('\n');
-    for preset in presets {
-        text.push_str(&format!("| {} |", preset.name));
-        for &band in &shown {
-            text.push_str(&format!(" {:+.1} |", preset.voiced.voiced_bands_db[band]));
-        }
-        text.push('\n');
-    }
+         Voiced output band levels minus 1.4.0's in dB at the strikes, averaged\n\
+         over the recordings, at every other third-octave band and 16 kHz.",
+        presets,
+    ));
     text.push_str(
         "\n## Levels\n\n\
          After the Output change, each preset's integrated loudness and strike\n\

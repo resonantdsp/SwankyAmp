@@ -30,7 +30,8 @@ installs beside Swanky Amp 1.4.0.
 - Corrected the tone stack's discretisation: 1.4.0 voiced every tone-stack
   feature an octave above the circuit. The ten factory presets are revoiced
   for it on real guitar recordings, judged by the balance between bands at the
-  output, with Power Drive keeping each one's drive into the power stage; the
+  output, with Power Drive keeping each one's drive into the power stage to
+  within about a dB, the nearest half mark on the panel; the
   results are in `verification/tone-stack/refit-report.md`, and Swanky Amp
   1.4.0 remains available for the original voicing. Imported 1.x user
   presets use a faster conversion and can sound boxier than their originals.

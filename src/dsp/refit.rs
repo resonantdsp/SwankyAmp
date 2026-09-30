@@ -483,28 +483,46 @@ pub fn fit(controls: AmpControls, input: &[f32]) -> AmpControls {
     fit_power_drive(toned, level_change)
 }
 
-/// Third-octave bands from 80 Hz to 8 kHz, the range the factory voicing is
-/// judged over.
-const THIRDS: usize = 21;
-/// Cost in dB² of moving Low, Mid, High or Presence by one stored unit, half
-/// the control's range, from the original, so a control moves only as far as the balance pays.
-pub const VOICING_RESTRAINT: f64 = 0.5;
+/// Sixth-octave bands from 80 Hz to 16 kHz, the range the factory voicing is
+/// judged over. Bands this narrow keep a peak such as Presence's from
+/// hiding in its neighbours.
+const BANDS: usize = 47;
+const BANDS_PER_OCTAVE: f64 = 6.;
+/// The share of the recording's momentary-loudness blocks, loudest first,
+/// whose balance the voicing matches: the strikes, where the ear judges a
+/// tone, rather than the ring-out. They are picked on the recording itself,
+/// where the player struck, because a driven preset's loudest blocks are its
+/// sustained chord. Below 0.4 the single plucks drop out and only the strum
+/// and the chord remain.
+pub const STRIKE_FRACTION: f64 = 0.4;
 /// The search keeps the tone controls within this, 1 to 9 on the panel, so a
 /// preset leaves the player room either way.
 pub const RAIL: f32 = 0.8;
 /// Cost in dB² per dB² the power stage's feed misses 1.4.0's when Power
 /// Drive runs out of range to restore it.
 pub const FEED_COST: f64 = 0.5;
-const SEARCH_STEPS: [f32; 4] = [0.2, 0.1, 0.05, 0.025];
+/// One step of the voicing grid in stored units: half a mark on the panel's
+/// 0 to 10 scale. Finer settings are not a tone a player can tell apart.
+const GRID_STEP: f32 = 0.1;
+/// The least a step must lower the balance error, in dB, to be taken.
+pub const RESOLUTION_DB: f64 = 0.1;
 
-/// Band levels in dB about their mean: the tonal balance, not the level.
-fn balance(samples: &[f32], sample_rate: f64) -> [f64; THIRDS] {
-    let size = 8_192;
-    let power = power_spectrum(samples, size);
+/// Band levels in dB about their mean, over `ranges` of the recording: the
+/// tonal balance, not the level.
+fn balance(samples: &[f32], sample_rate: f64, ranges: &[std::ops::Range<usize>]) -> [f64; BANDS] {
+    let size = 16_384;
+    let mut power = vec![0.; size / 2 + 1];
+    for range in ranges {
+        let part = &samples[range.start.min(samples.len())..range.end.min(samples.len())];
+        for (total, value) in power.iter_mut().zip(power_spectrum(part, size)) {
+            *total += value;
+        }
+    }
     let bin_hz = sample_rate / size as f64;
-    let levels: [f64; THIRDS] = std::array::from_fn(|band| {
-        let centre = 80. * 2_f64.powf(band as f64 / 3.);
-        let (low, high) = (centre * 2_f64.powf(-1. / 6.), centre * 2_f64.powf(1. / 6.));
+    let levels: [f64; BANDS] = std::array::from_fn(|band| {
+        let centre = band_centre(band);
+        let half = 2_f64.powf(0.5 / BANDS_PER_OCTAVE);
+        let (low, high) = (centre / half, centre * half);
         let energy: f64 = power
             .iter()
             .enumerate()
@@ -513,17 +531,25 @@ fn balance(samples: &[f32], sample_rate: f64) -> [f64; THIRDS] {
             .sum();
         10. * energy.max(1e-30).log10()
     });
-    let mean = levels.iter().sum::<f64>() / THIRDS as f64;
+    let mean = levels.iter().sum::<f64>() / BANDS as f64;
     levels.map(|level| level - mean)
 }
 
-fn balance_error(balance: &[f64; THIRDS], reference: &[f64; THIRDS]) -> f64 {
-    balance
+fn band_centre(band: usize) -> f64 {
+    80. * 2_f64.powf(band as f64 / BANDS_PER_OCTAVE)
+}
+
+/// The balance error in dB², from band differences averaged at the fourth
+/// power: a narrow peak costs more than the same energy spread thin, where
+/// a mean square would call a 2 dB peak cheap.
+fn balance_error(balance: &[f64; BANDS], reference: &[f64; BANDS]) -> f64 {
+    (balance
         .iter()
         .zip(reference)
-        .map(|(value, target)| (value - target).powi(2))
+        .map(|(value, target)| (value - target).powi(4))
         .sum::<f64>()
-        / THIRDS as f64
+        / BANDS as f64)
+        .sqrt()
 }
 
 fn level_db(samples: &[f32]) -> f64 {
@@ -535,10 +561,25 @@ fn level_db(samples: &[f32]) -> f64 {
         .log10()
 }
 
-/// One recording through a path: its output balance, the level it feeds the
-/// power stage and the tone-stack seam's power spectrum.
+/// Overlapping block ranges joined, so no stretch of the recording counts
+/// twice.
+fn merged(ranges: Vec<std::ops::Range<usize>>) -> Vec<std::ops::Range<usize>> {
+    let mut joined: Vec<std::ops::Range<usize>> = Vec::new();
+    for range in ranges {
+        match joined.last_mut() {
+            Some(last) if range.start <= last.end => last.end = last.end.max(range.end),
+            _ => joined.push(range),
+        }
+    }
+    joined
+}
+
+/// One recording through a path: its output balance over the whole
+/// recording and at the strikes, the level it feeds the power stage and the
+/// tone-stack seam's power spectrum.
 struct Heard {
-    balance: [f64; THIRDS],
+    whole: [f64; BANDS],
+    strike: [f64; BANDS],
     feed_db: f64,
     seam: Vec<f64>,
     seam_rate: f64,
@@ -546,7 +587,12 @@ struct Heard {
 
 const SEAM_WINDOW: usize = 16_384;
 
-fn hear(controls: AmpControls, legacy: bool, clip: &[f32]) -> Heard {
+fn hear(
+    controls: AmpControls,
+    legacy: bool,
+    clip: &[f32],
+    strikes: &[std::ops::Range<usize>],
+) -> Heard {
     let rate = super::calibration::SAMPLE_RATE;
     let mut seams = SeamOutput::with_capacity(clip.len() * 2);
     let mut audio = clip.to_vec();
@@ -569,7 +615,12 @@ fn hear(controls: AmpControls, legacy: bool, clip: &[f32]) -> Heard {
         path.factor()
     };
     Heard {
-        balance: balance(&audio, f64::from(rate)),
+        whole: balance(
+            &audio,
+            f64::from(rate),
+            std::slice::from_ref(&(0..audio.len())),
+        ),
+        strike: balance(&audio, f64::from(rate), strikes),
         feed_db: level_db(&seams.power_input),
         seam: if legacy {
             Vec::new()
@@ -602,9 +653,34 @@ fn seam_change_db(heard: &Heard, original: AmpControls, candidate: AmpControls) 
     10. * (new / old).log10()
 }
 
-/// Power Drive that brings the power stage's feed back by `change_db`,
-/// within the control's range, and the dB it still misses by.
-fn power_drive_for(controls: AmpControls, change_db: f64) -> (f32, f64) {
+/// A stored value's position on the voicing grid, in steps from -1.
+fn grid_index(value: f32) -> f64 {
+    f64::from((value + 1.) / GRID_STEP)
+}
+
+fn grid_value(index: i32) -> f32 {
+    (f64::from(index) * f64::from(GRID_STEP) - 1.) as f32
+}
+
+/// The grid values either side of `value`, or the one it sits on.
+fn neighbours(value: f32, lowest: i32, highest: i32) -> Vec<i32> {
+    let index = grid_index(value);
+    let mut indices = if (index - index.round()).abs() < 1e-3 {
+        vec![index.round() as i32]
+    } else {
+        vec![index.floor() as i32, index.ceil() as i32]
+    };
+    for index in &mut indices {
+        *index = (*index).clamp(lowest, highest);
+    }
+    indices.dedup();
+    indices
+}
+
+/// Power Drive that brings the power stage's feed back by `change_db`: the
+/// exact setting within the control's range, the grid value nearest it in
+/// gain, and the dB the exact setting still misses by.
+fn power_drive_for(controls: AmpControls, change_db: f64) -> (f32, f32, f64) {
     let target = power_gain_db(controls) + change_db;
     let at = |power_drive: f32| {
         power_gain_db(AmpControls {
@@ -621,8 +697,14 @@ fn power_drive_for(controls: AmpControls, change_db: f64) -> (f32, f64) {
             high = middle;
         }
     }
-    let power_drive = (0.5 * (low + high) * 1000.).round() / 1000.;
-    (power_drive, target - at(power_drive))
+    let exact = (0.5 * (low + high) * 1000.).round() / 1000.;
+    let full = grid_index(1.) as i32;
+    let on_grid = neighbours(exact, 0, full)
+        .into_iter()
+        .map(grid_value)
+        .min_by(|a, b| (target - at(*a)).abs().total_cmp(&(target - at(*b)).abs()))
+        .expect("a grid value is always near");
+    (exact, on_grid, target - at(exact))
 }
 
 /// The four tone controls the voicing moves, plus Power Drive, which follows
@@ -673,45 +755,101 @@ impl Voicing {
     }
 }
 
+/// How a setting compares with 1.4.0 on each recording (single coil,
+/// humbucker).
+#[derive(Debug, Clone, Copy)]
+pub struct Comparison {
+    /// Band difference from 1.4.0's balance at the strikes, in dB, as the
+    /// voicing weighs it.
+    pub strike_db: [f64; 2],
+    /// The same over the whole recording.
+    pub whole_db: [f64; 2],
+    /// The power stage's feed minus 1.4.0's, in dB.
+    pub feed_db: [f64; 2],
+}
+
 /// A preset voiced for the corrected stack: its settings and how far each
-/// version is from 1.4.0 on the recordings.
+/// is from 1.4.0 on the recordings.
 #[derive(Debug, Clone)]
 pub struct Voiced {
     pub original: Voicing,
+    /// The bank being replaced, or the 1.4.0 settings without one.
+    pub current: Voicing,
     pub voiced: Voicing,
-    /// RMS difference of the output balance from 1.4.0 in dB, per recording
-    /// (single coil, humbucker), with the original knobs and after voicing.
-    pub unvoiced_balance_db: [f64; 2],
-    pub voiced_balance_db: [f64; 2],
-    /// Output band levels minus 1.4.0's, averaged over the recordings.
-    pub voiced_bands_db: [f64; THIRDS],
-    /// The power stage's feed minus 1.4.0's, per recording.
-    pub unvoiced_feed_db: [f64; 2],
-    pub voiced_feed_db: [f64; 2],
+    pub current_comparison: Comparison,
+    pub voiced_comparison: Comparison,
+    /// The feed with Power Drive off the grid, restoring it exactly for the
+    /// voiced tone, minus 1.4.0's.
+    pub exact_feed_db: [f64; 2],
+    /// Voiced output band levels minus 1.4.0's at the strikes, averaged
+    /// over the recordings.
+    pub strike_bands_db: [f64; BANDS],
 }
 
-/// Third-octave band centres of `Voiced::voiced_bands_db`, in Hz.
-pub fn band_centres() -> [f64; THIRDS] {
-    std::array::from_fn(|band| 80. * 2_f64.powf(band as f64 / 3.))
+/// Band centres of `Voiced::strike_bands_db`, in Hz.
+pub fn band_centres() -> [f64; BANDS] {
+    std::array::from_fn(band_centre)
+}
+
+struct Trial {
+    voicing: Voicing,
+    heard: [Heard; 2],
+    cost: f64,
+}
+
+impl Trial {
+    fn score(&self) -> f64 {
+        self.cost.sqrt()
+    }
 }
 
 /// Voices `controls`, a preset made on 1.4.0's octave-high stack, for the
-/// corrected one, and Power Drive follows so the power stage is driven as
-/// 1.4.0 drove it. `accepted` is Low, Mid, High and Presence as already
-/// accepted by ear, which are kept: a search moves them by amounts the ear
-/// and the recordings cannot resolve. Without them the four are searched so
-/// the output's tonal balance on real playing is as close to 1.4.0's as the
-/// restraint allows.
+/// corrected one on a grid of half panel marks. `current` is the voicing
+/// already accepted by ear, the starting point; without it the 1.4.0
+/// settings are. Low, Mid, High and Presence start on whichever
+/// neighbouring grid values match 1.4.0's balance at the strikes best, then
+/// move a step at a time while a step improves it by `RESOLUTION_DB`.
+/// Power Drive follows every setting so the power stage is driven as 1.4.0
+/// drove it.
 pub fn voice(
     controls: AmpControls,
-    accepted: Option<[f32; 4]>,
+    current: Option<Voicing>,
     clips: &super::calibration::Clips,
 ) -> Voiced {
     let clips = [clips.single_coil.as_slice(), clips.humbucker.as_slice()];
-    let reference = clips.map(|clip| hear(controls, true, clip));
-    let unvoiced = clips.map(|clip| hear(controls, false, clip));
+    let strikes =
+        clips.map(|clip| merged(super::calibration::loudest_blocks(clip, STRIKE_FRACTION)));
+    let reference =
+        std::array::from_fn::<_, 2, _>(|index| hear(controls, true, clips[index], &strikes[index]));
+    let unvoiced = std::array::from_fn::<_, 2, _>(|index| {
+        hear(controls, false, clips[index], &strikes[index])
+    });
     let original = Voicing::of(controls);
-    let feed_for = |tone: [f32; 4]| {
+    let current = current.unwrap_or(original);
+    let heard = |voicing: Voicing| {
+        std::array::from_fn::<_, 2, _>(|index| {
+            hear(
+                voicing.apply(controls),
+                false,
+                clips[index],
+                &strikes[index],
+            )
+        })
+    };
+    let compare = |heard: &[Heard; 2]| {
+        let each = |error: &dyn Fn(usize) -> f64| std::array::from_fn(error);
+        Comparison {
+            strike_db: each(&|index| {
+                balance_error(&heard[index].strike, &reference[index].strike).sqrt()
+            }),
+            whole_db: each(&|index| {
+                balance_error(&heard[index].whole, &reference[index].whole).sqrt()
+            }),
+            feed_db: each(&|index| heard[index].feed_db - reference[index].feed_db),
+        }
+    };
+    let trial = |tone: [i32; 4]| {
+        let tone = tone.map(grid_value);
         let candidate = original.with_tone(tone).apply(controls);
         let change = (0..2)
             .map(|index| {
@@ -721,83 +859,126 @@ pub fn voice(
             })
             .sum::<f64>()
             / 2.;
-        let (power_drive, miss) = power_drive_for(candidate, change);
+        let (exact_power_drive, power_drive, miss) = power_drive_for(candidate, change);
+        // The tone is judged with the feed restored exactly, so the choice
+        // between tones does not ride on where Power Drive's grid falls.
+        let heard = heard(Voicing {
+            power_drive: exact_power_drive,
+            ..original.with_tone(tone)
+        });
         let voicing = Voicing {
             power_drive,
             ..original.with_tone(tone)
         };
-        (voicing, miss)
-    };
-    let cost = |(voicing, miss): (Voicing, f64)| {
-        let candidate = voicing.apply(controls);
-        let heard = clips.map(|clip| hear(candidate, false, clip));
         let sound = (0..2)
-            .map(|index| balance_error(&heard[index].balance, &reference[index].balance))
+            .map(|index| balance_error(&heard[index].strike, &reference[index].strike))
             .sum::<f64>()
             / 2.;
-        let moved: f64 = voicing
-            .tone()
-            .iter()
-            .zip(original.tone())
-            .map(|(new, old)| f64::from(new - old).powi(2))
-            .sum();
-        sound + VOICING_RESTRAINT * moved + FEED_COST * miss.powi(2)
+        Trial {
+            voicing,
+            heard,
+            cost: sound + FEED_COST * miss.powi(2),
+        }
     };
-    let mut best =
-        feed_for(accepted.unwrap_or_else(|| original.tone().map(|value| value.clamp(-RAIL, RAIL))));
-    let mut best_cost = cost(best);
-    let steps = if accepted.is_some() {
-        &[][..]
-    } else {
-        &SEARCH_STEPS[..]
-    };
-    for &step in steps {
-        loop {
-            let mut improved = false;
-            for control in 0..4 {
-                for direction in [-1., 1.] {
-                    let mut tone = best.0.tone();
-                    tone[control] = (tone[control] + direction * step).clamp(-RAIL, RAIL);
-                    tone[control] = (tone[control] * 1000.).round() / 1000.;
-                    if tone == best.0.tone() {
-                        continue;
-                    }
-                    let candidate = feed_for(tone);
-                    let candidate_cost = cost(candidate);
-                    if candidate_cost < best_cost - 1e-6 {
-                        best = candidate;
-                        best_cost = candidate_cost;
-                        improved = true;
-                    }
+    let rail = grid_index(RAIL).round() as i32;
+    let floor = grid_index(-RAIL).round() as i32;
+    let starts: Vec<Vec<i32>> = current
+        .tone()
+        .iter()
+        .map(|&value| neighbours(value, floor, rail))
+        .collect();
+    let mut rounded: Vec<([i32; 4], Trial)> = Vec::new();
+    for &low in &starts[0] {
+        for &mid in &starts[1] {
+            for &high in &starts[2] {
+                for &presence in &starts[3] {
+                    let tone = [low, mid, high, presence];
+                    rounded.push((tone, trial(tone)));
                 }
-            }
-            if !improved {
-                break;
             }
         }
     }
-    let best = best.0;
-    let voiced = clips.map(|clip| hear(best.apply(controls), false, clip));
-    let rms = |heard: &[Heard; 2]| {
-        std::array::from_fn(|index| {
-            balance_error(&heard[index].balance, &reference[index].balance).sqrt()
+    // Among roundings the ear cannot tell apart, the one off the rails and
+    // nearest 1.4.0's settings.
+    let best_score = rounded
+        .iter()
+        .map(|(_, trial)| trial.score())
+        .fold(f64::INFINITY, f64::min);
+    let origin = original.tone().map(grid_index);
+    let preference = |tone: &[i32; 4]| {
+        let on_rails = tone
+            .iter()
+            .filter(|&&index| index == rail || index == floor)
+            .count();
+        let distance: f64 = tone
+            .iter()
+            .zip(origin)
+            .map(|(&index, target)| (f64::from(index) - target).abs())
+            .sum();
+        (on_rails, distance)
+    };
+    let (mut tone, mut best) = rounded
+        .into_iter()
+        .filter(|(_, trial)| trial.score() <= best_score + RESOLUTION_DB)
+        .min_by(|(a, _), (b, _)| {
+            let (a, b) = (preference(a), preference(b));
+            a.0.cmp(&b.0).then(a.1.total_cmp(&b.1))
         })
-    };
-    let feed = |heard: &[Heard; 2]| {
-        std::array::from_fn(|index| heard[index].feed_db - reference[index].feed_db)
-    };
+        .expect("at least one rounding");
+    loop {
+        let mut step: Option<([i32; 4], Trial)> = None;
+        for control in 0..4 {
+            for direction in [-1, 1] {
+                let mut next = tone;
+                next[control] += direction;
+                if !(floor..=rail).contains(&next[control]) {
+                    continue;
+                }
+                let candidate = trial(next);
+                let bar = step
+                    .as_ref()
+                    .map_or(best.score() - RESOLUTION_DB, |(_, trial)| trial.score());
+                if candidate.score() <= bar {
+                    step = Some((next, candidate));
+                }
+            }
+        }
+        let Some((next, trial)) = step else {
+            break;
+        };
+        tone = next;
+        best = trial;
+    }
+    // A control left on a rail comes a step in where that is as good.
+    for control in 0..4 {
+        let inward = match tone[control] {
+            index if index == rail => index - 1,
+            index if index == floor => index + 1,
+            _ => continue,
+        };
+        let mut next = tone;
+        next[control] = inward;
+        let candidate = trial(next);
+        if candidate.score() <= best.score() + RESOLUTION_DB {
+            tone = next;
+            best = candidate;
+        }
+    }
+    let exact = best.heard;
+    let voiced = heard(best.voicing);
+    let current_heard = heard(current);
     Voiced {
         original,
-        voiced: best,
-        unvoiced_balance_db: rms(&unvoiced),
-        voiced_balance_db: rms(&voiced),
-        voiced_bands_db: std::array::from_fn(|band| {
+        current,
+        voiced: best.voicing,
+        current_comparison: compare(&current_heard),
+        voiced_comparison: compare(&voiced),
+        exact_feed_db: std::array::from_fn(|index| exact[index].feed_db - reference[index].feed_db),
+        strike_bands_db: std::array::from_fn(|band| {
             (0..2)
-                .map(|index| voiced[index].balance[band] - reference[index].balance[band])
+                .map(|index| voiced[index].strike[band] - reference[index].strike[band])
                 .sum::<f64>()
                 / 2.
         }),
-        unvoiced_feed_db: feed(&unvoiced),
-        voiced_feed_db: feed(&voiced),
     }
 }

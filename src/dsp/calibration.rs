@@ -204,6 +204,11 @@ fn biquad(samples: &[f64], b: [f64; 3], a: [f64; 3]) -> Vec<f64> {
         .collect()
 }
 
+/// The standard's 400 ms momentary block at `SAMPLE_RATE`, and its 75 %
+/// overlap.
+const MOMENTARY_BLOCK: usize = SAMPLE_RATE as usize * 2 / 5;
+const MOMENTARY_HOP: usize = MOMENTARY_BLOCK / 4;
+
 /// The K-weighted power of every 400 ms block of a mono signal at
 /// `SAMPLE_RATE`, at the standard's 75 % overlap.
 fn block_powers(samples: &[f32]) -> Vec<f64> {
@@ -240,8 +245,7 @@ fn block_powers(samples: &[f32]) -> Vec<f64> {
         [(1. + cos) / 2., -(1. + cos), (1. + cos) / 2.],
         [1. + alpha, -2. * cos, 1. - alpha],
     );
-    let size = (0.4 * rate) as usize;
-    let hop = size / 4;
+    let (size, hop) = (MOMENTARY_BLOCK, MOMENTARY_HOP);
     (0..=weighted.len().saturating_sub(size) / hop)
         .map(|block| {
             let window = &weighted[block * hop..block * hop + size];
@@ -299,6 +303,29 @@ pub fn strike_level(samples: &[f32]) -> f64 {
         .get(rank.saturating_sub(1))
         .copied()
         .unwrap_or(f64::NEG_INFINITY)
+}
+
+/// The sample ranges, in time order, of the loudest `fraction` of the blocks
+/// `strike_level` ranks. At 0.05 they are the blocks at or above the strike
+/// level.
+pub fn loudest_blocks(samples: &[f32], fraction: f64) -> Vec<std::ops::Range<usize>> {
+    let blocks: Vec<(usize, f64)> = block_powers(samples)
+        .into_iter()
+        .map(block_level)
+        .enumerate()
+        .filter(|&(_, level)| level > -70.)
+        .collect();
+    let mut levels: Vec<f64> = blocks.iter().map(|&(_, level)| level).collect();
+    levels.sort_by(f64::total_cmp);
+    let rank = ((1. - fraction) * levels.len() as f64).ceil() as usize;
+    let Some(&threshold) = levels.get(rank.saturating_sub(1)) else {
+        return Vec::new();
+    };
+    blocks
+        .into_iter()
+        .filter(|&(_, level)| level >= threshold)
+        .map(|(block, _)| block * MOMENTARY_HOP..block * MOMENTARY_HOP + MOMENTARY_BLOCK)
+        .collect()
 }
 
 fn table_point(index: usize) -> f32 {
