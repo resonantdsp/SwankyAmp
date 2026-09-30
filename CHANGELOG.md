@@ -28,8 +28,8 @@ installs beside Swanky Amp 1.4.0.
   1x at 88.2 kHz and above, and the header's oversampling button cycles Auto,
   1x, 2x and 4x and names the factor the engine resolved.
 - Corrected the tone stack's discretisation: 1.4.0 voiced every tone-stack
-  feature an octave above the circuit. The ten factory presets are voiced
-  again on real guitar recordings, judged by the balance between bands at the
+  feature an octave above the circuit. The ten factory presets are revoiced
+  for it on real guitar recordings, judged by the balance between bands at the
   output, with Power Drive keeping each one's drive into the power stage; the
   results are in `verification/tone-stack/refit-report.md`, and Swanky Amp
   1.4.0 remains available for the original voicing. Imported 1.x user
@@ -56,15 +56,15 @@ installs beside Swanky Amp 1.4.0.
   Input 0: with the tone controls at their
   defaults, playing drives the power stage within about 1 dB of 1.4.0 at every
   Drive on every tone stack.
-- Drive, Power Drive and Grit now change the sound without changing the
-  volume. At playing level 1.4.0 got several dB louder as Drive and Power
-  Drive rose, and Grit silenced the amplifier at its top. Output gains
+- Drive, Power Drive and Grit change the sound without changing the volume.
+  In 1.4.0 the level moved by several dB across Drive and Power Drive, most on
+  a humbucker, and Grit silenced the amplifier at its top. Output gains
   measured by `just calibrate` hold the loudness, averaged over the
   recordings, close to Init's across each control.
 - Fixed Grit silencing the amplifier near its top: it raised a triode
   compressor's threshold past the stage's plate signal, collapsing the
-  stage's output to a constant (-52 dB in 1.4.0, -100 dB after the knee
-  correction). The threshold now stops just short of that point.
+  stage's output to a constant, 52 dB down. The threshold now stops just
+  short of that point.
 - Input, Output and the level gains Drive and Power Drive derive now glide
   linearly across the block in which they change instead of stepping, so
   sweeping or automating them no longer clicks or zippers. The tube stages,

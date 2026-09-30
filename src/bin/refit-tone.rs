@@ -1,7 +1,8 @@
 //! Voices the 1.4.0 factory presets for the corrected tone stack and writes
-//! the version 2 factory bank with a report. The result is a starting point
-//! for listening, not a contract: the bank is judged by ear and may be
-//! adjusted by hand afterwards.
+//! the version 2 factory bank with a report. Low, Mid, High and Presence come
+//! from the bank being rewritten, the voicing accepted by ear, and are searched
+//! only for a preset it lacks; Power Drive and Output are measured on every
+//! run. The bank is judged by ear, not by the report.
 
 use std::env;
 use std::fs;
@@ -167,7 +168,7 @@ fn markdown(presets: &[Preset], init: PresetLevels) -> String {
          Version 2 discretises the tone stack with the standard bilinear constant\n\
          `2·SR`. Swanky Amp 1.4.0 used `SR`, which voiced every tone-stack\n\
          feature an octave above the circuit. The factory presets were made on\n\
-         that stack, so each is voiced again to keep its character: the same\n\
+         that stack, so each is revoiced to keep its character: the same\n\
          balance between bands at the output, and the power stage driven as\n\
          hard. The corrected stack cannot reproduce the octave-high scoop\n\
          exactly, so the aim is the right range, not a replica.\n\n\
@@ -183,7 +184,7 @@ fn markdown(presets: &[Preset], init: PresetLevels) -> String {
            count. The error is the mean squared band difference from 1.4.0,\n\
            averaged over the recordings.\n\
          - Low, Mid, High and Presence keep the values of the bank being\n\
-           replaced, the voicing accepted by ear. Only for a preset it lacks are\n\
+           rewritten, the voicing accepted by ear. Only for a preset it lacks are\n\
            they searched, from the 1.4.0 settings in\n\
            steps of 1, 0.5, 0.25 and 0.125 on the 0 to 10 scale. Moving a\n\
            control costs {VOICING_RESTRAINT} dB² per half range squared, and the\n\
@@ -203,7 +204,8 @@ fn markdown(presets: &[Preset], init: PresetLevels) -> String {
          Controls are Low / Mid / High / Presence / Power Drive on the panel's 0\n\
          to 10 scale. Balance is the RMS band difference from 1.4.0 in dB and\n\
          feed is the power stage's input level minus 1.4.0's in dB, each for the\n\
-         single coil / humbucker. Unvoiced is version 2 with the 1.4.0 settings.\n\n\
+         single coil / humbucker. Unvoiced is version 2 with the 1.4.0 settings.\n\
+         Output is 1.4.0's and then version 2's, in dB.\n\n\
          | Preset | 1.4.0 | Voiced | Balance unvoiced | Balance voiced | Feed unvoiced | Feed voiced | Output dB |\n\
          |---|---|---|---|---|---|---|---|\n",
         calibration::SAMPLE_RATE,

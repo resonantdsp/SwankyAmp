@@ -54,18 +54,19 @@ above the circuit. Version 2 ships the standard mapping. The legacy path, which
 mapping so that comparison still proves the port. Anyone who wants the old
 voicing exactly can keep Swanky Amp 1.4.0 installed beside version 2.
 
-The factory presets were voiced on the octave-high stack, so each is voiced
-again for the corrected one on the guitar recordings in
-`verification/reference/input`, judged at the output. Low, Mid, High and
-Presence are searched so the balance between third-octave bands from 80 Hz to
-8 kHz is as close to 1.4.0's as a light cost on moving each control allows,
-with the controls kept between 1 and 9, and Power Drive follows so each preset
-drives the power stage as 1.4.0 did. Once a bank is accepted by ear, `just
-refit` keeps its Low, Mid, High and Presence and sets only Power Drive and
-Output again: moving the tone controls bought a few tenths of a dB of balance,
-less than the ear or the recordings resolve. It searches only a preset the
-bank lacks. Regenerate the version 2 bank and its report, which records each
-preset's settings, balance and power-stage level against 1.4.0, with:
+The factory presets were voiced on the octave-high stack, so each is revoiced
+for the corrected one on the [guitar recordings](verification/reference/input/README.md),
+judged at the output. Low, Mid, High and Presence were set so the balance
+between third-octave bands from 80 Hz to 8 kHz is as close to 1.4.0's as a
+light cost on moving each control allows, with the controls kept between 1 and
+9, and then accepted by ear. `just refit` keeps those four as the bank has
+them, since searching them further buys a few tenths of a dB of balance, less
+than the ear or the recordings resolve; it searches them only for a preset the
+bank lacks. On every run it sets Power Drive so each preset feeds the power
+stage as 1.4.0 did, and Output so each strikes at Init's level (see
+[Presets](#presets)). Rerun it after `just calibrate`, and listen to the
+result. Regenerate the version 2 bank and its report, which records each
+preset's settings, balance and power-stage feed against 1.4.0, with:
 
 ```sh
 just refit
@@ -78,16 +79,19 @@ Known limits of the corrected stack against 1.4.0:
 
 - 1.4.0's scoop sat an octave higher than any setting of the corrected stack
   can place it, and the corrected Low acts only below about 125 Hz. The
-  voiced presets keep 150 to 400 Hz 1 to 2 dB under 1.4.0 and 1 to 1.6 kHz
-  about 1 dB over; the [voicing report](verification/tone-stack/refit-report.md)
-  lists the remainder per preset.
+  voiced presets keep 150 to 400 Hz up to 0.6 dB under 1.4.0 (level 11 up to
+  1.7 dB) and 1 to 1.6 kHz up to 2 dB over; the
+  [voicing report](verification/tone-stack/refit-report.md) lists the
+  remainder per preset.
 - Init is the corrected stack at its default settings and is not revoiced:
-  against 1.4.0 it has 3.5 to 7 dB less between 100 and 400 Hz and 4 to
-  5.6 dB more between 0.8 and 1.6 kHz.
-- At playing level 1.4.0 got several dB louder as Drive and Power Drive rose
-  towards 10, by how much depending on the pickup. Version 2 holds Init's
-  level across both, so high Drive and Power Drive settings play quieter than
-  they did in 1.4.0.
+  against 1.4.0 it has 3 to 6.3 dB less between 100 and 400 Hz and 3.8 to
+  4.7 dB more between 0.8 and 1.6 kHz.
+- 1.4.0's level moved with Drive and Power Drive, differently on each pickup:
+  on the recordings, full Drive played 4.5 dB (single coil) and 8.4 dB
+  (humbucker) under Init, and full Power Drive 1.4 and 7.0 dB under. Version 2
+  holds Init's level averaged over the two pickups, so high Drive and Power
+  Drive settings play louder against Init than they did in 1.4.0, and each
+  pickup still lands up to about 3 dB either side of Init.
 
 These levels are measured at 44.1 kHz with Auto oversampling and on the three
 tone stacks themselves, not on blends between them.
@@ -195,10 +199,10 @@ Grit lowers each triode's grid clip and raises the threshold of its plate compre
 ### Level calibration
 
 The level compensation has two stages, both measured by `calibrate` on the
-guitar recordings in `verification/reference/input`, played at Input 0 with
-`RECORDING_GAIN_DB` (2 dB) applied to both and averaged over the two pickups,
-at 44.1 kHz with Auto oversampling from a settled amplifier, every control but
-the swept one at its default. The reference is the released path, which `just
+[guitar recordings](verification/reference/input/README.md), staged by the
+1.x input meter as that README describes, played at Input 0 and averaged over
+the two pickups, at 44.1 kHz with Auto oversampling from a settled amplifier,
+every control but the swept one at its default. The reference is the released path, which `just
 model-check` holds to the frozen 1.4.0 renders.
 
 The first stage keeps 1.4.0's structure and sets how hard the power stage is

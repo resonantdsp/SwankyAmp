@@ -118,11 +118,11 @@ fn shipping_output(controls: AmpControls, clip: &[f32], tables: LevelTables) -> 
     audio
 }
 
-/// The gain both recordings are played at. The takes were recorded a little
-/// under the level 1.x staged a guitar for: on its input meter a light strum
-/// peaked about one third of the way up with a single coil, -16.5 dBFS, and
-/// about two thirds with a humbucker, -2.5 dBFS. The same gain on both keeps
-/// the player's own gap between the pickups.
+/// The gain both recordings are played at, set by the 1.x input meter's
+/// staging: at Input 0 a light strum peaks about one third of the way up with
+/// a single coil, -16.5 dBFS, and about two thirds with a humbucker,
+/// -2.5 dBFS. One gain on both keeps the player's own gap between the
+/// pickups; the recordings' README says how it is chosen.
 pub const RECORDING_GAIN_DB: f32 = 2.;
 
 /// The two recordings at `SAMPLE_RATE` with `RECORDING_GAIN_DB` applied: the
@@ -564,10 +564,8 @@ mod tests {
 
     fn recordings() -> Clips {
         Clips::new(
-            include_bytes!(
-                "../../verification/reference/input/single-coil-plucks-strum-chord-2.wav"
-            ),
-            include_bytes!("../../verification/reference/input/humbucker-plucks-strum-chord-2.wav"),
+            include_bytes!("../../verification/reference/input/single-coil-plucks-strum-chord.wav"),
+            include_bytes!("../../verification/reference/input/humbucker-plucks-strum-chord.wav"),
         )
         .expect("recordings read")
     }
