@@ -204,6 +204,11 @@ fn biquad(samples: &[f64], b: [f64; 3], a: [f64; 3]) -> Vec<f64> {
         .collect()
 }
 
+/// The standard's 400 ms momentary block at `SAMPLE_RATE`, and its 75 %
+/// overlap.
+const MOMENTARY_BLOCK: usize = SAMPLE_RATE as usize * 2 / 5;
+const MOMENTARY_HOP: usize = MOMENTARY_BLOCK / 4;
+
 /// The K-weighted power of every 400 ms block of a mono signal at
 /// `SAMPLE_RATE`, at the standard's 75 % overlap.
 fn block_powers(samples: &[f32]) -> Vec<f64> {
@@ -240,8 +245,7 @@ fn block_powers(samples: &[f32]) -> Vec<f64> {
         [(1. + cos) / 2., -(1. + cos), (1. + cos) / 2.],
         [1. + alpha, -2. * cos, 1. - alpha],
     );
-    let size = (0.4 * rate) as usize;
-    let hop = size / 4;
+    let (size, hop) = (MOMENTARY_BLOCK, MOMENTARY_HOP);
     (0..=weighted.len().saturating_sub(size) / hop)
         .map(|block| {
             let window = &weighted[block * hop..block * hop + size];
@@ -305,8 +309,6 @@ pub fn strike_level(samples: &[f32]) -> f64 {
 /// `strike_level` ranks. At 0.05 they are the blocks at or above the strike
 /// level.
 pub fn loudest_blocks(samples: &[f32], fraction: f64) -> Vec<std::ops::Range<usize>> {
-    let size = (0.4 * f64::from(SAMPLE_RATE)) as usize;
-    let hop = size / 4;
     let blocks: Vec<(usize, f64)> = block_powers(samples)
         .into_iter()
         .map(block_level)
@@ -322,7 +324,7 @@ pub fn loudest_blocks(samples: &[f32], fraction: f64) -> Vec<std::ops::Range<usi
     blocks
         .into_iter()
         .filter(|&(_, level)| level >= threshold)
-        .map(|(block, _)| block * hop..block * hop + size)
+        .map(|(block, _)| block * MOMENTARY_HOP..block * MOMENTARY_HOP + MOMENTARY_BLOCK)
         .collect()
 }
 

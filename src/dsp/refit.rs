@@ -503,7 +503,7 @@ pub const RAIL: f32 = 0.8;
 pub const FEED_COST: f64 = 0.5;
 /// One step of the voicing grid in stored units: half a mark on the panel's
 /// 0 to 10 scale. Finer settings are not a tone a player can tell apart.
-pub const GRID_STEP: f32 = 0.1;
+const GRID_STEP: f32 = 0.1;
 /// The least a step must lower the balance error, in dB, to be taken.
 pub const RESOLUTION_DB: f64 = 0.1;
 
@@ -776,21 +776,14 @@ pub struct Voiced {
     /// The bank being replaced, or the 1.4.0 settings without one.
     pub current: Voicing,
     pub voiced: Voicing,
-    /// Power Drive that restores the feed exactly for the voiced tone,
-    /// before it is put on the grid.
-    pub exact_power_drive: f32,
     pub current_comparison: Comparison,
     pub voiced_comparison: Comparison,
-    /// The feed with `exact_power_drive`, minus 1.4.0's.
+    /// The feed with Power Drive off the grid, restoring it exactly for the
+    /// voiced tone, minus 1.4.0's.
     pub exact_feed_db: [f64; 2],
-    /// Voiced output band levels minus 1.4.0's at the strikes and over the
-    /// whole recording, averaged over the recordings.
+    /// Voiced output band levels minus 1.4.0's at the strikes, averaged
+    /// over the recordings.
     pub strike_bands_db: [f64; BANDS],
-    pub whole_bands_db: [f64; BANDS],
-    /// RMS difference in dB between the bank's band differences at the
-    /// strikes and over the whole recording: how far the two pictures
-    /// disagree.
-    pub picture_gap_db: f64,
 }
 
 /// Band centres of `Voiced::strike_bands_db`, in Hz.
@@ -800,7 +793,6 @@ pub fn band_centres() -> [f64; BANDS] {
 
 struct Trial {
     voicing: Voicing,
-    exact_power_drive: f32,
     heard: [Heard; 2],
     cost: f64,
 }
@@ -884,7 +876,6 @@ pub fn voice(
             / 2.;
         Trial {
             voicing,
-            exact_power_drive,
             heard,
             cost: sound + FEED_COST * miss.powi(2),
         }
@@ -976,38 +967,18 @@ pub fn voice(
     let exact = best.heard;
     let voiced = heard(best.voicing);
     let current_heard = heard(current);
-    let bands = |pick: &dyn Fn(&Heard) -> &[f64; BANDS]| {
-        std::array::from_fn(|band| {
-            (0..2)
-                .map(|index| pick(&voiced[index])[band] - pick(&reference[index])[band])
-                .sum::<f64>()
-                / 2.
-        })
-    };
-    let picture_gap_db = ((0..2)
-        .map(|index| {
-            (0..BANDS)
-                .map(|band| {
-                    let strike = current_heard[index].strike[band] - reference[index].strike[band];
-                    let whole = current_heard[index].whole[band] - reference[index].whole[band];
-                    (strike - whole).powi(2)
-                })
-                .sum::<f64>()
-                / BANDS as f64
-        })
-        .sum::<f64>()
-        / 2.)
-        .sqrt();
     Voiced {
         original,
         current,
         voiced: best.voicing,
-        exact_power_drive: best.exact_power_drive,
         current_comparison: compare(&current_heard),
         voiced_comparison: compare(&voiced),
         exact_feed_db: std::array::from_fn(|index| exact[index].feed_db - reference[index].feed_db),
-        strike_bands_db: bands(&|heard| &heard.strike),
-        whole_bands_db: bands(&|heard| &heard.whole),
-        picture_gap_db,
+        strike_bands_db: std::array::from_fn(|band| {
+            (0..2)
+                .map(|index| voiced[index].strike[band] - reference[index].strike[band])
+                .sum::<f64>()
+                / 2.
+        }),
     }
 }

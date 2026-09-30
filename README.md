@@ -82,8 +82,8 @@ Known limits of the corrected stack against 1.4.0:
 
 - 1.4.0's scoop sat an octave higher than any setting of the corrected stack
   can place it, and the corrected Low acts only below about 125 Hz. The
-  voiced presets keep 150 to 400 Hz up to 0.6 dB under 1.4.0 (level 11 up to
-  1.7 dB) and 1 to 1.6 kHz up to 2 dB over; the
+  voiced presets keep 150 to 400 Hz up to 1.1 dB under 1.4.0 (level 11 up to
+  2.7 dB) and around 1.3 kHz 0.5 to 2.5 dB over; the
   [voicing report](verification/tone-stack/refit-report.md) lists the
   remainder per preset.
 - Init is the corrected stack at its default settings and is not revoiced:

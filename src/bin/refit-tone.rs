@@ -178,7 +178,7 @@ fn change(before: [f64; 2], after: [f64; 2], signed: bool) -> String {
     format!("{} → {}", pair(before, signed), pair(after, signed))
 }
 
-fn band_table(title: &str, presets: &[Preset], bands: fn(&Voiced) -> &[f64]) -> String {
+fn band_table(title: &str, presets: &[Preset]) -> String {
     let centres = refit::band_centres();
     let shown: Vec<usize> = (0..centres.len())
         .step_by(4)
@@ -194,7 +194,7 @@ fn band_table(title: &str, presets: &[Preset], bands: fn(&Voiced) -> &[f64]) -> 
     for preset in presets {
         text.push_str(&format!("| {} |", preset.name));
         for &band in &shown {
-            text.push_str(&format!(" {:+.1} |", bands(&preset.voiced)[band]));
+            text.push_str(&format!(" {:+.1} |", preset.voiced.strike_bands_db[band]));
         }
         text.push('\n');
     }
@@ -280,26 +280,11 @@ fn markdown(presets: &[Preset], init: PresetLevels) -> String {
             f64::from(preset.output_after) * OUTPUT_RANGE_DB,
         ));
     }
-    text.push_str(&format!(
-        "\nThe strike and whole-recording pictures of the replaced bank differ by\n\
-         {} dB RMS across the bands, preset by preset in the order above.\n\n",
-        presets
-            .iter()
-            .map(|preset| format!("{:.1}", preset.voiced.picture_gap_db))
-            .collect::<Vec<_>>()
-            .join(", ")
-    ));
     text.push_str(&band_table(
-        "## Remaining balance\n\n\
+        "\n## Remaining balance\n\n\
          Voiced output band levels minus 1.4.0's in dB at the strikes, averaged\n\
          over the recordings, at every other third-octave band and 16 kHz.",
         presets,
-        |voiced| &voiced.strike_bands_db,
-    ));
-    text.push_str(&band_table(
-        "\nThe same over the whole recordings.",
-        presets,
-        |voiced| &voiced.whole_bands_db,
     ));
     text.push_str(
         "\n## Levels\n\n\
