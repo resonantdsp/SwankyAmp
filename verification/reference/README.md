@@ -112,15 +112,14 @@ libc++ freeze fingerprint and the complete observed libstdc++ fingerprint. The
 check accepts only an exact match to one of them, including all eight families
 and all five values per family.
 
-Floating-point contraction changes the nonlinear sample trajectory: on Linux,
-all 30 WAVs differed from the Apple arm64 freeze even though the instrumented
-and untouched paths remained bit identical in each process. Compiling the same
-source on the freeze machine with contraction disabled reproduced that drift.
-The Linux matrix observed a worst sample error of `0.00185403`, RMS error of
-`0.000399044`, seam-level drift of `0.026258 dB`, and six-band output-level
-drift of `0.00162867 dB`. Raw sample and RMS errors remain diagnostics. The
-portable gate checks every seam within `0.03 dB` and six output bands split at
-120, 400, 1,200, 3,500, and 8,000 Hz within `0.002 dB`.
+Floating-point contraction changes the nonlinear sample trajectory, so a
+compiler that contracts differently, as on Linux, changes every WAV while the
+instrumented and untouched paths stay bit identical in each process. On Linux
+the worst sample error is `0.00185403`, the RMS error `0.000399044`, the
+seam-level drift `0.026258 dB` and the six-band output-level drift
+`0.00162867 dB`. Raw sample and RMS errors are diagnostics only. The portable
+gate checks every seam within `0.03 dB` and six output bands split at 120, 400,
+1,200, 3,500, and 8,000 Hz within `0.002 dB`.
 
 The exact freeze environment is identified by its OS/platform, arm64
 architecture, compiler driver and Apple Clang version, and `-std=c++20 -O2`
@@ -128,16 +127,13 @@ flags; it must reproduce all 30 WAVs byte for byte. Every environment must
 preserve bit identity between the untouched and instrumented paths, match a
 strict detune fingerprint, and pass the seam and band-level gates.
 
-`render.sh` refuses to overwrite `frozen/`. The original freeze renderer may
-use the explicit `--replace-frozen` option only on the canonical macOS arm64
-Apple Clang/libc++ environment. This extended comparison renderer cannot replace
-the authoritative cold baseline.
-
-The feature flags are opt-in. Omitting them preserves every frozen cold WAV and
-JSON report byte-for-byte. `frozen/` remains the authoritative released fixture;
-seam exports and warmed renders are generated comparison artifacts. The
-manifest records the original freeze renderer hash separately from the current
-compatible verification renderer hash.
+`render.sh` refuses to overwrite `frozen/`; only the original freeze renderer,
+with the explicit `--replace-frozen` option on the canonical macOS arm64 Apple
+Clang/libc++ environment, may replace it. The seam and pre-roll options are
+opt-in, and omitting them reproduces every frozen cold WAV and JSON report byte
+for byte. `frozen/` is the authoritative released fixture; seam exports and
+warmed renders are generated comparison artifacts. The manifest records the
+original freeze renderer's hash separately from the current renderer's.
 
 The renderer preserves the released octave-high tone-stack discretisation,
 soft-clip knee, two sweep tables, block-constant static gains, and seeded
