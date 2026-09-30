@@ -301,6 +301,31 @@ pub fn strike_level(samples: &[f32]) -> f64 {
         .unwrap_or(f64::NEG_INFINITY)
 }
 
+/// The sample ranges, in time order, of the loudest `fraction` of the blocks
+/// `strike_level` ranks. At 0.05 they are the blocks at or above the strike
+/// level.
+pub fn loudest_blocks(samples: &[f32], fraction: f64) -> Vec<std::ops::Range<usize>> {
+    let size = (0.4 * f64::from(SAMPLE_RATE)) as usize;
+    let hop = size / 4;
+    let blocks: Vec<(usize, f64)> = block_powers(samples)
+        .into_iter()
+        .map(block_level)
+        .enumerate()
+        .filter(|&(_, level)| level > -70.)
+        .collect();
+    let mut levels: Vec<f64> = blocks.iter().map(|&(_, level)| level).collect();
+    levels.sort_by(f64::total_cmp);
+    let rank = ((1. - fraction) * levels.len() as f64).ceil() as usize;
+    let Some(&threshold) = levels.get(rank.saturating_sub(1)) else {
+        return Vec::new();
+    };
+    blocks
+        .into_iter()
+        .filter(|&(_, level)| level >= threshold)
+        .map(|(block, _)| block * hop..block * hop + size)
+        .collect()
+}
+
 fn table_point(index: usize) -> f32 {
     -1. + 2. * index as f32 / (TABLE_POINTS - 1) as f32
 }

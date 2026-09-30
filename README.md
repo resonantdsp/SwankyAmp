@@ -56,17 +56,20 @@ voicing exactly can keep Swanky Amp 1.4.0 installed beside version 2.
 
 The factory presets were voiced on the octave-high stack, so each is revoiced
 for the corrected one on the [guitar recordings](verification/reference/input/README.md),
-judged at the output. Low, Mid, High and Presence were set so the balance
-between third-octave bands from 80 Hz to 8 kHz is as close to 1.4.0's as a
-light cost on moving each control allows, with the controls kept between 1 and
-9, and then accepted by ear. `just refit` keeps those four as the bank has
-them, since searching them further buys a few tenths of a dB of balance, less
-than the ear or the recordings resolve; it searches them only for a preset the
-bank lacks. On every run it sets Power Drive so each preset feeds the power
-stage as 1.4.0 did, and Output so each strikes at Init's level (see
-[Presets](#presets)). Rerun it after `just calibrate`, and listen to the
-result. Regenerate the version 2 bank and its report, which records each
-preset's settings, balance and power-stage feed against 1.4.0, with:
+judged at the output where the player strikes: the loudest 40 % of each
+recording's momentary-loudness blocks, which take in the plucks, the strum and
+the chord. Low, Mid, High and Presence move on a grid of half marks so the
+balance between sixth-octave bands from 80 Hz to 16 kHz is as close to 1.4.0's
+as the grid allows, starting from the bank accepted by ear and moving a step
+only where that buys at least 0.1 dB, with the controls kept between 1 and 9.
+Measured at the strikes or over the whole recording, the balance against 1.4.0
+agrees within a few tenths of a dB, so the choice of window moves no knob. On
+every run `just refit` sets Power Drive so each preset feeds the power stage as
+1.4.0 did, to the nearest half mark, within about a dB, and Output so each
+strikes at Init's level (see [Presets](#presets)). Rerun it after `just
+calibrate`, and listen to the result. Regenerate the version 2 bank and its
+report, which records each preset's settings, balance and power-stage feed
+against 1.4.0, with:
 
 ```sh
 just refit
