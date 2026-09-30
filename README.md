@@ -422,8 +422,9 @@ shipping identities, and each artifact's size and SHA-256. An RC tag creates a
 draft GitHub Release once. The workflow refuses an RC tag that already has a
 release at its start, before any signing, and the final job refuses again
 rather than replace one, so any new bytes require a new RC number and a fresh
-review. A run that failed partway resumes with "Re-run failed jobs"; re-running
-all jobs is refused once the draft exists. Workflow artifacts are also retained
+review. A run that failed partway resumes with "Re-run failed jobs", unless it
+failed after creating the draft, which needs a new RC; re-running all jobs is
+refused once the draft exists. Workflow artifacts are also retained
 for rehearsals and inspection.
 
 ### Signing setup
@@ -475,7 +476,7 @@ tag other than `vX.Y.Z` or a candidate tag other than `vX.Y.Z-rc.N`, so no
 branch's code runs in the release environment. It then checks out
 `refs/tags/<tag>` without leaving the repository token in the tree and runs the
 release-script tests from it; tokens reach only the steps that call GitHub or
-the website. It verifies a successful candidate workflow, requires both tags
+the website, and the tree those steps run comes from an administrator-only tag. It verifies a successful candidate workflow, requires both tags
 and the checkout to resolve to the recorded commit, rechecks
 the record plus every artifact byte, and then creates the stable GitHub Release
 from those files. It does not compile or sign. If a later proof or website step

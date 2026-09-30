@@ -337,10 +337,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "$RELEASE" >/dev/null 2>&1; then
+          if gh release view "$RELEASE" 2>"$RUNNER_TEMP/err" >/dev/null; then
             echo "$RELEASE already has a GitHub release; refusing to replace candidate bytes." >&2
             exit 1
           fi
+          grep -qx 'release not found' "$RUNNER_TEMP/err" || { cat "$RUNNER_TEMP/err" >&2; exit 1; }
           version=$(python3 .github/scripts/release_contract.py version)
           awk -v version="$version" '
             $0 ~ "^## " version "( |$)" { printing = 1; next }
