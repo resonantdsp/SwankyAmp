@@ -12,7 +12,16 @@ Install Rust through [rustup](https://rustup.rs/) and install [just](https://git
 just
 ```
 
-The gate checks formatting, lints the crate without the plugin-format features, and runs its behavioral tests. CI runs the full set, `just ci-checks`, on every push: it also lints with the plugin-format features, tests the format adapters and the vendored standalone host, runs the release-script tests, verifies the [released reference renderer](verification/reference/README.md), compares the Rust amplifier's legacy path against all ten released factory presets at 44.1 kHz and 1x processing, proves the committed level calibration reproduces, and validates the artwork package. Run a part of it locally only when the change touches that area: `just release-tests` for the release scripts; `just reference-check`, `just model-check` and `just calibrate-check` for the DSP; `just validate-assets` for artwork or layout; `just clippy-all` and `just test-all` for the vendored host or a format adapter.
+The gate checks formatting, lints every target of the crate with the default features (the plug-in formats and the standalone) and the tools, and runs the crate's behavioral tests without the default features. It therefore compiles the format adapters and the standalone binary but does not run their tests.
+
+CI runs the full set, `just ci-checks`, on every pull request and every push to master. Beyond the gate it lints without the default features, runs the format adapters' tests and the vendored standalone host's tests, runs the release-script tests, verifies the [released reference renderer](verification/reference/README.md), compares the Rust amplifier's legacy path against all ten released factory presets at 44.1 kHz and 1x processing, proves the committed level calibration reproduces, and validates the artwork package.
+
+Run a part of it locally only when the change touches that area:
+
+- `just release-tests` for the release scripts;
+- `just reference-check`, `just model-check` and `just calibrate-check` for the DSP;
+- `just validate-assets` for artwork or layout;
+- `just clippy-all` and `just test-all` for the vendored host, a format adapter or the standalone.
 
 The offline tools in `src/bin` build only with the `tools` feature, which keeps them out of the plug-in format builds; the recipes that run them turn it on.
 

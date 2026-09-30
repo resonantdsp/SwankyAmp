@@ -46,12 +46,16 @@ setup:
 fmt:
     cargo fmt --all --check
 
+# The default features (the plug-in formats and the standalone) compile the
+# most of the crate: everything the set without them does, plus the format
+# adapters and the standalone binary.
 clippy:
-    cargo clippy --all-targets --no-default-features --features tools -- -D warnings
-
-# Also lints the format adapters and the standalone.
-clippy-all: clippy
     cargo clippy --all-targets --features tools -- -D warnings
+
+# Also lints without the default features, where code only they use would be
+# dead.
+clippy-all: clippy
+    cargo clippy --all-targets --no-default-features --features tools -- -D warnings
 
 test:
     cargo test --no-default-features --features tools
@@ -169,11 +173,8 @@ refresh-artwork layers="assets/artwork":
 notices:
     bash scripts/notices.sh
 
-# The per-change gate. CI runs the full set in `ci-checks` on every push; run
-# one of its checks locally only when the change touches that area:
-# `release-tests` for the release scripts; `reference-check`, `model-check`
-# and `calibrate-check` for the DSP; `validate-assets` for artwork or layout;
-# `clippy-all` and `test-all` for the vendored host or a format adapter.
+# The per-change gate. CI runs `ci-checks`; the README says which of its
+# checks to run locally for which kind of change.
 check: fmt clippy test
 
 build:

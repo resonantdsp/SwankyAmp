@@ -6,6 +6,10 @@ rust-version = "1.92"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/resonantdsp/SwankyAmp"
 publish = false
+# Binaries are declared below so that a new file in src/bin cannot join the
+# plug-in format builds without the `tools` gate.
+autobins = false
+default-run = "swanky-amp-2"
 
 [lib]
 crate-type = ["cdylib", "staticlib", "rlib"]
@@ -16,7 +20,7 @@ path = "src/main.rs"
 required-features = ["standalone"]
 
 # The offline measurement tools sit behind the `tools` feature because
-# cargo-truce builds every target of the package for each plug-in format, and
+# cargo-truce builds every binary of the package for each plug-in format, and
 # link-optimising six tools per format cost minutes of each bundle build.
 [[bin]]
 name = "render-model"
