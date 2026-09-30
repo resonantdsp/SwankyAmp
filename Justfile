@@ -84,11 +84,12 @@ dsp-report output="verification/dsp/oversampling-plate.json":
         target/debug/render-model target/debug/dsp-probe "{{ output }}"
 
 recordings := "verification/reference/input"
-recording_args := "--single-coil " + recordings / "single-coil-plucks-strum-chord-2.wav" + " --humbucker " + recordings / "humbucker-plucks-strum-chord-2.wav"
+recording_args := "--single-coil " + recordings / "single-coil-plucks-strum-chord.wav" + " --humbucker " + recordings / "humbucker-plucks-strum-chord.wav"
 
-# Voice the 1.4.0 factory presets for the corrected tone stack on the guitar
-# recordings and rewrite the version 2 bank and its report. A starting point
-# for listening; takes minutes in a release build.
+# Rewrite the version 2 factory bank and its report from the 1.4.0 presets on
+# the guitar recordings: keep the bank's Low, Mid, High and Presence, match
+# Power Drive to 1.4.0's power-stage feed and balance Output to Init's strike
+# level. Rerun after `just calibrate` and listen; minutes in a release build.
 refit:
     cargo build --release --quiet --no-default-features --features tools --bin refit-tone
     target/release/refit-tone --presets verification/reference/released/Resources/presets.xml \
