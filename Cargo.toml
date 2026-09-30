@@ -15,25 +15,43 @@ name = "swanky-amp-2"
 path = "src/main.rs"
 required-features = ["standalone"]
 
+# The offline measurement tools sit behind the `tools` feature because
+# cargo-truce builds every target of the package for each plug-in format, and
+# link-optimising six tools per format cost minutes of each bundle build.
 [[bin]]
 name = "render-model"
 path = "src/bin/render-model.rs"
+required-features = ["tools"]
 
 [[bin]]
 name = "dsp-probe"
 path = "src/bin/dsp-probe.rs"
+required-features = ["tools"]
 
 [[bin]]
 name = "refit-tone"
 path = "src/bin/refit-tone.rs"
+required-features = ["tools"]
 
 [[bin]]
 name = "soak"
 path = "src/bin/soak.rs"
+required-features = ["tools"]
+
+[[bin]]
+name = "tone-stack-soak"
+path = "src/bin/tone-stack-soak.rs"
+required-features = ["tools"]
 
 [[bin]]
 name = "calibrate"
 path = "src/bin/calibrate.rs"
+required-features = ["tools"]
+
+[[test]]
+name = "soak"
+path = "tests/soak.rs"
+required-features = ["tools"]
 
 [features]
 default = ["clap", "vst3", "standalone"]
@@ -46,6 +64,9 @@ standalone = ["dep:truce-standalone"]
 # Windows recipes enable it.
 asio = ["truce-standalone?/asio"]
 rt-paranoid = ["truce/rt-paranoid"]
+# Builds the offline measurement tools in src/bin; the recipes that run them
+# turn it on.
+tools = []
 
 [dependencies]
 truce = { version = "=6.3.0", default-features = false }

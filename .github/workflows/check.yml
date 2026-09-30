@@ -13,6 +13,11 @@ name: check
 # named for the unresolved expression and the two per-platform names never
 # appear. Its legs therefore always start, and every step declines instead,
 # so each leg reports its real name and finishes in seconds.
+#
+# `bundles` also waits for `checks`, so the twenty-minute builds are not spent
+# on a change that already failed. Its legs start even when `checks` fails or
+# is skipped; after a failure, or a failed `changes`, each leg fails at once
+# rather than declining, so no green bundle check stands for work never done.
 on:
   push:
     branches: [master]
@@ -102,13 +107,20 @@ jobs:
 
   bundles:
     name: bundles (${{ matrix.os }})
-    needs: changes
+    needs: [changes, checks]
+    if: ${{ !cancelled() }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [macos-15, windows-2025]
     steps:
+      - name: Require passing checks
+        if: needs.changes.result != 'success' || (needs.checks.result != 'success' && needs.checks.result != 'skipped')
+        shell: bash
+        run: |
+          echo "changes: ${{ needs.changes.result }}, checks: ${{ needs.checks.result }}; bundles not built."
+          exit 1
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         if: needs.changes.outputs.code == 'true'
       - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0

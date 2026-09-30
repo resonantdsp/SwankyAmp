@@ -47,13 +47,18 @@ fmt:
     cargo fmt --all --check
 
 clippy:
-    cargo clippy --all-targets --no-default-features -- -D warnings
-    cargo clippy --all-targets -- -D warnings
+    cargo clippy --all-targets --no-default-features --features tools -- -D warnings
 
-# The vendored standalone host is a patched dependency, whose tests the
-# crate's own run leaves out.
+# Also lints the format adapters and the standalone.
+clippy-all: clippy
+    cargo clippy --all-targets --features tools -- -D warnings
+
 test:
-    cargo test --no-default-features
+    cargo test --no-default-features --features tools
+
+# Also tests the format adapters and the vendored standalone host, a patched
+# dependency whose tests the crate's own run leaves out.
+test-all: test
     cargo test --no-default-features --features clap,standalone,rt-paranoid adapter_
     cargo test -p truce-standalone
 
@@ -65,12 +70,12 @@ reference-check:
     bash verification/reference/check.sh
 
 model-check:
-    cargo build --quiet --no-default-features --bin render-model
+    cargo build --quiet --no-default-features --features tools --bin render-model
     python3 verification/model/check.py target/debug/render-model
 
 # Regenerate the measured oversampling and plate-filter evidence.
 dsp-report output="verification/dsp/oversampling-plate.json":
-    cargo build --quiet --no-default-features --bin render-model --bin dsp-probe
+    cargo build --quiet --no-default-features --features tools --bin render-model --bin dsp-probe
     python3 verification/dsp/report.py \
         target/debug/render-model target/debug/dsp-probe "{{ output }}"
 
@@ -81,7 +86,7 @@ recording_args := "--single-coil " + recordings / "single-coil-plucks-strum-chor
 # recordings and rewrite the version 2 bank and its report. A starting point
 # for listening; takes minutes in a release build.
 refit:
-    cargo build --release --quiet --no-default-features --bin refit-tone
+    cargo build --release --quiet --no-default-features --features tools --bin refit-tone
     target/release/refit-tone --presets verification/reference/released/Resources/presets.xml \
         {{ recording_args }} --report verification/tone-stack/refit-report.md \
         --factory presets/factory-2.0.xml
@@ -89,23 +94,23 @@ refit:
 # Measure the shipping path's preamp and output level tables against the
 # released path and rewrite them as source.
 calibrate:
-    cargo build --quiet --no-default-features --bin calibrate
+    cargo build --quiet --no-default-features --features tools --bin calibrate
     target/debug/calibrate {{ recording_args }} --data src/dsp/calibration_data.rs
 
 # Fails unless a fresh measurement reproduces the committed level tables.
 calibrate-check:
-    cargo build --quiet --no-default-features --bin calibrate
+    cargo build --quiet --no-default-features --features tools --bin calibrate
     target/debug/calibrate {{ recording_args }} --data src/dsp/calibration_data.rs --check
 
 # Regenerate the unit-knee seam residuals per factory preset and input level.
 knee-report output="verification/dsp/knee.json":
-    cargo build --quiet --no-default-features --bin render-model
+    cargo build --quiet --no-default-features --features tools --bin render-model
     python3 verification/dsp/knee.py target/debug/render-model "{{ output }}"
 
 # Render one released factory preset through the Rust baseline, including the
 # internal seam WAVs used to localize any model drift.
 render-model preset="clean" output="verification/model-output.wav":
-    cargo run --quiet --no-default-features --bin render-model -- \
+    cargo run --quiet --no-default-features --features tools --bin render-model -- \
         --input verification/reference/input/single-coil.wav \
         --presets verification/reference/released/Resources/presets.xml \
         --preset "{{ preset }}" --sample-rate 44100 \
@@ -114,14 +119,14 @@ render-model preset="clean" output="verification/model-output.wav":
 # Pre-release: drive the shipping tone stack alone for 24 hours of samples at
 # 44.1, 88.2 and 176.4 kHz and fail on any drift. Minutes in a release build.
 tone-stack-soak hours="24":
-    cargo build --release --quiet --no-default-features --bin tone-stack-soak
+    cargo build --release --quiet --no-default-features --features tools --bin tone-stack-soak
     target/release/tone-stack-soak "{{ hours }}"
 
 # Start the long-run diagnostic soak (issue #34) in the background: three
 # presets on the shipping path plus level 11 on the legacy path, logs under
 # target/soak.
 soak hours="4":
-    cargo build --release --quiet --no-default-features --bin soak
+    cargo build --release --quiet --no-default-features --features tools --bin soak
     bash scripts/soak.sh start "{{ hours }}"
 
 # Print the soak verdict from target/soak, finished or still running.
@@ -164,8 +169,12 @@ refresh-artwork layers="assets/artwork":
 notices:
     bash scripts/notices.sh
 
-
-check: fmt clippy test release-tests reference-check model-check calibrate-check validate-assets
+# The per-change gate. CI runs the full set in `ci-checks` on every push; run
+# one of its checks locally only when the change touches that area:
+# `release-tests` for the release scripts; `reference-check`, `model-check`
+# and `calibrate-check` for the DSP; `validate-assets` for artwork or layout;
+# `clippy-all` and `test-all` for the vendored host or a format adapter.
+check: fmt clippy test
 
 build:
     bash scripts/truce.sh build {{ bundle_formats }} {{ bundle_features }}
@@ -203,6 +212,7 @@ promote-check candidate_tag tag record_sha256 directory:
     python3 .github/scripts/release_contract.py verify-candidate \
         "{{ candidate_tag }}" "{{ tag }}" "{{ record_sha256 }}" "{{ directory }}"
 
-ci-checks: check
+# Everything CI's Linux job proves before any bundle is built.
+ci-checks: fmt clippy-all test-all release-tests reference-check model-check calibrate-check validate-assets
 
 ci-bundles: build-standalone (validate "--skip-gui-tests")
