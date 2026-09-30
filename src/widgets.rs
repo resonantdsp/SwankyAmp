@@ -297,17 +297,19 @@ impl<'a, R: FreeRenderer + 'a> From<Knob> for Element<'a, Msg, Theme, R> {
     }
 }
 
-/// The release-notice mark: an information sign at rest, a download arrow
-/// when a newer release is known. It is drawn from round-capped strokes so
-/// it needs neither an image asset nor arrow coverage in the interface font.
+/// The information button's mark: Pro's settings cog at rest, a download
+/// arrow when a newer release is known. Neither needs an image asset nor
+/// arrow coverage in the interface font.
 pub struct NoticeGlyph {
     pub download: bool,
     pub color: Color,
 }
 
 const GLYPH_STROKE: f32 = 0.75;
+/// Pro's header glyph box: the cog is drawn on twenty units scaled to it.
+const COG_SIZE: f32 = 8.8;
 
-impl<R: iced_core::Renderer> Widget<Msg, Theme, R> for NoticeGlyph {
+impl<R: FreeRenderer> Widget<Msg, Theme, R> for NoticeGlyph {
     fn size(&self) -> Size<Length> {
         Size::new(Length::Fill, Length::Fill)
     }
@@ -346,32 +348,49 @@ impl<R: iced_core::Renderer> Widget<Msg, Theme, R> for NoticeGlyph {
                 self.color,
             );
         } else {
-            let radius = 6.0;
-            renderer.fill_quad(
-                renderer::Quad {
-                    bounds: Rectangle::new(
-                        at(-radius, -radius),
-                        Size::new(radius * 2.0, radius * 2.0),
-                    ),
-                    border: iced_core::Border {
-                        color: self.color,
-                        width: 1.1,
-                        radius: radius.into(),
-                    },
-                    ..Default::default()
-                },
-                Color::TRANSPARENT,
-            );
-            disk(renderer, at(0.0, -2.75), 0.9, self.color);
-            stroke(renderer, &[at(0.0, -0.5), at(0.0, 3.25)], self.color);
+            draw_cog(renderer, layout.bounds(), self.color);
         }
     }
 }
 
-impl<'a, R: iced_core::Renderer + 'a> From<NoticeGlyph> for Element<'a, Msg, Theme, R> {
+impl<'a, R: FreeRenderer + 'a> From<NoticeGlyph> for Element<'a, Msg, Theme, R> {
     fn from(glyph: NoticeGlyph) -> Self {
         Element::new(glyph)
     }
+}
+
+// A cog: a ring with six stubby teeth, the mark players read as settings.
+// Square teeth traced around a hub close up into a blot at the header's
+// size; a stroked ring keeps its hole and radial strokes keep their gaps.
+// Its centre sits on a pixel centre, as Pro's fixed glyph box places it:
+// centred on a pixel edge, the teeth smear into a plain ring at 1x.
+fn draw_cog<R: FreeRenderer>(renderer: &mut R, bounds: Rectangle, color: Color) {
+    use iced_core::Vector;
+    use iced_graphics::geometry::{LineCap, LineJoin, Path, Stroke};
+    let scale = COG_SIZE / 20.;
+    renderer.graphic(bounds, move |frame| {
+        let centre = bounds.center();
+        let c = Point::new(
+            centre.x.floor() + 0.5 - bounds.x,
+            centre.y.floor() + 0.5 - bounds.y,
+        );
+        let stroke = Stroke::default()
+            .with_width(1.6)
+            .with_color(color)
+            .with_line_cap(LineCap::Round)
+            .with_line_join(LineJoin::Round);
+        let at = |x: f32, y: f32| c + Vector::new(x * scale, y * scale);
+        frame.stroke(&Path::circle(at(0., 0.), 5. * scale), stroke);
+        let teeth = Path::new(|b| {
+            for tooth in 0..6 {
+                let angle = tooth as f32 * std::f32::consts::TAU / 6.;
+                let (sin, cos) = angle.sin_cos();
+                b.move_to(at(6. * cos, 6. * sin));
+                b.line_to(at(8.6 * cos, 8.6 * sin));
+            }
+        });
+        frame.stroke(&teeth, stroke.with_width(2.4).with_line_cap(LineCap::Butt));
+    });
 }
 
 fn stroke<R: iced_core::Renderer + ?Sized>(renderer: &mut R, points: &[Point], color: Color) {

@@ -95,12 +95,12 @@ installs beside Swanky Amp 1.4.0.
   while the cabinet is off, and stay adjustable.
 - Lit the level meters from each instance's own signal, rising instantly and
   falling to 1/e in 0.3 s: input after the Input control on 1.4.0's -26 to
-  +8 dBFS scale with its S and H notches, where a light strum from a single
-  coil or a humbucker should peak, and output after the cabinet and Output
-  control on -60 to 0 dBFS. Hosts that show plugin meters receive the same
-  four levels.
-- Added an information panel, opened from the header's information button:
-  it names the product and its version, links to the website, the manual and
+  +8 dBFS scale, where a light strum peaks about one third of the way up with
+  a single coil, about two thirds with a humbucker, and output after the
+  cabinet and Output control on -60 to 0 dBFS. Hosts that show plugin meters
+  receive the same four levels.
+- Added an information panel, opened from the header's cog button: it
+  names the product and its version, links to the website, the manual and
   support, and closes with Escape, the button again or a press outside. Its
   Copy diagnostics link copies the version, system, host and format, sample
   rate and buffer for a support request, and its Third-party licences link
@@ -117,8 +117,8 @@ installs beside Swanky Amp 1.4.0.
   artwork package with its receipt and licence, and `just unpack-artwork`
   recreates the EXR layers from the package, which pack back to it byte for
   byte.
-- Added a bounded, cached release notice: the information button turns into a
-  highlighted download arrow when a newer stable release is published, and the
+- Added a bounded, cached release notice: the header's cog button turns into
+  a highlighted download arrow when a newer stable release is published, and the
   panel announces it with a link to the fixed catalogue page.
 - Kept the standalone app's input from falling behind its output: a guitar
   played through it stays within about one buffer, where startup, a stall or

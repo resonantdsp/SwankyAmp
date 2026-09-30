@@ -338,13 +338,14 @@ The four live meter columns, captioned L and R, are local to each plugin
 instance. The blue input pair observes the signal after the Input control; the
 output pair, in the accent, observes the final signal after the optional
 cabinet and Output control. Cells light from the bottom up. The input meter
-keeps 1.4.0's scale, -26 to +8 dBFS, and its S and H notches at -16.5 and
--2.5 dBFS, where a light strum from a single coil or a humbucker should peak;
-the player stages the guitar with Input by eye. The output meter spans -60 to
-0 dBFS, one cell per 6 dB. A mono instance mirrors its reading into L
-and R. Levels rise immediately and fall to 1/e in 0.3 s, settling to exact
-darkness, after which the editor has no meter change to redraw; the meters also go dark
-while the editor window has lost focus and the pointer is elsewhere.
+keeps 1.4.0's scale, -26 to +8 dBFS, and the player stages the guitar with
+Input by eye: a light strum peaks about one third of the way up the input
+meter with a single coil, about two thirds with a humbucker. The output meter
+spans -60 to 0 dBFS, one cell per 6 dB. A mono instance mirrors its reading
+into L and R. Levels rise immediately and fall to 1/e in 0.3 s, settling to
+exact darkness, after which the editor has no meter change to redraw; the
+meters also go dark while the editor window has lost focus and the pointer is
+elsewhere.
 
 The repository carries the artwork as `assets/artwork.pack` with its
 `receipt.json` and `ARTWORK-LICENSE.txt` in `assets/artwork`; the editable
@@ -508,10 +509,10 @@ read-only identity and byte checks from the stable tag checkout.
 
 ## Information panel and release notices
 
-The header carries a small outlined information button to the left of the
-preset bar. A press opens the information panel over the dimmed editor: the
-product name and running version, such as "Swanky Amp Free 2.0.0", and links
-to the website's product page, the manual and support, each tagged
+The header carries a small outlined button with Pro's settings cog to the left
+of the preset bar. A press opens the information panel over the dimmed editor:
+the product name and running version, such as "Swanky Amp Free 2.0.0", and
+links to the website's product page, the manual and support, each tagged
 `utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=information`. Below
 them, Interface size offers 75, 100, 125 and 150 %; a press resizes the editor
 at once and is remembered for every later editor on the computer (see
@@ -541,7 +542,7 @@ invalid document and a timeout are all silent.
 
 The plugin accepts only a strict stable `major.minor.patch` version and
 compares it numerically, component by component, with the running version.
-When the document names a strictly newer version, the information button turns
+When the document names a strictly newer version, the cog button turns
 into a highlighted download arrow and the panel adds a line announcing that
 version with a Download link to the fixed tagged catalogue URL
 `https://resonantdsp.com/products/swanky-amp/?utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=release-notice`,

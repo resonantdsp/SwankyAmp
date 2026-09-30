@@ -1,10 +1,9 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
-/// The released 1.x input meter, in dBFS after the Input control. Its notches
-/// are where 1.x staged a guitar: a light strum from a single coil peaks at S
-/// and one from a humbucker at H, so a player sets Input by eye.
+/// The released 1.x input meter, in dBFS after the Input control. A player
+/// sets Input by eye: a light strum peaks about one third of the way up with a
+/// single coil, about two thirds with a humbucker.
 pub const INPUT_SCALE_DB: (f32, f32) = (-26., 8.);
-pub const INPUT_NOTCHES: [(f32, &str); 2] = [(-16.5, "S"), (-2.5, "H")];
 
 /// The output meter, in dBFS after the cabinet and Output control.
 pub const OUTPUT_SCALE_DB: (f32, f32) = (-60., 0.);

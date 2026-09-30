@@ -342,13 +342,14 @@ mod tests {
     }
 
     /// 1.x staged a guitar by its input meter: at Input 0 dB a light strum
-    /// from a single coil peaks at the S notch and one from a humbucker at H.
-    /// At Input 0 the meter must read the injected peak unchanged, and fall
-    /// dark soon after the playing stops.
+    /// peaked about one third of the way up with a single coil, -16.5 dBFS,
+    /// and about two thirds with a humbucker, -2.5 dBFS. At Input 0 the meter
+    /// must read the injected peak unchanged, and fall dark soon after the
+    /// playing stops.
     #[test]
     fn input_meter_reads_the_injected_peak_at_input_0_and_falls_dark_after_it() {
         let params = SwankyAmpParams::default();
-        for (db, letter) in meters::INPUT_NOTCHES {
+        for db in [-16.5_f32, -2.5] {
             let mut engine = engine::Engine::new(&params);
             engine.reset(&params, 48_000., 512);
             let peak = 10_f32.powf(db / 20.);
@@ -363,7 +364,7 @@ mod tests {
             assert_eq!(
                 engine.meter_levels()[0],
                 0.,
-                "the input meter was still lit two seconds after a peak at {letter}"
+                "the input meter was still lit two seconds after a {db} dBFS peak"
             );
         }
     }
