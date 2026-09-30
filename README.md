@@ -6,13 +6,24 @@ The released JUCE 1.4.0 source is preserved at the `juce-1.4.0` tag. Version 2 d
 
 ## Development
 
-Install Rust through [rustup](https://rustup.rs/) and install [just](https://github.com/casey/just). The repository pins its Rust toolchain. Run the complete per-change gate with:
+Install Rust through [rustup](https://rustup.rs/) and install [just](https://github.com/casey/just). The repository pins its Rust toolchain. Run the per-change gate with:
 
 ```sh
 just
 ```
 
-The gate checks formatting, lints with and without the plugin-format features, runs the behavioral tests, verifies the [released reference renderer](verification/reference/README.md), compares the Rust amplifier's legacy path against all ten released factory presets at 44.1 kHz and 1x processing, and proves the committed level calibration reproduces.
+The gate checks formatting, lints every target of the crate with the default features (the plug-in formats and the standalone) and the tools, and runs the crate's behavioral tests without the default features. It therefore compiles the format adapters and the standalone binary but does not run their tests.
+
+CI runs the full set, `just ci-checks`, on every pull request and every push to master. Beyond the gate it lints without the default features, runs the format adapters' tests and the vendored standalone host's tests, runs the release-script tests, verifies the [released reference renderer](verification/reference/README.md), compares the Rust amplifier's legacy path against all ten released factory presets at 44.1 kHz and 1x processing, proves the committed level calibration reproduces, and validates the artwork package.
+
+Run a part of it locally only when the change touches that area:
+
+- `just release-tests` for the release scripts;
+- `just reference-check`, `just model-check` and `just calibrate-check` for the DSP;
+- `just validate-assets` for artwork or layout;
+- `just clippy-all` and `just test-all` for the vendored host, a format adapter or the standalone.
+
+The offline tools in `src/bin` build only with the `tools` feature, which keeps them out of the plug-in format builds; the recipes that run them turn it on.
 
 Render one preset and its internal comparison seams with:
 
@@ -219,11 +230,11 @@ Regenerate the values in `src/dsp/calibration_data.rs` with:
 just calibrate
 ```
 
-`just calibrate-check`, part of `just`, fails if a fresh measurement moves any committed value by more than 0.05 dB. The factory voicing and balance use the same levels, so rerun `just refit` after a calibration change and listen to the result.
+`just calibrate-check`, part of CI's checks, fails if a fresh measurement moves any committed value by more than 0.05 dB. The factory voicing and balance use the same levels, so rerun `just refit` after a calibration change and listen to the result.
 
 ### Soak
 
-Issue #34 reported that 1.2 started sounding like a tremolo after hours of running. The soak is a diagnostic, run on demand when a long-run defect is suspected; it is not a step in releasing a candidate. The pre-release checks are the `just` gate and `just tone-stack-soak`, described below.
+Issue #34 reported that 1.2 started sounding like a tremolo after hours of running. The soak is a diagnostic, run on demand when a long-run defect is suspected; it is not a step in releasing a candidate. The pre-release checks are `just ci-checks` and `just tone-stack-soak`, described below.
 
 ```sh
 just soak 4        # hours of audio per run, started in the background
@@ -372,7 +383,7 @@ interface sizes that draw them smaller than their texels.
 The receipt records the scene-linear radiance and display-linear shadow
 semantics, dimensions, hashes, and public layout provenance. Producer metadata
 is descriptive, so replacement CC artwork does not depend on Blender or the
-original production sources. `just` validates that the checked-in package
+original production sources. `just validate-assets`, part of CI's checks, validates that the checked-in package
 describes its committed receipt and, when the layers are present in
 `assets/artwork` or a folder given to `validate-assets`, that it is the
 deterministic result of packing them.
@@ -392,7 +403,7 @@ and on Windows the checksum-verified ASIO SDK.
 `validate` builds and installs the CLAP and VST3 bundles, and on macOS the
 Audio Unit, and runs the validators over them, auval among them on macOS.
 GitHub Actions builds the standalone and runs the same bundle validation on
-macOS and Windows without signing or repository secrets.
+macOS and Windows without signing or repository secrets, once the checks pass.
 
 ## Releasing
 
@@ -401,7 +412,7 @@ have the matching section. The local helpers do not push anything:
 
 ```sh
 just version 2.0.1
-just
+just ci-checks
 git add Cargo.toml Cargo.lock CHANGELOG.md
 git commit -m "Release version 2.0.1"
 just tag-candidate       # creates the next v2.0.1-rc.N locally
@@ -410,7 +421,7 @@ git push origin v2.0.1-rc.1
 
 `just version` preflights the changelog and prepares only those three version
 files. It never stages or commits them. The tag helpers require a clean tracked
-working tree so each tag describes the committed version that passed `just`.
+working tree so each tag describes the committed version that passed `just ci-checks`.
 
 Only `vX.Y.Z-rc.N` tags start `.github/workflows/candidate.yml`. A manual run is
 a rehearsal and is accepted only from an administrator-owned `rehearsal/*`
