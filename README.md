@@ -561,7 +561,7 @@ opened in the default browser only on an explicit press; the downloaded
 document cannot choose a link.
 
 The check has a three-second total timeout, follows no redirects and retains its
-last valid answer and last attempt time in the process. It also stores them
+last valid answer, last attempt time and last successful check time in the process. It also stores them
 under the operating system's cache directory in
 `Resonant DSP/Swanky Amp 2/release-notice.json` when that location is writable.
 Successful and failed attempts both wait 24 hours before another request, even
@@ -569,9 +569,13 @@ when the cache cannot be written. Invalid or future cache timestamps trigger a
 check instead of suppressing one indefinitely. All filesystem and network work
 stays on the notice worker, outside audio processing.
 
-The request is a bodyless `GET` to the exact document URL above. It sends no query,
-custom User-Agent, running version, product key, machine identifier or user
-telemetry. As with any HTTPS request, the website or its delivery provider
+The request is a bodyless `GET` to the document URL above. So the website can
+count monthly unique installs without an identifier, it adds `?first=ever` when
+this computer has no previous successful check, `?first=month` when the
+previous successful check was in an earlier calendar month (UTC), and no query
+otherwise. A failed check leaves that record untouched, so the next attempt
+carries the same flag. The request sends no custom User-Agent, running version,
+product key, machine identifier or user telemetry. As with any HTTPS request, the website or its delivery provider
 receives the public IP address and ordinary connection, TLS, HTTP-header and
 request-timing information needed to serve and operate the endpoint.
 

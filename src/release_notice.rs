@@ -83,6 +83,7 @@ struct Shared {
 #[derive(Clone, Default)]
 struct State {
     checked_at: Option<u64>,
+    succeeded_at: Option<u64>,
     current_version: Option<String>,
 }
 
@@ -166,6 +167,9 @@ struct Cache {
     schema_version: u8,
     product_id: String,
     checked_at: u64,
+    /// Absent in caches written before installs were counted, which then
+    /// count once more as a first check.
+    succeeded_at: Option<u64>,
     current_version: Option<String>,
 }
 
@@ -188,11 +192,13 @@ fn refresh(cache_path: &Path, endpoint: &str, now: SystemTime, shared: &RwLock<S
     let previous = match (memory.checked_at, disk) {
         (Some(memory_time), Some(disk)) if disk.checked_at > memory_time => State {
             checked_at: Some(disk.checked_at),
+            succeeded_at: disk.succeeded_at,
             current_version: disk.current_version,
         },
         (Some(_), _) => memory,
         (None, Some(disk)) => State {
             checked_at: Some(disk.checked_at),
+            succeeded_at: disk.succeeded_at,
             current_version: disk.current_version,
         },
         (None, None) => memory,
@@ -206,7 +212,8 @@ fn refresh(cache_path: &Path, endpoint: &str, now: SystemTime, shared: &RwLock<S
         return;
     }
 
-    let fetched = fetch(endpoint).and_then(|document| {
+    let url = format!("{endpoint}{}", install_query(previous.succeeded_at, now));
+    let fetched = fetch(&url).and_then(|document| {
         if document.schema_version != 1 || document.product_id != PRODUCT_ID {
             return None;
         }
@@ -216,9 +223,9 @@ fn refresh(cache_path: &Path, endpoint: &str, now: SystemTime, shared: &RwLock<S
             None => Some(None),
         }
     });
-    let retained = match fetched {
-        Some(current_version) => current_version,
-        None => previous.current_version,
+    let (retained, succeeded_at) = match fetched {
+        Some(current_version) => (current_version, Some(now)),
+        None => (previous.current_version, previous.succeeded_at),
     };
 
     // Store before publishing so an answer the editor can see is already
@@ -229,6 +236,7 @@ fn refresh(cache_path: &Path, endpoint: &str, now: SystemTime, shared: &RwLock<S
             schema_version: 1,
             product_id: PRODUCT_ID.into(),
             checked_at: now,
+            succeeded_at,
             current_version: retained.clone(),
         },
     );
@@ -236,9 +244,41 @@ fn refresh(cache_path: &Path, endpoint: &str, now: SystemTime, shared: &RwLock<S
         shared,
         State {
             checked_at: Some(now),
+            succeeded_at,
             current_version: retained,
         },
     );
+}
+
+/// Lets the website count monthly unique installs without an identifier: each
+/// computer flags its first successful check ever and its first in each UTC
+/// calendar month. Only a success advances the record, so a failed attempt
+/// carries the same flag again next time.
+fn install_query(succeeded_at: Option<u64>, now: u64) -> &'static str {
+    match succeeded_at {
+        None => "?first=ever",
+        Some(previous) if utc_month(previous) < utc_month(now) => "?first=month",
+        Some(_) => "",
+    }
+}
+
+/// Months since January of year 0 in the proleptic Gregorian calendar, from
+/// Hinnant's `civil_from_days`.
+fn utc_month(unix_seconds: u64) -> u64 {
+    let days = unix_seconds / 86_400 + 719_468;
+    let era = days / 146_097;
+    let day_of_era = days % 146_097;
+    let year_of_era =
+        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let shifted_month = (5 * day_of_year + 2) / 153;
+    let month = if shifted_month < 10 {
+        shifted_month + 3
+    } else {
+        shifted_month - 9
+    };
+    let year = year_of_era + era * 400 + u64::from(month <= 2);
+    year * 12 + month - 1
 }
 
 fn fetch(endpoint: &str) -> Option<Document> {
@@ -651,18 +691,50 @@ mod tests {
         assert_eq!(corrected.requests.load(Ordering::Relaxed), 1);
     }
 
-    #[test]
-    fn the_request_contains_no_version_identifier_or_query() {
-        let directory = TestDirectory::new("request");
-        let mut server = Server::responding(document(Some("2.0.1")));
-        let service = Service::spawn(Some(directory.cache()), server.endpoint.clone(), at(6_000));
-        let _ = wait_for_notice(&service);
+    fn request_line_at(directory: &TestDirectory, body: Vec<u8>, second: u64) -> String {
+        let mut server = Server::responding(body);
+        let _service = Service::spawn(Some(directory.cache()), server.endpoint.clone(), at(second));
+        wait_for_cache(&directory.cache(), second);
         server.finish();
         let request = server.request.lock().unwrap();
-        assert!(request.starts_with("GET /current.json HTTP/1.1\r\n"));
-        assert!(!request.contains("2.0.0"));
-        assert!(!request.contains("?"));
-        assert!(!request.to_ascii_lowercase().contains("user-agent:"));
+        assert!(!request.contains("2.0.0"), "the request names a version");
+        assert!(
+            !request.to_ascii_lowercase().contains("user-agent:"),
+            "the request carries a User-Agent"
+        );
+        request.lines().next().unwrap_or_default().to_owned()
+    }
+
+    #[test]
+    fn the_request_flags_only_the_first_check_ever_and_each_month() {
+        const DAY: u64 = 24 * 60 * 60;
+        const SEPTEMBER_10_2026: u64 = 1_788_998_400;
+        const OCTOBER_1_2026: u64 = 1_790_812_800;
+        const JANUARY_1_2027: u64 = 1_798_761_600;
+        let directory = TestDirectory::new("request");
+        let valid = || document(Some("2.0.1"));
+
+        assert_eq!(
+            request_line_at(&directory, b"unavailable".to_vec(), SEPTEMBER_10_2026),
+            "GET /current.json?first=ever HTTP/1.1"
+        );
+        assert_eq!(
+            request_line_at(&directory, valid(), SEPTEMBER_10_2026 + DAY),
+            "GET /current.json?first=ever HTTP/1.1",
+            "a failed check must not spend the first-ever flag"
+        );
+        assert_eq!(
+            request_line_at(&directory, valid(), SEPTEMBER_10_2026 + 2 * DAY),
+            "GET /current.json HTTP/1.1"
+        );
+        assert_eq!(
+            request_line_at(&directory, valid(), OCTOBER_1_2026),
+            "GET /current.json?first=month HTTP/1.1"
+        );
+        assert_eq!(
+            request_line_at(&directory, valid(), JANUARY_1_2027),
+            "GET /current.json?first=month HTTP/1.1"
+        );
     }
 
     #[test]
