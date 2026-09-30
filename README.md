@@ -45,14 +45,16 @@ voicing exactly can keep Swanky Amp 1.4.0 installed beside version 2.
 
 The factory presets were voiced on the octave-high stack, so each is voiced
 again for the corrected one on the guitar recordings in
-`verification/reference/input`, judged at the output: Low, Mid, High and
-Presence are searched from the 1.4.0 settings so the balance between
-third-octave bands from 80 Hz to 8 kHz is as close to 1.4.0's as a light cost
-on moving each control allows, with the controls kept between 1 and 9, and
-Power Drive follows so each preset drives the power stage as 1.4.0 did. The
-search is a starting point; the bank is accepted by ear. Regenerate the version
-2 bank and its report, which records each preset's settings, balance and
-power-stage level against 1.4.0, with:
+`verification/reference/input`, judged at the output. Low, Mid, High and
+Presence are searched so the balance between third-octave bands from 80 Hz to
+8 kHz is as close to 1.4.0's as a light cost on moving each control allows,
+with the controls kept between 1 and 9, and Power Drive follows so each preset
+drives the power stage as 1.4.0 did. Once a bank is accepted by ear, `just
+refit` keeps its Low, Mid, High and Presence and sets only Power Drive and
+Output again: moving the tone controls bought a few tenths of a dB of balance,
+less than the ear or the recordings resolve. It searches only a preset the
+bank lacks. Regenerate the version 2 bank and its report, which records each
+preset's settings, balance and power-stage level against 1.4.0, with:
 
 ```sh
 just refit
@@ -111,13 +113,20 @@ again. A dot after the name marks a preset changed since it was chosen. The
 menu capitalises the factory presets like Init; the bank, the saved state and
 the tools such as `just capture-preset` name them in lower case, as 1.4.0 did.
 
-Version 2's factory presets are balanced to equal loudness: each one's
-Output is set so that its loudness, averaged over the two recordings, matches
-Init's, by the measure the level calibration below holds. Swanky Amp 1.4.0's
-factory presets were not balanced, and imported 1.x presets keep their Output
-as it was. `just refit` measures the balance and applies it when it writes
-the bank, and the [voicing report](verification/tone-stack/refit-report.md)
-lists each preset's Output change.
+Version 2's factory presets are balanced to strike as loud as Init: each
+one's Output is set so that its strike level on the humbucker recording
+matches Init's. The strike level is the 95th percentile of momentary
+loudness (K-weighted 400 ms blocks at a 100 ms hop, those above -70 LUFS)
+over the whole recording. Integrated loudness, the measure the level
+calibration below holds, averages over the ring-out, where a driven amp
+sustains and a clean one decays; a driven preset level with Init on it
+strikes several dB softer. A clean amp also follows the pickup where a
+driven one does not, so on the single coil the driven presets come out
+louder than Init. Swanky Amp 1.4.0's factory presets were not balanced, and
+imported 1.x presets keep their Output as it was. `just refit` measures the
+balance and applies it when it writes the bank, and the [voicing
+report](verification/tone-stack/refit-report.md) lists each preset's Output
+change and its levels against Init on each pickup.
 
 As in 1.4.0, Input and the cabinet switch belong to the session: a preset
 stores them, but choosing one leaves them as they are and changing them does
@@ -175,11 +184,11 @@ Grit lowers each triode's grid clip and raises the threshold of its plate compre
 ### Level calibration
 
 The level compensation has two stages, both measured by `calibrate` on the
-guitar recordings in `verification/reference/input`, played as recorded at
-Input 0 and averaged over the two pickups, at 44.1 kHz with Auto oversampling
-from a settled amplifier, every control but the swept one at its default. The
-reference is the released path, which `just model-check` holds to the frozen
-1.4.0 renders.
+guitar recordings in `verification/reference/input`, played at Input 0 with
+`RECORDING_GAIN_DB` (2 dB) applied to both and averaged over the two pickups,
+at 44.1 kHz with Auto oversampling from a settled amplifier, every control but
+the swept one at its default. The reference is the released path, which `just
+model-check` holds to the frozen 1.4.0 renders.
 
 The first stage keeps 1.4.0's structure and sets how hard the power stage is
 driven. With the tone controls at their defaults, the level into the power
@@ -328,9 +337,11 @@ can be produced from changed widget geometry.
 The four live meter columns, captioned L and R, are local to each plugin
 instance. The blue input pair observes the signal after the Input control; the
 output pair, in the accent, observes the final signal after the optional
-cabinet and Output control. Both span -60 to 0 dBFS, one cell per 6 dB, lit
-from the bottom up, so a single-coil DI at Input 0 dB lights about six input
-cells and a humbucker about seven. A mono instance mirrors its reading into L
+cabinet and Output control. Cells light from the bottom up. The input meter
+keeps 1.4.0's scale, -26 to +8 dBFS, and its S and H notches at -16.5 and
+-2.5 dBFS, where a light strum from a single coil or a humbucker should peak;
+the player stages the guitar with Input by eye. The output meter spans -60 to
+0 dBFS, one cell per 6 dB. A mono instance mirrors its reading into L
 and R. Levels rise immediately and fall to 1/e in 0.3 s, settling to exact
 darkness, after which the editor has no meter change to redraw; the meters also go dark
 while the editor window has lost focus and the pointer is elsewhere.

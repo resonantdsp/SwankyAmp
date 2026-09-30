@@ -696,11 +696,17 @@ pub fn band_centres() -> [f64; THIRDS] {
 }
 
 /// Voices `controls`, a preset made on 1.4.0's octave-high stack, for the
-/// corrected one. Low, Mid, High and Presence are searched so the output's
-/// tonal balance on real playing is as close to 1.4.0's as the restraint
-/// allows, and Power Drive follows so the power stage is driven as 1.4.0
-/// drove it.
-pub fn voice(controls: AmpControls, clips: &super::calibration::Clips) -> Voiced {
+/// corrected one, and Power Drive follows so the power stage is driven as
+/// 1.4.0 drove it. `accepted` is Low, Mid, High and Presence as already
+/// accepted by ear, which are kept: a search moves them by amounts the ear
+/// and the recordings cannot resolve. Without them the four are searched so
+/// the output's tonal balance on real playing is as close to 1.4.0's as the
+/// restraint allows.
+pub fn voice(
+    controls: AmpControls,
+    accepted: Option<[f32; 4]>,
+    clips: &super::calibration::Clips,
+) -> Voiced {
     let clips = [clips.single_coil.as_slice(), clips.humbucker.as_slice()];
     let reference = clips.map(|clip| hear(controls, true, clip));
     let unvoiced = clips.map(|clip| hear(controls, false, clip));
@@ -737,9 +743,15 @@ pub fn voice(controls: AmpControls, clips: &super::calibration::Clips) -> Voiced
             .sum();
         sound + VOICING_RESTRAINT * moved + FEED_COST * miss.powi(2)
     };
-    let mut best = feed_for(original.tone().map(|value| value.clamp(-RAIL, RAIL)));
+    let mut best =
+        feed_for(accepted.unwrap_or_else(|| original.tone().map(|value| value.clamp(-RAIL, RAIL))));
     let mut best_cost = cost(best);
-    for step in SEARCH_STEPS {
+    let steps = if accepted.is_some() {
+        &[][..]
+    } else {
+        &SEARCH_STEPS[..]
+    };
+    for &step in steps {
         loop {
             let mut improved = false;
             for control in 0..4 {

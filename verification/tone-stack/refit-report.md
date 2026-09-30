@@ -13,7 +13,8 @@ exactly, so the aim is the right range, not a replica.
 ## Method
 
 - Input: the two guitar recordings in `verification/reference/input`, single
-coil and humbucker, as recorded at Input 0.
+coil and humbucker, played at Input 0 with `RECORDING_GAIN_DB` (2 dB)
+applied to both.
 - Each preset is rendered through 1.4.0 (the legacy path, which `just
 model-check` holds to the released renders) and through the shipping
 path at 44100 Hz with Auto oversampling.
@@ -21,15 +22,23 @@ path at 44100 Hz with Auto oversampling.
 each render's bands taken about their own mean, so level does not
 count. The error is the mean squared band difference from 1.4.0,
 averaged over the recordings.
-- Low, Mid, High and Presence are searched from the 1.4.0 settings in
+- Low, Mid, High and Presence keep the values of the bank being
+replaced, the voicing accepted by ear. Only for a preset it lacks are
+they searched, from the 1.4.0 settings in
 steps of 1, 0.5, 0.25 and 0.125 on the 0 to 10 scale. Moving a
 control costs 0.5 dB² per half range squared, and the
 controls stay within 1 to 9, so presets leave room either way.
 - For every candidate, Power Drive is set so the power stage's input
 level, averaged over the recordings, matches 1.4.0's. Where Power
 Drive runs out of range, the miss costs 0.5 dB² per dB².
-- Output then brings each preset to Init's loudness, BS.1770-4
-integrated loudness averaged over the recordings.
+- Output then brings each preset's strike level on the humbucker to
+Init's. The strike level is the 95th percentile of momentary
+loudness (BS.1770-4 K-weighted 400 ms blocks at a 100 ms hop, those
+above -70 LUFS) over the whole recording. Integrated loudness
+averages over the ring-out, where a driven amp sustains and a clean
+one decays, so a driven preset level with Init on it strikes
+softer. A clean amp follows the pickup and a driven one does not,
+so on the single coil the driven presets come out louder than Init.
 
 ## Results
 
@@ -40,16 +49,16 @@ single coil / humbucker. Unvoiced is version 2 with the 1.4.0 settings.
 
 | Preset | 1.4.0 | Voiced | Balance unvoiced | Balance voiced | Feed unvoiced | Feed voiced | Output dB |
 |---|---|---|---|---|---|---|---|
-| clean | 5.0 / 3.5 / 7.0 / 7.0 / 0.00 | 3.5 / 1.0 / 2.0 / 8.9 / 0.82 | 4.6 / 4.5 | 1.2 / 1.0 | -0.5 / +2.4 | -0.0 / +0.0 | -7.0 → +1.5 |
-| bright | 4.0 / 6.0 / 5.0 / 6.5 / 2.53 | 3.6 / 5.6 / 5.1 / 6.2 / 2.58 | 0.6 / 0.9 | 0.6 / 0.9 | +0.2 / +0.1 | +0.3 / -0.0 | -3.5 → -2.0 |
-| edge | 4.0 / 5.0 / 6.5 / 6.6 / 3.03 | 2.8 / 3.2 / 2.7 / 7.7 / 3.54 | 2.6 / 3.0 | 1.2 / 0.7 | +0.1 / +1.5 | -0.1 / +0.1 | -3.5 → +0.5 |
-| distort | 6.0 / 8.0 / 6.0 / 7.0 / 5.95 | 5.1 / 6.1 / 2.1 / 8.6 / 6.38 | 2.6 / 2.3 | 0.6 / 0.5 | -0.8 / +0.7 | -0.1 / +0.1 | +1.9 → -2.9 |
-| dirty distort | 4.0 / 6.5 / 7.5 / 6.0 / 8.27 | 3.0 / 4.2 / 2.7 / 7.8 / 8.79 | 2.3 / 2.3 | 0.7 / 0.8 | +0.2 / +2.0 | -0.3 / +0.4 | +0.0 → -5.1 |
-| pre drive | 4.0 / 8.0 / 6.0 / 5.9 / 5.02 | 2.9 / 6.8 / 2.7 / 7.7 / 5.24 | 2.0 / 1.7 | 0.9 / 0.8 | +0.6 / +1.8 | -0.2 / +0.2 | +0.0 → -2.2 |
-| power drive | 4.0 / 8.0 / 7.4 / 4.0 / 6.94 | 2.8 / 7.4 / 3.4 / 4.9 / 7.11 | 1.8 / 1.6 | 0.5 / 0.4 | +0.6 / +1.4 | -0.1 / +0.1 | +0.0 → -3.1 |
-| full drive | 3.4 / 7.0 / 8.0 / 6.0 / 7.02 | 2.4 / 6.8 / 4.5 / 7.1 / 7.11 | 1.2 / 1.1 | 0.6 / 0.5 | +0.8 / +1.9 | -0.2 / +0.2 | +0.0 → -2.5 |
-| high gain | 6.0 / 5.9 / 8.0 / 3.0 / 8.05 | 4.5 / 2.8 / 3.1 / 3.8 / 8.56 | 2.0 / 2.2 | 0.9 / 1.0 | +0.2 / +1.4 | +0.1 / -0.0 | -2.0 → -1.4 |
-| level 11 | 7.0 / 10.0 / 7.2 / 6.9 / 10.00 | 7.8 / 8.8 / 3.7 / 9.0 / 10.00 | 2.0 / 2.2 | 1.1 / 1.3 | +1.1 / +0.8 | -0.4 / -0.8 | +0.0 → -2.6 |
+| clean | 5.0 / 3.5 / 7.0 / 7.0 / 0.00 | 3.5 / 1.0 / 2.0 / 8.9 / 0.74 | 4.5 / 4.6 | 1.2 / 0.9 | -1.1 / +1.5 | -0.0 / +0.0 | -7.0 → -4.8 |
+| bright | 4.0 / 6.0 / 5.0 / 6.5 / 2.53 | 3.6 / 5.6 / 5.1 / 6.2 / 2.53 | 0.6 / 0.5 | 0.6 / 0.4 | +0.3 / +0.4 | +0.0 / -0.0 | -3.5 → -5.2 |
+| edge | 4.0 / 5.0 / 6.5 / 6.6 / 3.03 | 2.8 / 3.2 / 2.7 / 7.7 / 3.45 | 2.6 / 3.0 | 1.1 / 0.6 | -0.1 / +1.1 | -0.1 / +0.1 | -3.5 → -3.1 |
+| distort | 6.0 / 8.0 / 6.0 / 7.0 / 5.95 | 5.1 / 6.1 / 2.1 / 8.6 / 6.35 | 2.1 / 1.9 | 0.6 / 0.6 | -1.0 / +0.6 | -0.1 / +0.1 | +1.9 → -2.8 |
+| dirty distort | 4.0 / 6.5 / 7.5 / 6.0 / 8.27 | 3.0 / 4.2 / 2.7 / 7.8 / 8.70 | 2.2 / 2.5 | 0.7 / 1.0 | +0.9 / +2.2 | -0.1 / +0.1 | +0.0 → -5.0 |
+| pre drive | 4.0 / 8.0 / 6.0 / 5.9 / 5.02 | 2.9 / 6.8 / 2.7 / 7.7 / 5.22 | 1.8 / 1.7 | 0.8 / 1.0 | +0.5 / +1.8 | -0.1 / +0.2 | +0.0 → -1.7 |
+| power drive | 4.0 / 8.0 / 7.4 / 4.0 / 6.94 | 2.8 / 7.4 / 3.4 / 4.9 / 7.02 | 1.4 / 1.3 | 0.4 / 0.4 | +0.5 / +1.5 | -0.1 / +0.1 | +0.0 → -0.7 |
+| full drive | 3.4 / 7.0 / 8.0 / 6.0 / 7.02 | 2.4 / 6.8 / 4.5 / 7.1 / 7.08 | 1.1 / 1.6 | 0.5 / 0.9 | +0.9 / +1.9 | -0.2 / +0.2 | +0.0 → -2.7 |
+| high gain | 6.0 / 5.9 / 8.0 / 3.0 / 8.05 | 4.5 / 2.8 / 3.1 / 3.8 / 8.53 | 2.2 / 2.4 | 1.0 / 1.1 | +0.3 / +1.4 | +0.1 / -0.0 | -2.0 → -2.3 |
+| level 11 | 7.0 / 10.0 / 7.2 / 6.9 / 10.00 | 7.8 / 8.8 / 3.7 / 9.0 / 10.00 | 2.0 / 2.2 | 1.3 / 1.3 | +0.3 / +0.6 | -1.0 / -0.9 | +0.0 → -4.8 |
 
 ## Remaining balance
 
@@ -58,18 +67,37 @@ recordings, at every other third-octave band.
 
 | Preset | 80 | 127 | 202 | 320 | 508 | 806 | 1280 | 2032 | 3225 | 5120 | 8127 |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| clean | +0.6 | +0.4 | +0.1 | -0.3 | -0.4 | +1.2 | +0.9 | +0.1 | +0.6 | -0.6 | -3.2 |
-| bright | +0.2 | +0.1 | -0.2 | -0.3 | -0.5 | -0.1 | +0.8 | +1.2 | +0.6 | -0.4 | -2.2 |
-| edge | +0.4 | +0.2 | -0.2 | -0.6 | -0.6 | +0.7 | +1.6 | +0.7 | +0.2 | -0.8 | -2.2 |
-| distort | +0.5 | +0.0 | -0.5 | -0.6 | -0.4 | +0.5 | +0.9 | +0.1 | +0.3 | -0.8 | -0.4 |
-| dirty distort | +0.6 | +0.2 | -0.1 | -0.6 | -0.3 | +0.7 | +1.0 | -0.0 | +0.1 | -1.0 | -0.6 |
-| pre drive | +0.2 | -0.1 | -0.5 | -0.7 | -0.4 | +0.7 | +1.4 | +0.6 | +0.5 | -1.1 | -1.5 |
-| power drive | +0.4 | -0.1 | -0.4 | -0.6 | -0.5 | +0.4 | +1.0 | +0.3 | -0.2 | -0.4 | +0.0 |
-| full drive | +0.3 | -0.3 | -0.4 | -0.7 | -0.4 | +0.4 | +1.2 | +0.5 | -0.0 | -0.8 | -0.0 |
-| high gain | +0.4 | +0.2 | -0.0 | -0.4 | -0.4 | +0.6 | +1.7 | +0.7 | -0.1 | -1.5 | -2.1 |
-| level 11 | -0.7 | -1.0 | -1.8 | -0.9 | +0.2 | +1.2 | +1.5 | +0.8 | +1.2 | +0.3 | -1.1 |
+| clean | +0.6 | +0.4 | +0.0 | -0.3 | -0.4 | +1.2 | +0.9 | +0.1 | +0.5 | -0.8 | -2.7 |
+| bright | +0.0 | -0.3 | -0.3 | -0.4 | -0.6 | -0.2 | +0.7 | +0.9 | +0.3 | +0.1 | -0.3 |
+| edge | +0.3 | -0.0 | -0.3 | -0.7 | -0.8 | +0.4 | +1.3 | +0.5 | +0.3 | -0.2 | -1.1 |
+| distort | +0.7 | +0.3 | -0.3 | -0.6 | -0.4 | +0.5 | +0.9 | +0.1 | +0.3 | -0.9 | -0.4 |
+| dirty distort | +0.5 | +0.3 | +0.0 | -0.4 | -0.5 | +0.6 | +1.0 | +0.1 | +0.3 | -1.1 | -1.2 |
+| pre drive | +0.4 | -0.0 | -0.4 | -0.6 | -0.4 | +0.7 | +1.4 | +0.5 | +0.5 | -1.3 | -0.9 |
+| power drive | +0.6 | -0.1 | -0.3 | -0.6 | -0.5 | +0.3 | +0.6 | +0.2 | -0.2 | -0.2 | -0.0 |
+| full drive | +0.5 | -0.0 | -0.4 | -0.6 | -0.5 | +0.4 | +1.2 | +0.4 | -0.2 | -1.3 | +0.4 |
+| high gain | +0.4 | +0.2 | -0.1 | -0.4 | -0.5 | +0.4 | +1.9 | +0.9 | +0.0 | -1.3 | -2.6 |
+| level 11 | -0.8 | -1.2 | -1.7 | -1.1 | +0.2 | +1.5 | +1.7 | +0.7 | +1.1 | +0.5 | -1.6 |
 
-After the Output change the presets sit at -34.0 to -30.8 LUFS on the single coil and -30.7 to -27.5 LUFS on the humbucker.
+## Levels
+
+After the Output change, each preset's integrated loudness and strike
+level minus Init's, in dB, for the single coil / humbucker.
+
+| Preset | Integrated | Strike |
+|---|---|---|
+| clean | -4.5 / -1.5 | -4.7 / -0.0 |
+| bright | -3.2 / -0.8 | -2.8 / +0.0 |
+| edge | -2.2 / -0.6 | -1.8 / +0.0 |
+| distort | +5.0 / +1.7 | +2.8 / +0.0 |
+| dirty distort | +5.3 / +0.1 | +3.0 / -0.0 |
+| pre drive | +5.2 / +1.5 | +3.0 / -0.0 |
+| power drive | +5.2 / +0.9 | +2.8 / +0.0 |
+| full drive | +6.1 / +1.6 | +3.1 / -0.0 |
+| high gain | +6.2 / +1.9 | +3.1 / +0.0 |
+| level 11 | +6.2 / +1.7 | +2.8 / -0.0 |
+
+Init's integrated loudness is -23.9 / -20.1 LUFS and its strike level
+-19.2 / -16.7 LUFS.
 
 The Swanky Amp 1.4.0 build stays installable beside version 2 for
 anyone who wants the original voicing exactly.

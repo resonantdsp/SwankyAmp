@@ -151,8 +151,7 @@ impl FreeUi {
             layers.push(surface(section, None));
         }
         layers.push(surface(layout::SWITCH, None));
-        let fractions = self.meter_levels.map(crate::meters::meter_fraction);
-        if baked && let Some(backdrop) = crate::artwork::backdrop::<R>(params, fractions) {
+        if baked && let Some(backdrop) = crate::artwork::backdrop::<R>(params, self.meter_levels) {
             layers.push(backdrop);
         }
         for section in layout::SECTIONS {
@@ -982,7 +981,43 @@ fn levels_meters<'a, R: FreeRenderer + 'a>(levels: [f32; 4]) -> Vec<Element<'a, 
                 .color(DIM),
         ));
     }
+    layers.extend(input_notches());
     layers
+}
+
+/// The released input meter's S and H marks, to the left of its columns as
+/// in 1.x, each a short tick at its level with its letter beside it.
+fn input_notches<'a, R: FreeRenderer + 'a>() -> Vec<Element<'a, Msg, Theme, R>> {
+    let [x, y, _, height] = layout::METERS[0].bounds;
+    crate::meters::INPUT_NOTCHES
+        .into_iter()
+        .flat_map(|(db, letter)| {
+            let fraction = crate::meters::scale_fraction(db, crate::meters::INPUT_SCALE_DB);
+            let level_y = y + height * (1.0 - fraction);
+            [
+                place(
+                    [x - 6.0, level_y - 0.75, 4.0, 1.5],
+                    container(Space::new())
+                        .width(Length::Fill)
+                        .height(Length::Fill)
+                        .style(|_| truce_iced::iced::widget::container::Style {
+                            background: Some(DIM.into()),
+                            ..Default::default()
+                        }),
+                ),
+                place(
+                    [x - 20.0, level_y - 8.0, 12.0, 16.0],
+                    text(letter)
+                        .size(10)
+                        .font(style::BOLD)
+                        .line_height(LineHeight::Absolute(16.0.into()))
+                        .width(Length::Fill)
+                        .align_x(iced_core::text::Alignment::Right)
+                        .color(DIM),
+                ),
+            ]
+        })
+        .collect()
 }
 
 /// Without a bake the cells are flat: lit cells in full colour from the
@@ -990,13 +1025,13 @@ fn levels_meters<'a, R: FreeRenderer + 'a>(levels: [f32; 4]) -> Vec<Element<'a, 
 fn meter_column<'a, R: FreeRenderer + 'a>(
     color: Color,
     height: f32,
-    amplitude: f32,
+    fraction: f32,
 ) -> Element<'a, Msg, Theme, R> {
     let pitch = height / style::METER_BARS as f32;
     let gap = pitch * style::METER_GAP;
     let bar_height = pitch - gap;
     let baked = R::LOAD_ARTWORK && crate::artwork::loaded();
-    let lit = crate::meters::active_bars(amplitude, style::METER_BARS);
+    let lit = crate::meters::active_bars(fraction, style::METER_BARS);
     let bars: Vec<Element<'a, Msg, Theme, R>> = (0..style::METER_BARS)
         .rev()
         .map(|bar| {

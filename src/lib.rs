@@ -59,14 +59,11 @@ impl PluginLogic for SwankyAmp {
         context: &mut ProcessContext,
     ) -> ProcessStatus {
         engine.process(params, buffer);
-        for (id, amplitude) in params
-            .display_meter_ids()
-            .into_iter()
-            .zip(engine.meter_levels())
-        {
-            context.set_meter(id, meters::meter_fraction(amplitude));
+        let fractions = meters::fractions(engine.meter_levels());
+        for (id, fraction) in params.display_meter_ids().into_iter().zip(fractions) {
+            context.set_meter(id, fraction);
         }
-        params.meter_state.publish(engine.meter_levels());
+        params.meter_state.publish(fractions);
         ProcessStatus::Normal
     }
 
@@ -344,38 +341,31 @@ mod tests {
         );
     }
 
-    /// Direct guitar peaks around -23 dBFS from a single coil and -14.5 dBFS
-    /// from a humbucker, as the audition recordings do. With Input at 0 dB the
-    /// input meter must show them well up its column, and fall dark soon after
-    /// the playing stops.
+    /// 1.x staged a guitar by its input meter: at Input 0 dB a light strum
+    /// from a single coil peaks at the S notch and one from a humbucker at H.
+    /// At Input 0 the meter must read the injected peak unchanged, and fall
+    /// dark soon after the playing stops.
     #[test]
-    fn input_meter_shows_direct_guitar_and_falls_dark_after_it() {
+    fn input_meter_reads_the_injected_peak_at_input_0_and_falls_dark_after_it() {
         let params = SwankyAmpParams::default();
-        let cells = |peak_db: f32| {
+        for (db, letter) in meters::INPUT_NOTCHES {
             let mut engine = engine::Engine::new(&params);
             engine.reset(&params, 48_000., 512);
-            let peak = 10_f32.powf(peak_db / 20.);
+            let peak = 10_f32.powf(db / 20.);
             let _ = render(&mut engine, &params, &[vec![peak; 512]], 512);
-            let lit = meters::active_bars(engine.meter_levels()[0], style::METER_BARS);
-            (engine, lit)
-        };
-        let (mut engine, single_coil) = cells(-23.2);
-        assert!(
-            (4..=8).contains(&single_coil),
-            "a single-coil peak lit {single_coil} of 10 cells, not the middle of the column"
-        );
-        let humbucker = cells(-14.5).1;
-        assert!(
-            (single_coil..10).contains(&humbucker),
-            "a humbucker peak lit {humbucker} cells beside the single coil's {single_coil}"
-        );
+            let reading = 20. * engine.meter_levels()[0].log10();
+            assert!(
+                (reading - db).abs() < 0.05,
+                "a {db} dBFS peak at Input 0 read {reading:.2} dBFS on the input meter"
+            );
 
-        let _ = render(&mut engine, &params, &[vec![0.; 96_000]], 512);
-        assert_eq!(
-            engine.meter_levels()[0],
-            0.,
-            "the input meter was still lit two seconds after the playing stopped"
-        );
+            let _ = render(&mut engine, &params, &[vec![0.; 96_000]], 512);
+            assert_eq!(
+                engine.meter_levels()[0],
+                0.,
+                "the input meter was still lit two seconds after a peak at {letter}"
+            );
+        }
     }
 
     #[test]

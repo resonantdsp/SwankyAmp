@@ -75,7 +75,7 @@ dsp-report output="verification/dsp/oversampling-plate.json":
         target/debug/render-model target/debug/dsp-probe "{{ output }}"
 
 recordings := "verification/reference/input"
-recording_args := "--single-coil " + recordings / "single-coil-plucks-strum-chord.wav" + " --humbucker " + recordings / "humbucker-plucks-strum-chord.wav"
+recording_args := "--single-coil " + recordings / "single-coil-plucks-strum-chord-2.wav" + " --humbucker " + recordings / "humbucker-plucks-strum-chord-2.wav"
 
 # Voice the 1.4.0 factory presets for the corrected tone stack on the guitar
 # recordings and rewrite the version 2 bank and its report. A starting point

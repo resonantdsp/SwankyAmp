@@ -1,5 +1,6 @@
 //! Measures the shipping path's level compensation on the guitar recordings in
-//! `verification/reference/input`, played as recorded at Input 0.
+//! `verification/reference/input`, played at Input 0 with `RECORDING_GAIN_DB`
+//! applied to both.
 //!
 //! The first stage makes real playing drive the power stage as 1.4.0 did. With
 //! the tone controls at their defaults, the level into the power stage is
@@ -117,8 +118,16 @@ fn shipping_output(controls: AmpControls, clip: &[f32], tables: LevelTables) -> 
     audio
 }
 
-/// The two recordings at `SAMPLE_RATE`, as recorded: the humbucker plays
-/// about 8.7 dB hotter, and that difference is part of what is measured.
+/// The gain both recordings are played at. The takes were recorded a little
+/// under the level 1.x staged a guitar for: its input meter put a light strum
+/// from a single coil at the S notch, -16.5 dBFS, and one from a humbucker at
+/// the H notch, -2.5 dBFS. The same gain on both keeps the player's own gap
+/// between the pickups.
+pub const RECORDING_GAIN_DB: f32 = 2.;
+
+/// The two recordings at `SAMPLE_RATE` with `RECORDING_GAIN_DB` applied: the
+/// humbucker plays about 10 dB hotter, and that difference is part of what is
+/// measured.
 pub struct Clips {
     pub single_coil: Vec<f32>,
     pub humbucker: Vec<f32>,
@@ -126,9 +135,13 @@ pub struct Clips {
 
 impl Clips {
     pub fn new(single_coil_wav: &[u8], humbucker_wav: &[u8]) -> Result<Self, String> {
+        let played = |wav: &[u8]| -> Result<Vec<f32>, String> {
+            let gain = 10_f32.powf(RECORDING_GAIN_DB / 20.);
+            Ok(clip(wav)?.into_iter().map(|sample| sample * gain).collect())
+        };
         Ok(Self {
-            single_coil: clip(single_coil_wav)?,
-            humbucker: clip(humbucker_wav)?,
+            single_coil: played(single_coil_wav)?,
+            humbucker: played(humbucker_wav)?,
         })
     }
 
@@ -152,9 +165,30 @@ impl Loudness {
 
 /// The shipping path's loudness with `tables` in place.
 pub fn loudness(controls: AmpControls, clips: &Clips, tables: LevelTables) -> Loudness {
-    Loudness {
-        single_coil: integrated_loudness(&shipping_output(controls, &clips.single_coil, tables)),
-        humbucker: integrated_loudness(&shipping_output(controls, &clips.humbucker, tables)),
+    preset_levels(controls, clips, tables).integrated
+}
+
+/// Integrated loudness and strike level on each recording, in LUFS.
+#[derive(Debug, Clone, Copy)]
+pub struct PresetLevels {
+    pub integrated: Loudness,
+    pub strike: Loudness,
+}
+
+/// The shipping path's integrated loudness and strike level with `tables` in
+/// place.
+pub fn preset_levels(controls: AmpControls, clips: &Clips, tables: LevelTables) -> PresetLevels {
+    let single_coil = shipping_output(controls, &clips.single_coil, tables);
+    let humbucker = shipping_output(controls, &clips.humbucker, tables);
+    PresetLevels {
+        integrated: Loudness {
+            single_coil: integrated_loudness(&single_coil),
+            humbucker: integrated_loudness(&humbucker),
+        },
+        strike: Loudness {
+            single_coil: strike_level(&single_coil),
+            humbucker: strike_level(&humbucker),
+        },
     }
 }
 
@@ -170,10 +204,9 @@ fn biquad(samples: &[f64], b: [f64; 3], a: [f64; 3]) -> Vec<f64> {
         .collect()
 }
 
-/// ITU-R BS.1770-4 integrated loudness of a mono signal at `SAMPLE_RATE`, in
-/// LUFS: K-weighting, 400 ms blocks at 75 % overlap, the -70 LUFS absolute
-/// gate and the -10 LU relative gate.
-pub fn integrated_loudness(samples: &[f32]) -> f64 {
+/// The K-weighted power of every 400 ms block of a mono signal at
+/// `SAMPLE_RATE`, at the standard's 75 % overlap.
+fn block_powers(samples: &[f32]) -> Vec<f64> {
     let rate = f64::from(SAMPLE_RATE);
     let input: Vec<f64> = samples.iter().map(|&x| f64::from(x)).collect();
     // The standard's two stages, designed for any rate as in its annex.
@@ -209,24 +242,63 @@ pub fn integrated_loudness(samples: &[f32]) -> f64 {
     );
     let size = (0.4 * rate) as usize;
     let hop = size / 4;
-    let blocks: Vec<f64> = (0..=weighted.len().saturating_sub(size) / hop)
+    (0..=weighted.len().saturating_sub(size) / hop)
         .map(|block| {
             let window = &weighted[block * hop..block * hop + size];
             window.iter().map(|x| x * x).sum::<f64>() / size as f64
         })
-        .collect();
-    let level = |power: f64| -0.691 + 10. * power.log10();
+        .collect()
+}
+
+fn block_level(power: f64) -> f64 {
+    -0.691 + 10. * power.log10()
+}
+
+/// The blocks above the standard's -70 LUFS absolute gate.
+fn audible_blocks(samples: &[f32]) -> Vec<f64> {
+    block_powers(samples)
+        .into_iter()
+        .filter(|&power| block_level(power) > -70.)
+        .collect()
+}
+
+/// ITU-R BS.1770-4 integrated loudness of a mono signal at `SAMPLE_RATE`, in
+/// LUFS: K-weighting, 400 ms blocks at 75 % overlap, the -70 LUFS absolute
+/// gate and the -10 LU relative gate.
+pub fn integrated_loudness(samples: &[f32]) -> f64 {
     let mean = |powers: &[f64]| powers.iter().sum::<f64>() / powers.len() as f64;
-    let audible: Vec<f64> = blocks.into_iter().filter(|&p| level(p) > -70.).collect();
+    let audible = audible_blocks(samples);
     if audible.is_empty() {
         return f64::NEG_INFINITY;
     }
-    let relative = level(mean(&audible)) - 10.;
+    let relative = block_level(mean(&audible)) - 10.;
     let gated: Vec<f64> = audible
         .into_iter()
-        .filter(|&p| level(p) > relative)
+        .filter(|&p| block_level(p) > relative)
         .collect();
-    level(mean(&gated))
+    block_level(mean(&gated))
+}
+
+/// Which momentary block level counts as the strike: loud enough to be the
+/// attacks rather than the ring-out, below the odd transient peak.
+const STRIKE_PERCENTILE: f64 = 0.95;
+
+/// How loud the strikes land, in LUFS: the 95th percentile of momentary
+/// loudness (the blocks `integrated_loudness` reads, above its absolute
+/// gate). Integrated loudness averages over the ring-out, where a driven amp
+/// sustains and a clean one decays, so it rates a driven tone louder than it
+/// strikes.
+pub fn strike_level(samples: &[f32]) -> f64 {
+    let mut levels: Vec<f64> = audible_blocks(samples)
+        .into_iter()
+        .map(block_level)
+        .collect();
+    levels.sort_by(f64::total_cmp);
+    let rank = (STRIKE_PERCENTILE * levels.len() as f64).ceil() as usize;
+    levels
+        .get(rank.saturating_sub(1))
+        .copied()
+        .unwrap_or(f64::NEG_INFINITY)
 }
 
 fn table_point(index: usize) -> f32 {
@@ -492,8 +564,10 @@ mod tests {
 
     fn recordings() -> Clips {
         Clips::new(
-            include_bytes!("../../verification/reference/input/single-coil-plucks-strum-chord.wav"),
-            include_bytes!("../../verification/reference/input/humbucker-plucks-strum-chord.wav"),
+            include_bytes!(
+                "../../verification/reference/input/single-coil-plucks-strum-chord-2.wav"
+            ),
+            include_bytes!("../../verification/reference/input/humbucker-plucks-strum-chord-2.wav"),
         )
         .expect("recordings read")
     }

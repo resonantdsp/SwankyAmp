@@ -1,6 +1,6 @@
 use crate::dsp::amp::{AmpChannel, AmpControls, MAX_OVERSAMPLING};
 use crate::dsp::mapping::AmpVoicing;
-use crate::meters::METER_FLOOR;
+use crate::meters;
 use crate::params::SwankyAmpParams;
 use truce::prelude::AudioBuffer;
 
@@ -175,12 +175,17 @@ impl Engine {
     fn finish(&mut self, frames: usize) {
         let release =
             (-(frames as f64) / (f64::from(self.sample_rate) * METER_RELEASE_SECONDS)).exp() as f32;
-        for (level, peak) in self.levels.iter_mut().zip(self.block_peaks) {
+        for ((level, peak), scale) in self
+            .levels
+            .iter_mut()
+            .zip(self.block_peaks)
+            .zip(meters::SCALES_DB)
+        {
             // A meter too quiet to light a cell is already a still picture.
             // Reporting the remainder of its release would keep the editor
             // redrawing a meter that shows nothing.
             *level = peak.max(*level * release);
-            if *level < METER_FLOOR {
+            if *level < meters::floor_amplitude(scale) {
                 *level = 0.;
             }
         }
