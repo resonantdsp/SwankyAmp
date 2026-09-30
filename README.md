@@ -409,12 +409,13 @@ The candidate workflow validates the committed artwork before packaging. It
 builds a universal macOS package signed with the existing Resonant DSP Developer
 ID identities, notarizes and staples it, and builds a Windows x64 installer
 signed through the Free-specific Azure CI identity and shared Resonant DSP
-publisher profile. Both installers are installed on clean runners; pluginval
-and clap-validator inspect what was installed, and the workflows verify the
-publisher identities. Linux packaging is attempted on Ubuntu 22.04. Its tarball
-is included only if installing and validating it succeeds; a Linux failure does
-not discard qualified macOS and Windows candidates and does not create an
-unqualified Linux download.
+publisher profile. Both installers offer an install for all users or for the
+current user, and both are installed silently for all users on clean runners;
+pluginval and clap-validator inspect what was installed, and the workflows
+verify the publisher identities. Linux packaging is attempted on Ubuntu 22.04.
+Its tarball is included only if installing and validating it succeeds; a Linux
+failure does not discard qualified macOS and Windows candidates and does not
+create an unqualified Linux download.
 
 The final job writes `release-record.json` with the RC tag, commit, version,
 toolchain, patched cargo-truce version, Cargo lockfile and artwork hashes,

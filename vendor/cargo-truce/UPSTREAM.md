@@ -41,8 +41,9 @@ A package run given an install scope (`--user`, `--system`, or
 carries, but the Inno Setup script it generates names the output without the
 suffix. ISCC succeeds and the run then fails with "ISCC reported success but
 installer is missing". Only the unscoped default (`ask`) worked, which is why
-Pro, which passes no scope, never saw it. The candidate workflow passes
-`--system` so the silent CI install lands in the system paths it verifies.
+Pro, which passes no scope, never saw it. The candidate workflow now packages
+unscoped too, as Pro does, so the patch is inert there; it stays so a scoped
+package run keeps working.
 
 The change adds the scope suffix to `OutputBaseFilename` in both the per-plugin
 and suite `[Setup]` sections of `src/commands/package/windows.rs`, so the file
