@@ -49,10 +49,11 @@ again for the corrected one on the guitar recordings in
 Presence are searched so the balance between third-octave bands from 80 Hz to
 8 kHz is as close to 1.4.0's as a light cost on moving each control allows,
 with the controls kept between 1 and 9, and Power Drive follows so each preset
-drives the power stage as 1.4.0 did. The search starts from the bank it
-replaces, the voicing last accepted by ear, and the cost is for moving away
-from it, so a new measurement refines that voicing rather than starting over
-from 1.4.0. The bank is accepted by ear. Regenerate the version 2 bank and its
+drives the power stage as 1.4.0 did. Once a bank is accepted by ear, `just
+refit` keeps its Low, Mid, High and Presence and sets only Power Drive and
+Output again: moving the tone controls bought a few tenths of a dB of balance,
+less than the ear or the recordings resolve. It searches only a preset the
+bank lacks. The bank is accepted by ear. Regenerate the version 2 bank and its
 report, which records each preset's settings, balance and power-stage level
 against 1.4.0, with:
 

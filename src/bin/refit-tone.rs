@@ -1,7 +1,7 @@
-//! Voices the 1.4.0 factory presets for the corrected tone stack, refining the
-//! bank it replaces, and writes the version 2 factory bank with a report. The
-//! result is a starting point for listening, not a contract: the bank is
-//! judged by ear and may be adjusted by hand afterwards.
+//! Voices the 1.4.0 factory presets for the corrected tone stack and writes
+//! the version 2 factory bank with a report. The result is a starting point
+//! for listening, not a contract: the bank is judged by ear and may be
+//! adjusted by hand afterwards.
 
 use std::env;
 use std::fs;
@@ -56,9 +56,8 @@ fn xml_value(value: f32) -> String {
     }
 }
 
-/// Voices every 1.4.0 factory preset, each searched from its voicing in
-/// `current`, the bank as accepted by ear, so a new measurement refines that
-/// voicing rather than starting over from 1.4.0.
+/// Voices every 1.4.0 factory preset, keeping the tone controls `current`,
+/// the bank as accepted by ear, gives it.
 fn voice_all(
     released: &str,
     current: Option<&str>,
@@ -68,23 +67,18 @@ fn voice_all(
     let jobs = presets::names(released)
         .into_iter()
         .map(|name| {
-            let controls = presets::controls(released, &name)?;
-            let start = current
+            let accepted = current
                 .and_then(|bank| presets::controls(bank, &name).ok())
-                .unwrap_or(controls);
-            Ok((
-                controls,
-                [start.low, start.mid, start.high, start.presence],
-                name,
-            ))
+                .map(|bank| [bank.low, bank.mid, bank.high, bank.presence]);
+            Ok((presets::controls(released, &name)?, accepted, name))
         })
         .collect::<Result<Vec<_>, String>>()?;
     Ok(std::thread::scope(|scope| {
         let handles: Vec<_> = jobs
             .into_iter()
-            .map(|(controls, start, name)| {
+            .map(|(controls, accepted, name)| {
                 scope.spawn(move || {
-                    let voiced = refit::voice(controls, start, clips);
+                    let voiced = refit::voice(controls, accepted, clips);
                     let voiced_controls = voiced.voiced.apply(controls);
                     let measured =
                         calibration::preset_levels(voiced_controls, clips, LevelTables::CALIBRATED);
@@ -186,10 +180,11 @@ fn markdown(presets: &[Preset], init: PresetLevels) -> String {
            each render's bands taken about their own mean, so level does not\n\
            count. The error is the mean squared band difference from 1.4.0,\n\
            averaged over the recordings.\n\
-         - Low, Mid, High and Presence are searched from the bank being\n\
-           replaced, the voicing last accepted by ear (1.4.0's for a preset it\n\
-           lacks), in steps of 1, 0.5, 0.25 and 0.125 on the 0 to 10 scale.\n\
-           Moving a control from there costs {VOICING_RESTRAINT} dB² per half range squared, and the\n\
+         - Low, Mid, High and Presence keep the values of the bank being\n\
+           replaced, the voicing accepted by ear. Only for a preset it lacks are\n\
+           they searched, from the 1.4.0 settings in\n\
+           steps of 1, 0.5, 0.25 and 0.125 on the 0 to 10 scale. Moving a\n\
+           control costs {VOICING_RESTRAINT} dB² per half range squared, and the\n\
            controls stay within {:.0} to {:.0}, so presets leave room either way.\n\
          - For every candidate, Power Drive is set so the power stage's input\n\
            level, averaged over the recordings, matches 1.4.0's. Where Power\n\
@@ -206,10 +201,9 @@ fn markdown(presets: &[Preset], init: PresetLevels) -> String {
          Controls are Low / Mid / High / Presence / Power Drive on the panel's 0\n\
          to 10 scale. Balance is the RMS band difference from 1.4.0 in dB and\n\
          feed is the power stage's input level minus 1.4.0's in dB, each for the\n\
-         single coil / humbucker. Unvoiced is version 2 with the 1.4.0 settings;\n\
-         start is the bank being replaced, with Power Drive matched to the feed.\n\n\
-         | Preset | 1.4.0 | Start | Voiced | Balance unvoiced | Balance start | Balance voiced | Feed unvoiced | Feed voiced | Output dB |\n\
-         |---|---|---|---|---|---|---|---|---|---|\n",
+         single coil / humbucker. Unvoiced is version 2 with the 1.4.0 settings.\n\n\
+         | Preset | 1.4.0 | Voiced | Balance unvoiced | Balance voiced | Feed unvoiced | Feed voiced | Output dB |\n\
+         |---|---|---|---|---|---|---|---|\n",
         calibration::SAMPLE_RATE,
         knob(-RAIL),
         knob(RAIL),
@@ -217,13 +211,11 @@ fn markdown(presets: &[Preset], init: PresetLevels) -> String {
     for preset in presets {
         let voiced = &preset.voiced;
         text.push_str(&format!(
-            "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {:+.1} → {:+.1} |\n",
+            "| {} | {} | {} | {} | {} | {} | {} | {:+.1} → {:+.1} |\n",
             preset.name,
             settings(voiced.original),
-            settings(voiced.start),
             settings(voiced.voiced),
             pair(voiced.unvoiced_balance_db, false),
-            pair(voiced.start_balance_db, false),
             pair(voiced.voiced_balance_db, false),
             pair(voiced.unvoiced_feed_db, true),
             pair(voiced.voiced_feed_db, true),

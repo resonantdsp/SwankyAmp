@@ -22,10 +22,11 @@ path at 44100 Hz with Auto oversampling.
 each render's bands taken about their own mean, so level does not
 count. The error is the mean squared band difference from 1.4.0,
 averaged over the recordings.
-- Low, Mid, High and Presence are searched from the bank being
-replaced, the voicing last accepted by ear (1.4.0's for a preset it
-lacks), in steps of 1, 0.5, 0.25 and 0.125 on the 0 to 10 scale.
-Moving a control from there costs 0.5 dB² per half range squared, and the
+- Low, Mid, High and Presence keep the values of the bank being
+replaced, the voicing accepted by ear. Only for a preset it lacks are
+they searched, from the 1.4.0 settings in
+steps of 1, 0.5, 0.25 and 0.125 on the 0 to 10 scale. Moving a
+control costs 0.5 dB² per half range squared, and the
 controls stay within 1 to 9, so presets leave room either way.
 - For every candidate, Power Drive is set so the power stage's input
 level, averaged over the recordings, matches 1.4.0's. Where Power
@@ -44,21 +45,20 @@ so on the single coil the driven presets come out louder than Init.
 Controls are Low / Mid / High / Presence / Power Drive on the panel's 0
 to 10 scale. Balance is the RMS band difference from 1.4.0 in dB and
 feed is the power stage's input level minus 1.4.0's in dB, each for the
-single coil / humbucker. Unvoiced is version 2 with the 1.4.0 settings;
-start is the bank being replaced, with Power Drive matched to the feed.
+single coil / humbucker. Unvoiced is version 2 with the 1.4.0 settings.
 
-| Preset | 1.4.0 | Start | Voiced | Balance unvoiced | Balance start | Balance voiced | Feed unvoiced | Feed voiced | Output dB |
-|---|---|---|---|---|---|---|---|---|---|
-| clean | 5.0 / 3.5 / 7.0 / 7.0 / 0.00 | 3.5 / 1.0 / 2.0 / 8.9 / 0.74 | 3.5 / 1.0 / 2.0 / 8.9 / 0.74 | 4.5 / 4.6 | 1.2 / 0.9 | 1.2 / 0.9 | -1.1 / +1.5 | -0.0 / +0.0 | -7.0 → -4.8 |
-| bright | 4.0 / 6.0 / 5.0 / 6.5 / 2.53 | 3.6 / 5.6 / 5.1 / 6.2 / 2.53 | 3.4 / 5.5 / 4.5 / 6.3 / 2.53 | 0.6 / 0.5 | 0.6 / 0.4 | 0.5 / 0.3 | +0.3 / +0.4 | +0.1 / -0.1 | -3.5 → -5.2 |
-| edge | 4.0 / 5.0 / 6.5 / 6.6 / 3.03 | 2.8 / 3.2 / 2.7 / 7.7 / 3.45 | 2.4 / 2.0 / 2.4 / 8.3 / 3.68 | 2.6 / 3.0 | 1.1 / 0.6 | 1.0 / 0.3 | -0.1 / +1.1 | -0.0 / +0.0 | -3.5 → -2.6 |
-| distort | 6.0 / 8.0 / 6.0 / 7.0 / 5.95 | 5.1 / 6.1 / 2.1 / 8.6 / 6.35 | 4.4 / 4.8 / 1.9 / 8.7 / 6.45 | 2.1 / 1.9 | 0.6 / 0.6 | 0.4 / 0.5 | -1.0 / +0.6 | -0.0 / +0.0 | +1.9 → -2.8 |
-| dirty distort | 4.0 / 6.5 / 7.5 / 6.0 / 8.27 | 3.0 / 4.2 / 2.7 / 7.8 / 8.70 | 2.8 / 2.8 / 2.3 / 7.8 / 8.88 | 2.2 / 2.5 | 0.7 / 1.0 | 0.6 / 0.8 | +0.9 / +2.2 | +0.1 / +0.0 | +0.0 → -5.2 |
-| pre drive | 4.0 / 8.0 / 6.0 / 5.9 / 5.02 | 2.9 / 6.8 / 2.7 / 7.7 / 5.22 | 2.6 / 5.4 / 2.5 / 7.7 / 5.38 | 1.8 / 1.7 | 0.8 / 1.0 | 0.8 / 0.9 | +0.5 / +1.8 | -0.1 / +0.1 | +0.0 → -1.5 |
-| power drive | 4.0 / 8.0 / 7.4 / 4.0 / 6.94 | 2.8 / 7.4 / 3.4 / 4.9 / 7.02 | 2.4 / 7.1 / 2.9 / 5.3 / 7.07 | 1.4 / 1.3 | 0.4 / 0.4 | 0.3 / 0.3 | +0.5 / +1.5 | -0.1 / +0.1 | +0.0 → -0.7 |
-| full drive | 3.4 / 7.0 / 8.0 / 6.0 / 7.02 | 2.4 / 6.8 / 4.5 / 7.1 / 7.08 | 2.2 / 6.0 / 3.4 / 7.3 / 7.24 | 1.1 / 1.6 | 0.5 / 0.9 | 0.5 / 0.8 | +0.9 / +1.9 | -0.0 / +0.0 | +0.0 → -2.7 |
-| high gain | 6.0 / 5.9 / 8.0 / 3.0 / 8.05 | 4.5 / 2.8 / 3.1 / 3.8 / 8.53 | 3.5 / 1.0 / 2.6 / 3.5 / 8.74 | 2.2 / 2.4 | 1.0 / 1.1 | 0.8 / 0.9 | +0.3 / +1.4 | +0.2 / -0.1 | -2.0 → -2.6 |
-| level 11 | 7.0 / 10.0 / 7.2 / 6.9 / 10.00 | 7.8 / 8.8 / 3.7 / 9.0 / 10.00 | 9.0 / 9.0 / 3.6 / 9.0 / 10.00 | 2.0 / 2.2 | 1.3 / 1.3 | 1.3 / 1.3 | +0.3 / +0.6 | -0.8 / -0.7 | +0.0 → -4.7 |
+| Preset | 1.4.0 | Voiced | Balance unvoiced | Balance voiced | Feed unvoiced | Feed voiced | Output dB |
+|---|---|---|---|---|---|---|---|
+| clean | 5.0 / 3.5 / 7.0 / 7.0 / 0.00 | 3.5 / 1.0 / 2.0 / 8.9 / 0.74 | 4.5 / 4.6 | 1.2 / 0.9 | -1.1 / +1.5 | -0.0 / +0.0 | -7.0 → -4.8 |
+| bright | 4.0 / 6.0 / 5.0 / 6.5 / 2.53 | 3.6 / 5.6 / 5.1 / 6.2 / 2.53 | 0.6 / 0.5 | 0.6 / 0.4 | +0.3 / +0.4 | +0.0 / -0.0 | -3.5 → -5.2 |
+| edge | 4.0 / 5.0 / 6.5 / 6.6 / 3.03 | 2.8 / 3.2 / 2.7 / 7.7 / 3.45 | 2.6 / 3.0 | 1.1 / 0.6 | -0.1 / +1.1 | -0.1 / +0.1 | -3.5 → -3.1 |
+| distort | 6.0 / 8.0 / 6.0 / 7.0 / 5.95 | 5.1 / 6.1 / 2.1 / 8.6 / 6.35 | 2.1 / 1.9 | 0.6 / 0.6 | -1.0 / +0.6 | -0.1 / +0.1 | +1.9 → -2.8 |
+| dirty distort | 4.0 / 6.5 / 7.5 / 6.0 / 8.27 | 3.0 / 4.2 / 2.7 / 7.8 / 8.70 | 2.2 / 2.5 | 0.7 / 1.0 | +0.9 / +2.2 | -0.1 / +0.1 | +0.0 → -5.0 |
+| pre drive | 4.0 / 8.0 / 6.0 / 5.9 / 5.02 | 2.9 / 6.8 / 2.7 / 7.7 / 5.22 | 1.8 / 1.7 | 0.8 / 1.0 | +0.5 / +1.8 | -0.1 / +0.2 | +0.0 → -1.7 |
+| power drive | 4.0 / 8.0 / 7.4 / 4.0 / 6.94 | 2.8 / 7.4 / 3.4 / 4.9 / 7.02 | 1.4 / 1.3 | 0.4 / 0.4 | +0.5 / +1.5 | -0.1 / +0.1 | +0.0 → -0.7 |
+| full drive | 3.4 / 7.0 / 8.0 / 6.0 / 7.02 | 2.4 / 6.8 / 4.5 / 7.1 / 7.08 | 1.1 / 1.6 | 0.5 / 0.9 | +0.9 / +1.9 | -0.2 / +0.2 | +0.0 → -2.7 |
+| high gain | 6.0 / 5.9 / 8.0 / 3.0 / 8.05 | 4.5 / 2.8 / 3.1 / 3.8 / 8.53 | 2.2 / 2.4 | 1.0 / 1.1 | +0.3 / +1.4 | +0.1 / -0.0 | -2.0 → -2.3 |
+| level 11 | 7.0 / 10.0 / 7.2 / 6.9 / 10.00 | 7.8 / 8.8 / 3.7 / 9.0 / 10.00 | 2.0 / 2.2 | 1.3 / 1.3 | +0.3 / +0.6 | -1.0 / -0.9 | +0.0 → -4.8 |
 
 ## Remaining balance
 
@@ -68,15 +68,15 @@ recordings, at every other third-octave band.
 | Preset | 80 | 127 | 202 | 320 | 508 | 806 | 1280 | 2032 | 3225 | 5120 | 8127 |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | clean | +0.6 | +0.4 | +0.0 | -0.3 | -0.4 | +1.2 | +0.9 | +0.1 | +0.5 | -0.8 | -2.7 |
-| bright | +0.3 | -0.0 | +0.0 | -0.1 | -0.4 | -0.3 | +0.4 | +0.7 | +0.1 | -0.2 | -0.7 |
-| edge | +0.0 | +0.0 | -0.0 | -0.2 | -0.4 | +0.1 | +0.8 | +0.3 | +0.4 | -0.2 | -1.4 |
-| distort | +0.3 | +0.2 | -0.1 | -0.2 | -0.2 | +0.3 | +0.6 | -0.1 | +0.4 | -0.7 | -0.5 |
-| dirty distort | +0.6 | +0.4 | +0.4 | +0.0 | -0.3 | +0.0 | +0.6 | -0.1 | +0.2 | -1.0 | -1.2 |
-| pre drive | +0.3 | +0.0 | -0.2 | -0.3 | -0.3 | +0.5 | +1.2 | +0.4 | +0.5 | -1.3 | -1.0 |
-| power drive | +0.3 | -0.1 | -0.3 | -0.3 | -0.2 | +0.4 | +0.5 | +0.0 | -0.1 | -0.2 | -0.2 |
-| full drive | +0.5 | +0.1 | -0.1 | -0.3 | -0.1 | +0.4 | +0.9 | +0.0 | -0.3 | -1.2 | +0.2 |
-| high gain | -0.1 | +0.3 | +0.5 | +0.3 | -0.1 | -0.1 | +1.0 | +0.6 | -0.0 | -1.2 | -2.3 |
-| level 11 | -0.7 | -1.2 | -1.7 | -1.1 | +0.2 | +1.6 | +1.7 | +0.7 | +1.1 | +0.5 | -1.7 |
+| bright | +0.0 | -0.3 | -0.3 | -0.4 | -0.6 | -0.2 | +0.7 | +0.9 | +0.3 | +0.1 | -0.3 |
+| edge | +0.3 | -0.0 | -0.3 | -0.7 | -0.8 | +0.4 | +1.3 | +0.5 | +0.3 | -0.2 | -1.1 |
+| distort | +0.7 | +0.3 | -0.3 | -0.6 | -0.4 | +0.5 | +0.9 | +0.1 | +0.3 | -0.9 | -0.4 |
+| dirty distort | +0.5 | +0.3 | +0.0 | -0.4 | -0.5 | +0.6 | +1.0 | +0.1 | +0.3 | -1.1 | -1.2 |
+| pre drive | +0.4 | -0.0 | -0.4 | -0.6 | -0.4 | +0.7 | +1.4 | +0.5 | +0.5 | -1.3 | -0.9 |
+| power drive | +0.6 | -0.1 | -0.3 | -0.6 | -0.5 | +0.3 | +0.6 | +0.2 | -0.2 | -0.2 | -0.0 |
+| full drive | +0.5 | -0.0 | -0.4 | -0.6 | -0.5 | +0.4 | +1.2 | +0.4 | -0.2 | -1.3 | +0.4 |
+| high gain | +0.4 | +0.2 | -0.1 | -0.4 | -0.5 | +0.4 | +1.9 | +0.9 | +0.0 | -1.3 | -2.6 |
+| level 11 | -0.8 | -1.2 | -1.7 | -1.1 | +0.2 | +1.5 | +1.7 | +0.7 | +1.1 | +0.5 | -1.6 |
 
 ## Levels
 
@@ -86,15 +86,15 @@ level minus Init's, in dB, for the single coil / humbucker.
 | Preset | Integrated | Strike |
 |---|---|---|
 | clean | -4.5 / -1.5 | -4.7 / -0.0 |
-| bright | -3.2 / -0.9 | -2.8 / -0.0 |
+| bright | -3.2 / -0.8 | -2.8 / +0.0 |
 | edge | -2.2 / -0.6 | -1.8 / +0.0 |
 | distort | +5.0 / +1.7 | +2.8 / +0.0 |
-| dirty distort | +5.4 / +0.3 | +3.0 / +0.0 |
-| pre drive | +5.2 / +1.5 | +3.1 / +0.0 |
-| power drive | +5.2 / +1.0 | +2.8 / +0.0 |
-| full drive | +6.0 / +1.7 | +3.1 / +0.0 |
-| high gain | +6.2 / +1.9 | +3.1 / -0.0 |
-| level 11 | +6.3 / +1.8 | +2.8 / -0.0 |
+| dirty distort | +5.3 / +0.1 | +3.0 / -0.0 |
+| pre drive | +5.2 / +1.5 | +3.0 / -0.0 |
+| power drive | +5.2 / +0.9 | +2.8 / +0.0 |
+| full drive | +6.1 / +1.6 | +3.1 / -0.0 |
+| high gain | +6.2 / +1.9 | +3.1 / +0.0 |
+| level 11 | +6.2 / +1.7 | +2.8 / -0.0 |
 
 Init's integrated loudness is -23.9 / -20.1 LUFS and its strike level
 -19.2 / -16.7 LUFS.
