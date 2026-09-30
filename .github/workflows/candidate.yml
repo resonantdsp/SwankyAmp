@@ -18,28 +18,42 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # First and cheap: a tag the contract refuses, or one that already has a
+  # release, fails here, before an hour of signing proves nothing.
   identify:
     name: identify
     runs-on: ubuntu-24.04
     permissions:
-      contents: read
+      # A read-only token is shown published releases only, and a candidate's
+      # release is a draft until promotion. Write is what lets this job see the
+      # draft that says the name is taken; the token reaches only that query,
+      # never the checked-out tree.
+      contents: write
     outputs:
       release: ${{ steps.release.outputs.release }}
       tagged: ${{ steps.release.outputs.tagged }}
     steps:
+      # Any failure other than "release not found" stops the run as itself, so
+      # an outage never reads as a free name.
+      - name: Refuse a candidate tag that already has a release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --json isDraft 2>"$RUNNER_TEMP/err" >/dev/null; then
+            echo "$GITHUB_REF_NAME already has a release; use a new RC tag for new bytes." >&2
+            exit 1
+          fi
+          grep -qx 'release not found' "$RUNNER_TEMP/err" || { cat "$RUNNER_TEMP/err" >&2; exit 1; }
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
+          persist-credentials: false
       - id: release
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           if [ "$GITHUB_REF_TYPE" = tag ]; then
             python3 .github/scripts/release_contract.py check-tag candidate "$GITHUB_REF_NAME"
-            if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-              echo "$GITHUB_REF_NAME already has a draft; use a new RC tag for new bytes." >&2
-              exit 1
-            fi
             echo "release=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
             echo "tagged=true" >> "$GITHUB_OUTPUT"
           else
@@ -326,10 +340,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "$RELEASE" >/dev/null 2>&1; then
+          if gh release view "$RELEASE" 2>"$RUNNER_TEMP/err" >/dev/null; then
             echo "$RELEASE already has a GitHub release; refusing to replace candidate bytes." >&2
             exit 1
           fi
+          grep -qx 'release not found' "$RUNNER_TEMP/err" || { cat "$RUNNER_TEMP/err" >&2; exit 1; }
           version=$(python3 .github/scripts/release_contract.py version)
           awk -v version="$version" '
             $0 ~ "^## " version "( |$)" { printing = 1; next }

@@ -45,16 +45,32 @@ jobs:
       WEBSITE_REPO: resonantdsp/website
       PRODUCT_REPOSITORY: https://github.com/resonantdsp/SwankyAmp
     steps:
-      - name: Require the protected master dispatch ref
+      # A dispatch from any other ref would run that ref's copy of this
+      # workflow with the environment's secrets, and a tag input naming a
+      # branch would run that branch's scripts with them. Release tags are
+      # administrator-only, so the tree checked out below is one an
+      # administrator made.
+      - name: Require the protected master dispatch ref and tag inputs
         run: |
           test "$GITHUB_REF_TYPE" = branch && test "$GITHUB_REF_NAME" = master || {
             echo "Promotion must be dispatched with --ref master." >&2
             exit 1
           }
+          [[ $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "'$TAG' is not a stable tag: expected vX.Y.Z." >&2
+            exit 1
+          }
+          [[ $CANDIDATE_TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc\.[1-9][0-9]*$ ]] || {
+            echo "'$CANDIDATE_TAG' is not a candidate tag: expected vX.Y.Z-rc.N." >&2
+            exit 1
+          }
+      # The whole history, so both tags resolve. The repository token stays out
+      # of the tree's git config; the steps that publish pass it themselves.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          ref: ${{ inputs.tag }}
+          ref: refs/tags/${{ inputs.tag }}
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24.21.0"
@@ -94,13 +110,17 @@ jobs:
           }
           python3 .github/scripts/release_contract.py verify-candidate \
             "$CANDIDATE_TAG" "$TAG" "$RECORD_SHA256" candidate
-      - name: Prepare and validate the website catalogue change
+      # The token reaches git through a helper that reads it from the
+      # environment, so it is never written to a config file or a remote URL.
+      - name: Clone the website
         env:
           GH_TOKEN: ${{ secrets.WEBSITE_TOKEN }}
         run: |
           git config --global credential."https://github.com".helper \
             '!f() { printf "username=x-access-token\npassword=%s\n" "$GH_TOKEN"; }; f'
           git clone --depth 1 --branch master "https://github.com/${WEBSITE_REPO}.git" website
+      - name: Prepare and validate the website catalogue change
+        run: |
           node .github/scripts/website_release.mjs site \
             --record candidate/release-record.json --repository "$PRODUCT_REPOSITORY" \
             --tag "$TAG" --site website/site --released-at "$(date -u +%Y-%m-%d)"
