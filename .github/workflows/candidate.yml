@@ -101,7 +101,10 @@ jobs:
           xcrun notarytool store-credentials TRUCE_NOTARY --key "$key" \
             --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID" --keychain "$KEYCHAIN"
           rm -f "$key"
-      - run: just package --system
+      # Unscoped, both installers let the customer choose all users or the
+      # current user. The silent CI installs run as an administrator and take
+      # the all-users paths the checks read.
+      - run: just package
         env:
           THIRD_PARTY_NOTICES: ${{ github.workspace }}/THIRD-PARTY-NOTICES.txt
       - run: bash scripts/notices.sh verify
@@ -206,7 +209,7 @@ jobs:
       - name: Prefetch signing token while the OIDC assertion is valid
         shell: bash
         run: az account get-access-token --scope https://codesigning.azure.net/.default --output none
-      - run: just package --host-only --system
+      - run: just package --host-only
         shell: bash
         env:
           THIRD_PARTY_NOTICES: ${{ github.workspace }}/THIRD-PARTY-NOTICES.txt
