@@ -201,7 +201,7 @@ def manifest(
             "samples": 68704,
             "level_before_factory_preset": "0 dB fixture precondition: a fresh session's Input Level 0.0 maps to 0 dB; factory selection preserves the live Input Level",
             "cabinet": "enabled fixture precondition: a fresh session starts enabled; factory selection preserves the live cabinet switch even though the XML carries idCabOnOff",
-            "origin": "Owner-recorded DI copied from code/SwankyAmpPro/verification/calibration/single-coil.wav; no Pro DSP is used",
+            "origin": "single-coil DI recording; no Pro DSP is used",
         },
         "render_contract": {
             "frozen_sample_rates": list(RATES),
