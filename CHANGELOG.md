@@ -34,10 +34,11 @@ installs beside Swanky Amp 1.4.0.
   results are in `verification/tone-stack/refit-report.md`, and Swanky Amp
   1.4.0 remains available for the original voicing. Imported 1.x user
   presets use a faster conversion and can sound boxier than their originals.
-- Balanced the factory presets to equal loudness, which 1.4.0's never were:
-  each preset's Output moves so that all ten match Init's loudness averaged
-  over the two guitar recordings.
-  Imported 1.x presets are not rebalanced.
+- Balanced the factory presets to Init's level, which 1.4.0's never were:
+  each preset's Output moves so that all ten strike as loud as Init on a
+  humbucker, so switching presets no longer jumps in level. On a single coil
+  the driven presets play louder than Init, because their sustain holds up
+  where a clean tone decays. Imported 1.x presets are not rebalanced.
 - Fixed a slow tone-stack instability that silenced high-gain presets after
   hours of continuous play (issue #34). The first-order treble sections were
   discretised as biquads with a spurious pole at Nyquist, which f32 rounding

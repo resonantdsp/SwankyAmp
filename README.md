@@ -111,13 +111,20 @@ again. A dot after the name marks a preset changed since it was chosen. The
 menu capitalises the factory presets like Init; the bank, the saved state and
 the tools such as `just capture-preset` name them in lower case, as 1.4.0 did.
 
-Version 2's factory presets are balanced to equal loudness: each one's
-Output is set so that its loudness, averaged over the two recordings, matches
-Init's, by the measure the level calibration below holds. Swanky Amp 1.4.0's
-factory presets were not balanced, and imported 1.x presets keep their Output
-as it was. `just refit` measures the balance and applies it when it writes
-the bank, and the [voicing report](verification/tone-stack/refit-report.md)
-lists each preset's Output change.
+Version 2's factory presets are balanced to strike as loud as Init: each
+one's Output is set so that its strike level on the humbucker recording
+matches Init's. The strike level is the 95th percentile of momentary
+loudness (K-weighted 400 ms blocks at a 100 ms hop, those above -70 LUFS)
+over the whole recording. Integrated loudness, the measure the level
+calibration below holds, averages over the ring-out, where a driven amp
+sustains and a clean one decays; a driven preset level with Init on it
+strikes several dB softer. A clean amp also follows the pickup where a
+driven one does not, so on the single coil the driven presets come out
+louder than Init. Swanky Amp 1.4.0's factory presets were not balanced, and
+imported 1.x presets keep their Output as it was. `just refit` measures the
+balance and applies it when it writes the bank, and the [voicing
+report](verification/tone-stack/refit-report.md) lists each preset's Output
+change and its levels against Init on each pickup.
 
 As in 1.4.0, Input and the cabinet switch belong to the session: a preset
 stores them, but choosing one leaves them as they are and changing them does
