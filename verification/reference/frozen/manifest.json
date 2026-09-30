@@ -206,7 +206,7 @@
     "channels": 1,
     "format": "24-bit PCM",
     "level_before_factory_preset": "0 dB fixture precondition: a fresh session's Input Level 0.0 maps to 0 dB; factory selection preserves the live Input Level",
-    "origin": "Owner-recorded DI copied from code/SwankyAmpPro/verification/calibration/single-coil.wav; no Pro DSP is used",
+    "origin": "single-coil DI recording; no Pro DSP is used",
     "path": "input/single-coil.wav",
     "sample_rate": 48000,
     "samples": 68704,
