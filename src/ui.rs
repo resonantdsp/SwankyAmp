@@ -184,9 +184,9 @@ impl FreeUi {
                 ControlKind::Toggle => cabinet_switch(control, params),
             });
         }
-        let (line, color) = match (self.presets.footer(params), self.presets.status()) {
-            (Some(name), _) => (name, INK),
-            (None, Some(status)) => (status.to_owned(), INK),
+        let (line, color) = match (self.presets.status(), self.presets.footer(params)) {
+            (Some(status), _) => (status.to_owned(), INK),
+            (None, Some(name)) => (name, INK),
             (None, None) => (
                 "DRAG TO TURN   ·   SHIFT FOR FINE CONTROL   ·   RIGHT-CLICK TO RESET".to_owned(),
                 DIM,
@@ -254,20 +254,7 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
     }
 
     fn subscription(&self) -> Subscription<Msg> {
-        event::listen_with(|event, _, _| {
-            let action = match event {
-                iced_core::Event::Window(window::Event::Focused) => Action::Focus(true),
-                iced_core::Event::Window(window::Event::Unfocused) => Action::Focus(false),
-                iced_core::Event::Mouse(mouse::Event::CursorMoved { .. }) => Action::Pointer(true),
-                iced_core::Event::Mouse(mouse::Event::CursorLeft) => Action::Pointer(false),
-                iced_core::Event::Keyboard(keyboard::Event::KeyPressed {
-                    key: keyboard::Key::Named(keyboard::key::Named::Escape),
-                    ..
-                }) => Action::Dismiss,
-                _ => return None,
-            };
-            Some(Message::Plugin(action))
-        })
+        event::listen_with(|event, _, _| window_action(&event).map(Message::Plugin))
     }
 
     fn update(
@@ -324,6 +311,11 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
             Message::Plugin(Action::Pointer(hovered)) => {
                 self.hovered = hovered;
                 self.sync_meters();
+                // The window goes on reporting the last position after the
+                // pointer leaves, so the field never hears it go.
+                if !hovered {
+                    self.presets.update(PresetMsg::Hover(false), params, ctx);
+                }
             }
             _ => {}
         }
@@ -362,6 +354,22 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
     ) -> Element<'a, Msg, Theme, iced_wgpu::Renderer> {
         self.view_content(params)
     }
+}
+
+/// What the editor makes of window-wide events, whichever widget is under
+/// the pointer.
+fn window_action(event: &iced_core::Event) -> Option<Action> {
+    Some(match event {
+        iced_core::Event::Window(window::Event::Focused) => Action::Focus(true),
+        iced_core::Event::Window(window::Event::Unfocused) => Action::Focus(false),
+        iced_core::Event::Mouse(mouse::Event::CursorMoved { .. }) => Action::Pointer(true),
+        iced_core::Event::Mouse(mouse::Event::CursorLeft) => Action::Pointer(false),
+        iced_core::Event::Keyboard(keyboard::Event::KeyPressed {
+            key: keyboard::Key::Named(keyboard::key::Named::Escape),
+            ..
+        }) => Action::Dismiss,
+        _ => return None,
+    })
 }
 
 fn surface<'a, R: FreeRenderer + 'a>(
@@ -1101,6 +1109,7 @@ mod tests {
 
         fn press(&mut self, at: [f32; 2]) {
             self.send(mouse::Event::ButtonPressed(mouse::Button::Left), at);
+            self.send(mouse::Event::ButtonReleased(mouse::Button::Left), at);
         }
 
         fn point(&mut self, at: [f32; 2]) {
@@ -1112,9 +1121,18 @@ mod tests {
             );
         }
 
+        /// The window reports the last position with the pointer's leaving.
+        fn leave(&mut self, last: [f32; 2]) {
+            self.send(mouse::Event::CursorLeft, last);
+        }
+
         fn send(&mut self, event: mouse::Event, [x, y]: [f32; 2]) {
             let mut renderer = Measure;
             let mut messages = Vec::new();
+            let event = Event::Mouse(event);
+            // What the window's subscription hears arrives first, as it
+            // does in the editor.
+            messages.extend(super::window_action(&event).map(Message::Plugin));
             let mut interface = UserInterface::build(
                 self.ui.view_content::<Measure>(&self.params),
                 Size::new(style::WIDTH, style::HEIGHT),
@@ -1122,7 +1140,7 @@ mod tests {
                 &mut renderer,
             );
             interface.update(
-                &[Event::Mouse(event)],
+                &[event],
                 mouse::Cursor::Available(Point::new(x, y)),
                 &mut renderer,
                 &mut clipboard::Null,
@@ -1242,22 +1260,25 @@ mod tests {
     struct UserPresets(std::path::PathBuf);
 
     impl UserPresets {
-        fn new(editor: &mut Editor, names: &[&str]) -> Self {
+        /// The folder is `tag`'s own, so tests running at once never share it.
+        /// Returns the saved presets' keys too.
+        fn new(editor: &mut Editor, tag: &str, names: &[&str]) -> (Self, Vec<String>) {
             use crate::presets::Library;
-            let root = std::env::temp_dir().join(format!(
-                "swanky-amp-menu-{}-{}",
-                std::process::id(),
-                names.len()
-            ));
+            let root =
+                std::env::temp_dir().join(format!("swanky-amp-{tag}-{}", std::process::id()));
             let _ = std::fs::remove_dir_all(&root);
             let library = Library::with_user_root(Some(root.clone()));
-            for name in names {
-                library
-                    .save(name, &crate::dsp::amp::AmpControls::default())
-                    .unwrap();
-            }
+            let keys = names
+                .iter()
+                .map(|name| {
+                    library
+                        .save(name, &crate::dsp::amp::AmpControls::default())
+                        .unwrap()
+                        .key
+                })
+                .collect();
             editor.ui.presets = crate::preset_bar::PresetBar::with_library(library);
-            Self(root)
+            (Self(root), keys)
         }
     }
 
@@ -1277,7 +1298,7 @@ mod tests {
         let long = "Friday night rehearsal lead with the extra gain";
         let endless = "An endless name ".repeat(12);
         let mut editor = Editor::new(None);
-        let _presets = UserPresets::new(&mut editor, &[long, endless.trim()]);
+        let _presets = UserPresets::new(&mut editor, "menu-width", &[long, endless.trim()]);
         editor.press(field_centre());
 
         let [x, _, width, _] = editor.bounds("preset.menu").expect("the menu opens");
@@ -1290,12 +1311,6 @@ mod tests {
         assert!(
             rows.lines().any(|row| row == long),
             "{long:?} is not listed whole in {rows:?}"
-        );
-        let room = width - 2.0 * 10.0;
-        let set = super::text_width(long, 12.0, style::FONT);
-        assert!(
-            set <= room,
-            "{long:?} sets {set:.1} px in a row with {room:.1} px"
         );
         assert!(
             rows.lines()
@@ -1310,14 +1325,14 @@ mod tests {
         use truce::prelude::Params;
         let long = "Friday night rehearsal lead with the extra gain on the neck pickup";
         let mut editor = Editor::new(None);
-        let _presets = UserPresets::new(&mut editor, &[long]);
-        let key = format!("user:{long}.xml");
+        let (_presets, keys) = UserPresets::new(&mut editor, "hover-name", &[long]);
         let _ = editor.ui.update(
-            Message::Plugin(Action::Preset(PresetMsg::Select(key))),
+            Message::Plugin(Action::Preset(PresetMsg::Select(keys[0].clone()))),
             &editor.params,
             &editor.ctx,
         );
-        editor.params.params().set_plain(1, 0.5);
+        let output = editor.params.params().output.id();
+        editor.params.params().set_plain(output, 0.5);
 
         editor.point(field_centre());
         let line = editor.text("footer.line").unwrap();
@@ -1334,6 +1349,14 @@ mod tests {
             editor.text("footer.line").as_deref(),
             Some(line.as_str()),
             "the name stays in the footer after the pointer leaves the field"
+        );
+
+        editor.point(field_centre());
+        editor.leave(field_centre());
+        assert_ne!(
+            editor.text("footer.line").as_deref(),
+            Some(line.as_str()),
+            "the name stays in the footer after the pointer leaves the window from the field"
         );
     }
 

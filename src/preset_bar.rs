@@ -195,12 +195,7 @@ impl PresetBar {
     /// pointer, which rests on the field.
     pub fn captured_menu(name: &str) -> Self {
         let mut bar = Self::offline();
-        let entry = Entry {
-            key: format!("user:{name}.xml"),
-            name: name.to_owned(),
-            scope: Scope::User,
-            path: None,
-        };
+        let entry = Entry::user(PathBuf::from(format!("{name}.xml")));
         let mut entries = bar.entries.clone();
         entries.push(entry.clone());
         bar.list(entries);
@@ -347,9 +342,10 @@ impl PresetBar {
     }
 
     /// The footer line naming the current preset in full while the pointer
-    /// is over the field.
+    /// is over the field. A fresh status wins: the arrows sit inside the
+    /// field, so a failed step would otherwise go unread.
     pub fn footer(&self, params: &ParamCache<SwankyAmpParams>) -> Option<String> {
-        self.hovered
+        (self.hovered && self.status.is_none())
             .then(|| self.shown(params, |shown| shown.footer.clone()))
     }
 

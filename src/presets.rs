@@ -440,6 +440,23 @@ impl Entry {
             path: None,
         }
     }
+
+    /// The user preset a file in the preset folder holds, named by its file.
+    pub fn user(path: PathBuf) -> Self {
+        Self {
+            key: format!(
+                "user:{}",
+                path.file_name().unwrap_or_default().to_string_lossy()
+            ),
+            name: path
+                .file_stem()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .into_owned(),
+            scope: Scope::User,
+            path: Some(path),
+        }
+    }
 }
 
 /// Where version 2 keeps the user's presets: the platform's audio preset
@@ -617,15 +634,7 @@ impl Library {
                 .map_err(|error| error.to_string())
                 .and_then(|xml| parse_state(&xml))
             {
-                Ok(_) => user.push(Entry {
-                    key: format!(
-                        "user:{}",
-                        path.file_name().unwrap_or_default().to_string_lossy()
-                    ),
-                    name: stem,
-                    scope: Scope::User,
-                    path: Some(path),
-                }),
+                Ok(_) => user.push(Entry::user(path)),
                 Err(_) => listing.unreadable.push(stem),
             }
         }
