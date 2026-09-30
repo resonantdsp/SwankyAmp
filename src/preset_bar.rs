@@ -15,14 +15,15 @@ use truce_iced::iced::widget::{
 use truce_iced::iced::{Border, Color};
 use truce_iced::{Message, ParamCache, PluginContext};
 
+use crate::layout::{self, Component};
 use crate::params::SwankyAmpParams;
 use crate::presets::{Entry, ImportJob, Library, Scope, legacy_root};
 use crate::style;
 use crate::widgets::{FreeRenderer, Msg};
 
 const DIM: Color = Color::from_rgb(0.49, 0.53, 0.56);
-/// The field's width, which its menu shares. It holds the longest factory
-/// name with its modified mark, with room to spare for a user's name.
+/// The field's width, and the narrowest its menu gets. It holds the longest
+/// factory name with its modified mark, and every action in the menu.
 pub const FIELD_WIDTH: f32 = 164.0;
 /// Each arrow's share of the field, either side of the name.
 const ARROW_WIDTH: f32 = 22.0;
@@ -38,8 +39,15 @@ const TEXT_SIZE: f32 = 12.0;
 const MODIFIED: &str = " •";
 /// The menu's question before a user preset is removed: this, the name, "?".
 const REMOVE_PREFIX: &str = "Remove ";
+/// Names the current preset in the footer, where there is room to say it.
+const EDITED: &str = " (edited)";
 const ITEM_HEIGHT: f32 = 20.0;
 const ITEM_PADDING: f32 = 10.0;
+/// What a menu wider than the field keeps clear of the window's edges: the
+/// editor's margin, so one pushed left ends in line with the header.
+const MENU_MARGIN: f32 = style::MARGIN;
+/// The menu's outline, which a row's text keeps clear of.
+const MENU_BORDER: f32 = 1.0;
 /// The menu stops short of the footer; a longer user list scrolls.
 const MENU_BOTTOM: f32 = style::HEIGHT - style::FOOTER_HEIGHT - 6.0;
 /// Long enough to read a sentence, short enough not to linger over playing.
@@ -57,6 +65,8 @@ pub enum PresetMsg {
     Remove,
     Import,
     OpenFolder,
+    /// The pointer arrived over the field or left it.
+    Hover(bool),
 }
 
 type Pending<T> = Arc<Mutex<Option<T>>>;
@@ -64,11 +74,16 @@ type Pending<T> = Arc<Mutex<Option<T>>>;
 pub struct PresetBar {
     library: Library,
     entries: Vec<Entry>,
+    /// The menu's rows for `entries`, measured once per listing.
+    rows: MenuRows,
     current: Entry,
     /// The values the current preset set, for telling when it is modified.
     baseline: Vec<(u32, f64)>,
     host_revision: u64,
     pub open: bool,
+    /// Whether the pointer is over the field, whose full name the footer
+    /// then shows.
+    hovered: bool,
     status: Option<(String, Instant)>,
     import: Option<ImportJob>,
     naming: Option<Pending<Option<PathBuf>>>,
@@ -81,28 +96,82 @@ pub struct PresetBar {
     shown: RefCell<Option<Shown>>,
 }
 
-/// The current preset's name fitted to the field and to the menu's Remove
-/// question, for one name and modified state.
+/// The current preset's name fitted to the field, to the menu's Remove
+/// question and to the footer, for one name, modified state and menu width.
 struct Shown {
     name: String,
     modified: bool,
+    menu_width: f32,
     field: String,
     remove: String,
+    footer: String,
 }
 
 impl Shown {
-    fn new(name: &str, modified: bool) -> Self {
+    fn new(name: &str, modified: bool, menu_width: f32) -> Self {
         let mark = if modified { MODIFIED } else { "" };
-        let room = FIELD_WIDTH
-            - 2.0 * ITEM_PADDING
-            - crate::ui::text_width(REMOVE_PREFIX, TEXT_SIZE, style::FONT);
+        let room = row_room(menu_width) - measure(REMOVE_PREFIX, TEXT_SIZE);
         Self {
             name: name.to_owned(),
             modified,
-            field: fitted(name, mark, NAME_ROOM),
-            remove: format!("{REMOVE_PREFIX}{}", fitted(name, "?", room)),
+            menu_width,
+            field: fitted(name, mark, NAME_ROOM, TEXT_SIZE),
+            remove: format!("{REMOVE_PREFIX}{}", fitted(name, "?", room, TEXT_SIZE)),
+            footer: footer_name(name, modified),
         }
     }
+}
+
+/// The footer line while the pointer is over the field: the whole name, which
+/// the field may have had to cut, marked when edited. Only a name wider than
+/// the footer itself is cut, and never its mark.
+fn footer_name(name: &str, modified: bool) -> String {
+    let mark = if modified { EDITED } else { "" };
+    fitted(
+        name,
+        mark,
+        crate::ui::FOOTER_TEXT[1],
+        crate::ui::FOOTER_TEXT_SIZE,
+    )
+}
+
+/// The open menu's preset rows as they read, and the width the widest needs.
+#[derive(Default)]
+struct MenuRows {
+    labels: Vec<String>,
+    width: f32,
+}
+
+impl MenuRows {
+    /// Each name whole where the window allows, cut to end in an ellipsis
+    /// only where it does not; the menu is never narrower than the field.
+    fn new(entries: &[Entry]) -> Self {
+        let widest = style::WIDTH - 2.0 * MENU_MARGIN;
+        let room = row_room(widest);
+        let mut width = FIELD_WIDTH;
+        let labels = entries
+            .iter()
+            .map(|entry| {
+                let label = fitted(&entry.name, "", room, TEXT_SIZE);
+                width = width.max(widest - room + measure(&label, TEXT_SIZE));
+                label
+            })
+            .collect();
+        Self {
+            labels,
+            // Whole pixels keep the text and the outline crisp.
+            width: width.ceil().min(widest),
+        }
+    }
+}
+
+/// What a row's text has in a menu `width` wide.
+fn row_room(width: f32) -> f32 {
+    width - 2.0 * (ITEM_PADDING + MENU_BORDER)
+}
+
+fn measure(body: &str, size: f32) -> f32 {
+    crate::ui::text_width(body, size, style::FONT)
 }
 
 impl PresetBar {
@@ -115,23 +184,45 @@ impl PresetBar {
     /// imported the first time version 2 runs.
     pub fn live(params: &SwankyAmpParams) -> Self {
         let mut bar = Self::with_library(Library::default());
-        bar.entries = bar.library.list().entries;
+        bar.list(bar.library.list().entries);
         bar.import = legacy_root().and_then(|source| ImportJob::first_run(&bar.library, source));
         bar.sync(params);
         bar
     }
 
-    fn with_library(library: Library) -> Self {
+    /// Editors created by the capture tool open with this bar: `name` listed
+    /// as the player's own preset and chosen, and the menu open under the
+    /// pointer, which rests on the field.
+    pub fn captured_menu(name: &str) -> Self {
+        let mut bar = Self::offline();
+        let entry = Entry {
+            key: format!("user:{name}.xml"),
+            name: name.to_owned(),
+            scope: Scope::User,
+            path: None,
+        };
+        let mut entries = bar.entries.clone();
+        entries.push(entry.clone());
+        bar.list(entries);
+        bar.current = entry;
+        bar.open = true;
+        bar.hovered = true;
+        bar
+    }
+
+    pub(crate) fn with_library(library: Library) -> Self {
         let entries = library.builtin();
         let current = entries[0].clone();
         let baseline = library.tone(&current);
         Self {
             library,
+            rows: MenuRows::new(&entries),
             entries,
             current,
             baseline,
             host_revision: 0,
             open: false,
+            hovered: false,
             status: None,
             import: None,
             naming: None,
@@ -223,9 +314,14 @@ impl PresetBar {
         self.status = Some((message, Instant::now()));
     }
 
+    fn list(&mut self, entries: Vec<Entry>) {
+        self.rows = MenuRows::new(&entries);
+        self.entries = entries;
+    }
+
     fn refresh(&mut self) {
         let listing = self.library.list();
-        self.entries = listing.entries;
+        self.list(listing.entries);
         if !listing.unreadable.is_empty() {
             self.report(Err(format!(
                 "Skipped unreadable presets: {}",
@@ -234,18 +330,27 @@ impl PresetBar {
         }
     }
 
-    /// The current name fitted for the field, and for the Remove question.
-    fn shown(&self, params: &ParamCache<SwankyAmpParams>) -> (String, String) {
+    /// The current name fitted for the field, the Remove question and the
+    /// footer.
+    fn shown<T>(&self, params: &ParamCache<SwankyAmpParams>, pick: impl Fn(&Shown) -> T) -> T {
         let modified = self.modified(params);
         let mut shown = self.shown.borrow_mut();
-        let current = shown
-            .as_ref()
-            .is_some_and(|shown| shown.name == self.current.name && shown.modified == modified);
+        let current = shown.as_ref().is_some_and(|shown| {
+            shown.name == self.current.name
+                && shown.modified == modified
+                && shown.menu_width == self.rows.width
+        });
         if !current {
-            *shown = Some(Shown::new(&self.current.name, modified));
+            *shown = Some(Shown::new(&self.current.name, modified, self.rows.width));
         }
-        let shown = shown.as_ref().expect("the fitted name was just set");
-        (shown.field.clone(), shown.remove.clone())
+        pick(shown.as_ref().expect("the fitted name was just set"))
+    }
+
+    /// The footer line naming the current preset in full while the pointer
+    /// is over the field.
+    pub fn footer(&self, params: &ParamCache<SwankyAmpParams>) -> Option<String> {
+        self.hovered
+            .then(|| self.shown(params, |shown| shown.footer.clone()))
     }
 
     /// Init never reads as modified: it is the absence of a preset.
@@ -285,6 +390,10 @@ impl PresetBar {
         params: &ParamCache<SwankyAmpParams>,
         ctx: &PluginContext<SwankyAmpParams>,
     ) {
+        if let PresetMsg::Hover(over) = message {
+            self.hovered = over;
+            return;
+        }
         self.sync(params.params());
         let armed = self.removing.take();
         let mut close = !matches!(message, PresetMsg::Toggle);
@@ -295,7 +404,7 @@ impl PresetBar {
                     self.refresh();
                 }
             }
-            PresetMsg::Close => {}
+            PresetMsg::Close | PresetMsg::Hover(_) => {}
             PresetMsg::Select(key) => match self.library.find(&key) {
                 Some(entry) => self.apply(entry, params, ctx),
                 None => self.report(Err("That preset is no longer available.".into())),
@@ -457,7 +566,7 @@ impl PresetBar {
         &self,
         params: &ParamCache<SwankyAmpParams>,
     ) -> Element<'a, Msg, Theme, R> {
-        let (name, _) = self.shown(params);
+        let name = self.shown(params, |shown| shown.field.clone());
         let chevron = |glyph, message: Option<PresetMsg>| {
             let available = message.is_some();
             let glyph = container(text(glyph).size(17).color(DIM.scale_alpha(if available {
@@ -478,7 +587,7 @@ impl PresetBar {
         let previous = self.step(false).map(|_| PresetMsg::Previous);
         let next = self.step(true).map(|_| PresetMsg::Next);
         let open = self.open;
-        container(
+        let field = container(
             row![
                 chevron("‹", previous),
                 mouse_area(
@@ -501,8 +610,11 @@ impl PresetBar {
         )
         .width(Length::Fill)
         .height(Length::Fill)
-        .style(move |_| style::outlined(open))
-        .into()
+        .style(move |_| style::outlined(open));
+        mouse_area(field)
+            .on_enter(preset(PresetMsg::Hover(true)))
+            .on_exit(preset(PresetMsg::Hover(false)))
+            .into()
     }
 
     /// The open menu as layers over the whole editor: a catch-all that closes
@@ -521,13 +633,13 @@ impl PresetBar {
         };
         let mut presets: Vec<Element<'a, Msg, Theme, R>> = Vec::new();
         let mut previous_scope = None;
-        for entry in &self.entries {
+        for (entry, label) in self.entries.iter().zip(&self.rows.labels) {
             if previous_scope.is_some_and(|scope| scope != entry.scope) {
                 presets.push(divider());
             }
             previous_scope = Some(entry.scope);
             presets.push(item(
-                entry.name.clone(),
+                label.clone(),
                 Some(PresetMsg::Select(entry.key.clone())),
                 entry.key == self.current.key,
             ));
@@ -535,7 +647,7 @@ impl PresetBar {
         let user = self.current.scope == Scope::User;
         let confirming = self.removing.as_deref() == Some(self.current.key.as_str());
         let remove = if confirming {
-            self.shown(params).1
+            self.shown(params, |shown| shown.remove.clone())
         } else {
             "Remove".into()
         };
@@ -590,6 +702,10 @@ impl PresetBar {
                 .width(Length::Fill)
                 .style(|_| menu_style());
         let height = chrome + list_height.min(list_room);
+        let width = self.rows.width;
+        let left = field[0].min(style::WIDTH - MENU_MARGIN - width);
+        let mut spec = Component::new("preset.menu", "menu", "native");
+        spec.text = Some(self.rows.labels.join("\n"));
         vec![
             place(
                 [0.0, 0.0, style::WIDTH, style::HEIGHT],
@@ -597,7 +713,7 @@ impl PresetBar {
                     .on_press(preset(PresetMsg::Close))
                     .on_right_press(preset(PresetMsg::Close)),
             ),
-            place([field[0], top, FIELD_WIDTH, height], panel),
+            place([left, top, width, height], layout::mark(spec, panel)),
         ]
     }
 }
@@ -609,10 +725,10 @@ fn preset(message: PresetMsg) -> Msg {
     Message::Plugin(crate::ui::Action::Preset(message))
 }
 
-/// The name followed by `mark`, set within `room`: whole when it fits, or
-/// cut to end in an ellipsis before the mark.
-fn fitted(name: &str, mark: &str, room: f32) -> String {
-    let fits = |body: &str| crate::ui::text_width(body, TEXT_SIZE, style::FONT) <= room;
+/// The name followed by `mark`, set at `size` within `room`: whole when it
+/// fits, or cut to end in an ellipsis before the mark.
+fn fitted(name: &str, mark: &str, room: f32, size: f32) -> String {
+    let fits = |body: &str| measure(body, size) <= room;
     let whole = format!("{name}{mark}");
     if fits(&whole) {
         return whole;
@@ -657,6 +773,7 @@ fn menu_item<'a, R: FreeRenderer + 'a>(
         text(label)
             .size(TEXT_SIZE)
             .font(style::FONT)
+            .wrapping(iced_core::text::Wrapping::None)
             .line_height(LineHeight::Absolute(15.0.into())),
     )
     .width(Length::Fill)

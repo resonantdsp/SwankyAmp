@@ -184,16 +184,25 @@ impl FreeUi {
                 ControlKind::Toggle => cabinet_switch(control, params),
             });
         }
+        let (line, color) = match (self.presets.footer(params), self.presets.status()) {
+            (Some(name), _) => (name, INK),
+            (None, Some(status)) => (status.to_owned(), INK),
+            (None, None) => (
+                "DRAG TO TURN   ·   SHIFT FOR FINE CONTROL   ·   RIGHT-CLICK TO RESET".to_owned(),
+                DIM,
+            ),
+        };
+        let mut spec = Component::new("footer.line", "text", "native");
+        spec.text = Some(line.clone());
         layers.push(footer(
-            [style::MARGIN, 680.0],
-            match self.presets.status() {
-                Some(status) => text(status.to_owned()).size(10).color(INK),
-                None => {
-                    text("DRAG TO TURN   ·   SHIFT FOR FINE CONTROL   ·   RIGHT-CLICK TO RESET")
-                        .size(10)
-                        .color(DIM)
-                }
-            },
+            FOOTER_TEXT,
+            layout::mark(
+                spec,
+                text(line)
+                    .size(FOOTER_TEXT_SIZE)
+                    .font(style::FONT)
+                    .color(color),
+            ),
         ));
         layers.push(footer(
             [RIGHT_EDGE - 124.0, 124.0],
@@ -232,6 +241,9 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
             // starts live until a focus or pointer event says otherwise.
             ..Self::installed(crate::interface::folder())
         };
+        if let Some(name) = CAPTURED_MENU.get() {
+            ui.presets = PresetBar::captured_menu(name);
+        }
         if let Some(release) = CAPTURED_INFORMATION.get() {
             ui.releases = None;
             ui.notice = release_notice::notice_for(release.as_deref());
@@ -422,6 +434,10 @@ fn footer<'a, R: iced_core::Renderer + 'a>(
     )
 }
 
+/// Where the footer's line of help or status sets, and at what size.
+pub(crate) const FOOTER_TEXT: [f32; 2] = [style::MARGIN, 680.0];
+pub(crate) const FOOTER_TEXT_SIZE: f32 = 10.0;
+
 /// How wide a single line of text sets.
 pub(crate) fn text_width(body: &str, size: f32, font: iced_core::Font) -> f32 {
     use iced_core::text::{Paragraph, Shaping, Text, Wrapping};
@@ -575,6 +591,15 @@ static CAPTURED_INFORMATION: OnceLock<Option<String>> = OnceLock::new();
 /// announce `release` if it is newer than this build.
 pub fn capture_information(release: Option<String>) {
     let _ = CAPTURED_INFORMATION.set(release);
+}
+
+/// Like the panel, the capture tool cannot open the preset menu itself.
+static CAPTURED_MENU: OnceLock<String> = OnceLock::new();
+
+/// Editors created after this open with `name` as the chosen user preset, its
+/// menu open and the pointer over the field.
+pub fn capture_menu(name: String) {
+    let _ = CAPTURED_MENU.set(name);
 }
 
 const INFORMATION_WIDTH: f32 = 340.0;
@@ -1042,6 +1067,9 @@ mod tests {
         ui: FreeUi,
         params: ParamCache<SwankyAmpParams>,
         ctx: PluginContext<SwankyAmpParams>,
+        /// The widgets' state between events, such as what the pointer is
+        /// over, as the editor's window keeps it.
+        cache: Option<Cache>,
     }
 
     impl Editor {
@@ -1053,6 +1081,7 @@ mod tests {
                 ui,
                 params: ParamCache::new(Arc::clone(&params)),
                 ctx: PluginContext::new(Arc::new(NullHost), params),
+                cache: None,
             }
         }
 
@@ -1070,24 +1099,36 @@ mod tests {
                 .and_then(|component| component.text)
         }
 
-        fn press(&mut self, [x, y]: [f32; 2]) {
+        fn press(&mut self, at: [f32; 2]) {
+            self.send(mouse::Event::ButtonPressed(mouse::Button::Left), at);
+        }
+
+        fn point(&mut self, at: [f32; 2]) {
+            self.send(
+                mouse::Event::CursorMoved {
+                    position: Point::new(at[0], at[1]),
+                },
+                at,
+            );
+        }
+
+        fn send(&mut self, event: mouse::Event, [x, y]: [f32; 2]) {
             let mut renderer = Measure;
             let mut messages = Vec::new();
-            UserInterface::build(
+            let mut interface = UserInterface::build(
                 self.ui.view_content::<Measure>(&self.params),
                 Size::new(style::WIDTH, style::HEIGHT),
-                Cache::new(),
+                self.cache.take().unwrap_or_default(),
                 &mut renderer,
-            )
-            .update(
-                &[Event::Mouse(mouse::Event::ButtonPressed(
-                    mouse::Button::Left,
-                ))],
+            );
+            interface.update(
+                &[Event::Mouse(event)],
                 mouse::Cursor::Available(Point::new(x, y)),
                 &mut renderer,
                 &mut clipboard::Null,
                 &mut messages,
             );
+            self.cache = Some(interface.into_cache());
             for message in messages {
                 let _ = self.ui.update(message, &self.params, &self.ctx);
             }
@@ -1195,6 +1236,105 @@ mod tests {
             "the host must be told the window of the chosen size"
         );
         let _ = std::fs::remove_dir_all(&folder);
+    }
+
+    /// An editor whose preset folder holds `names`, empty when it is dropped.
+    struct UserPresets(std::path::PathBuf);
+
+    impl UserPresets {
+        fn new(editor: &mut Editor, names: &[&str]) -> Self {
+            use crate::presets::Library;
+            let root = std::env::temp_dir().join(format!(
+                "swanky-amp-menu-{}-{}",
+                std::process::id(),
+                names.len()
+            ));
+            let _ = std::fs::remove_dir_all(&root);
+            let library = Library::with_user_root(Some(root.clone()));
+            for name in names {
+                library
+                    .save(name, &crate::dsp::amp::AmpControls::default())
+                    .unwrap();
+            }
+            editor.ui.presets = crate::preset_bar::PresetBar::with_library(library);
+            Self(root)
+        }
+    }
+
+    impl Drop for UserPresets {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn field_centre() -> [f32; 2] {
+        let [x, y, width, height] = super::PRESET_FIELD;
+        [x + width / 2.0, y + height / 2.0]
+    }
+
+    #[test]
+    fn a_long_preset_name_reads_whole_in_a_menu_that_stays_in_the_window() {
+        let long = "Friday night rehearsal lead with the extra gain";
+        let endless = "An endless name ".repeat(12);
+        let mut editor = Editor::new(None);
+        let _presets = UserPresets::new(&mut editor, &[long, endless.trim()]);
+        editor.press(field_centre());
+
+        let [x, _, width, _] = editor.bounds("preset.menu").expect("the menu opens");
+        assert!(
+            x >= 0.0 && x + width <= style::WIDTH,
+            "the menu runs off the window at {x}..{}",
+            x + width
+        );
+        let rows = editor.text("preset.menu").unwrap();
+        assert!(
+            rows.lines().any(|row| row == long),
+            "{long:?} is not listed whole in {rows:?}"
+        );
+        let room = width - 2.0 * 10.0;
+        let set = super::text_width(long, 12.0, style::FONT);
+        assert!(
+            set <= room,
+            "{long:?} sets {set:.1} px in a row with {room:.1} px"
+        );
+        assert!(
+            rows.lines()
+                .any(|row| row.starts_with("An endless name") && row.ends_with('…')),
+            "a name wider than the window is not cut to an ellipsis in {rows:?}"
+        );
+    }
+
+    #[test]
+    fn hovering_the_preset_field_names_the_preset_in_full_within_the_footer() {
+        use crate::preset_bar::PresetMsg;
+        use truce::prelude::Params;
+        let long = "Friday night rehearsal lead with the extra gain on the neck pickup";
+        let mut editor = Editor::new(None);
+        let _presets = UserPresets::new(&mut editor, &[long]);
+        let key = format!("user:{long}.xml");
+        let _ = editor.ui.update(
+            Message::Plugin(Action::Preset(PresetMsg::Select(key))),
+            &editor.params,
+            &editor.ctx,
+        );
+        editor.params.params().set_plain(1, 0.5);
+
+        editor.point(field_centre());
+        let line = editor.text("footer.line").unwrap();
+        assert_eq!(line, format!("{long} (edited)"));
+        let set = super::text_width(&line, super::FOOTER_TEXT_SIZE, style::FONT);
+        assert!(
+            set <= super::FOOTER_TEXT[1],
+            "{line:?} sets {set:.1} px in a footer of {} px",
+            super::FOOTER_TEXT[1]
+        );
+
+        editor.point([style::WIDTH / 2.0, style::HEIGHT / 2.0]);
+        assert_ne!(
+            editor.text("footer.line").as_deref(),
+            Some(line.as_str()),
+            "the name stays in the footer after the pointer leaves the field"
+        );
     }
 
     #[test]

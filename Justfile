@@ -157,6 +157,11 @@ capture-live output="verification/interface-live":
 capture-information output="verification/interface-information" release="":
     cargo run --quiet --bin swanky-amp-2 -- capture "{{ output }}" information {{ release }}
 
+# Capture with the preset menu open under a user preset of this name, and
+# the pointer over the field so the footer names it.
+capture-menu name="Friday night rehearsal lead with the extra gain on the neck pickup" output="verification/interface-menu":
+    cargo run --quiet --bin swanky-amp-2 -- capture "{{ output }}" menu "{{ name }}"
+
 pack-artwork layers package="assets/artwork.pack":
     cargo run --quiet --bin swanky-amp-2 -- pack-artwork "{{ layers }}" "{{ package }}"
 
