@@ -61,7 +61,9 @@ if [ ! -x "$tool" ]; then
   work=$(mktemp -d "${TMPDIR:-/tmp}/cargo-about.XXXXXX")
   trap 'rm -rf "$work"' EXIT
   archive="cargo-about-${CARGO_ABOUT_VERSION}-${target}.tar.gz"
-  curl --fail --location --silent --show-error --output "$work/$archive" \
+  # A download host's transient error (a 5xx or a timeout) is retried rather
+  # than failing the run; the timeouts stop a hung download.
+  curl --fail --location --silent --show-error --retry 4 --connect-timeout 30 --max-time 600 --output "$work/$archive" \
     "https://github.com/EmbarkStudios/cargo-about/releases/download/${CARGO_ABOUT_VERSION}/${archive}"
   actual=$( (sha256sum "$work/$archive" 2>/dev/null || shasum -a 256 "$work/$archive") | cut -d' ' -f1)
   if [ "$actual" != "$sha" ]; then

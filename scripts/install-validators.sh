@@ -49,7 +49,9 @@ unpack_zip() {
 
 download() {
   local url=$1 destination=$2 expected=$3
-  curl --fail --location --silent --show-error --output "$destination" "$url"
+  # A download host's transient error (a 5xx or a timeout) is retried rather
+  # than failing the run; the timeouts stop a hung download.
+  curl --fail --location --silent --show-error --retry 4 --connect-timeout 30 --max-time 600 --output "$destination" "$url"
   local actual
   actual=$(sha256_of "$destination")
   if [ "$actual" != "$expected" ]; then
