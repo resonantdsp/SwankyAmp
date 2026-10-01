@@ -40,14 +40,42 @@ pub const LINKS: [(&str, &str); 3] = [
 /// convenience and the editor must not block or report on the user's desktop
 /// setup.
 pub fn open_in_browser(url: &str) {
-    let launcher = if cfg!(target_os = "macos") {
-        "open"
-    } else if cfg!(target_os = "windows") {
-        "explorer"
-    } else {
-        "xdg-open"
-    };
-    let _ = std::process::Command::new(launcher).arg(url).spawn();
+    #[cfg(windows)]
+    shell_open(url);
+    #[cfg(not(windows))]
+    {
+        let launcher = if cfg!(target_os = "macos") {
+            "open"
+        } else {
+            "xdg-open"
+        };
+        let _ = std::process::Command::new(launcher).arg(url).spawn();
+    }
+}
+
+/// The shell's open verb takes the whole URL as one argument. Explorer parses
+/// its own command line, which Rust leaves unquoted for a URL without spaces,
+/// and is reported to open a folder window for a URL containing `=`, which
+/// every tagged link here does.
+#[cfg(windows)]
+fn shell_open(target: &str) {
+    use windows_sys::Win32::UI::Shell::ShellExecuteW;
+    use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+    let wide = |text: &str| text.encode_utf16().chain([0]).collect::<Vec<u16>>();
+    let (verb, target) = (wide("open"), wide(target));
+    // SAFETY: both strings are NUL-terminated and outlive the call; a null
+    // window, parameters and directory are documented as accepted.
+    unsafe {
+        ShellExecuteW(
+            std::ptr::null_mut(),
+            verb.as_ptr(),
+            target.as_ptr(),
+            std::ptr::null(),
+            std::ptr::null(),
+            SW_SHOWNORMAL,
+        );
+    }
 }
 
 /// The fonts and crates this build ships, with their licences; `just notices`
