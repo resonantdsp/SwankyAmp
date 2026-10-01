@@ -2,7 +2,8 @@
 
 `Cargo.toml` is the version authority. Candidate tags add `-rc.N`; stable tags
 equal the crate version. Every stable version has a section here before any
-signed build starts.
+signed build starts, and its heading carries the release date, not "in
+development", before the candidate that becomes the release is tagged.
 
 ## Unreleased
 

@@ -222,7 +222,7 @@ A shipping-path run passes when no sample is non-finite, its output RMS over the
 
 ## Releasing
 
-A release goes candidate tag → candidate workflow → qualification → stable tag → promote workflow. The crate version in `Cargo.toml` is the version authority, and `CHANGELOG.md` must have the matching section.
+A release goes candidate tag → candidate workflow → qualification → stable tag → promote workflow. The crate version in `Cargo.toml` is the version authority, and `CHANGELOG.md` must have the matching section. A stable release also needs that section's heading dated, as `just version` writes it, rather than "in development"; since the stable tag goes on the accepted candidate's commit, date it before tagging the candidate meant to ship. `[package.metadata.release]` in `Cargo.toml` states whether the release ships a Linux download.
 
 Prepare the version on a branch and land it through a pull request like any change:
 
@@ -238,13 +238,13 @@ just tag-candidate      # creates the next v2.0.1-rc.N locally
 git push origin v2.0.1-rc.1
 ```
 
-The tag helpers require a clean tracked working tree and push nothing.
+`tag-candidate` requires a clean tracked working tree, fetches, and refuses unless the checkout is `origin/master`. It numbers the candidate past every candidate tag held locally or on `origin`. The tag helpers push nothing.
 
 ### Candidate workflow
 
-Only `vX.Y.Z-rc.N` tags start `.github/workflows/candidate.yml`; stable `vX.Y.Z` tags never build. A manual run is a rehearsal, accepted only from an administrator-owned `rehearsal/*` branch; its artifacts use the commit hash and it creates no GitHub Release.
+Only `vX.Y.Z-rc.N` tags start `.github/workflows/candidate.yml`, and its first job refuses a tag whose commit is not on master; stable `vX.Y.Z` tags never build. A manual run is a rehearsal, accepted only from an administrator-owned `rehearsal/*` branch; its artifacts use the commit hash and it creates no GitHub Release.
 
-The workflow validates the committed artwork and writes the third-party notices before packaging. It builds a universal macOS package signed with the Resonant DSP Developer ID identities, notarized and stapled, and a Windows x64 installer signed through the Free-specific Azure identity and the shared Resonant DSP publisher profile. Both installers offer an install for all users or the current user; both are installed silently for all users on clean runners, pluginval and clap-validator inspect what was installed, and the workflow verifies the publisher identities and that every packaged binary carries the notices. Linux packaging is attempted on Ubuntu 22.04 and its tarball included only if installing and validating it succeeds; a Linux failure never discards the macOS and Windows candidates.
+The workflow validates the committed artwork and writes the third-party notices before packaging. It builds a universal macOS package signed with the Resonant DSP Developer ID identities, notarized and stapled, and a Windows x64 installer signed through the Free-specific Azure identity and the shared Resonant DSP publisher profile. Both installers offer an install for all users or the current user; both are installed silently for all users on clean runners, pluginval and clap-validator inspect what was installed, and the workflow verifies the publisher identities and that every packaged binary carries the notices. When the release declares a Linux download, the workflow packages it on Ubuntu 22.04, installs and validates the tarball, and records no candidate unless that passes; a release that declares none builds none.
 
 The final job writes `release-record.json` with the tag, commit, version, toolchain, cargo-truce version, lockfile and artwork hashes, shipping identities, and each artifact's size and SHA-256, and creates a draft GitHub Release once. The workflow refuses an RC tag that already has a release, before any signing and again at the end, so new bytes need a new RC number. A run that failed partway resumes with "Re-run failed jobs", unless it failed after creating the draft, which needs a new RC; re-running all jobs is refused once the draft exists.
 
@@ -253,13 +253,15 @@ The final job writes `release-record.json` with the tag, commit, version, toolch
 A person qualifies the candidate's exact installers in real hosts, checks installation, the interface and audio, and records the SHA-256 printed for `release-record.json`. Acceptance is a release decision; workflow success does not make it one. After acceptance, create the stable tag on the same commit:
 
 ```sh
-just tag-release
+just tag-release v2.0.1-rc.3   # tags the commit origin's v2.0.1-rc.3 names as v2.0.1
 git push origin v2.0.1
 ```
 
+`tag-release` reads the candidate tag from `origin`, never the checkout or a local tag, and checks the version and the dated changelog heading as committed there.
+
 Then dispatch the protected `promote` workflow from `master` (`gh workflow run promote.yml --ref master ...` or the equivalent UI choice), the only branch its `release` environment permits. It takes the RC tag, stable tag, accepted record SHA-256, and a qualification naming the reviewer, date, hosts, machines and findings. It refuses malformed tags before checking anything out, checks out `refs/tags/<tag>` without leaving the token in the tree, and runs the release-script tests from it. It verifies a successful candidate workflow, requires both tags and the checkout to resolve to the recorded commit, rechecks the record and every artifact byte, and creates the stable GitHub Release from those files; it does not compile or sign. A rerun after a later failure resumes only once the existing release's assets prove byte-for-byte identical; it never overwrites a differing asset.
 
-Promotion resolves each public release URL only through GitHub's release-asset host and compares size and SHA-256 with the record, then opens a website pull request for logical product `SwankyAmp` that keeps the archived 1.4.0 fields and publishes version 2 downloads under the `swanky-amp-2` identity. The website's own checks and review control that merge. The `release` environment supplies only the `WEBSITE_TOKEN` for that pull request.
+Promotion resolves each public release URL only through GitHub's release-asset host and compares size and SHA-256 with the record, then opens a website pull request for logical product `SwankyAmp` that keeps the 1.4.0 legacy release and publishes version 2 downloads under the `swanky-amp-2` identity. The release date it catalogues is the day the stable GitHub Release was published, so a rerun on a later day changes nothing. The website's own checks and review control that merge. The `release` environment supplies only the `WEBSITE_TOKEN` for that pull request.
 
 `just promote-check CANDIDATE_TAG TAG RECORD_SHA256 DIRECTORY` runs the same identity and byte checks locally and read-only from the stable tag checkout.
 

@@ -32,6 +32,7 @@ jobs:
     outputs:
       release: ${{ steps.release.outputs.release }}
       tagged: ${{ steps.release.outputs.tagged }}
+      linux: ${{ steps.release.outputs.linux }}
     steps:
       # Any failure other than "release not found" stops the run as itself, so
       # an outage never reads as a free name.
@@ -54,6 +55,13 @@ jobs:
         run: |
           if [ "$GITHUB_REF_TYPE" = tag ]; then
             python3 .github/scripts/release_contract.py check-tag candidate "$GITHUB_REF_NAME"
+            # Only reviewed, merged work is signed; a tag pushed from a stale
+            # or unmerged checkout stops here.
+            git fetch --quiet --no-tags origin +refs/heads/master:refs/remotes/origin/master
+            git merge-base --is-ancestor HEAD origin/master || {
+              echo "$GITHUB_REF_NAME is not on master; tag a merged master commit." >&2
+              exit 1
+            }
             echo "release=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
             echo "tagged=true" >> "$GITHUB_OUTPUT"
           else
@@ -64,6 +72,8 @@ jobs:
             echo "release=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
             echo "tagged=false" >> "$GITHUB_OUTPUT"
           fi
+          linux=$(python3 .github/scripts/release_contract.py ships-linux)
+          echo "linux=$linux" >> "$GITHUB_OUTPUT"
 
   macos:
     name: signed installer (macos)
@@ -273,11 +283,12 @@ jobs:
           path: target/dist/*.exe
           if-no-files-found: error
 
+  # Runs, and must pass, exactly when Cargo.toml declares a Linux download.
   linux:
-    name: bundle attempt (linux)
+    name: bundle (linux)
     needs: identify
+    if: needs.identify.outputs.linux == 'true'
     runs-on: ubuntu-22.04
-    continue-on-error: true
     permissions:
       contents: read
     steps:
@@ -316,7 +327,8 @@ jobs:
   record:
     name: immutable candidate record
     needs: [identify, macos, windows, linux]
-    if: ${{ always() && needs.macos.result == 'success' && needs.windows.result == 'success' }}
+    # A Linux job skipped because none is declared must not skip the record.
+    if: ${{ !cancelled() && !failure() }}
     runs-on: ubuntu-24.04
     permissions:
       contents: write
