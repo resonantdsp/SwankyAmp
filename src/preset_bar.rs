@@ -414,6 +414,11 @@ impl PresetBar {
                 let outcome = match (&self.current.scope, self.current.path.clone()) {
                     (Scope::User, Some(path)) => {
                         let saved = self.library.save_to(&path, &params.params().snapshot());
+                        if saved.is_err() {
+                            // The file may be gone; the menu should list what
+                            // the folder holds now.
+                            self.refresh();
+                        }
                         self.keep(saved, params)
                     }
                     _ => Err("Use Save as… to keep a copy of this preset.".into()),
