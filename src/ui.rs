@@ -72,6 +72,25 @@ pub struct FreeUi {
     settings: Option<PathBuf>,
     /// Why the last chosen size could not be remembered.
     size_error: Option<String>,
+    /// The standalone's line about its audio devices, as last shown.
+    device_notice: Option<String>,
+}
+
+/// The standalone app's line about its audio devices, such as why the input
+/// is off. It stays in the footer until the app clears it, since the player
+/// has to act on it.
+static DEVICE_NOTICE: std::sync::RwLock<Option<String>> = std::sync::RwLock::new(None);
+
+/// Shows `line` in every open editor's footer, or clears it with `None`.
+/// The standalone app posts it from its audio workers.
+pub fn show_device_notice(line: Option<&str>) {
+    if let Ok(mut notice) = DEVICE_NOTICE.write() {
+        *notice = line.map(str::to_owned);
+    }
+}
+
+fn device_notice() -> Option<String> {
+    DEVICE_NOTICE.read().ok().and_then(|notice| notice.clone())
 }
 
 impl FreeUi {
@@ -94,6 +113,7 @@ impl FreeUi {
             interface_size: crate::interface::DEFAULT,
             settings: None,
             size_error: None,
+            device_notice: None,
         }
     }
 
@@ -184,10 +204,14 @@ impl FreeUi {
                 ControlKind::Toggle => cabinet_switch(control, params),
             });
         }
-        let (line, color) = match (self.presets.status(), self.presets.footer(params)) {
-            (Some(status), _) => (status.to_owned(), INK),
-            (None, Some(name)) => (name, INK),
-            (None, None) => (
+        let (line, color) = match (
+            self.presets.status(),
+            self.device_notice.clone(),
+            self.presets.footer(params),
+        ) {
+            (Some(status), _, _) => (status.to_owned(), INK),
+            (None, Some(notice), _) | (None, None, Some(notice)) => (notice, INK),
+            (None, None, None) => (
                 "DRAG TO TURN   ·   SHIFT FOR FINE CONTROL   ·   RIGHT-CLICK TO RESET".to_owned(),
                 DIM,
             ),
@@ -267,6 +291,7 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
         match message {
             Message::Tick => {
                 self.notice = self.latest_notice();
+                self.device_notice = device_notice();
                 self.sync_meters();
                 self.presets.sync(params.params());
                 self.presets.poll(params);
@@ -338,7 +363,7 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
             .owner
             .as_ref()
             .is_some_and(|params| self.presets.needs_redraw(params));
-        notice || meters || presets
+        notice || meters || presets || device_notice() != self.device_notice
     }
 
     fn title(&self) -> String {

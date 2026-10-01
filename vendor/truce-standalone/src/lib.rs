@@ -35,6 +35,7 @@ pub mod driver;
 mod format;
 pub mod keyboard;
 pub mod midi;
+pub mod notice;
 #[cfg(feature = "playback")]
 pub mod offline;
 #[cfg(feature = "playback")]
@@ -110,6 +111,14 @@ pub struct Defaults {
     /// Whether the speakers are enabled at launch. `None` = use the
     /// runtime default (on).
     pub output_enabled: Option<bool>,
+    /// With `input_enabled` on, still start the input off unless its
+    /// device is one the player chose (by flag or from the Settings menu)
+    /// and is connected. A flag or environment variable that turns the
+    /// input on is obeyed as given.
+    pub input_needs_choice: bool,
+    /// Where lines the player must see about the devices go, such as why
+    /// the input is off; see [`notice`].
+    pub notices: Option<notice::Sink>,
 }
 
 impl Defaults {
@@ -127,8 +136,14 @@ impl Defaults {
         let Defaults {
             input_enabled,
             output_enabled,
+            input_needs_choice,
+            notices,
         } = self;
+        opts.input_needs_choice = opts.input_enabled.is_none() && input_needs_choice;
         opts.input_enabled = opts.input_enabled.or(input_enabled);
+        if let Some(sink) = notices {
+            notice::set_sink(sink);
+        }
         opts.output_enabled = opts.output_enabled.or(output_enabled);
     }
 }
@@ -289,4 +304,35 @@ where
     }
     #[cfg(not(feature = "gui"))]
     headless::run::<P>(&opts);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Defaults, cli::Options};
+
+    /// A flag or environment variable that sets the input is obeyed as
+    /// given; only the application's own default waits for a chosen device.
+    #[test]
+    fn a_flag_overrides_the_default_that_waits_for_a_chosen_input() {
+        let defaults = Defaults {
+            input_enabled: Some(true),
+            input_needs_choice: true,
+            ..Defaults::default()
+        };
+
+        let mut unset = Options::default();
+        defaults.apply(&mut unset);
+        assert_eq!(unset.input_enabled, Some(true));
+        assert!(unset.input_needs_choice);
+
+        for flag in [true, false] {
+            let mut flagged = Options {
+                input_enabled: Some(flag),
+                ..Options::default()
+            };
+            defaults.apply(&mut flagged);
+            assert_eq!(flagged.input_enabled, Some(flag));
+            assert!(!flagged.input_needs_choice, "--input-enabled {flag} waited for a choice");
+        }
+    }
 }

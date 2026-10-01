@@ -138,9 +138,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{}", layers.join("receipt.json").display());
     } else {
         // An amplifier with its input off makes no sound, so the standalone
-        // opens listening; `--input-enabled off` still opts out.
+        // opens listening, but only on an input the player chose: the system
+        // default is often a built-in microphone beside the speakers. The
+        // footer says why when it opens with the input off.
         truce_standalone::run_with::<Plugin>(truce_standalone::Defaults {
             input_enabled: Some(true),
+            input_needs_choice: true,
+            notices: Some(swanky_amp::ui::show_device_notice),
             ..Default::default()
         });
     }

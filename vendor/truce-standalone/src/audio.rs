@@ -43,6 +43,7 @@ use truce_params::{ParamInfo, Params};
 
 use crate::cli::Options;
 use crate::driver;
+use crate::notice;
 use crate::format::{build_input, build_output};
 use crate::settings::{self, AudioDriver, SettingsStore};
 use crate::transport::Transport;
@@ -327,6 +328,25 @@ impl ChannelRoute {
         (c >= 1).then(|| ChannelRoute::Mono { base: c - 1 })
     }
 
+    /// The spec [`Self::parse`] reads back as this route.
+    #[must_use]
+    pub fn spec(self) -> String {
+        match self {
+            ChannelRoute::Direct => "direct".to_owned(),
+            ChannelRoute::Stereo { base } => format!("{}-{}", base + 1, base + 2),
+            ChannelRoute::Mono { base } => (base + 1).to_string(),
+        }
+    }
+
+    /// The first device channel the route reads or writes; `None` for the
+    /// direct mapping, which fits any device.
+    fn base(self) -> Option<usize> {
+        match self {
+            ChannelRoute::Direct => None,
+            ChannelRoute::Stereo { base } | ChannelRoute::Mono { base } => Some(base),
+        }
+    }
+
     /// Inverse of [`Self::encode`].
     #[must_use]
     pub fn decode(v: usize) -> Self {
@@ -379,6 +399,8 @@ pub struct InputController {
     /// Whether an output device was chosen (by flag, saved choice or the
     /// menu), which stops the output following the input.
     output_chosen: Arc<AtomicBool>,
+    /// Remembers the input channels chosen from the menu.
+    settings: SettingsStore,
 }
 
 enum InputCmd {
@@ -434,9 +456,12 @@ impl InputController {
     }
 
     /// Choose how device input channels feed the plugin's input bus.
-    /// Takes effect on the next audio block.
+    /// Takes effect on the next audio block, and is remembered for the next
+    /// launch: a guitar on input 2 would otherwise be silent at every one.
     pub fn set_channel_route(&self, route: ChannelRoute) {
         self.channel_route.store(route.encode(), Ordering::Relaxed);
+        self.settings
+            .update(|s| s.input_channels = Some(route.spec()));
     }
 
     /// The current input channel routing.
@@ -853,7 +878,7 @@ pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, B
     // Resolve initial output device synchronously so we can pull
     // its default config (sample rate, channels) before spawning
     // the worker, which opens it.
-    let (input_device, initial_output) = launch_devices(opts, &saved, is_effect)?;
+    let (input_device, initial_output, input_pick) = launch_devices(opts, &saved, is_effect)?;
     let output_chosen = Arc::new(AtomicBool::new(
         opts.output_device.is_some() || saved.output_device.is_some(),
     ));
@@ -881,7 +906,13 @@ pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, B
     let buffer_frames = Arc::new(AtomicU32::new(buffer_request));
     let stream_rate = Arc::new(AtomicU32::new(config.sample_rate));
 
-    let input_label = input_device.as_ref().and_then(device_label);
+    // A chosen input that is not connected stays the worker's device, so
+    // turning the input on opens it if it is back and otherwise says it is
+    // not connected, rather than opening the system default.
+    let input_label = match &input_pick {
+        InputPick::Missing(name) if !driver::on_asio() => Some(name.clone()),
+        _ => input_device.as_ref().and_then(device_label),
+    };
 
     // Capacity 256: covers a generous MIDI burst within a single
     // audio callback period. ArrayQueue is lock-free MPMC - the MIDI
@@ -919,6 +950,7 @@ pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, B
     let output_cmd_tx = Arc::new(output_cmd_tx);
     let input_setup = setup_input_pipeline(
         input_label.as_deref(),
+        &input_pick,
         opts,
         is_effect,
         channels,
@@ -935,13 +967,29 @@ pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, B
     let input_enabled = input_setup.enabled;
     let input_ring_width = input_setup.ring_width;
     let input_controller = input_setup.controller;
+    // A flag routes this launch only; the menu's choice is the saved one.
     if let Some(spec) = opts.input_channels.as_deref() {
         match ChannelRoute::parse(spec) {
-            Some(route) => input_controller.set_channel_route(route),
+            Some(route) => input_controller
+                .channel_route
+                .store(route.encode(), Ordering::Relaxed),
             None => eprintln!(
                 "--input-channels: ignoring invalid '{spec}' \
                  (expected 'direct', a channel like '3', or a pair like '3-4')"
             ),
+        }
+    } else if let Some(route) = saved.input_channels.as_deref().and_then(ChannelRoute::parse) {
+        // A channel this device does not have would leave the input
+        // silent with no word, so it is kept for a device that has it.
+        let opened = input_device
+            .as_ref()
+            .and_then(|device| device.default_input_config().ok())
+            .map_or(0, |config| usize::from(config.channels()))
+            .min(channels);
+        if route.base().is_none_or(|base| base < opened) {
+            input_controller
+                .channel_route
+                .store(route.encode(), Ordering::Relaxed);
         }
     }
 
@@ -1266,52 +1314,69 @@ fn launch_devices(
     opts: &Options,
     saved: &settings::Settings,
     is_effect: bool,
-) -> Result<(Option<cpal::Device>, cpal::Device), String> {
+) -> Result<(Option<cpal::Device>, cpal::Device, InputPick), String> {
     if driver::on_asio() {
         let host = driver::host();
-        if let Some(interface) = launch_asio_interface(&host, opts, saved) {
+        let (interface, pick) = launch_asio_interface(&host, opts, saved);
+        if let Some(interface) = interface {
             let input = (is_effect && interface.supports_input()).then(|| interface.clone());
-            return Ok((input, interface));
+            return Ok((input, interface, pick));
         }
         eprintln!("no ASIO driver could be opened; using Windows (WASAPI)");
         driver::set_active(AudioDriver::Wasapi);
     }
     let host = driver::host();
-    let (input, input_chosen) = if is_effect {
+    let (input, pick) = if is_effect {
         launch_input(&host, opts, saved)
     } else {
-        (None, false)
+        (None, InputPick::Default)
     };
-    let output = launch_output(&host, opts, saved, input.as_ref().filter(|_| input_chosen))?;
-    Ok((input, output))
+    let chosen_input = input.as_ref().filter(|_| pick == InputPick::Chosen);
+    let output = launch_output(&host, opts, saved, chosen_input)?;
+    Ok((input, output, pick))
+}
+
+/// How a launch came by its input device. Only a device the player chose
+/// may start live: the system default is often a built-in microphone
+/// beside the built-in speakers, and an amplifier between them howls.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum InputPick {
+    /// Named by a flag or the saved choice, and connected.
+    Chosen,
+    /// Named by a flag or the saved choice, and not connected.
+    Missing(String),
+    /// Nothing was chosen.
+    Default,
 }
 
 fn launch_asio_interface(
     host: &cpal::Host,
     opts: &Options,
     saved: &settings::Settings,
-) -> Option<cpal::Device> {
+) -> (Option<cpal::Device>, InputPick) {
     let named = opts
         .output_device
         .as_ref()
         .or(opts.input_device.as_ref())
         .or(saved.asio_device.as_ref());
+    let mut pick = InputPick::Default;
     if let Some(name) = named {
         if let Some(interface) = find_device(host, name, true) {
-            return Some(interface);
+            return (Some(interface), InputPick::Chosen);
         }
         eprintln!("the ASIO interface '{name}' is not available; trying the others installed");
+        pick = InputPick::Missing(name.clone());
     }
     // The first own driver that loads ends the search, which loads each
     // driver listed before it.
     let mut generic = None;
     for interface in devices(host, true) {
         if device_label(&interface).is_some_and(|label| !driver::is_generic(&label)) {
-            return Some(interface);
+            return (Some(interface), pick);
         }
         generic.get_or_insert(interface);
     }
-    generic
+    (generic, pick)
 }
 
 /// The installed ASIO interfaces whose drivers load, an interface's own
@@ -1322,25 +1387,24 @@ fn asio_interfaces(host: &cpal::Host) -> Vec<cpal::Device> {
     interfaces
 }
 
-/// The input device a launch opens, and whether it was chosen (by flag
-/// or saved choice) rather than left to the system default. A saved
-/// device that is absent today falls back to the default and stays saved
-/// for when it returns.
+/// The input device a launch opens, and how it came by it. A saved device
+/// that is absent today opens nothing and stays saved for when it returns.
 fn launch_input(
     host: &cpal::Host,
     opts: &Options,
     saved: &settings::Settings,
-) -> (Option<cpal::Device>, bool) {
-    if let Some(name) = &opts.input_device {
-        return (find_device(host, name, false), true);
+) -> (Option<cpal::Device>, InputPick) {
+    let named = opts.input_device.as_ref().or(saved.input_device.as_ref());
+    match named {
+        Some(name) => match find_device(host, name, false) {
+            Some(device) => (Some(device), InputPick::Chosen),
+            None => {
+                eprintln!("the input device '{name}' is not available");
+                (None, InputPick::Missing(name.clone()))
+            }
+        },
+        None => (host.default_input_device(), InputPick::Default),
     }
-    if let Some(name) = &saved.input_device {
-        if let Some(device) = find_device(host, name, false) {
-            return (Some(device), true);
-        }
-        eprintln!("the saved input device '{name}' is not available; using the system default");
-    }
-    (host.default_input_device(), false)
 }
 
 /// The output device a launch opens. A flag must match a device; a saved
@@ -1379,12 +1443,36 @@ fn launch_output(
     })
 }
 
+/// Why the input starts off although the launch asked for it, and what
+/// turns it on.
+fn input_held_off(input_name: Option<&str>, pick: &InputPick) -> String {
+    let (choose, turn_on) = (notice::CHOOSE_INPUT, notice::MIC_INPUT);
+    match (pick, input_name) {
+        (InputPick::Missing(name), _) => {
+            format!("Input is off: {name} is not connected. Connect it, then {turn_on}.")
+        }
+        (_, None) => format!(
+            "Input is off: no audio input was found. Connect your interface, {choose}, then {turn_on}."
+        ),
+        _ if cfg!(target_os = "linux") => format!(
+            "Input is off: {turn_on} to play through the default input, or {choose}."
+        ),
+        _ => format!("Input is off: choose your interface in Settings › Input Device, then {turn_on}."),
+    }
+}
+
+/// The line once the player has chosen `name` while the input is off.
+fn input_chosen(name: &str) -> String {
+    format!("Input is off: {} to play through {name}.", notice::MIC_INPUT)
+}
+
 /// Allocate the input ring + control channels, and (for effects) spawn
 /// the input worker thread on `input_name`. Also flips
 /// `set_enabled(true)` when the user passed `--input-enabled on`, so the
 /// launch state matches the CLI ask.
 fn setup_input_pipeline(
     input_name: Option<&str>,
+    pick: &InputPick,
     opts: &Options,
     is_effect: bool,
     channels: usize,
@@ -1419,6 +1507,7 @@ fn setup_input_pipeline(
         channel_route: Arc::new(AtomicUsize::new(0)),
         output_cmd: links.output_cmd,
         output_chosen: links.output_chosen,
+        settings: links.settings.clone(),
     };
 
     if is_effect {
@@ -1438,9 +1527,12 @@ fn setup_input_pipeline(
             .ok();
     }
 
-    let want_input_enabled = is_effect && opts.input_enabled.unwrap_or(false);
+    let asked = is_effect && opts.input_enabled.unwrap_or(false);
+    let want_input_enabled = asked && (!opts.input_needs_choice || *pick == InputPick::Chosen);
     if want_input_enabled {
         controller.set_enabled(true);
+    } else if asked {
+        notice::input(Some(input_held_off(input_name, pick)));
     }
 
     if is_effect {
@@ -1613,6 +1705,19 @@ impl<P: PluginExport> OutputWorker<P> {
             && driver::on_asio()
         {
             eprintln!("could not open the ASIO interface ({e}); using Windows (WASAPI)");
+            // Windows audio is often the laptop's own microphone and
+            // speakers, so the input goes off before the input worker
+            // follows the driver, and the player is told why.
+            let interface = device_label(&self.device);
+            let _ = self.res.input_cmd.send(InputCmd::SetEnabled(false));
+            if self.is_effect {
+                notice::input(Some(format!(
+                    "Input is off: {} did not open; Windows audio is playing. \
+                     Choose it in Settings › Input Device, then {}.",
+                    interface.as_deref().unwrap_or("The ASIO interface"),
+                    notice::MIC_INPUT
+                )));
+            }
             self.config.buffer_size = requested_buffer;
             initial = self.switch_driver(AudioDriver::Wasapi);
         }
@@ -1714,6 +1819,12 @@ impl<P: PluginExport> OutputWorker<P> {
         }
         let chosen = self.current_name();
         if driver::on_asio() {
+            if notice::input_showing()
+                && !self.res.input_enabled.load(Ordering::Relaxed)
+                && let Some(name) = &chosen
+            {
+                notice::input(Some(input_chosen(name)));
+            }
             self.res.settings.update(|s| s.asio_device = chosen);
         } else {
             self.res.output_chosen.store(true, Ordering::Relaxed);
@@ -2301,11 +2412,18 @@ impl InputWorker {
                         stream = None;
                         self.enabled.store(false, Ordering::Relaxed);
                         self.apply(&mut stream, true, device_name.as_deref());
-                    } else if let Ok(mut g) = self.current_name.lock() {
-                        // Reflect the chosen device immediately even
-                        // though we haven't opened a stream - the menu
-                        // checkmark should match the user's pick.
-                        g.clone_from(&device_name);
+                    } else {
+                        if let Ok(mut g) = self.current_name.lock() {
+                            // Reflect the chosen device immediately even
+                            // though we haven't opened a stream - the menu
+                            // checkmark should match the user's pick.
+                            g.clone_from(&device_name);
+                        }
+                        if notice::input_showing()
+                            && let Some(name) = &device_name
+                        {
+                            notice::input(Some(input_chosen(name)));
+                        }
                     }
                     let chosen = self.current_name.lock().ok().and_then(|g| g.clone());
                     self.settings.update(|s| s.input_device = chosen);
@@ -2352,6 +2470,9 @@ impl InputWorker {
                 self.ring.clear();
             }
             self.enabled.store(want, Ordering::Relaxed);
+            if want {
+                notice::input(None);
+            }
             return;
         }
         let currently = stream.is_some();
@@ -2371,8 +2492,14 @@ impl InputWorker {
             None => host.default_input_device(),
         };
         let Some(dev) = device else {
-            eprintln!("mic enable failed: no input device available");
             self.enabled.store(false, Ordering::Relaxed);
+            notice::input(Some(match device_name {
+                Some(name) => format!(
+                    "Input is off: {name} is not connected. Connect it, then {}.",
+                    notice::MIC_INPUT
+                ),
+                None => "Input is off: no audio input was found.".to_owned(),
+            }));
             return;
         };
         match self.open(&dev) {
@@ -2382,10 +2509,15 @@ impl InputWorker {
                 if let Ok(mut g) = self.current_name.lock() {
                     *g = device_label(&dev);
                 }
+                notice::input(None);
             }
             Err(e) => {
                 eprintln!("mic enable failed: {e}");
                 self.enabled.store(false, Ordering::Relaxed);
+                notice::input(Some(format!(
+                    "Input is off: {} could not be opened.",
+                    device_label(&dev).unwrap_or_else(|| "the input".to_owned())
+                )));
             }
         }
     }
@@ -3339,6 +3471,19 @@ mod tests {
         // A freshly-zeroed atomic must decode to the default mapping.
         assert_eq!(ChannelRoute::Direct.encode(), 0);
         assert_eq!(ChannelRoute::decode(0), ChannelRoute::Direct);
+    }
+
+    /// The input channels chosen from the menu are saved as a spec and must
+    /// come back as the same route at the next launch.
+    #[test]
+    fn a_saved_route_reads_back_as_the_route_chosen() {
+        for route in [
+            ChannelRoute::Direct,
+            ChannelRoute::Mono { base: 1 },
+            ChannelRoute::Stereo { base: 2 },
+        ] {
+            assert_eq!(ChannelRoute::parse(&route.spec()), Some(route));
+        }
     }
 
     #[test]

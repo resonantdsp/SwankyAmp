@@ -46,6 +46,9 @@ pub struct Options {
     /// on|off`, the env var, or `[plugin.standalone].input_enabled`
     /// in `truce.toml`.
     pub input_enabled: Option<bool>,
+    /// Keep the input off at launch unless its device was chosen; set from
+    /// [`crate::Defaults::input_needs_choice`] when no flag spoke.
+    pub input_needs_choice: bool,
     /// Whether the speaker output is enabled at launch. `None` →
     /// runtime default (on - the user launched standalone to hear
     /// the plugin). Set explicitly via `--output-enabled on|off`,
@@ -140,15 +143,18 @@ OPTIONS:
                             `direct` (all, default), a channel like `3`
                             (mono), or a pair like `3-4` (stereo).
   --input-channels <spec>   Route input from specific device channels;
-                            same grammar as --output-channels.
+                            same grammar as --output-channels. Overrides
+                            the Settings menu's choice for this launch.
   --driver <asio|wasapi>    Windows audio driver. Overrides the Settings
                             menu's choice for this launch (default: that
                             choice, else ASIO when a driver is installed).
                             With ASIO, --input and --output name the
                             interface.
   --input-enabled <on|off>  Enable mic input at launch (default: the
-                            application's own, else off).
-                            Press `I` in the window to toggle live.
+                            application's own, which may keep it off
+                            until an input is chosen, else off).
+                            Press Cmd+I (macOS) or Ctrl+I in the window
+                            to toggle live.
   --output-enabled <on|off> Enable speaker output at launch (default: on).
                             Toggle live from the Plugin menu (Cmd+O / Ctrl+O).
   --qwerty-keys             Let the computer keyboard play MIDI notes
@@ -354,6 +360,7 @@ pub fn parse() -> Result<Options, String> {
             env("INPUT_ENABLED")
                 .and_then(|s| parse_on_off(&s, "TRUCE_STANDALONE_INPUT_ENABLED").ok())
         }),
+        input_needs_choice: false,
         output_enabled: output_enabled.or_else(|| {
             env("OUTPUT_ENABLED")
                 .and_then(|s| parse_on_off(&s, "TRUCE_STANDALONE_OUTPUT_ENABLED").ok())

@@ -70,6 +70,22 @@ application can set its own through `Defaults`, as Swanky Amp does to open
 with its input on. The help now names the application's default first
 (`cli.rs`).
 
+An application can ask, through `Defaults::input_needs_choice`, that an
+input its defaults turn on stays off unless it is a device the player chose,
+by flag or from the Settings menu, and is connected: the system default, or
+a stand-in for an unplugged interface, is often a built-in microphone beside
+the speakers. A flag or environment variable that turns the input on is
+obeyed as given. A chosen input that is not connected stays the input
+worker's device, so turning the input on opens it once it is back rather
+than the system default. When a saved ASIO interface loads but will not
+open and the launch falls back to WASAPI, the input is turned off first.
+The line saying why the input is off goes to a sink the application
+supplies in `Defaults::notices` (`notice.rs`), since a windowed app has no
+console; Swanky Amp shows it in its footer. The input channels chosen from
+the menu are saved with the devices (`input_channels`), and
+`--input-channels` overrides them for one launch; a saved channel the
+device does not have is left unused.
+
 The buffer, device, ring, ASIO and zoom-pin changes follow the same fixes in Swanky Amp
 Pro's copy of this crate. Keep these fixes here until a pinned upstream
 release includes equivalent handling; remove the Cargo patch and this
