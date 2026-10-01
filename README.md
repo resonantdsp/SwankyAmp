@@ -131,7 +131,7 @@ These are measured at 44.1 kHz with Auto oversampling on the three tone stacks, 
 
 ### The preset bar
 
-The header's preset field shows the current preset's name between `‹` and `›`, which step through the factory presets and then the user's own; a name too long for the field ends in an ellipsis. Pressing the name opens the menu: Init, the ten factory presets, the user presets, then Save (a changed user preset), Save as…, Remove (user presets only), Import 1.x presets and Open folder. Remove's first press turns the item into "Remove <name>?" and keeps the menu open; a second press deletes the file, and closing the menu cancels. Init restores every preset control to its default; there is no Reset button.
+The header's preset field shows the current preset's name between `‹` and `›`, which step through the factory presets and then the user's own; a name too long for the field ends in an ellipsis, and hovering the field shows the whole name in the footer. Pressing the name opens the menu: Init, the ten factory presets, the user presets, then Save (a changed user preset), Save as…, Remove (user presets only), Import 1.x presets and Open folder. The menu widens to fit its longest name, up to the window's width, and moves left where it would run past the header's edge; only a name wider than the window ends in an ellipsis there. Remove's first press turns the item into "Remove <name>?" and keeps the menu open; a second press deletes the file, and closing the menu cancels. Init restores every preset control to its default; there is no Reset button.
 
 Choosing a preset sets its controls through the host, so automation and undo see the change, and the selected preset is part of the plug-in state, so a reopened session shows its name. A dot after the name marks a preset changed since it was chosen. The menu capitalises the factory presets like Init; the bank, the saved state and tools such as `just capture-preset` name them in lower case, as 1.4.0 did. As in 1.4.0, Input and the cabinet switch belong to the session: a preset stores them, but choosing one leaves them as they are and changing them does not mark the preset changed.
 
@@ -189,9 +189,10 @@ just capture /tmp/swanky-capture
 just capture-preset "high gain" /tmp/swanky-capture
 just capture-live /tmp/swanky-capture
 just capture-information /tmp/swanky-capture 2.0.1
+just capture-menu "A long preset name of the player's own" /tmp/swanky-capture
 ```
 
-`export-layout` writes the resolved geometry (layout manifest schema 4, with each section's outline radius and the switch track); it works when the artwork package is missing or stale, so a new bake can follow changed geometry. `capture` draws the editor at every interface size at 1x and 2x (`amp-1x.png` and `amp-2x.png` at 100 %, `amp-150-2x.png` and so on), whatever size this machine has chosen, and needs a working GPU adapter. `capture-preset` applies a factory preset and names it in the header, `capture-live` lights the meters with a deterministic stereo note, and `capture-information` opens the information panel, announcing the named release if one is given.
+`export-layout` writes the resolved geometry (layout manifest schema 4, with each section's outline radius and the switch track); it works when the artwork package is missing or stale, so a new bake can follow changed geometry. `capture` draws the editor at every interface size at 1x and 2x (`amp-1x.png` and `amp-2x.png` at 100 %, `amp-150-2x.png` and so on), whatever size this machine has chosen, and needs a working GPU adapter. `capture-preset` applies a factory preset and names it in the header, `capture-live` lights the meters with a deterministic stereo note, and `capture-information` opens the information panel, announcing the named release if one is given. `capture-menu` lists the named preset as the player's own, chooses it and opens the preset menu, with the pointer over the field so the footer names it.
 
 ### Artwork
 
