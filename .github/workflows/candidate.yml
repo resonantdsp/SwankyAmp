@@ -56,8 +56,8 @@ jobs:
           if [ "$GITHUB_REF_TYPE" = tag ]; then
             python3 .github/scripts/release_contract.py check-tag candidate "$GITHUB_REF_NAME"
             # Only reviewed, merged work is signed; a tag pushed from a stale
-            # or unmerged checkout stops here.
-            git fetch --quiet --no-tags origin +refs/heads/master:refs/remotes/origin/master
+            # or unmerged checkout stops here. The full-history checkout has
+            # already fetched master.
             git merge-base --is-ancestor HEAD origin/master || {
               echo "$GITHUB_REF_NAME is not on master; tag a merged master commit." >&2
               exit 1

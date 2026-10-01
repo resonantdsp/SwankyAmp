@@ -222,7 +222,7 @@ A shipping-path run passes when no sample is non-finite, its output RMS over the
 
 ## Releasing
 
-A release goes candidate tag → candidate workflow → qualification → stable tag → promote workflow. The crate version in `Cargo.toml` is the version authority, and `CHANGELOG.md` must have the matching section. A stable release also needs that section's heading dated, as `just version` writes it, rather than "in development"; since the stable tag goes on the accepted candidate's commit, date it before tagging the candidate meant to ship. `[package.metadata.release]` in `Cargo.toml` states whether the release ships a Linux download.
+A release goes candidate tag → candidate workflow → qualification → stable tag → promote workflow. The crate version in `Cargo.toml` is the version authority, and `CHANGELOG.md` must have the matching section. That section's heading carries the planned release date, such as `## 2.0.1 — 2026-11-02`, never "in development": the tagged source is public, and every candidate must be releasable as it stands. `just version` dates a new section; an existing one, such as an "in development" heading, is dated by hand before the first candidate is cut. The website catalogue's date is the day the GitHub Release is published and may differ from the heading; a moved date is never a reason for a new candidate. `[package.metadata.release]` in `Cargo.toml` states whether the release ships a Linux download.
 
 Prepare the version on a branch and land it through a pull request like any change:
 
@@ -238,7 +238,7 @@ just tag-candidate      # creates the next v2.0.1-rc.N locally
 git push origin v2.0.1-rc.1
 ```
 
-`tag-candidate` requires a clean tracked working tree, fetches, and refuses unless the checkout is `origin/master`. It numbers the candidate past every candidate tag held locally or on `origin`. The tag helpers push nothing.
+`tag-candidate` fetches first. It refuses changes in tracked files, a checkout other than `origin/master`, a commit that would fail the stable release check (version and dated heading), and a version whose stable tag `origin` already has. It numbers the candidate past every candidate tag held locally or on `origin`. The tag helpers push nothing.
 
 ### Candidate workflow
 
@@ -257,7 +257,7 @@ just tag-release v2.0.1-rc.3   # tags the commit origin's v2.0.1-rc.3 names as v
 git push origin v2.0.1
 ```
 
-`tag-release` reads the candidate tag from `origin`, never the checkout or a local tag, and checks the version and the dated changelog heading as committed there.
+`tag-release` reads the candidate tag from `origin`, never the checkout or a local tag, and checks the version and the dated changelog heading as committed there. It notes when `origin` holds a higher candidate than the one named.
 
 Then dispatch the protected `promote` workflow from `master` (`gh workflow run promote.yml --ref master ...` or the equivalent UI choice), the only branch its `release` environment permits. It takes the RC tag, stable tag, accepted record SHA-256, and a qualification naming the reviewer, date, hosts, machines and findings. It refuses malformed tags before checking anything out, checks out `refs/tags/<tag>` without leaving the token in the tree, and runs the release-script tests from it. It verifies a successful candidate workflow, requires both tags and the checkout to resolve to the recorded commit, rechecks the record and every artifact byte, and creates the stable GitHub Release from those files; it does not compile or sign. A rerun after a later failure resumes only once the existing release's assets prove byte-for-byte identical; it never overwrites a differing asset.
 

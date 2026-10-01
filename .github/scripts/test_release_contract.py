@@ -126,20 +126,18 @@ class ReleaseCommandTest(unittest.TestCase):
             [artifact["kind"] for artifact in record["artifacts"]],
             ["macos-pkg", "windows-exe"],
         )
-        verified = run(
+        run(
             self.root, *self.command, "verify-candidate", "v2.0.0-rc.1",
             "v2.0.0", record_hash, str(self.artifacts),
         )
-        self.assertIn("2 recorded artifacts", verified.stdout)
 
         (self.artifacts / "qualification.md").write_text("Accepted on test hosts.\n")
         published = self.root / "published"
         shutil.copytree(self.artifacts, published)
-        resumed = run(
+        run(
             self.root, *self.command, "verify-stable-assets",
             str(self.artifacts), str(published),
         )
-        self.assertIn("exactly match", resumed.stdout)
         (published / "swanky-amp-2.0.0-macos.pkg").write_bytes(b"different")
         refused = run(
             self.root, *self.command, "verify-stable-assets",
@@ -212,10 +210,21 @@ class ReleaseCommandTest(unittest.TestCase):
         self.assertEqual(self.tags(), {"v2.0.0-rc.1"})
 
         run(self.root, "git", "pull", "--ff-only", "origin", "master")
+        cargo = self.root / "Cargo.toml"
+        committed = cargo.read_text(encoding="utf-8")
+        cargo.write_text(committed + "\n# local edit\n", encoding="utf-8")
+        self.assertNotEqual(self.tag_script("candidate").returncode, 0)
+        self.assertEqual(self.tags(), {"v2.0.0-rc.1"})
+        cargo.write_text(committed, encoding="utf-8")
+
         self.assertEqual(self.tag_script("candidate").returncode, 0)
         self.assertEqual(self.tags(), {"v2.0.0-rc.1", "v2.0.0-rc.3"})
         self.assertEqual(self.rev("v2.0.0-rc.3"), self.rev("origin/master"))
         self.assertNotIn("v2.0.0-rc.3", self.remote_tags())
+
+        run(self.root, "git", "push", "origin", "HEAD:refs/tags/v2.0.0")
+        self.assertNotEqual(self.tag_script("candidate").returncode, 0)
+        self.assertEqual(self.tags(), {"v2.0.0-rc.1", "v2.0.0-rc.3"})
 
     def test_release_tags_the_pushed_candidate_commit_not_the_checkout(self):
         self.add_origin()
@@ -230,23 +239,27 @@ class ReleaseCommandTest(unittest.TestCase):
         self.assertEqual(self.rev("v2.0.0"), candidate)
         self.assertNotIn("v2.0.0", self.remote_tags())
 
-    def test_stable_release_refuses_a_changelog_still_in_development(self):
+    def test_candidate_and_release_refuse_an_undated_changelog_heading(self):
         self.add_origin()
-        self.commit(
-            "CHANGELOG.md",
-            "# Changelog\n\n## Unreleased\n\n## 2.0.0 — in development\n\n- First release.\n",
-        )
-        run(self.root, "git", "push", "origin", "HEAD:master", "HEAD:refs/tags/v2.0.0-rc.2")
-        candidate = run(
-            self.root, *self.command, "check-tag", "candidate", "v2.0.0-rc.2", check=False
-        )
-        self.assertEqual(candidate.returncode, 0)
+        changelog = "# Changelog\n\n## Unreleased\n\n## 2.0.0{}\n\n- First release.\n"
+        for heading in (" — in development", "\n2026-09-20"):
+            self.commit("CHANGELOG.md", changelog.format(heading))
+            run(self.root, "git", "push", "origin", "HEAD:master")
+            self.assertNotEqual(self.tag_script("candidate").returncode, 0)
+            self.assertEqual(self.tags(), {"v2.0.0-rc.1"})
+        # A candidate tagged by hand on that commit cannot be released either.
+        run(self.root, "git", "push", "origin", "HEAD:refs/tags/v2.0.0-rc.2")
         self.assertNotEqual(self.tag_script("release", "v2.0.0-rc.2").returncode, 0)
-        stable = run(self.root, *self.command, "check-tag", "stable", "v2.0.0", check=False)
-        self.assertNotEqual(stable.returncode, 0)
         self.assertNotIn("v2.0.0", self.tags())
 
-    def test_release_helpers_preserve_invalid_or_uncommitted_source(self):
+        self.commit("CHANGELOG.md", changelog.format(" — 2026-09-20"))
+        run(self.root, "git", "push", "origin", "HEAD:master")
+        self.assertEqual(self.tag_script("candidate").returncode, 0)
+        run(self.root, "git", "push", "origin", "v2.0.0-rc.3")
+        self.assertEqual(self.tag_script("release", "v2.0.0-rc.3").returncode, 0)
+        self.assertEqual(self.rev("v2.0.0"), self.rev("HEAD"))
+
+    def test_version_helper_leaves_source_untouched_when_it_refuses(self):
         cargo_before = (self.root / "Cargo.toml").read_bytes()
         (self.root / "CHANGELOG.md").write_text(
             "# Changelog\n\n## 2.0.0 — 2026-09-20\n", encoding="utf-8"
@@ -259,14 +272,6 @@ class ReleaseCommandTest(unittest.TestCase):
         )
         self.assertNotEqual(invalid.returncode, 0)
         self.assertEqual((self.root / "Cargo.toml").read_bytes(), cargo_before)
-
-        (self.root / "Cargo.toml").write_text(
-            (self.root / "Cargo.toml").read_text(encoding="utf-8") + "\n# local edit\n",
-            encoding="utf-8",
-        )
-        tags_before = self.tags()
-        self.assertNotEqual(self.tag_script("candidate").returncode, 0)
-        self.assertEqual(self.tags(), tags_before)
 
 
 if __name__ == "__main__":

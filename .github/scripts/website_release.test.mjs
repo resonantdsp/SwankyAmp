@@ -10,7 +10,7 @@ const options = {
   releasedAt: '2026-09-20',
   releaseNotes: 'Version 2 keeps the released sound in a new host identity.',
 };
-// The website catalogue's shape (web/site/src/lib/releases.ts): earlier
+// The website catalogue's shape (site/src/lib/releases.ts in the website repository): earlier
 // versions live under `legacy`, each with its own downloads.
 const catalogue = { schemaVersion: 1, products: [
   { productId: 'SwankyAmpPro', status: 'recovering', source: 'records', verifiedDownloads: [] },

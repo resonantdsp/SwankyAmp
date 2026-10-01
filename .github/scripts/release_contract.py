@@ -33,7 +33,7 @@ def sha256(path: Path) -> str:
 
 def git(*args: str, root: Path = ROOT) -> str:
     return subprocess.run(
-        ["git", *args], cwd=root, check=True, text=True, capture_output=True
+        ["git", *args], cwd=root, check=True, capture_output=True, encoding="utf-8"
     ).stdout.strip()
 
 
@@ -113,12 +113,12 @@ def validate_source_tag(
         )
     changelog = source(root, "CHANGELOG.md", commit)
     heading = re.search(
-        rf"^## {re.escape(crate_version)}(?:\s(.*))?$", changelog, re.MULTILINE
+        rf"^## {re.escape(crate_version)}(?:[ \t](.*))?$", changelog, re.MULTILINE
     )
     if not heading:
         raise ValueError(f"CHANGELOG.md has no '## {crate_version}' section")
-    # The heading becomes the published release notes, so a stable release
-    # needs the dated heading a finished version has, never "in development".
+    # The tagged source is public and permanent, so its changelog would say
+    # "in development" for a released version forever.
     if kind == "stable" and not re.search(r"\b\d{4}-\d{2}-\d{2}\b", heading.group(1) or ""):
         raise ValueError(f"CHANGELOG.md's '## {crate_version}' heading has no release date")
     return crate_version
