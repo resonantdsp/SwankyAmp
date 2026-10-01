@@ -17,12 +17,17 @@ permissions: {}
 env:
   CARGO_TERM_COLOR: always
 
+# A hung step otherwise runs to GitHub's six-hour limit. The bounds sit far
+# above the slowest of ten candidate runs in September 2026 (identify and the
+# record under a minute, Linux 32, Windows 45, macOS 54 minutes), because a
+# signing or notarization job cut off part way costs more than a slow one.
 jobs:
   # First and cheap: a tag the contract refuses, or one that already has a
   # release, fails here, before an hour of signing proves nothing.
   identify:
     name: identify
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     permissions:
       # A read-only token is shown published releases only, and a candidate's
       # release is a draft until promotion. Write is what lets this job see the
@@ -79,6 +84,7 @@ jobs:
     name: signed installer (macos)
     needs: identify
     runs-on: macos-15
+    timeout-minutes: 150
     environment: signing
     permissions:
       contents: read
@@ -168,6 +174,7 @@ jobs:
     name: signed installer (windows)
     needs: identify
     runs-on: windows-2025
+    timeout-minutes: 150
     environment: signing
     permissions:
       contents: read
@@ -289,6 +296,7 @@ jobs:
     needs: identify
     if: needs.identify.outputs.linux == 'true'
     runs-on: ubuntu-22.04
+    timeout-minutes: 90
     permissions:
       contents: read
     steps:
@@ -330,6 +338,7 @@ jobs:
     # A Linux job skipped because none is declared must not skip the record.
     if: ${{ !cancelled() && !failure() }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     permissions:
       contents: write
     env:

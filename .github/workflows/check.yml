@@ -38,10 +38,15 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
 
+# A hung step, such as a stalled package install, otherwise runs to GitHub's
+# six-hour limit. Each timeout is several times the job's slowest run in
+# October 2026 (changes under a minute, checks 8, bundles 8 minutes), and
+# leaves room for a build on a cold dependency cache.
 jobs:
   changes:
     name: changes
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     outputs:
       code: ${{ steps.filter.outputs.code }}
       reference: ${{ steps.filter.outputs.reference }}
@@ -100,6 +105,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       # alsa-sys is the only dependency that resolves a system library at build
@@ -128,6 +134,7 @@ jobs:
     needs: [changes, checks]
     if: ${{ !cancelled() }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
