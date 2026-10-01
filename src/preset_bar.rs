@@ -1011,12 +1011,7 @@ mod tests {
     fn user_files(folder: &Folder, names: &[&str]) -> Vec<Entry> {
         names
             .iter()
-            .map(|name| {
-                folder
-                    .library()
-                    .save(name, &AmpControls::default())
-                    .unwrap()
-            })
+            .map(|name| crate::presets::saved_as(&folder.library(), name, &AmpControls::default()))
             .collect()
     }
 
@@ -1057,7 +1052,7 @@ mod tests {
         let [a, b, c] = <[Entry; 3]>::try_from(user_files(&folder, &["a", "b", "c"])).unwrap();
         for (message, expected) in [(PresetMsg::Next, &c), (PresetMsg::Previous, &a)] {
             for reopen in [false, true] {
-                folder.library().save("b", &AmpControls::default()).unwrap();
+                crate::presets::saved_as(&folder.library(), "b", &AmpControls::default());
                 let mut bar = listed_bar(&folder, &b);
                 std::fs::remove_file(b.path.as_ref().unwrap()).unwrap();
                 if reopen {
