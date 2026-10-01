@@ -1313,9 +1313,61 @@ mod tests {
             "{long:?} is not listed whole in {rows:?}"
         );
         assert!(
-            rows.lines()
-                .any(|row| row.starts_with("An endless name") && row.ends_with('…')),
-            "a name wider than the window is not cut to an ellipsis in {rows:?}"
+            rows.lines().any(|row| row.starts_with("An endless name")),
+            "the longest name is not listed in {rows:?}"
+        );
+    }
+
+    /// A shared preset is named by its file, which can hold line breaks, tabs
+    /// and as many characters as the file system allows. It still lists as a
+    /// short single line, and naming it in the footer keeps the edited mark;
+    /// a file whose name shows nothing lists as Untitled.
+    #[test]
+    fn a_shared_preset_with_an_unruly_file_name_lists_on_one_line() {
+        use crate::preset_bar::PresetMsg;
+        use truce::prelude::Params;
+        let mut editor = Editor::new(None);
+        let (presets, _) = UserPresets::new(&mut editor, "unruly-names", &["Plain"]);
+        let saved = presets.0.join("Plain.xml");
+        let unruly = format!("Shared\rlead\tfrom a friend {}", "x".repeat(200));
+        for name in [unruly.as_str(), "\u{200B}"] {
+            std::fs::copy(&saved, presets.0.join(format!("{name}.xml"))).unwrap();
+        }
+        editor.press(field_centre());
+
+        let rows = editor.text("preset.menu").unwrap();
+        let shared = rows
+            .lines()
+            .find(|row| row.starts_with("Shared lead from a friend"))
+            .unwrap_or_else(|| panic!("the shared preset does not list on one line in {rows:?}"));
+        assert!(
+            shared.chars().count() <= 128 && shared.ends_with('…'),
+            "{shared:?} is not capped with an ellipsis"
+        );
+        assert!(
+            rows.lines().any(|row| row == "Untitled"),
+            "a name with nothing visible is not listed as Untitled in {rows:?}"
+        );
+
+        let key = format!("user:{unruly}.xml");
+        let _ = editor.ui.update(
+            Message::Plugin(Action::Preset(PresetMsg::Select(key))),
+            &editor.params,
+            &editor.ctx,
+        );
+        let output = editor.params.params().output.id();
+        editor.params.params().set_plain(output, 0.5);
+        editor.point(field_centre());
+        let line = editor.text("footer.line").unwrap();
+        let set = super::text_width(&line, super::FOOTER_TEXT_SIZE, style::FONT);
+        assert!(
+            line.starts_with("Shared lead from a friend") && line.ends_with(" (edited)"),
+            "the footer names the shared preset as {line:?}"
+        );
+        assert!(
+            set <= super::FOOTER_TEXT[1],
+            "{line:?} sets {set:.1} px in a footer of {} px",
+            super::FOOTER_TEXT[1]
         );
     }
 

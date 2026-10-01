@@ -448,15 +448,75 @@ impl Entry {
                 "user:{}",
                 path.file_name().unwrap_or_default().to_string_lossy()
             ),
-            name: path
-                .file_stem()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .into_owned(),
+            name: file_name(&path),
             scope: Scope::User,
             path: Some(path),
         }
     }
+}
+
+/// A preset file's name as the menu lists it. The folder holds files shared
+/// from anywhere, and the field and menu are laid out for a short name on one
+/// line, so the name is cleaned where it enters the listing. A file whose name
+/// has nothing visible left is listed as Untitled; its key keeps the file name.
+fn file_name(path: &Path) -> String {
+    Some(listed(
+        &path.file_stem().unwrap_or_default().to_string_lossy(),
+    ))
+    .filter(|name| !name.is_empty())
+    .unwrap_or_else(|| "Untitled".into())
+}
+
+/// The most characters a listed name keeps, its ellipsis included; the
+/// menu cannot show more on one line, and fitting a longer one would cost
+/// every redraw.
+const NAME_LIMIT: usize = 128;
+
+/// `raw` as one line of visible text: line breaks, tabs and other control
+/// characters become spaces, characters that draw nothing or reorder the text
+/// around them are dropped so they cannot disguise a name, runs of space
+/// collapse, and the result is trimmed. One longer than [`NAME_LIMIT`] is cut
+/// to end in an ellipsis, so the player can tell it was cut.
+fn listed(raw: &str) -> String {
+    let mut out = String::new();
+    let mut count = 0;
+    let mut gap = false;
+    for character in raw.chars() {
+        if invisible(character) {
+            continue;
+        }
+        if character.is_whitespace() || character.is_control() {
+            gap = !out.is_empty();
+            continue;
+        }
+        if gap {
+            out.push(' ');
+            count += 1;
+            gap = false;
+        }
+        out.push(character);
+        count += 1;
+        if count > NAME_LIMIT {
+            let kept: String = out.chars().take(NAME_LIMIT - 1).collect();
+            return format!("{}…", kept.trim_end());
+        }
+    }
+    out
+}
+
+/// Zero-width, joiner and bidirectional formatting characters.
+fn invisible(character: char) -> bool {
+    matches!(
+        character,
+        '\u{00AD}'
+            | '\u{061C}'
+            | '\u{180E}'
+            | '\u{200B}'..='\u{200F}'
+            | '\u{202A}'..='\u{202E}'
+            | '\u{2060}'..='\u{206F}'
+            | '\u{FEFF}'
+            | '\u{FFF9}'..='\u{FFFB}'
+    )
 }
 
 /// Where version 2 keeps the user's presets: the platform's audio preset
@@ -624,18 +684,12 @@ impl Library {
         };
         let mut user = Vec::new();
         for path in xml_files(root) {
-            let Some(stem) = path
-                .file_stem()
-                .map(|stem| stem.to_string_lossy().into_owned())
-            else {
-                continue;
-            };
             match std::fs::read_to_string(&path)
                 .map_err(|error| error.to_string())
                 .and_then(|xml| parse_state(&xml))
             {
                 Ok(_) => user.push(Entry::user(path)),
-                Err(_) => listing.unreadable.push(stem),
+                Err(_) => listing.unreadable.push(file_name(&path)),
             }
         }
         user.sort_by_key(|entry| entry.name.to_lowercase());

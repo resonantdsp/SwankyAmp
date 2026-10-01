@@ -730,14 +730,22 @@ fn fitted(name: &str, mark: &str, room: f32, size: f32) -> String {
         return whole;
     }
     let characters: Vec<char> = name.chars().collect();
-    (0..characters.len())
-        .rev()
-        .map(|kept| {
-            let short: String = characters[..kept].iter().collect();
-            format!("{}…{mark}", short.trim_end())
-        })
-        .find(|short| fits(short))
-        .unwrap_or_else(|| format!("…{mark}"))
+    let cut = |kept: usize| {
+        let short: String = characters[..kept].iter().collect();
+        format!("{}…{mark}", short.trim_end())
+    };
+    // Measuring is what costs, so the cut is found by bisection rather than by
+    // trying every length.
+    let (mut fitting, mut over) = (0, characters.len());
+    while over - fitting > 1 {
+        let kept = (fitting + over) / 2;
+        if fits(&cut(kept)) {
+            fitting = kept;
+        } else {
+            over = kept;
+        }
+    }
+    cut(fitting)
 }
 
 /// Pro's selector menu: a raised dark panel sharing the controls' corner
