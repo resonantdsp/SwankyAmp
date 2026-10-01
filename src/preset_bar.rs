@@ -314,13 +314,24 @@ impl PresetBar {
         self.entries = entries;
     }
 
-    fn refresh(&mut self) {
+    /// The cached listing only draws the menu, which is rebuilt every frame;
+    /// an action that depends on the listing re-reads the folder first, since
+    /// the player may have changed it outside the editor. Returns the files
+    /// left out.
+    fn reread(&mut self) -> Vec<String> {
         let listing = self.library.list();
         self.list(listing.entries);
-        if !listing.unreadable.is_empty() {
+        listing.unreadable
+    }
+
+    /// Re-reads the folder and names any file left out. Only actions that
+    /// show the listing report it, so stepping never buries a status.
+    fn refresh(&mut self) {
+        let unreadable = self.reread();
+        if !unreadable.is_empty() {
             self.report(Err(format!(
                 "Skipped unreadable presets: {}",
-                listing.unreadable.join(", ")
+                unreadable.join(", ")
             )));
         }
     }
@@ -401,11 +412,15 @@ impl PresetBar {
                 }
             }
             PresetMsg::Close | PresetMsg::Hover(_) => {}
-            PresetMsg::Select(key) => match self.library.find(&key) {
-                Some(entry) => self.apply(entry, params, ctx),
-                None => self.report(Err("That preset is no longer available.".into())),
-            },
+            PresetMsg::Select(key) => {
+                self.reread();
+                match self.entries.iter().find(|entry| entry.key == key).cloned() {
+                    Some(entry) => self.apply(entry, params, ctx),
+                    None => self.report(Err("That preset is no longer available.".into())),
+                }
+            }
             PresetMsg::Previous | PresetMsg::Next => {
+                self.reread();
                 if let Some(entry) = self.step(matches!(message, PresetMsg::Next)) {
                     self.apply(entry, params, ctx);
                 }
@@ -977,6 +992,63 @@ mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.root);
         }
+    }
+
+    fn user_files(folder: &Folder, names: &[&str]) -> Vec<Entry> {
+        names
+            .iter()
+            .map(|name| {
+                folder
+                    .library()
+                    .save(name, &AmpControls::default())
+                    .unwrap()
+            })
+            .collect()
+    }
+
+    /// A bar whose menu has listed the folder, then chooses `entry`.
+    fn listed_bar(folder: &Folder, entry: &Entry) -> PresetBar {
+        let mut bar = PresetBar::with_library(folder.library());
+        bar.update(PresetMsg::Toggle, &folder.cache, &folder.ctx);
+        bar.update(
+            PresetMsg::Select(entry.key.clone()),
+            &folder.cache,
+            &folder.ctx,
+        );
+        bar
+    }
+
+    #[test]
+    fn next_steps_past_a_preset_removed_on_disk() {
+        let folder = Folder::new("step-removed");
+        let [a, b, c] = <[Entry; 3]>::try_from(user_files(&folder, &["a", "b", "c"])).unwrap();
+        let mut bar = listed_bar(&folder, &a);
+        std::fs::remove_file(b.path.unwrap()).unwrap();
+
+        bar.update(PresetMsg::Next, &folder.cache, &folder.ctx);
+
+        assert_eq!(
+            folder.params.preset.read(),
+            c.key,
+            "› did not step past the removed b"
+        );
+        assert_eq!(bar.status(), None, "› reported {:?}", bar.status());
+    }
+
+    #[test]
+    fn next_steps_onto_a_preset_added_on_disk() {
+        let folder = Folder::new("step-added");
+        let [a, _c] = <[Entry; 2]>::try_from(user_files(&folder, &["a", "c"])).unwrap();
+        let mut bar = listed_bar(&folder, &a);
+        let [b] = <[Entry; 1]>::try_from(user_files(&folder, &["b"])).unwrap();
+
+        bar.update(PresetMsg::Next, &folder.cache, &folder.ctx);
+
+        assert_eq!(
+            folder.params.preset.read(),
+            b.key,
+            "› did not step onto the added b"
+        );
     }
 
     /// On a case-insensitive file system saving as "lead" writes into an
