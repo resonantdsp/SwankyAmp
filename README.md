@@ -106,7 +106,7 @@ The second stage holds loudness: ITU-R BS.1770-4 gated integrated loudness, aver
 just calibrate          # rewrite src/dsp/calibration_data.rs, printing every point
 ```
 
-`just` tests the result on the same recordings: Drive, Power Drive and Grit at their extremes keep Init's loudness, and at default tone each stack feeds the power stage as 1.4.0 did.
+`just` tests the result on the same recordings: Drive, Power Drive and Grit at their extremes keep Init's loudness, at default tone each stack feeds the power stage as 1.4.0 did, and the factory defaults play as loud as 1.4.0.
 
 The factory voicing uses these levels, so rerun `just refit` after a calibration change and listen to the result.
 

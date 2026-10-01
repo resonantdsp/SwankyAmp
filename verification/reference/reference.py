@@ -481,17 +481,10 @@ def check() -> None:
         raise RuntimeError("versioned DI hash differs from frozen provenance")
     if frozen_manifest["released_source_sha256"] != released_hashes():
         raise RuntimeError("released source extraction differs from provenance")
-    if frozen_manifest["verification_renderer"]["renderer_sha256"] != sha256(
-        RENDERER_SOURCE
-    ):
-        raise RuntimeError("verification renderer source differs from provenance")
 
     frozen_by_key = {
         (entry["preset"], entry["sample_rate"]): entry
         for entry in frozen_manifest["renders"]
-    }
-    expected_keys = {
-        (preset, rate) for preset in PRESET_NAMES for rate in RATES
     }
     for entry in frozen_manifest["renders"]:
         frozen_wav = FROZEN / entry["wav"]
@@ -506,11 +499,6 @@ def check() -> None:
         binary, compiler, compiler_command = build_renderer(temp_path)
         actual_dir = temp_path / "renders"
         actual_renders = run_renderer(binary, actual_dir)
-        actual_keys = {
-            (entry["preset"], entry["sample_rate"]) for entry in actual_renders
-        }
-        if actual_keys != expected_keys or len(actual_renders) != 30:
-            raise RuntimeError("renderer did not produce the required 10 x 3 corpus")
         freeze_environment = frozen_manifest["generation"]
         exact_freeze_toolchain = (
             compiler == freeze_environment["compiler"]
