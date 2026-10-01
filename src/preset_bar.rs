@@ -376,30 +376,25 @@ impl PresetBar {
             .collect()
     }
 
-    /// The next preset from the current one in the listing just read.
-    /// `previous` is the listing before that read: a current preset whose
-    /// file has since gone steps from where it stood there, to the nearest
-    /// preset still listed.
-    fn step(&self, forward: bool, previous: &[Entry]) -> Option<Entry> {
+    /// The preset beside the current one. A user preset whose file has gone
+    /// since it was chosen steps from the place it would sort into.
+    fn step(&self, forward: bool) -> Option<Entry> {
         let stepping = self.stepping();
-        let listed = |key: &str| stepping.iter().find(|entry| entry.key == key);
         let position = stepping
             .iter()
             .position(|entry| entry.key == self.current.key);
-        let was = previous
-            .iter()
-            .filter(|entry| entry.scope != Scope::Init)
-            .collect::<Vec<_>>();
-        if position.is_none()
-            && let Some(old) = was.iter().position(|entry| entry.key == self.current.key)
-        {
-            let still_listed = |entry: &&Entry| listed(&entry.key);
-            let found = if forward {
-                was[old + 1..].iter().find_map(still_listed)
+        if position.is_none() && self.current.scope == Scope::User {
+            let order = self.current.order();
+            let place = stepping
+                .iter()
+                .position(|entry| entry.scope == Scope::User && entry.order() > order)
+                .unwrap_or(stepping.len());
+            let target = if forward {
+                Some(place)
             } else {
-                was[..old].iter().rev().find_map(still_listed)
-            };
-            return found.map(|entry| (*entry).clone());
+                place.checked_sub(1)
+            }?;
+            return stepping.get(target).map(|entry| (*entry).clone());
         }
         let target = match (position, forward) {
             (None, true) => Some(0),
@@ -439,9 +434,8 @@ impl PresetBar {
                 }
             }
             PresetMsg::Previous | PresetMsg::Next => {
-                let previous = self.entries.clone();
                 self.reread();
-                if let Some(entry) = self.step(matches!(message, PresetMsg::Next), &previous) {
+                if let Some(entry) = self.step(matches!(message, PresetMsg::Next)) {
                     self.apply(entry, params, ctx);
                 }
             }
@@ -631,8 +625,8 @@ impl PresetBar {
                 None => Element::from(glyph),
             }
         };
-        let previous = self.step(false, &self.entries).map(|_| PresetMsg::Previous);
-        let next = self.step(true, &self.entries).map(|_| PresetMsg::Next);
+        let previous = self.step(false).map(|_| PresetMsg::Previous);
+        let next = self.step(true).map(|_| PresetMsg::Next);
         let open = self.open;
         let field = container(
             row![
@@ -1062,18 +1056,24 @@ mod tests {
         let folder = Folder::new("step-current-removed");
         let [a, b, c] = <[Entry; 3]>::try_from(user_files(&folder, &["a", "b", "c"])).unwrap();
         for (message, expected) in [(PresetMsg::Next, &c), (PresetMsg::Previous, &a)] {
-            folder.library().save("b", &AmpControls::default()).unwrap();
-            let mut bar = listed_bar(&folder, &b);
-            std::fs::remove_file(b.path.as_ref().unwrap()).unwrap();
+            for reopen in [false, true] {
+                folder.library().save("b", &AmpControls::default()).unwrap();
+                let mut bar = listed_bar(&folder, &b);
+                std::fs::remove_file(b.path.as_ref().unwrap()).unwrap();
+                if reopen {
+                    bar.update(PresetMsg::Toggle, &folder.cache, &folder.ctx);
+                    bar.update(PresetMsg::Close, &folder.cache, &folder.ctx);
+                }
 
-            bar.update(message.clone(), &folder.cache, &folder.ctx);
+                bar.update(message.clone(), &folder.cache, &folder.ctx);
 
-            assert_eq!(
-                folder.params.preset.read(),
-                expected.key,
-                "{message:?} from the removed b did not reach {}",
-                expected.name
-            );
+                assert_eq!(
+                    folder.params.preset.read(),
+                    expected.key,
+                    "{message:?} from the removed b (menu reopened: {reopen}) did not reach {}",
+                    expected.name
+                );
+            }
         }
     }
 

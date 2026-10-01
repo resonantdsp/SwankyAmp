@@ -453,6 +453,11 @@ impl Entry {
             path: Some(path),
         }
     }
+
+    /// Where a user preset sorts in the listing.
+    pub fn order(&self) -> String {
+        self.name.to_lowercase()
+    }
 }
 
 /// A preset file's name as the menu lists it. The folder holds files shared
@@ -726,7 +731,7 @@ impl Library {
                 Err(_) => listing.unreadable.push(file_name(&path)),
             }
         }
-        user.sort_by_key(|entry| entry.name.to_lowercase());
+        user.sort_by_key(Entry::order);
         listing.entries.extend(user);
         listing
     }
