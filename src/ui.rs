@@ -1271,10 +1271,12 @@ mod tests {
             let keys = names
                 .iter()
                 .map(|name| {
-                    library
-                        .save(name, &crate::dsp::amp::AmpControls::default())
-                        .unwrap()
-                        .key
+                    crate::presets::saved_as(
+                        &library,
+                        name,
+                        &crate::dsp::amp::AmpControls::default(),
+                    )
+                    .key
                 })
                 .collect();
             editor.ui.presets = crate::preset_bar::PresetBar::with_library(library);

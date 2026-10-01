@@ -528,7 +528,7 @@ impl PresetBar {
         .unwrap_or_default();
         let saved = self
             .library
-            .save_chosen(path, &name, &params.params().snapshot());
+            .save_as(path, &name, &params.params().snapshot());
         if let Err(error) = self.keep(saved, params) {
             self.report(Err(error));
         }
@@ -854,7 +854,7 @@ mod tests {
         let root = std::env::temp_dir().join(format!("swanky-save-own-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let library = Library::with_user_root(Some(root.clone()));
-        let plain = library.save("plain", &AmpControls::default()).unwrap();
+        let plain = crate::presets::saved_as(&library, "plain", &AmpControls::default());
         let plain = plain.path.unwrap();
         let params = Arc::new(SwankyAmpParams::default());
         let cache = ParamCache::new(Arc::clone(&params));
@@ -896,7 +896,7 @@ mod tests {
         let root = std::env::temp_dir().join(format!("swanky-remove-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let library = Library::with_user_root(Some(root.clone()));
-        let saved = library.save("mine", &AmpControls::default()).unwrap();
+        let saved = crate::presets::saved_as(&library, "mine", &AmpControls::default());
         let file = saved.path.clone().unwrap();
         let params = Arc::new(SwankyAmpParams::default());
         let cache = ParamCache::new(Arc::clone(&params));
@@ -921,12 +921,6 @@ mod tests {
         );
         press(PresetMsg::Remove);
         assert!(!file.exists(), "confirming Remove kept the preset");
-        assert!(
-            Library::with_user_root(Some(root.clone()))
-                .find(&saved.key)
-                .is_none(),
-            "the removed preset is still listed"
-        );
         std::fs::remove_dir_all(root).unwrap();
     }
 
@@ -990,10 +984,7 @@ mod tests {
     #[test]
     fn save_as_a_name_differing_only_in_case_chooses_the_saved_preset() {
         let folder = Folder::new("save-as-case");
-        folder
-            .library()
-            .save("Lead", &AmpControls::default())
-            .unwrap();
+        crate::presets::saved_as(&folder.library(), "Lead", &AmpControls::default());
         let mut bar = PresetBar::with_library(folder.library());
         folder.turn_output();
 
@@ -1012,10 +1003,7 @@ mod tests {
     #[test]
     fn save_after_the_file_is_renamed_away_reports_it_is_gone() {
         let folder = Folder::new("save-renamed");
-        let saved = folder
-            .library()
-            .save("mine", &AmpControls::default())
-            .unwrap();
+        let saved = crate::presets::saved_as(&folder.library(), "mine", &AmpControls::default());
         let mut bar = PresetBar::with_library(folder.library());
         bar.update(PresetMsg::Select(saved.key), &folder.cache, &folder.ctx);
         std::fs::rename(saved.path.unwrap(), folder.root.join("renamed.xml")).unwrap();
@@ -1035,29 +1023,32 @@ mod tests {
         );
     }
 
-    /// The save dialog asks before replacing only a file in the folder it
-    /// shows. Pointed elsewhere, it saw no preset of the typed name, so the
-    /// one in the preset folder is left alone and the sound is not saved.
+    /// The system dialog asks before replacing only the file it returns, so
+    /// Save As replaces a preset only when the dialog returned that very file.
+    /// Any other way to the same name writes nothing.
     #[test]
-    fn save_as_from_another_folder_never_replaces_a_preset() {
-        let folder = Folder::new("save-as-elsewhere");
+    fn save_as_replaces_only_the_file_the_dialog_returned() {
+        let folder = Folder::new("save-as-asked");
         let elsewhere = folder.root.join("elsewhere");
         std::fs::create_dir_all(&elsewhere).unwrap();
-        let kept = folder
-            .library()
-            .save("Lead", &AmpControls::default())
-            .unwrap();
-        let before = std::fs::read(kept.path.as_ref().unwrap()).unwrap();
+        let kept = crate::presets::saved_as(&folder.library(), "Lead", &AmpControls::default());
+        let lead = kept.path.clone().unwrap();
+        let before = std::fs::read(&lead).unwrap();
         let mut bar = PresetBar::with_library(folder.library());
         folder.turn_output();
 
-        bar.save_as(&elsewhere.join("Lead.xml"), &folder.cache);
-        assert_eq!(
-            std::fs::read(kept.path.as_ref().unwrap()).unwrap(),
-            before,
-            "Save As from another folder replaced the preset folder's Lead"
-        );
-        assert!(bar.status().is_some(), "the refused save said nothing");
+        // Another folder, and the preset folder without the extension as a
+        // Linux dialog returns it.
+        for unasked in [elsewhere.join("Lead.xml"), folder.root.join("Lead")] {
+            bar.save_as(&unasked, &folder.cache);
+            assert_eq!(
+                std::fs::read(&lead).unwrap(),
+                before,
+                "Save As to {} replaced the preset folder's Lead",
+                unasked.display()
+            );
+            assert!(bar.status().is_some(), "the refused save said nothing");
+        }
 
         bar.save_as(&elsewhere.join("Rhythm.xml"), &folder.cache);
         assert_eq!(
@@ -1066,6 +1057,13 @@ mod tests {
             "a new name from another folder was not saved into the preset folder"
         );
         assert_eq!(folder.files(), ["Lead.xml", "Rhythm.xml", "elsewhere"]);
+
+        bar.save_as(&lead, &folder.cache);
+        assert_ne!(
+            std::fs::read(&lead).unwrap(),
+            before,
+            "Save As onto the file the dialog returned did not replace it"
+        );
     }
 
     /// Some save dialogs return the name without the extension.

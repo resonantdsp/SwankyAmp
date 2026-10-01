@@ -455,51 +455,32 @@ impl Entry {
     }
 }
 
-/// The file `path` names as the folder spells it. A case-insensitive file
-/// system finds "Lead.xml" for "lead.xml", and a save keeps that spelling.
-fn on_disk(path: &Path) -> Option<PathBuf> {
-    if !path.is_file() {
-        return None;
-    }
-    let wanted = path.file_name()?.to_string_lossy().to_lowercase();
-    let mut alike = std::fs::read_dir(path.parent()?)
-        .ok()?
-        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
-        .filter(|candidate| {
-            candidate
-                .file_name()
-                .is_some_and(|name| name.to_string_lossy().to_lowercase() == wanted)
-        });
-    let spelled = match (alike.next(), alike.next()) {
-        (Some(only), None) => only,
-        _ => path.to_owned(),
-    };
-    Some(spelled)
-}
-
 /// Writes a preset whole or not at all: it is the one kind of data here that
 /// cannot be regenerated, so a crash or a full disk mid-write must leave the
 /// previous file rather than a truncated one.
 fn write_whole(target: &Path, contents: &str) -> std::io::Result<()> {
     static NEXT_TEMPORARY: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-    let invalid = || std::io::Error::from(std::io::ErrorKind::InvalidInput);
-    let folder = target.parent().ok_or_else(invalid)?;
-    let name = target.file_name().ok_or_else(invalid)?;
+    let folder = target
+        .parent()
+        .ok_or_else(|| std::io::Error::from(std::io::ErrorKind::InvalidInput))?;
+    // Not named after the preset, so a name near the file system's limit
+    // still saves.
     let temporary = folder.join(format!(
-        ".{}.{}-{}.tmp",
-        name.to_string_lossy(),
+        ".swanky-preset-{}-{}.tmp",
         std::process::id(),
         NEXT_TEMPORARY.fetch_add(1, Ordering::Relaxed)
     ));
-    let written = std::fs::OpenOptions::new()
+    let mut file = std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
-        .open(&temporary)
-        .and_then(|mut file| {
-            file.write_all(contents.as_bytes())?;
-            file.sync_all()
-        })
-        .and_then(|()| std::fs::rename(&temporary, target));
+        .open(&temporary)?;
+    let written = file.write_all(contents.as_bytes()).and_then(|()| {
+        // The rename is what keeps the previous file whole. Some network
+        // and FUSE volumes refuse the flush, which must not stop the save.
+        let _ = file.sync_all();
+        drop(file);
+        std::fs::rename(&temporary, target)
+    });
     if written.is_err() {
         let _ = std::fs::remove_file(&temporary);
     }
@@ -727,6 +708,11 @@ impl Default for Library {
     }
 }
 
+/// Why Save As wrote nothing: the typed name is taken and the dialog never
+/// showed that file, so it never asked about replacing it.
+const SAVE_AS_REFUSED: &str =
+    "Not saved: a preset with that name already exists. Choose another name.";
+
 impl Library {
     /// Tests keep user presets away from the real folder.
     pub fn with_user_root(user_root: Option<PathBuf>) -> Self {
@@ -845,31 +831,26 @@ impl Library {
             .join(format!("{}.{EXTENSION}", valid_name(name)?)))
     }
 
-    /// Saves the controls as a user preset, replacing one of the same name.
-    pub fn save(&self, name: &str, controls: &AmpControls) -> Result<Entry, String> {
-        self.write(&self.path_for(name)?, controls, true)
-    }
-
-    /// Saves the controls under the name of the file a save dialog chose,
-    /// always into the preset folder so the menu lists it. The dialog asked
-    /// before replacing only a file in the folder it showed, so a preset of
-    /// that name is replaced only when that folder was the preset folder.
-    pub fn save_chosen(
+    /// Saves the controls under `name`, from the file a save dialog chose,
+    /// always into the preset folder so the menu lists it. An existing
+    /// preset is replaced only when the dialog returned exactly its file,
+    /// the one case in which the dialog asked the player first.
+    pub fn save_as(
         &self,
         chosen: &Path,
         name: &str,
         controls: &AmpControls,
     ) -> Result<Entry, String> {
         let path = self.path_for(name)?;
-        let shown_folder = chosen
-            .parent()
-            .and_then(|folder| folder.canonicalize().ok());
-        let preset_folder = path.parent().and_then(|folder| folder.canonicalize().ok());
-        if on_disk(&path).is_some() && (shown_folder.is_none() || shown_folder != preset_folder) {
-            return Err(format!(
-                "Not saved: {} is already a preset. Save it in the preset folder to replace it.",
-                file_name(&path)
-            ));
+        if std::fs::symlink_metadata(&path).is_ok() {
+            let asked = chosen
+                .canonicalize()
+                .ok()
+                .zip(path.canonicalize().ok())
+                .is_some_and(|(chosen, existing)| chosen == existing);
+            if !asked {
+                return Err(SAVE_AS_REFUSED.into());
+            }
         }
         self.write(&path, controls, true)
     }
@@ -882,21 +863,26 @@ impl Library {
     }
 
     fn write(&self, path: &Path, controls: &AmpControls, create: bool) -> Result<Entry, String> {
-        let existing = on_disk(path);
-        if existing.is_none() && !create {
-            return Err(format!(
-                "{} is no longer in the preset folder. Use Save as… to keep this sound.",
-                file_name(path)
-            ));
-        }
-        let target = existing.unwrap_or_else(|| path.to_owned());
+        // The file as the folder spells it, so a name differing only in
+        // case keeps the existing spelling, and a symlinked preset stays a
+        // link to the file it names.
+        let target = match path.canonicalize() {
+            Ok(target) => target,
+            Err(_) if create => path.to_owned(),
+            Err(_) => {
+                return Err(format!(
+                    "{} is no longer in the preset folder. Use Save as… to keep this sound.",
+                    file_name(path)
+                ));
+            }
+        };
         // Resaving an imported preset keeps the record of where it came from.
         let provenance = std::fs::read_to_string(&target)
             .map(|xml| provenance(&xml))
             .unwrap_or_default();
         write_whole(&target, &write_state(controls, &provenance))
             .map_err(|error| format!("The preset could not be saved: {error}."))?;
-        self.entry_for(&target)
+        self.entry_for(path)
     }
 
     /// The listed preset a file was written to. A case-insensitive file
@@ -1004,9 +990,10 @@ impl Library {
             let provenance = Provenance {
                 imported_from: Some(source_version),
             };
-            // Another editor importing the same folder writes the same
-            // preset, so whichever finishes last replacing the file is
-            // harmless; a preset the player already has is never replaced.
+            // A preset the player already has is skipped. One that appears
+            // between this check and the rename, in practice only the same
+            // preset from another editor importing at the same moment, is
+            // replaced.
             if target.exists() {
                 report.existing.push(reported);
                 continue;
@@ -1129,6 +1116,14 @@ pub fn apply_offline(
     Ok(())
 }
 
+/// Saves a new preset as Save As does when the dialog names a file in the
+/// preset folder.
+#[cfg(test)]
+pub(crate) fn saved_as(library: &Library, name: &str, controls: &AmpControls) -> Entry {
+    let chosen = library.root().unwrap().join(format!("{name}.{EXTENSION}"));
+    library.save_as(&chosen, name, controls).unwrap()
+}
+
 /// Shows a folder in the system file browser.
 pub fn reveal(path: &Path) -> Result<(), String> {
     let opener = if cfg!(target_os = "macos") {
@@ -1236,7 +1231,7 @@ mod tests {
         controls.low = 0.123_456_7;
         controls.cabinet_on = false;
         controls.input = -0.25;
-        let entry = library.save("my tone", &controls).unwrap();
+        let entry = saved_as(&library, "my tone", &controls);
         assert_eq!(entry.name, "my tone");
         let reloaded = library.find(&entry.key).unwrap();
         assert_eq!(library.load(&reloaded).unwrap().unwrap().controls, controls);
@@ -1261,7 +1256,7 @@ mod tests {
         std::fs::write(legacy.join("01 clean.xml"), legacy_file("clean")).unwrap();
         std::fs::write(legacy.join("12 kept.xml"), legacy_file("edge")).unwrap();
         std::fs::write(legacy.join("13 broken.xml"), "<APVTSSwankyAmp><PARAM").unwrap();
-        let kept = library.save("kept", &AmpControls::default()).unwrap();
+        let kept = saved_as(&library, "kept", &AmpControls::default());
         let kept_before = std::fs::read(kept.path.as_ref().unwrap()).unwrap();
         let legacy_before: Vec<Vec<u8>> = xml_files(&legacy)
             .iter()

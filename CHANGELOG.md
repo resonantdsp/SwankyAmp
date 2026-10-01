@@ -81,7 +81,7 @@ installs beside Swanky Amp 1.4.0.
   Presets apply through the host, the selection survives a session reload, and
   a dot marks a changed preset. Input and the cabinet switch stay with the
   session, as in 1.4.0. Save as… replaces a preset only when the system
-  dialog showed it, and every save is written whole or not at all. Remove
+  dialog returned that file, and every save is written whole or not at all. Remove
   asks in the menu before it deletes the file,
   and the factory presets are capitalised like Init. A name too long for the
   field ends in an ellipsis and reads whole in the footer while the pointer is
