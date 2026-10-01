@@ -39,9 +39,9 @@ env:
   CARGO_TERM_COLOR: always
 
 # A hung step, such as a stalled package install, otherwise runs to GitHub's
-# six-hour limit. Each timeout is several times the job's slowest run in
-# October 2026 (changes under a minute, checks 8, bundles 8 minutes), and
-# leaves room for a build on a cold dependency cache.
+# six-hour limit. Each timeout is at least twice the job's slowest run from
+# September 23 to October 1, 2026, cold dependency caches included: changes
+# under a minute, checks 13 minutes, bundles 30 minutes (Windows; macOS 26).
 jobs:
   changes:
     name: changes
