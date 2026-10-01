@@ -38,7 +38,11 @@ On Windows the standalone plays through ASIO when an ASIO driver is installed, a
 
 ## Signal path
 
-The shipping path is the 1.4.0 model with tube-only oversampling, a plate filter that tracks the oversampled rate, a smooth triode knee, a capped Grit mapping, the standard tone-stack mapping, and level compensation recalibrated against 1.4.0. The legacy path keeps every released mapping so that `just model-check` can prove the port against the frozen 1.4.0 renders. The tools below measure one correction at a time:
+The shipping path is the 1.4.0 model with tube-only oversampling, a plate filter whose cutoff holds as the oversampled rate changes, a smooth triode knee, a capped Grit mapping, the standard tone-stack mapping, and level compensation recalibrated against 1.4.0. The legacy path keeps every released mapping so that `just model-check` can prove the port against the frozen 1.4.0 renders.
+
+Oversampling is set in the editor's header: Auto picks the tube stages' factor from the host's sample rate, or the player fixes one. The plug-in reports the oversampling filter's latency to the host, so changing the factor restarts processing for the host to take up the new latency.
+
+These tools render, measure and stress the paths:
 
 ```sh
 just render-model "high gain" /tmp/high-gain.wav   # one released preset through the legacy path, with its internal seams
@@ -71,7 +75,7 @@ rewrites `presets/factory-2.0.xml` and its [voicing report](verification/tone-st
 
 Accepted limits of the corrected stack against 1.4.0:
 
-- 1.4.0's scoop sat an octave higher than any setting of the corrected stack can place it, and the corrected Low acts only below about 125 Hz. The voiced presets keep 150 to 400 Hz up to 1.1 dB under 1.4.0 (level 11 up to 2.7 dB) and around 1.3 kHz 0.5 to 2.5 dB over.
+- 1.4.0's scoop sat an octave higher than any setting of the corrected stack can place it, and the corrected Low acts only at the very bottom. The voiced presets therefore keep the low mids under 1.4.0 and the region around 1.3 kHz over it; the [voicing report](verification/tone-stack/refit-report.md)'s Remaining balance table gives the figures.
 - Init is the corrected stack at its defaults and is not revoiced: against 1.4.0 it has 3 to 6.3 dB less between 100 and 400 Hz and 3.8 to 4.7 dB more between 0.8 and 1.6 kHz.
 - 1.4.0's level fell with Drive and Power Drive, differently on each pickup. Version 2 holds Init's level averaged over the pickups, so high Drive and Power Drive play louder against Init than they did in 1.4.0, and each pickup lands up to about 3 dB either side of Init.
 - On the single coil the driven presets come out louder than Init, because a clean amp follows the pickup where a driven one does not. 1.4.0's factory presets were not balanced at all.
@@ -112,7 +116,7 @@ Opening an editor starts a background check of `https://resonantdsp.com/release-
 {"schemaVersion":1,"productId":"SwankyAmp","currentVersion":"2.0.1"}
 ```
 
-The website generates it from the promoted release catalogue and emits `"currentVersion":null` until `SwankyAmp` has verified downloads for that version. The plug-in ignores fields it does not know, so the website can add to the document without silencing installed versions. When the version is a strictly newer stable release, the cog turns into a download arrow and the panel announces it with a Download link to the product page, opened only on an explicit press; the document cannot choose a link. Any failure is silent, and every attempt, successful or not, waits 24 hours before the next. The last answer is kept in `Swanky Amp 2 release notice.json` beside the interface size.
+The website generates it from the promoted release catalogue and emits `"currentVersion":null` until `SwankyAmp` has verified downloads for that version. The plug-in rejects a document over 4 KiB and ignores fields it does not know, so the website can add to the document, within that size, without silencing installed versions. When the version is a strictly newer stable release, the cog turns into a download arrow and the panel announces it with a Download link to the product page, opened only on an explicit press; the document cannot choose a link. Any failure is silent, and every attempt, successful or not, waits 24 hours before the next. The last answer is kept in `Swanky Amp 2 release notice.json` beside the interface size.
 
 The request is a bodyless `GET`. So the website can count monthly unique installs without an identifier, it adds `?first=ever` when this computer has no previous successful check, `?first=month` when the previous successful check was in an earlier calendar month (UTC), and no query otherwise. It sends no custom User-Agent, running version, product key, machine identifier or telemetry. As with any HTTPS request, the website or its delivery provider receives the public IP address and the ordinary connection, TLS, header and timing information needed to serve it.
 
@@ -133,7 +137,7 @@ just capture-menu "A long preset name of the player's own" /tmp/swanky-capture
 
 ### Artwork
 
-The repository carries the artwork as `assets/artwork.pack` with its `receipt.json` and `ARTWORK-LICENSE.txt` in `assets/artwork`. The editable layers are not committed; they come from the package. To edit them, unpack to EXRs, edit them in a standard HDR image tool, refresh the receipt, then repack and validate:
+The repository carries the artwork as `assets/artwork.pack` with its `receipt.json` and `ARTWORK-LICENSE.txt` in `assets/artwork`. The editable layers are not committed; they come from the package. To change them, unpack to EXRs and edit in a standard HDR image tool, saving as ZIP-compressed float32 RGB with no alpha (the packer refuses anything else, and many tools default to half float or add alpha); then refresh the receipt, repack and validate:
 
 ```sh
 just unpack-artwork assets/artwork.pack /tmp/swanky-artwork
@@ -168,7 +172,7 @@ just version 2.0.1      # updates Cargo.toml, Cargo.lock and CHANGELOG.md; never
 Then, on the merged master commit, which CI has checked:
 
 ```sh
-just tone-stack-soak
+just tone-stack-soak    # must pass before a candidate
 just tag-candidate      # creates the next v2.0.1-rc.N locally
 git push origin v2.0.1-rc.1
 ```
