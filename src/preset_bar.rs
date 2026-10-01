@@ -314,13 +314,23 @@ impl PresetBar {
         self.entries = entries;
     }
 
-    fn refresh(&mut self) {
+    /// The cached listing is for drawing; an action that depends on it
+    /// re-reads the folder first, since the player may change it outside the
+    /// editor. Returns the files left out.
+    fn reread(&mut self) -> Vec<String> {
         let listing = self.library.list();
         self.list(listing.entries);
-        if !listing.unreadable.is_empty() {
+        listing.unreadable
+    }
+
+    /// Re-reads the folder and names any file left out. Only actions that
+    /// show the listing report it, so stepping never buries a status.
+    fn refresh(&mut self) {
+        let unreadable = self.reread();
+        if !unreadable.is_empty() {
             self.report(Err(format!(
                 "Skipped unreadable presets: {}",
-                listing.unreadable.join(", ")
+                unreadable.join(", ")
             )));
         }
     }
@@ -366,11 +376,26 @@ impl PresetBar {
             .collect()
     }
 
+    /// The preset beside the current one. A user preset whose file has gone
+    /// since it was chosen steps from the place it would sort into.
     fn step(&self, forward: bool) -> Option<Entry> {
         let stepping = self.stepping();
         let position = stepping
             .iter()
             .position(|entry| entry.key == self.current.key);
+        if position.is_none() && self.current.scope == Scope::User {
+            let order = self.current.order();
+            let place = stepping
+                .iter()
+                .position(|entry| entry.scope == Scope::User && entry.order() > order)
+                .unwrap_or(stepping.len());
+            let target = if forward {
+                Some(place)
+            } else {
+                place.checked_sub(1)
+            }?;
+            return stepping.get(target).map(|entry| (*entry).clone());
+        }
         let target = match (position, forward) {
             (None, true) => Some(0),
             (None, false) => None,
@@ -401,11 +426,15 @@ impl PresetBar {
                 }
             }
             PresetMsg::Close | PresetMsg::Hover(_) => {}
-            PresetMsg::Select(key) => match self.library.find(&key) {
-                Some(entry) => self.apply(entry, params, ctx),
-                None => self.report(Err("That preset is no longer available.".into())),
-            },
+            PresetMsg::Select(key) => {
+                self.reread();
+                match self.entries.iter().find(|entry| entry.key == key).cloned() {
+                    Some(entry) => self.apply(entry, params, ctx),
+                    None => self.report(Err("That preset is no longer available.".into())),
+                }
+            }
             PresetMsg::Previous | PresetMsg::Next => {
+                self.reread();
                 if let Some(entry) = self.step(matches!(message, PresetMsg::Next)) {
                     self.apply(entry, params, ctx);
                 }
@@ -977,6 +1006,91 @@ mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.root);
         }
+    }
+
+    fn user_files(folder: &Folder, names: &[&str]) -> Vec<Entry> {
+        names
+            .iter()
+            .map(|name| {
+                folder
+                    .library()
+                    .save(name, &AmpControls::default())
+                    .unwrap()
+            })
+            .collect()
+    }
+
+    /// A bar whose menu has listed the folder, then chooses `entry`.
+    fn listed_bar(folder: &Folder, entry: &Entry) -> PresetBar {
+        let mut bar = PresetBar::with_library(folder.library());
+        bar.update(PresetMsg::Toggle, &folder.cache, &folder.ctx);
+        bar.update(
+            PresetMsg::Select(entry.key.clone()),
+            &folder.cache,
+            &folder.ctx,
+        );
+        bar
+    }
+
+    #[test]
+    fn next_steps_past_a_preset_removed_on_disk() {
+        let folder = Folder::new("step-removed");
+        let [a, b, c] = <[Entry; 3]>::try_from(user_files(&folder, &["a", "b", "c"])).unwrap();
+        let mut bar = listed_bar(&folder, &a);
+        std::fs::remove_file(b.path.unwrap()).unwrap();
+
+        bar.update(PresetMsg::Next, &folder.cache, &folder.ctx);
+
+        assert_eq!(
+            folder.params.preset.read(),
+            c.key,
+            "› did not step past the removed b"
+        );
+        assert_eq!(bar.status(), None, "› reported {:?}", bar.status());
+    }
+
+    /// The current preset's own file going is the case re-reading is for:
+    /// the arrows step on from where it stood.
+    #[test]
+    fn arrows_step_on_from_a_current_preset_removed_on_disk() {
+        let folder = Folder::new("step-current-removed");
+        let [a, b, c] = <[Entry; 3]>::try_from(user_files(&folder, &["a", "b", "c"])).unwrap();
+        for (message, expected) in [(PresetMsg::Next, &c), (PresetMsg::Previous, &a)] {
+            for reopen in [false, true] {
+                folder.library().save("b", &AmpControls::default()).unwrap();
+                let mut bar = listed_bar(&folder, &b);
+                std::fs::remove_file(b.path.as_ref().unwrap()).unwrap();
+                if reopen {
+                    bar.update(PresetMsg::Toggle, &folder.cache, &folder.ctx);
+                    bar.update(PresetMsg::Close, &folder.cache, &folder.ctx);
+                }
+
+                bar.update(message.clone(), &folder.cache, &folder.ctx);
+
+                assert_eq!(
+                    folder.params.preset.read(),
+                    expected.key,
+                    "{message:?} from the removed b (menu reopened: {reopen}) did not reach {}",
+                    expected.name
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn next_steps_onto_a_preset_added_on_disk() {
+        let folder = Folder::new("step-added");
+        let [a, _c] = <[Entry; 2]>::try_from(user_files(&folder, &["a", "c"])).unwrap();
+        let mut bar = listed_bar(&folder, &a);
+        let [b] = <[Entry; 1]>::try_from(user_files(&folder, &["b"])).unwrap();
+
+        bar.update(PresetMsg::Next, &folder.cache, &folder.ctx);
+
+        assert_eq!(
+            folder.params.preset.read(),
+            b.key,
+            "› did not step onto the added b"
+        );
     }
 
     /// On a case-insensitive file system saving as "lead" writes into an
