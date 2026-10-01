@@ -1325,7 +1325,18 @@ mod tests {
         let mut editor = Editor::new(None);
         let (presets, _) = UserPresets::new(&mut editor, "unruly-names", &["Plain"]);
         let saved = presets.0.join("Plain.xml");
-        let unruly = format!("Shared\rlead\tfrom a friend {}", "x".repeat(200));
+        // Windows file names cannot hold control characters.
+        let breaks = if cfg!(windows) {
+            [' ', ' ']
+        } else {
+            ['\r', '\t']
+        };
+        let unruly = format!(
+            "Shared{}lead{}from a friend {}",
+            breaks[0],
+            breaks[1],
+            "x".repeat(200)
+        );
         for name in [unruly.as_str(), "\u{200B}"] {
             std::fs::copy(&saved, presets.0.join(format!("{name}.xml"))).unwrap();
         }

@@ -414,6 +414,11 @@ impl PresetBar {
                 let outcome = match (&self.current.scope, self.current.path.clone()) {
                     (Scope::User, Some(path)) => {
                         let saved = self.library.save_to(&path, &params.params().snapshot());
+                        if saved.is_err() {
+                            // The file may be gone; the menu should list what
+                            // the folder holds now.
+                            self.refresh();
+                        }
                         self.keep(saved, params)
                     }
                     _ => Err("Use Save as… to keep a copy of this preset.".into()),
@@ -508,12 +513,20 @@ impl PresetBar {
     }
 
     /// The name comes from the chosen file; the preset always lands in the
-    /// preset folder so the menu lists it.
+    /// preset folder so the menu lists it. Some dialogs return the name
+    /// without the extension, so only a trailing .xml is dropped and a name
+    /// like "Lead v1.2" keeps its dots.
     fn save_as(&mut self, path: &std::path::Path, params: &ParamCache<SwankyAmpParams>) {
-        let name = path
-            .file_stem()
-            .map(|stem| stem.to_string_lossy().into_owned())
-            .unwrap_or_default();
+        let named_xml = path
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("xml"));
+        let name = if named_xml {
+            path.file_stem()
+        } else {
+            path.file_name()
+        }
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default();
         let saved = self.library.save(&name, &params.params().snapshot());
         if let Err(error) = self.keep(saved, params) {
             self.report(Err(error));
@@ -909,5 +922,120 @@ mod tests {
         assert!(!file.exists(), "confirming Remove kept the preset");
         assert_eq!(bar.status(), Some("Removed mine"));
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    struct Folder {
+        root: PathBuf,
+        params: Arc<SwankyAmpParams>,
+        cache: ParamCache<SwankyAmpParams>,
+        ctx: PluginContext<SwankyAmpParams>,
+    }
+
+    impl Folder {
+        fn new(name: &str) -> Self {
+            let root = std::env::temp_dir().join(format!("swanky-{name}-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&root);
+            std::fs::create_dir_all(&root).unwrap();
+            let params = Arc::new(SwankyAmpParams::default());
+            Self {
+                root,
+                cache: ParamCache::new(Arc::clone(&params)),
+                ctx: PluginContext::new(Arc::new(NullHost), Arc::clone(&params)),
+                params,
+            }
+        }
+
+        fn library(&self) -> Library {
+            Library::with_user_root(Some(self.root.clone()))
+        }
+
+        fn files(&self) -> Vec<String> {
+            let mut names: Vec<String> = std::fs::read_dir(&self.root)
+                .unwrap()
+                .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+                .collect();
+            names.sort();
+            names
+        }
+
+        fn turn_output(&self) {
+            use truce::prelude::Params;
+            self.params.set_plain(self.params.output.id(), 0.5);
+        }
+
+        /// The preset the host state now names, as the folder holds it.
+        fn remembered(&self) -> AmpControls {
+            let library = self.library();
+            let entry = library
+                .find(&self.params.preset.read())
+                .expect("the remembered preset is not listed");
+            library.load(&entry).unwrap().unwrap().controls
+        }
+    }
+
+    impl Drop for Folder {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.root);
+        }
+    }
+
+    /// On a case-insensitive file system saving as "lead" writes into an
+    /// existing "Lead.xml"; the save still succeeds and is chosen.
+    #[test]
+    fn save_as_a_name_differing_only_in_case_chooses_the_saved_preset() {
+        let folder = Folder::new("save-as-case");
+        folder
+            .library()
+            .save("Lead", &AmpControls::default())
+            .unwrap();
+        let mut bar = PresetBar::with_library(folder.library());
+        folder.turn_output();
+
+        bar.save_as(&folder.root.join("lead.xml"), &folder.cache);
+
+        let status = bar.status().unwrap_or_default().to_owned();
+        assert!(
+            status.eq_ignore_ascii_case("Saved lead"),
+            "saving as lead reported {status:?}"
+        );
+        assert_eq!(folder.remembered(), folder.params.snapshot());
+    }
+
+    /// A preset renamed or removed outside the editor is not recreated
+    /// under its old name; the player is told it is gone.
+    #[test]
+    fn save_after_the_file_is_renamed_away_reports_it_is_gone() {
+        let folder = Folder::new("save-renamed");
+        let saved = folder
+            .library()
+            .save("mine", &AmpControls::default())
+            .unwrap();
+        let mut bar = PresetBar::with_library(folder.library());
+        bar.update(PresetMsg::Select(saved.key), &folder.cache, &folder.ctx);
+        std::fs::rename(saved.path.unwrap(), folder.root.join("renamed.xml")).unwrap();
+        folder.turn_output();
+
+        bar.update(PresetMsg::Save, &folder.cache, &folder.ctx);
+
+        assert_eq!(
+            folder.files(),
+            ["renamed.xml"],
+            "Save recreated the old file"
+        );
+        let status = bar.status().unwrap_or_default();
+        assert!(
+            status.contains("no longer"),
+            "Save of a missing preset reported {status:?}"
+        );
+    }
+
+    /// Some save dialogs return the name without the extension.
+    #[test]
+    fn a_name_with_dots_keeps_them() {
+        let folder = Folder::new("save-as-dots");
+        let mut bar = PresetBar::with_library(folder.library());
+        bar.save_as(&folder.root.join("Lead v1.2"), &folder.cache);
+        bar.save_as(&folder.root.join("Lead v1.2.xml"), &folder.cache);
+        assert_eq!(folder.files(), ["Lead v1.2.xml"]);
     }
 }

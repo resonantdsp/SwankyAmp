@@ -796,27 +796,67 @@ impl Library {
 
     /// Saves the controls as a user preset, replacing one of the same name.
     pub fn save(&self, name: &str, controls: &AmpControls) -> Result<Entry, String> {
-        self.save_to(&self.path_for(name)?, controls)
+        self.write(&self.path_for(name)?, controls, true)
     }
 
-    /// Saves the controls into a user preset's file, replacing it. Saving a
-    /// listed preset goes to its own file, since its listed name can read
-    /// differently from the file's.
+    /// Saves the controls into a listed user preset's own file, since its
+    /// listed name can read differently from the file's. A file renamed or
+    /// removed since it was listed is not written again under its old name.
     pub fn save_to(&self, path: &Path, controls: &AmpControls) -> Result<Entry, String> {
+        self.write(path, controls, false)
+    }
+
+    fn write(&self, path: &Path, controls: &AmpControls, create: bool) -> Result<Entry, String> {
         // Resaving an imported preset keeps the record of where it came from.
         let provenance = std::fs::read_to_string(path)
             .map(|xml| provenance(&xml))
             .unwrap_or_default();
-        std::fs::write(path, write_state(controls, &provenance))
-            .map_err(|error| format!("The preset could not be saved: {error}."))?;
+        std::fs::OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .create(create)
+            .open(path)
+            .and_then(|mut file| file.write_all(write_state(controls, &provenance).as_bytes()))
+            .map_err(|error| {
+                if error.kind() == std::io::ErrorKind::NotFound && !create {
+                    format!(
+                        "{} is no longer in the preset folder. Use Save as… to keep this sound.",
+                        file_name(path)
+                    )
+                } else {
+                    format!("The preset could not be saved: {error}.")
+                }
+            })?;
         self.entry_for(path)
     }
 
+    /// The listed preset a file was written to. A case-insensitive file
+    /// system writes a name differing only in case into the existing file,
+    /// which keeps its own spelling.
     fn entry_for(&self, path: &Path) -> Result<Entry, String> {
-        self.list()
+        let user: Vec<Entry> = self
+            .list()
             .entries
             .into_iter()
-            .find(|entry| entry.path.as_deref() == Some(path))
+            .filter(|entry| entry.path.is_some())
+            .collect();
+        let folded = |path: &Path| {
+            path.file_name()
+                .map(|name| name.to_string_lossy().to_lowercase())
+        };
+        let exact = user
+            .iter()
+            .find(|entry| entry.path.as_deref() == Some(path));
+        let mut alike = user
+            .iter()
+            .filter(|entry| entry.path.as_deref().and_then(folded) == folded(path));
+        let only_alike = match (alike.next(), alike.next()) {
+            (Some(entry), None) => Some(entry),
+            _ => None,
+        };
+        exact
+            .or(only_alike)
+            .cloned()
             .ok_or_else(|| "The saved preset could not be read back.".into())
     }
 
