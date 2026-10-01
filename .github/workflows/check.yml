@@ -14,6 +14,10 @@ name: check
 # appear. Its legs therefore always start, and every step declines instead,
 # so each leg reports its real name and finishes in seconds.
 #
+# Within `checks`, the reference and model comparisons run only when one of
+# their inputs changed: the frozen 1.4.0 fixture cannot move otherwise, and
+# the model comparison renders nothing that other code can change.
+#
 # `bundles` also waits for `checks`, so the twenty-minute builds are not spent
 # on a change that already failed. Its legs start even when `checks` fails or
 # is skipped; after a failure, or a failed `changes`, each leg fails at once
@@ -40,6 +44,8 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       code: ${{ steps.filter.outputs.code }}
+      reference: ${{ steps.filter.outputs.reference }}
+      model: ${{ steps.filter.outputs.model }}
     steps:
       # The base commit has to be in the clone for the diff below, and neither
       # a pull request's base nor the commit a push started from is reachable
@@ -58,7 +64,7 @@ jobs:
           if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ] \
             || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
             echo "No usable base commit; treating every path as changed."
-            echo "code=true" >> "$GITHUB_OUTPUT"
+            printf 'code=true\nreference=true\nmodel=true\n' >> "$GITHUB_OUTPUT"
             exit 0
           fi
           # On a pull request HEAD is the merge of the head into the base, so
@@ -67,19 +73,25 @@ jobs:
           echo "Changed files:"
           echo "$files"
           code=false
+          reference=false
+          model=false
           while IFS= read -r file; do
             [ -n "$file" ] || continue
             case "$file" in
-              *.md) ;;
-              *)
-                echo "Outside the ignored set: $file"
-                code=true
-                break
-                ;;
+              *.md) continue ;;
+            esac
+            code=true
+            case "$file" in
+              verification/reference/*) reference=true ;;
+            esac
+            case "$file" in
+              src/dsp/* | src/bin/render-model.rs | src/engine.rs | src/presets.rs \
+                | verification/* | Cargo.toml | Cargo.lock | rust-toolchain.toml)
+                model=true ;;
             esac
           done <<< "$files"
-          echo "code=$code"
-          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "code=$code reference=$reference model=$model"
+          printf 'code=%s\nreference=%s\nmodel=%s\n' "$code" "$reference" "$model" >> "$GITHUB_OUTPUT"
 
   checks:
     name: checks (linux)
@@ -104,6 +116,10 @@ jobs:
           # A failed check is the usual outcome, and it must not discard the dependency build.
           cache-on-failure: true
       - run: just ci-checks
+      - run: just reference-check
+        if: needs.changes.outputs.reference == 'true'
+      - run: just model-check
+        if: needs.changes.outputs.model == 'true'
 
   bundles:
     name: bundles (${{ matrix.os }})

@@ -77,8 +77,8 @@ model-check:
     cargo build --quiet --no-default-features --features tools --bin render-model
     python3 verification/model/check.py target/debug/render-model
 
-# Regenerate the measured oversampling and plate-filter evidence.
-dsp-report output="verification/dsp/oversampling-plate.json":
+# Measure oversampling and the plate filter against the legacy path.
+dsp-report output="target/dsp/oversampling-plate.json":
     cargo build --quiet --no-default-features --features tools --bin render-model --bin dsp-probe
     python3 verification/dsp/report.py \
         target/debug/render-model target/debug/dsp-probe "{{ output }}"
@@ -102,13 +102,8 @@ calibrate:
     cargo build --quiet --no-default-features --features tools --bin calibrate
     target/debug/calibrate {{ recording_args }} --data src/dsp/calibration_data.rs
 
-# Fails unless a fresh measurement reproduces the committed level tables.
-calibrate-check:
-    cargo build --quiet --no-default-features --features tools --bin calibrate
-    target/debug/calibrate {{ recording_args }} --data src/dsp/calibration_data.rs --check
-
-# Regenerate the unit-knee seam residuals per factory preset and input level.
-knee-report output="verification/dsp/knee.json":
+# Measure the unit knee's seam residuals per factory preset and input level.
+knee-report output="target/dsp/knee.json":
     cargo build --quiet --no-default-features --features tools --bin render-model
     python3 verification/dsp/knee.py target/debug/render-model "{{ output }}"
 
@@ -219,7 +214,8 @@ promote-check candidate_tag tag record_sha256 directory:
     python3 .github/scripts/release_contract.py verify-candidate \
         "{{ candidate_tag }}" "{{ tag }}" "{{ record_sha256 }}" "{{ directory }}"
 
-# Everything CI's Linux job proves before any bundle is built.
-ci-checks: fmt clippy-all test-all release-tests reference-check model-check calibrate-check validate-assets
+# Everything CI's Linux job proves before any bundle is built, besides the
+# reference and model comparisons, which it runs when their inputs change.
+ci-checks: fmt clippy-all test-all release-tests
 
 ci-bundles: build-standalone (validate "--skip-gui-tests")

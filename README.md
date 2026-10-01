@@ -14,13 +14,13 @@ just
 
 It checks formatting, lints every target with the default features (the plug-in formats and the standalone) and the tools, and runs the crate's tests without the default features. It compiles the format adapters and the standalone but does not run their tests.
 
-CI runs `just ci-checks` on every pull request and every push to master, except for changes to Markdown alone. Beyond the gate it lints without the default features, runs the format adapters' and the vendored standalone host's tests, runs the release-script tests, verifies the [released reference renderer](verification/reference/README.md), compares the legacy path against the ten released factory presets, proves the committed level calibration reproduces, and validates the artwork package. Once those pass, it builds the standalone and runs the bundle validation on macOS and Windows, without signing or secrets.
+CI runs `just ci-checks` on every pull request and every push to master, except for changes to Markdown alone. Beyond the gate it lints without the default features, runs the format adapters' and the vendored standalone host's tests, and runs the release-script tests. When a change reaches their inputs, it also verifies the [released reference renderer](verification/reference/README.md) and compares the legacy path against the ten released factory presets. Once those pass, it builds the standalone and runs the bundle validation on macOS and Windows, without signing or secrets.
 
 Run a part of it locally only when a change touches that area:
 
 - `just release-tests` for the release scripts;
-- `just reference-check`, `just model-check` and `just calibrate-check` for the DSP;
-- `just validate-assets` for artwork or layout;
+- `just reference-check` and `just model-check` for the DSP;
+- `just validate-assets` for artwork layers you have unpacked or rendered;
 - `just clippy-all` and `just test-all` for the vendored host, a format adapter or the standalone.
 
 The offline tools in `src/bin` build only with the `tools` feature, which keeps them out of the format builds; the recipes that run them turn it on.
@@ -64,7 +64,7 @@ The host receives the FIR delay: 32 samples at 2x and 48 at 4x. A factor change 
 just dsp-report
 ```
 
-regenerates the factor, latency, seam-level and aliasing measurements in `verification/dsp/oversampling-plate.json`. It keeps the released knee, tone mapping and level tables in the corrected path so it isolates oversampling and the plate filter, and it checks the active-reset equilibrium across the factory presets, control extremes and supported rates. It says nothing about how the corrected factory presets sound.
+writes the factor, latency, seam-level and aliasing measurements to `target/dsp/oversampling-plate.json`. It keeps the released knee, tone mapping and level tables in the corrected path so it isolates oversampling and the plate filter, and it checks the active-reset equilibrium across the factory presets, control extremes and supported rates. It says nothing about how the corrected factory presets sound.
 
 ### Tone stack
 
@@ -88,7 +88,7 @@ The triode soft clips (grid, bias, plate and compression) use a unit-slope knee.
 just knee-report
 ```
 
-renders every factory preset at 44.1 kHz and 1x with the DI at -12, -6, 0 and +6 dB through the released and the unit knee and writes each seam's RMS ratio and crest-factor change to `verification/dsp/knee.json`. At 0 dB input it requires every triode seam within 0.6 dB of the released level, the tone stack within 1.05 dB, and the power amp, cabinet and output within 0.5 dB.
+renders every factory preset at 44.1 kHz and 1x with the DI at -12, -6, 0 and +6 dB through the released and the unit knee and writes each seam's RMS ratio and crest-factor change to `target/dsp/knee.json`. It fails if a seam at 0 dB input leaves the released level by more than `verification/dsp/knee.py` allows.
 
 ### Grit
 
@@ -104,8 +104,9 @@ The second stage holds loudness: ITU-R BS.1770-4 gated integrated loudness, aver
 
 ```sh
 just calibrate          # rewrite src/dsp/calibration_data.rs, printing every point
-just calibrate-check    # fail if a fresh measurement moves a value by more than 0.05 dB
 ```
+
+`just` tests the result on the same recordings: Drive, Power Drive and Grit at their extremes keep Init's loudness, and at default tone each stack feeds the power stage as 1.4.0 did.
 
 The factory voicing uses these levels, so rerun `just refit` after a calibration change and listen to the result.
 
@@ -218,7 +219,7 @@ just soak-check    # verdict so far, or the final one
 
 `just soak` builds the `soak` tool in release mode and starts four detached runs at 44.1 kHz with Auto oversampling: the shipping path, built as the plug-in engine builds it, for `clean`, `level 11` and Init, plus `level 11` on the legacy path for comparison. Each writes `target/soak/<path>-<preset>.csv` with a `.log`, a `.pid` and the commit it was built from in `target/soak/commit`; `SOAK_DIR` and `SOAK_RUNS` (see `scripts/soak.sh`) choose another directory and set of runs. Each run renders two independent channels: white noise at -40 dBFS RMS, and the same floor with a decaying 110 Hz pluck peaking at -20 dBFS every two seconds. Every 10 seconds of audio a row records output RMS and peak, each seam's RMS, non-finite and subnormal counts, processing time, and the 0.5 to 15 Hz modulation of the RMS envelope.
 
-A shipping-path run passes when no sample is non-finite, its output RMS over the last 30 minutes is within 0.1 dB of the first 30, and its band modulation never exceeds the first 10 minutes' largest value by more than 25 % plus 0.005; a coherent tremolo of about 0.4 dB depth fails. The legacy run is reported, not gated. Four hours of audio take about 25 minutes per run on an Apple M-series core. The soak found the tone-stack Nyquist pole on both paths; the [12-hour runs after the fix](verification/soak/2026-09-23-summary.txt) pass.
+A shipping-path run passes when no sample is non-finite, its output RMS over the last 30 minutes is within 0.1 dB of the first 30, and its band modulation never exceeds the first 10 minutes' largest value by more than 25 % plus 0.005; a coherent tremolo of about 0.4 dB depth fails. The legacy run is reported, not gated. Four hours of audio take about 25 minutes per run on an Apple M-series core. The soak found the tone-stack Nyquist pole on both paths; 12-hour runs after the fix passed.
 
 ## Releasing
 

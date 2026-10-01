@@ -52,11 +52,6 @@ name = "calibrate"
 path = "src/bin/calibrate.rs"
 required-features = ["tools"]
 
-[[test]]
-name = "soak"
-path = "tests/soak.rs"
-required-features = ["tools"]
-
 [features]
 default = ["clap", "vst3", "standalone"]
 clap = ["dep:truce-clap", "dep:clap-sys"]
