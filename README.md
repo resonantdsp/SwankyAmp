@@ -12,16 +12,13 @@ Install Rust through [rustup](https://rustup.rs/) and [just](https://github.com/
 just
 ```
 
-It checks formatting, lints every target with the default features (the plug-in formats and the standalone) and the tools, and runs the crate's tests without the default features. It compiles the format adapters and the standalone but does not run their tests.
+It checks formatting, runs clippy and runs the crate's tests. CI runs the rest on every pull request, as `.github/workflows/check.yml` defines. Run a part of it locally only when a change touches that area:
 
-CI runs `just ci-checks` on every pull request and every push to master, except for changes to Markdown alone. Beyond the gate it lints without the default features, runs the format adapters' and the vendored standalone host's tests, and runs the release-script tests. When a change reaches their inputs, it also verifies the [released reference renderer](verification/reference/README.md) and compares the legacy path against the ten released factory presets. Once those pass, it builds the standalone and runs the bundle validation on macOS and Windows, without signing or secrets.
-
-Run a part of it locally only when a change touches that area:
-
-- `just release-tests` for the release scripts;
-- `just reference-check` and `just model-check` for the DSP;
-- `just validate-assets` for artwork layers you have unpacked or rendered;
-- `just clippy-all` and `just test-all` for the vendored host, a format adapter or the standalone.
+- `just release-tests`: the release scripts' tests;
+- `just reference-check`: the [released reference renderer](verification/reference/README.md) still reproduces its frozen 1.4.0 renders;
+- `just model-check`: the legacy path still matches the released 1.4.0 chain on the ten factory presets;
+- `just validate-assets`: an artwork package matches its receipt and the layers it was packed from;
+- `just clippy-all` and `just test-all`: the vendored host, the format adapters and the standalone.
 
 The offline tools in `src/bin` build only with the `tools` feature, which keeps them out of the format builds; the recipes that run them turn it on.
 
@@ -33,7 +30,7 @@ just validate   # build, install and validate the plug-in bundles
 just run        # open the standalone
 ```
 
-`setup` builds the source-pinned cargo-truce 6.3.0 inside this checkout and downloads checksum-verified pluginval and clap-validator, and on Windows the checksum-verified ASIO SDK. `validate` builds and installs the CLAP and VST3 bundles, and on macOS the Audio Unit, and runs the validators over them, auval among them on macOS.
+`setup` builds the pinned cargo-truce inside this checkout and downloads checksum-verified pluginval and clap-validator, and on Windows the ASIO SDK. `validate` builds and installs the CLAP and VST3 bundles, and on macOS the Audio Unit, and runs the validators over them, auval among them on macOS.
 
 The standalone opens with its input on, since an amplifier with its input off is silent; `--input-enabled off` opts out. Its Settings menu chooses the input, the output and the buffer size (128 samples unless chosen) and remembers them on the machine; `--input`, `--output` and `--buffer` override them for one launch (`cargo run --release -- --help` lists every option). Choosing an audio interface as the input takes the output to it too, unless an output has been chosen, and the input is kept within about one buffer of the output.
 
@@ -41,102 +38,51 @@ On Windows the standalone plays through ASIO when an ASIO driver is installed, a
 
 ## Signal path
 
-The shipping path is the 1.4.0 model with tube-only oversampling, a rate-tracked plate filter, a unit-slope triode knee, a capped Grit mapping, the standard tone-stack mapping, and level compensation recalibrated against the released path. The legacy path keeps every released mapping so that `just model-check` still proves the port against the frozen 1.4.0 renders.
+The shipping path is the 1.4.0 model with tube-only oversampling, a plate filter whose cutoff holds as the oversampled rate changes, a smooth triode knee, a capped Grit mapping, the standard tone-stack mapping, and level compensation recalibrated against 1.4.0. The legacy path keeps every released mapping so that `just model-check` can prove the port against the frozen 1.4.0 renders.
 
-### Model comparison
+Oversampling is set in the editor's header: Auto picks the tube stages' factor from the host's sample rate, or the player fixes one. The plug-in reports the oversampling filter's latency to the host, so changing the factor restarts processing for the host to take up the new latency.
 
-```sh
-just model-check
-just render-model "high gain" /tmp/high-gain.wav
-```
-
-`model-check` renders the ten released factory presets through the legacy path at 44.1 kHz and 1x and compares every active triode, the tone stack, power amp, cabinet and final output with the released chain. The bounds are 0.2 % relative waveform RMS, 0.65 % relative peak error and 0.02 dB in each of a low, mid and high band; the peak bound covers a 0.627 % level-11 power-stage difference measured against a C++ build without floating-point contraction. `render-model` renders one preset and writes its internal seams beside it.
-
-The frozen corpus captures the released cold start, including its 1,024-sample output mute. The Rust path settles its nonlinear state for one second before audio begins, and stages re-enter warm when the Stages control brings them back into the signal path, so the comparison applies the same one-second silent pre-roll to the released chain and excludes it from the measured WAVs.
-
-### Oversampling
-
-Auto oversampling applies to the nonlinear tube stages; the cabinet stays at the host rate. Auto uses 2x at 44.1 and 48 kHz and 1x at 88.2 kHz and above; the fixed 1x, 2x and 4x choices are capped below 193.92 kHz internally. The header button cycles Auto, 1x, 2x and 4x and shows the factor running once audio is prepared, such as "Auto 2×"; it is lit whenever the tube stages oversample or Auto is still choosing. Oversampling is not part of a preset.
-
-The host receives the FIR delay: 32 samples at 2x and 48 at 4x. A factor change requests the host's deactivate/activate sequence in CLAP and VST3; an Audio Unit host is told the new latency and the factor takes effect at its next reset; the standalone rebuilds its output stream on the existing worker. Activation applies the pending factor off the audio thread, and a choice that resolves to the active factor keeps its state without a restart. An active CLAP reset clears processing history at the current factor with a bounded, allocation-free equilibrium calculation. The plate low-pass stays at 20 kHz as the tube rate changes and reproduces the released coefficients at 44.1 kHz.
+These tools render, measure and stress the paths:
 
 ```sh
-just dsp-report
+just render-model "high gain" /tmp/high-gain.wav   # one released preset through the legacy path, with its internal seams
+just dsp-report        # oversampling and the plate filter against the legacy path; also checks the real-time reset
+just knee-report       # the smooth knee against the released one at every seam, per preset and input level
+just tone-stack-soak   # 24 hours of samples through the shipping tone stack; fails on any drift (minutes)
 ```
 
-writes the factor, latency, seam-level and aliasing measurements to `target/dsp/oversampling-plate.json`. It keeps the released knee, tone mapping and level tables in the corrected path so it isolates oversampling and the plate filter, and it checks the active-reset equilibrium across the factory presets, control extremes and supported rates. It says nothing about how the corrected factory presets sound.
+`dsp-report` and `knee-report` write their measurements under `target/dsp/`, and `knee-report` fails if a seam leaves the released level by more than `verification/dsp/knee.py` allows.
 
-### Tone stack
-
-Swanky Amp 1.4.0 discretised its tone stack with the bilinear constant `SR` instead of the standard `2·SR`, which placed every tone-stack feature an octave above the circuit. Version 2 ships the standard mapping. Anyone who wants the old voicing exactly can keep 1.4.0 installed beside version 2.
-
-The three treble sections are first-order circuits, which 1.4.0 discretised as biquads with the second-order terms set to zero. That leaves a pole on the unit circle at Nyquist that only exact arithmetic cancels; rounded to f32 it can sit a few parts in 10⁹ outside the circle (the Marshall treble at 88.2 kHz, the Fender treble at 176.4 kHz and, in the released mapping, at 44.1 kHz), and rounding noise at Nyquist then grows until, after hours of play, it drives the power stage into cutoff. Higher precision alone does not fix it: in f64 the pole sits exactly on the circle. The shipping mapping discretises the treble sections as true first-order filters, which removes the pole without changing the response. The legacy path keeps the released form, and the defect, so the model gate stays bit-identical.
-
-`just` includes a test that the stack falls silent after its input stops at each affected rate. Before a candidate,
-
-```sh
-just tone-stack-soak
-```
-
-drives the shipping tone stack alone for 24 hours of samples at 44.1, 88.2 and 176.4 kHz, level 11 and each stack model with Low, Mid, High and Presence at both extremes, on white noise at the level the stack sees at level 11. It fails if any hour's level moves more than 0.01 dB from the first or its mean exceeds 10⁻⁴ of its RMS, and takes about eight minutes on an Apple M-series machine.
-
-### Soft-clip knee
-
-The triode soft clips (grid, bias, plate and compression) use a unit-slope knee. The released model scaled its cubic clip input by 1/3.4, leaving a corner at every knee; scaling by 1/4 joins the knee smoothly at the cost of slightly less gain between knee and ceiling. Because all five preamp stages compress, the loss compounds, so each triode carries a fixed makeup gain (+0.13, +0.05, +0.13, +0.15 and +0.10 dB for stages 1 to 5), the mean seam residual over the ten factory presets at 0 dB input, which drives each next stage as hard as 1.4.0 did. The tetrode's push-pull clips keep the released curve: ordinary playing sits inside their cubic, where the knee span sets the power stage's bias and gain rather than shaping a knee.
-
-```sh
-just knee-report
-```
-
-renders every factory preset at 44.1 kHz and 1x with the DI at -12, -6, 0 and +6 dB through the released and the unit knee and writes each seam's RMS ratio and crest-factor change to `target/dsp/knee.json`. It fails if a seam at 0 dB input leaves the released level by more than `verification/dsp/knee.py` allows.
-
-### Grit
-
-Grit lowers each triode's grid clip and raises the threshold of its plate compressor. In 1.4.0 the threshold rose by up to 100 of its units; above about 72 the third stage's compressor never charges and the stage clips everything to a constant, which cost 1.4.0 52 dB at full Grit, at every input level. The shipping path stops the threshold at 70, which Grit reaches at 8.5 on its 0 to 10 scale. Below that nothing changes, and the raised threshold had barely begun to reach the signal, so no grit is lost. The lower grid clip still costs 12 dB on the DI at full Grit, which the Grit output gain restores; Grit below its centre does not change the level. The legacy path keeps the released mapping.
+Version 2 ships the standard bilinear tone-stack mapping; 1.4.0's placed every tone-stack feature an octave above the circuit. Anyone who wants the old voicing exactly can keep 1.4.0 installed beside version 2.
 
 ### Level calibration
 
-The level compensation is measured by `calibrate` on the [guitar recordings](verification/reference/input/README.md), staged as that README describes, played at Input 0 and averaged over the two pickups, at 44.1 kHz with Auto oversampling from a settled amplifier, every control but the swept one at its default. The reference is the released path.
-
-The first stage sets how hard the power stage is driven, keeping 1.4.0's structure. The level into the power stage is measured on both paths at each of Drive's eleven table points for each tone stack; the tone-stack scale takes the mean gap and the preamp table each Drive point's departure from it, so real playing drives the power stage as 1.4.0 did. One scale serves all three stacks, so each sits up to half their spread from 1.4.0, and the corrected Fender stack passes more of a humbucker's upper mids than 1.4.0's, so the two pickups land either side of the average. The power table normalises the power amp's output against Power Drive; the cabinet keeps its own fixed scale.
-
-The second stage holds loudness: ITU-R BS.1770-4 gated integrated loudness, averaged in LUFS over the recordings, with the factory defaults' loudness as the target so Init keeps its level. The power table is rescaled point by point to that target, then Drive and Grit each get an output gain table solved the same way. All three gains follow the cabinet, so they change level and nothing else. Stages stays uncompensated, as released.
-
 ```sh
-just calibrate          # rewrite src/dsp/calibration_data.rs, printing every point
+just calibrate   # rewrite src/dsp/calibration_data.rs, printing every point
 ```
 
-`just` tests the result on the same recordings: Drive, Power Drive and Grit at their extremes keep Init's loudness, at default tone each stack feeds the power stage as 1.4.0 did, and the factory defaults play as loud as 1.4.0.
-
-The factory voicing uses these levels, so rerun `just refit` after a calibration change and listen to the result.
+`calibrate` measures the level compensation on the [guitar recordings](verification/reference/input/README.md), against 1.4.0. It keeps the level into the power stage where 1.4.0 had it at every Drive setting, and holds Init's loudness as Drive, Power Drive and Grit move. `just` tests the result on the same recordings: Drive, Power Drive and Grit at their extremes keep Init's loudness, at default tone each stack feeds the power stage as 1.4.0 did, and the factory defaults play as loud as 1.4.0. The factory voicing uses these levels, so rerun `just refit` after a calibration change and listen to the result.
 
 ## Presets
 
 ### Factory bank
 
-The 1.4.0 factory presets were voiced on the octave-high stack, so each is revoiced for the corrected one on the guitar recordings, judged at the output where the player strikes (the loudest 40 % of each recording's momentary-loudness blocks). Low, Mid, High and Presence move on a grid of half marks, between 1 and 9, to bring the balance between sixth-octave bands from 80 Hz to 16 kHz as close to 1.4.0's as the grid allows. Power Drive is set so each preset feeds the power stage as 1.4.0 did, to the nearest half mark, and Output so each strikes as loud as Init on the humbucker. The strike level is the 95th percentile of momentary loudness over the whole recording; integrated loudness would average over the ring-out, where a driven amp sustains and a clean one decays. A clean amp follows the pickup where a driven one does not, so on the single coil the driven presets come out louder than Init. 1.4.0's factory presets were not balanced.
-
 ```sh
 just refit
 ```
 
-rewrites `presets/factory-2.0.xml` and its [voicing report](verification/tone-stack/refit-report.md), which lists each preset's settings, balance, power-stage feed and levels against 1.4.0 and Init. It takes minutes in a release build. The plug-in embeds the bank at build time.
+rewrites `presets/factory-2.0.xml` and its [voicing report](verification/tone-stack/refit-report.md) from the 1.4.0 presets on the guitar recordings. Low, Mid, High and Presence move on half marks to bring each preset's tonal balance as close to 1.4.0's as the corrected stack allows; Power Drive keeps the level 1.4.0 fed the power stage, and Output brings each preset to Init's strike level on the humbucker. It takes minutes in a release build. The plug-in embeds the bank at build time.
 
 Accepted limits of the corrected stack against 1.4.0:
 
-- 1.4.0's scoop sat an octave higher than any setting of the corrected stack can place it, and the corrected Low acts only below about 125 Hz. The voiced presets keep 150 to 400 Hz up to 1.1 dB under 1.4.0 (level 11 up to 2.7 dB) and around 1.3 kHz 0.5 to 2.5 dB over.
+- 1.4.0's scoop sat an octave higher than any setting of the corrected stack can place it, and the corrected Low acts only at the very bottom. The voiced presets therefore keep the low mids under 1.4.0 and the region around 1.3 kHz over it; the [voicing report](verification/tone-stack/refit-report.md)'s Remaining balance table gives the figures.
 - Init is the corrected stack at its defaults and is not revoiced: against 1.4.0 it has 3 to 6.3 dB less between 100 and 400 Hz and 3.8 to 4.7 dB more between 0.8 and 1.6 kHz.
 - 1.4.0's level fell with Drive and Power Drive, differently on each pickup. Version 2 holds Init's level averaged over the pickups, so high Drive and Power Drive play louder against Init than they did in 1.4.0, and each pickup lands up to about 3 dB either side of Init.
+- On the single coil the driven presets come out louder than Init, because a clean amp follows the pickup where a driven one does not. 1.4.0's factory presets were not balanced at all.
 
 These are measured at 44.1 kHz with Auto oversampling on the three tone stacks, not on blends between them.
 
-### The preset bar
-
-The header's preset field shows the current preset's name between `‹` and `›`, which step through the factory presets and then the user's own; a name too long for the field ends in an ellipsis, and hovering the field shows the whole name in the footer. Pressing the name opens the menu: Init, the ten factory presets, the user presets, then Save (a changed user preset), Save as…, Remove (user presets only), Import 1.x presets and Open folder. The menu widens to fit its longest name, up to the window's width, and moves left where it would run past the header's edge; only a name wider than the window ends in an ellipsis there. Save as… always saves into the preset folder under the name typed in the system dialog, so a new name typed while the dialog shows another folder still lands there. It replaces an existing preset only when the dialog returned exactly that file, the one case in which the dialog asked first; any other way to a name already taken saves nothing and says so in the footer. A save writes a temporary file and renames it over the preset, so a crash or a full disk never leaves a preset half written. Remove's first press turns the item into "Remove <name>?" and keeps the menu open; a second press deletes the file, and closing the menu cancels. Init restores every preset control to its default; there is no Reset button.
-
-Choosing a preset sets its controls through the host, so automation and undo see the change, and the selected preset is part of the plug-in state, so a reopened session shows its name. A dot after the name marks a preset changed since it was chosen. The menu capitalises the factory presets like Init; the bank, the saved state and tools such as `just capture-preset` name them in lower case, as 1.4.0 did. As in 1.4.0, Input and the cabinet switch belong to the session: a preset stores them, but choosing one leaves them as they are and changing them does not mark the preset changed.
-
-### User presets
+### Presets on the player's machine
 
 | Platform | Version 2 | Swanky Amp 1.4.0 |
 |---|---|---|
@@ -144,41 +90,35 @@ Choosing a preset sets its controls through the host, so automation and undo see
 | Windows | `%APPDATA%\Resonant DSP\Swanky Amp 2` | `%APPDATA%\Resonant DSP\Swanky Amp` |
 | Linux | `$XDG_DATA_HOME/Resonant DSP/Swanky Amp 2` (default `~/.local/share`) | `~/.config/Resonant DSP/Swanky Amp` |
 
-The version 2 folder is created when first needed: by a save, by Open folder, or by an import, even one that copies nothing. Each preset is one `<name>.xml` file in the 1.x schema, an `APVTSSwankyAmp` element of `<PARAM id value/>` entries under the 1.x parameter ids, so version 2 reads 1.4.0 files, including the migrations 1.4.0 applied to earlier presets, and 1.4.0 can load a version 2 file. A file that is not well-formed or not a Swanky Amp preset is left out of the menu and named in the footer.
+The version 2 folder is created when first needed: by a save, by Open folder, or by an import. Each preset is one `<name>.xml` file in the 1.x schema, so version 2 reads 1.4.0 files and 1.4.0 can load a version 2 file. A file that is not a Swanky Amp preset is left out of the menu and named in the footer. Saving never overwrites another preset unless the system dialog asked first, and a save never leaves a preset half written.
 
-The first time version 2 runs without a preset folder, and on Import 1.x presets, it copies the user's presets from the 1.4.0 folder, which it never modifies. Each imported preset keeps its name and every control except Low, Mid, High and Power Drive. Those are converted by a faster fit than the factory voicing, one the plug-in runs itself: the preset is rendered on the released stack and fitted on the corrected one to match the stack's own output on a generated pluck, with Power Drive moving at most 0.15 and only when the level into the power stage would otherwise change by more than 0.5 dB. Because it judges the stack rather than the output, and a pluck rather than a guitar, imported presets can sound boxier and less scooped than their originals, most where a preset relied on extreme Low, Mid or High. Imported presets keep their Output as it was. The file records `importedFrom` and `refit` attributes. A name already taken in the version 2 folder is kept as it is, and unchanged copies of the 1.4.0 factory presets, which 1.4.0 wrote into its folder, are not copied.
+As in 1.4.0, Input and the cabinet switch belong to the session: a preset stores them, but choosing one leaves them as they are. The selected preset is part of the plug-in state, so a reopened session shows its name.
+
+The first time version 2 runs without a preset folder, and on Import 1.x presets, it copies the player's presets from the 1.4.0 folder, which it never modifies, and skips names already taken and unchanged copies of 1.4.0's factory presets. An imported preset keeps every control except Low, Mid, High and Power Drive, which a quick fit in the plug-in converts for the corrected stack. That fit judges the stack on a generated pluck rather than the output on a guitar, so imported presets can sound boxier and less scooped than their originals, most where a preset relied on extreme Low, Mid or High.
 
 ## Editor
 
-The editor is 864 by 512 interface pixels and uses one iced widget tree for the live controls and the artwork layout contract. The six signal-flow groups (Levels, Cabinet, Preamp, Staging, Power Amp and Tone) are separate rounded boxes on the graphite, each outlined by its own V groove, with 1.4's rose as the accent on the lit rings, the selected outlines and the output meter. The bundled CC BY 4.0 artwork package provides the graphite, brushed metal, shadows and response lighting. Knob markers are glossy black divots. Readouts show whole units at rest and tenths while a knob is dragged.
-
-The cabinet's on/off is a two-position vertical switch: a brushed aluminium disc in a V track baked into the faceplate, the disc in the top half when on and the bottom half when off. While the cabinet is off, its three knobs, labels and readouts are dimmed and stay adjustable.
-
-### Meters
-
-The four meter columns, captioned L and R, are local to each plug-in instance. The blue input pair reads the signal after the Input control; the output pair, in the accent, reads the final signal after the optional cabinet and Output. Cells light from the bottom up. The input meter keeps 1.4.0's scale, -26 to +8 dBFS, without marks, and the player stages the guitar with Input by eye: a light strum peaks about one third of the way up with a single coil, about two thirds with a humbucker. The output meter spans -60 to 0 dBFS, one cell per 6 dB. A mono instance mirrors its reading into L and R. Levels rise immediately and fall to 1/e in 0.3 s, settling to exact darkness, after which the editor has nothing to redraw; the meters also go dark while the window has lost focus and the pointer is elsewhere.
+The six signal-flow groups (Levels, Cabinet, Preamp, Staging, Power Amp and Tone) sit on graphite with 1.4's rose as the accent. The bundled CC BY 4.0 artwork package provides the graphite, brushed metal, shadows and lighting; the text is native. The input meter keeps 1.4.0's scale, so the player stages the guitar with Input by eye as before.
 
 ### Information panel
 
-A small outlined cog button left of the preset bar opens the information panel over the dimmed editor: the product name and running version, such as "Swanky Amp Free 2.0.0"; Interface size; links to the product page, the manual and support, each tagged `utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=information`; Copy diagnostics; and Third-party licences. In the Windows standalone it also shows the ASIO Compatible logo and Steinberg's trademark line. Escape, the button again or a press outside closes it.
+The cog left of the preset bar opens the product name and version, Interface size, links to the product page, the manual and support, Copy diagnostics and Third-party licences. In the Windows standalone it also shows the ASIO Compatible logo and Steinberg's trademark line.
 
-Interface size draws the whole editor at 75, 100, 125 or 150 %. The layout never changes: the widget tree lays out at 864 by 512, the window is that times the size, and native text, knob rings, markers and meters render at the window's real resolution. The editor resizes its own window and asks the host to follow in CLAP, VST3, the Audio Unit and the standalone; it stays fixed-size to hosts, so none offers a drag handle. The size belongs to the computer: it is saved once per installation in `Swanky Amp 2 interface.json`, in `~/Library/Resonant DSP` on macOS, `%APPDATA%\Resonant DSP` on Windows and `$XDG_CONFIG_HOME/Resonant DSP` on Linux, never in presets or host state.
+Interface size draws the editor at 75, 100, 125 or 150 %. It belongs to the computer: it is saved in `Swanky Amp 2 interface.json`, in `~/Library/Resonant DSP` on macOS, `%APPDATA%\Resonant DSP` on Windows and `$XDG_CONFIG_HOME/Resonant DSP` on Linux, never in presets or host state.
 
-Copy diagnostics puts a short block on the clipboard for a support request: product, version and the short commit the build was made from, since a release candidate reports the version of the release it leads to; operating system and architecture, host application and plug-in format, the sample rate and buffer audio last ran at, and the licence. Nothing is sent anywhere.
+Copy diagnostics puts a short block on the clipboard for a support request: product, version and build commit, operating system and architecture, host and plug-in format, the sample rate and buffer audio last ran at, and the licence. Nothing is sent anywhere.
 
 ### Release notice
 
-Opening an editor starts a background check of `https://resonantdsp.com/release-notices/swanky-amp.json`, a document of at most 4 KiB:
+Opening an editor starts a background check of `https://resonantdsp.com/release-notices/swanky-amp.json`:
 
 ```json
 {"schemaVersion":1,"productId":"SwankyAmp","currentVersion":"2.0.1"}
 ```
 
-The website generates it from the promoted release catalogue and emits `"currentVersion":null` until `SwankyAmp` has verified downloads for that version. The plug-in ignores fields it does not know, so the website can add to the document without silencing installed versions. It accepts only a strict stable `major.minor.patch` version and compares it numerically with the running one. When it is strictly newer, the cog turns into a highlighted download arrow and the panel announces the version with a Download link to the fixed URL `https://resonantdsp.com/products/swanky-amp/?utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=release-notice`, opened only on an explicit press; the document cannot choose a link. A missing endpoint, an offline computer, an invalid document and a timeout are all silent.
+The website generates it from the promoted release catalogue and emits `"currentVersion":null` until `SwankyAmp` has verified downloads for that version. The plug-in rejects a document over 4 KiB and ignores fields it does not know, so the website can add to the document, within that size, without silencing installed versions. When the version is a strictly newer stable release, the cog turns into a download arrow and the panel announces it with a Download link to the product page, opened only on an explicit press; the document cannot choose a link. Any failure is silent, and every attempt, successful or not, waits 24 hours before the next. The last answer is kept in `Swanky Amp 2 release notice.json` beside the interface size.
 
-The check has a three-second total timeout and follows no redirects. It keeps its last valid answer, last attempt and last successful check in the process and, when writable, in `Swanky Amp 2 release notice.json` beside the interface size, never in a cache folder that a cleaner empties or a sandboxed host redirects. Successful and failed attempts both wait 24 hours before another request, even when the record cannot be written; invalid or future record timestamps trigger a check. All filesystem and network work stays on the notice worker, outside audio processing.
-
-The request is a bodyless `GET`. So the website can count monthly unique installs without an identifier, it adds `?first=ever` when this computer has no previous successful check, `?first=month` when the previous successful check was in an earlier calendar month (UTC), and no query otherwise; a failed check leaves that record untouched. It sends no custom User-Agent, running version, product key, machine identifier or telemetry. As with any HTTPS request, the website or its delivery provider receives the public IP address and the ordinary connection, TLS, header and timing information needed to serve it.
+The request is a bodyless `GET`. So the website can count monthly unique installs without an identifier, it adds `?first=ever` when this computer has no previous successful check, `?first=month` when the previous successful check was in an earlier calendar month (UTC), and no query otherwise. It sends no custom User-Agent, running version, product key, machine identifier or telemetry. As with any HTTPS request, the website or its delivery provider receives the public IP address and the ordinary connection, TLS, header and timing information needed to serve it.
 
 ### Captures and layout export
 
@@ -193,11 +133,11 @@ just capture-information /tmp/swanky-capture 2.0.1
 just capture-menu "A long preset name of the player's own" /tmp/swanky-capture
 ```
 
-`export-layout` writes the resolved geometry (layout manifest schema 4, with each section's outline radius and the switch track); it works when the artwork package is missing or stale, so a new bake can follow changed geometry. `capture` draws the editor at every interface size at 1x and 2x (`amp-1x.png` and `amp-2x.png` at 100 %, `amp-150-2x.png` and so on), whatever size this machine has chosen, and needs a working GPU adapter. `capture-preset` applies a factory preset and names it in the header, `capture-live` lights the meters with a deterministic stereo note, and `capture-information` opens the information panel, announcing the named release if one is given. `capture-menu` lists the named preset as the player's own, chooses it and opens the preset menu, with the pointer over the field so the footer names it.
+`export-layout` writes the resolved geometry an artwork bake follows; it works when the artwork package is missing or stale. `capture` draws the editor at every interface size and needs a working GPU adapter; the other capture recipes apply a factory preset, light the meters, open the information panel (announcing the named release, if given) or open the preset menu.
 
 ### Artwork
 
-The repository carries the artwork as `assets/artwork.pack` with its `receipt.json` and `ARTWORK-LICENSE.txt` in `assets/artwork`. The editable layers are not committed, since each rebake would add some 30 MB of EXRs; they come from the package. Contributors can make a reproducible round trip without the production renderer: unpack the deterministic RGB9E5 package to ZIP float32 RGB EXRs, edit them in a standard HDR image tool, refresh the receipt, then repack and validate:
+The repository carries the artwork as `assets/artwork.pack` with its `receipt.json` and `ARTWORK-LICENSE.txt` in `assets/artwork`. The editable layers are not committed; they come from the package. To change them, unpack to EXRs and edit in a standard HDR image tool, saving as ZIP-compressed float32 RGB with no alpha (the packer refuses anything else, and many tools default to half float or add alpha); then refresh the receipt, repack and validate:
 
 ```sh
 just unpack-artwork assets/artwork.pack /tmp/swanky-artwork
@@ -206,7 +146,7 @@ just pack-artwork /tmp/swanky-artwork /tmp/swanky-artwork.pack
 just validate-assets /tmp/swanky-artwork.pack /tmp/swanky-artwork
 ```
 
-Packing the unpacked layers unedited reproduces the package byte for byte. To propose an edit, unpack into `assets/artwork` (the EXRs there are ignored by git) and commit the repacked package and refreshed receipt. The base and shadow layers are two texels per interface pixel, exact at 100 % on a Retina display; the package stores every layer as deflated RGB9E5 and adds two box-filtered halvings of the base, shadow and disc sprite, averaged in linear light, for smaller interface sizes. The receipt records the radiance and shadow semantics, dimensions, hashes and public layout provenance; producer metadata is descriptive, so replacement CC artwork needs neither Blender nor the original production sources. `just validate-assets` checks that the package matches its committed receipt and, when layers are present in `assets/artwork` or a given folder, that it is the deterministic result of packing them.
+Packing the unpacked layers unedited reproduces the package byte for byte. To propose an edit, unpack into `assets/artwork` (the EXRs there are ignored by git) and commit the repacked package and refreshed receipt. Replacement artwork needs neither Blender nor the original production sources.
 
 ## Long-run soak
 
@@ -217,9 +157,7 @@ just soak 4        # hours of audio per run, started in the background
 just soak-check    # verdict so far, or the final one
 ```
 
-`just soak` builds the `soak` tool in release mode and starts four detached runs at 44.1 kHz with Auto oversampling: the shipping path, built as the plug-in engine builds it, for `clean`, `level 11` and Init, plus `level 11` on the legacy path for comparison. Each writes `target/soak/<path>-<preset>.csv` with a `.log`, a `.pid` and the commit it was built from in `target/soak/commit`; `SOAK_DIR` and `SOAK_RUNS` (see `scripts/soak.sh`) choose another directory and set of runs. Each run renders two independent channels: white noise at -40 dBFS RMS, and the same floor with a decaying 110 Hz pluck peaking at -20 dBFS every two seconds. Every 10 seconds of audio a row records output RMS and peak, each seam's RMS, non-finite and subnormal counts, processing time, and the 0.5 to 15 Hz modulation of the RMS envelope.
-
-A shipping-path run passes when no sample is non-finite, its output RMS over the last 30 minutes is within 0.1 dB of the first 30, and its band modulation never exceeds the first 10 minutes' largest value by more than 25 % plus 0.005; a coherent tremolo of about 0.4 dB depth fails. The legacy run is reported, not gated. Four hours of audio take about 25 minutes per run on an Apple M-series core. The soak found the tone-stack Nyquist pole on both paths; 12-hour runs after the fix passed.
+`just soak` runs clean, level 11 and Init on the shipping path and one on the legacy path for comparison, on low-level noise and plucks, and writes its results under `target/soak`; `scripts/soak.sh` says how to choose other runs. The verdict fails on non-finite output, level drift or tremolo. Four hours of audio take about 25 minutes per run on an Apple M-series core.
 
 ## Releasing
 
@@ -234,7 +172,7 @@ just version 2.0.1      # updates Cargo.toml, Cargo.lock and CHANGELOG.md; never
 Then, on the merged master commit, which CI has checked:
 
 ```sh
-just tone-stack-soak
+just tone-stack-soak    # must pass before a candidate
 just tag-candidate      # creates the next v2.0.1-rc.N locally
 git push origin v2.0.1-rc.1
 ```
@@ -245,7 +183,7 @@ git push origin v2.0.1-rc.1
 
 Only `vX.Y.Z-rc.N` tags start `.github/workflows/candidate.yml`, and its first job refuses a tag whose commit is not on master; stable `vX.Y.Z` tags never build. A manual run is a rehearsal, accepted only from an administrator-owned `rehearsal/*` branch; its artifacts use the commit hash and it creates no GitHub Release.
 
-The workflow validates the committed artwork and writes the third-party notices before packaging. It builds a universal macOS package signed with the Resonant DSP Developer ID identities, notarized and stapled, and a Windows x64 installer signed through the Free-specific Azure identity and the shared Resonant DSP publisher profile. Both installers offer an install for all users or the current user; both are installed silently for all users on clean runners, pluginval and clap-validator inspect what was installed, and the workflow verifies the publisher identities and that every packaged binary carries the notices. When the release declares a Linux download, the workflow packages it on Ubuntu 22.04, installs and validates the tarball, and records no candidate unless that passes; a release that declares none builds none.
+The workflow validates the committed artwork and writes the third-party notices before packaging. It builds a universal macOS package signed with the Resonant DSP Developer ID identities, notarized and stapled, and a Windows x64 installer signed through the Free-specific Azure identity and the shared Resonant DSP publisher profile. Both installers offer an install for all users or the current user; both are installed silently for all users on clean runners, pluginval and clap-validator inspect what was installed, and the workflow verifies the publisher identities and that every packaged binary carries the notices. When the release declares a Linux download, the workflow packages it on Linux, installs and validates the tarball, and records no candidate unless that passes; a release that declares none builds none.
 
 The final job writes `release-record.json` with the tag, commit, version, toolchain, cargo-truce version, lockfile and artwork hashes, shipping identities, and each artifact's size and SHA-256, and creates a draft GitHub Release once. The workflow refuses an RC tag that already has a release, before any signing and again at the end, so new bytes need a new RC number. A run that failed partway resumes with "Re-run failed jobs", unless it failed after creating the draft, which needs a new RC; re-running all jobs is refused once the draft exists.
 
@@ -276,7 +214,7 @@ Windows signing uses a Free-specific Azure application and service principal wit
 - `TRUCE_AZURE_ACCOUNT`, `TRUCE_AZURE_PROFILE` and `TRUCE_AZURE_ENDPOINT`
 - `WINDOWS_SIGNER_SUBJECT`, the exact subject expected on the installer, CLAP, VST3 and standalone signatures
 
-The workflow downloads Trusted Signing Client 1.0.95, logs in through GitHub OIDC and takes a signing token while the federated assertion is valid. The vendored cargo-truce writes `ExcludeCredentials` so the signing library uses that Azure CLI token instead of hanging in the runner's managed-identity probe. No client secret or signing key exists.
+The workflow logs in through GitHub OIDC and signs with the token that login gives; no client secret or signing key exists.
 
 ## Source and licences
 
@@ -290,7 +228,7 @@ The information panel's Third-party licences link opens the notices the plug-in 
 
 ### Vendored crates
 
-Narrow patches of the published Truce 6.3.0 sources and of baseview, each directory carrying its unchanged upstream licences, original manifest, source reference and an `UPSTREAM.md` describing the local changes:
+Narrow patches of the published Truce sources and of baseview, each directory carrying its unchanged upstream licences, original manifest, source reference and an `UPSTREAM.md` describing the local changes:
 
 - `vendor/baseview-truce`: frame delivery and host keyboard and modifier fixes.
 - `vendor/truce-iced`: iced input, focus, redraw and clipboard fixes.
@@ -298,6 +236,6 @@ Narrow patches of the published Truce 6.3.0 sources and of baseview, each direct
 - `vendor/truce-standalone`: dynamic-latency restart on the output worker, an input kept within about one buffer of the output, a Buffer Size menu, remembered devices and buffer size, and ASIO on Windows.
 - `vendor/truce-core`, `vendor/truce-plugin`, `vendor/truce-loader` and `vendor/truce`: a real-time reset lifecycle hook and its forwarding bridge.
 - `vendor/truce-au`: a latency change reaches the Audio Unit host's property listeners.
-- `vendor/cargo-truce`: the source-only 6.3.0 build tool with the Azure `ExcludeCredentials` patch, the Audio Unit Info.plist patch and the scoped Windows installer name. It is a build tool, not linked into the plug-in. The Truce Framework Rider's Section 2.2 lists audio plug-ins and suites among the uses that are not Covered Framework Offerings.
+- `vendor/cargo-truce`: the source-only build tool with the Azure `ExcludeCredentials` patch, the Audio Unit Info.plist patch and the scoped Windows installer name. It is a build tool, not linked into the plug-in. The Truce Framework Rider's Section 2.2 lists audio plug-ins and suites among the uses that are not Covered Framework Offerings.
 
 Everything else resolves from the pinned Cargo lockfile.
