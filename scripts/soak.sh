@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Starts the release soak as detached processes and reads their verdict, so a
+# Starts the diagnostic soak as detached processes and reads their verdict, so a
 # multi-hour run survives the shell that started it.
 #
 # SOAK_DIR chooses the output directory (default target/soak). SOAK_RUNS
-# replaces the release set with ";"-separated "path|preset|oversampling"
+# replaces the default set with ";"-separated "path|preset|oversampling"
 # entries, for example "corrected|level 11|1x;corrected|init|auto".
 set -euo pipefail
 

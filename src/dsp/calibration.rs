@@ -681,4 +681,28 @@ mod tests {
             );
         }
     }
+
+    /// The factory defaults play at 1.4.0's level. With the cabinet off the
+    /// only departures are the loudness rescale of the power table and
+    /// Drive's correction for missing its target, a few tenths of a dB. With
+    /// the cabinet on, the corrected stack's 3 to 6 dB less between 100 and
+    /// 400 Hz, where most of the cabinet's output lies, lowers the level by
+    /// up to about 2 dB; a power stage or cabinet scale off by more fails.
+    #[test]
+    fn factory_defaults_play_as_loud_as_released() {
+        const AMPLIFIER_TOLERANCE_DB: f64 = 0.5;
+        const CABINET_TOLERANCE_DB: f64 = 2.;
+        let anchor = anchor(&recordings(), LevelTables::CALIBRATED);
+        let amplifier = anchor.output_cabinet_off_db;
+        assert!(
+            amplifier.abs() <= AMPLIFIER_TOLERANCE_DB,
+            "cabinet off, Init plays {amplifier:+.2} dB from 1.4.0 \
+             (tolerance {AMPLIFIER_TOLERANCE_DB} dB)"
+        );
+        let output = anchor.output_db;
+        assert!(
+            output.abs() <= CABINET_TOLERANCE_DB,
+            "Init plays {output:+.2} dB from 1.4.0 (tolerance {CABINET_TOLERANCE_DB} dB)"
+        );
+    }
 }

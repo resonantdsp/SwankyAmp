@@ -65,9 +65,10 @@ const SEAMS: [&str; 9] = [
     "output",
 ];
 const SIGNALS: [Signal; 2] = [Signal::Noise, Signal::Pluck];
+const WINDOW_SECONDS: f64 = 10.;
 
 fn usage() -> String {
-    "usage:\n  soak run --csv PATH [--preset NAME|init] [--presets XML] [--path corrected|legacy]\n           [--oversampling auto|1x|2x|4x]\n           [--hours H | --seconds S] [--window SECONDS] [--signal both|noise|pluck] [--seed N]\n  soak check CSV...".into()
+    "usage:\n  soak run --csv PATH [--preset NAME|init] [--presets XML] [--path corrected|legacy]\n           [--oversampling auto|1x|2x|4x]\n           [--hours H] [--seed N]\n  soak check CSV...".into()
 }
 
 fn option(arguments: &[String], name: &str) -> Option<String> {
@@ -388,22 +389,10 @@ fn run(arguments: &[String]) -> Result<bool, String> {
     let csv = PathBuf::from(option(arguments, "--csv").ok_or_else(usage)?);
     let preset = option(arguments, "--preset").unwrap_or_else(|| "init".into());
     let path = option(arguments, "--path").unwrap_or_else(|| "corrected".into());
-    let seconds = match option(arguments, "--seconds") {
-        Some(_) => parsed(arguments, "--seconds", 0.)?,
-        None => parsed(arguments, "--hours", 4.)? * 3_600.,
-    };
-    let window_seconds: f64 = parsed(arguments, "--window", 10.)?;
+    let seconds = parsed(arguments, "--hours", 4.)? * 3_600.;
+    let window_seconds = WINDOW_SECONDS;
     let seed: u64 = parsed(arguments, "--seed", 1)?;
-    let signals: Vec<Signal> = match option(arguments, "--signal").as_deref() {
-        None | Some("both") => SIGNALS.to_vec(),
-        Some("noise") => vec![Signal::Noise],
-        Some("pluck") => vec![Signal::Pluck],
-        Some(value) => return Err(format!("unknown signal: {value}")),
-    };
     let frames_per_window = (window_seconds * ENVELOPE_RATE).round() as u64;
-    if frames_per_window < 4 {
-        return Err("window must be at least 0.04 s".into());
-    }
     let windows = (seconds / window_seconds).round() as u64;
     if windows == 0 {
         return Err("duration must be at least one window".into());
@@ -431,7 +420,7 @@ fn run(arguments: &[String]) -> Result<bool, String> {
             doublings,
         ))),
     };
-    let mut channels: Vec<Channel> = signals
+    let mut channels: Vec<Channel> = SIGNALS
         .iter()
         .map(|&signal| Channel::new(signal, seed, model()))
         .collect();

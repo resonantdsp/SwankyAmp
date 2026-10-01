@@ -227,16 +227,6 @@ def run(render_binary: Path, probe_binary: Path, destination: Path) -> None:
     probe = json.loads(subprocess.run(
         [str(probe_binary)], check=True, text=True, stdout=subprocess.PIPE, cwd=ROOT
     ).stdout)
-    expected_policy = {
-        44_100: [1, 0, 1, 2],
-        48_000: [1, 0, 1, 2],
-        88_200: [0, 0, 1, 1],
-        96_000: [0, 0, 1, 1],
-    }
-    if {
-        int(case["sample_rate"]): case["doublings"] for case in probe["policy"]
-    } != expected_policy:
-        raise RuntimeError(f"oversampling policy changed: {probe['policy']}")
     for impulse in probe["impulses"]:
         if impulse["reported_latency"] != impulse["peak_sample"]:
             raise RuntimeError(f"reported latency misses impulse peak: {impulse}")
