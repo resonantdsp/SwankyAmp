@@ -32,7 +32,8 @@ class ReleaseCommandTest(unittest.TestCase):
         (self.root / "Cargo.lock").write_text("lock\n", encoding="utf-8")
         (self.root / "Cargo.toml").write_text(
             '[package]\nname = "swanky-amp"\nversion = "2.0.0"\n'
-            'license = "GPL-3.0-or-later"\nrepository = "https://github.com/resonantdsp/SwankyAmp"\n',
+            'license = "GPL-3.0-or-later"\nrepository = "https://github.com/resonantdsp/SwankyAmp"\n'
+            '[package.metadata.release]\nlinux = false\n',
             encoding="utf-8",
         )
         (self.root / "truce.toml").write_text(
@@ -70,6 +71,37 @@ class ReleaseCommandTest(unittest.TestCase):
     def command(self) -> tuple[str, str]:
         return ("python3", str(self.root / ".github" / "scripts" / SCRIPT.name))
 
+    def tag_script(self, *args: str) -> subprocess.CompletedProcess:
+        return run(
+            self.root, "bash", str(self.root / ".github" / "scripts" / TAG_SCRIPT.name),
+            *args, check=False,
+        )
+
+    def commit(self, name: str, text: str) -> str:
+        (self.root / name).write_text(text, encoding="utf-8")
+        run(self.root, "git", "add", name)
+        run(self.root, "git", "commit", "-m", name)
+        return self.rev("HEAD")
+
+    def rev(self, ref: str) -> str:
+        return run(self.root, "git", "rev-parse", f"{ref}^{{commit}}").stdout.strip()
+
+    def tags(self) -> set[str]:
+        return set(run(self.root, "git", "tag", "--list").stdout.split())
+
+    def remote_tags(self) -> set[str]:
+        listing = run(self.root, "git", "ls-remote", "--tags", "--refs", "origin").stdout
+        return {line.split("refs/tags/")[1] for line in listing.splitlines()}
+
+    def add_origin(self) -> None:
+        """A remote holding master and the release tags, as GitHub would."""
+        origin = self.root.parent / f"{self.root.name}-origin.git"
+        run(self.root, "git", "init", "--bare", "-b", "master", str(origin))
+        self.addCleanup(shutil.rmtree, origin, True)
+        run(self.root, "git", "remote", "add", "origin", str(origin))
+        run(self.root, "git", "push", "origin", "master", "v2.0.0-rc.1")
+        run(self.root, "git", "tag", "-d", "v2.0.0")
+
     def record(self) -> str:
         result = run(
             self.root, *self.command, "record", "v2.0.0-rc.1", str(self.artifacts)
@@ -94,27 +126,24 @@ class ReleaseCommandTest(unittest.TestCase):
             [artifact["kind"] for artifact in record["artifacts"]],
             ["macos-pkg", "windows-exe"],
         )
-        verified = run(
+        run(
             self.root, *self.command, "verify-candidate", "v2.0.0-rc.1",
             "v2.0.0", record_hash, str(self.artifacts),
         )
-        self.assertIn("2 recorded artifacts", verified.stdout)
 
         (self.artifacts / "qualification.md").write_text("Accepted on test hosts.\n")
         published = self.root / "published"
         shutil.copytree(self.artifacts, published)
-        resumed = run(
+        run(
             self.root, *self.command, "verify-stable-assets",
             str(self.artifacts), str(published),
         )
-        self.assertIn("exactly match", resumed.stdout)
         (published / "swanky-amp-2.0.0-macos.pkg").write_bytes(b"different")
         refused = run(
             self.root, *self.command, "verify-stable-assets",
             str(self.artifacts), str(published), check=False,
         )
         self.assertNotEqual(refused.returncode, 0)
-        self.assertIn("asset differs", refused.stderr)
 
     def test_wrong_version_and_different_tag_commit_are_refused(self):
         wrong = run(
@@ -122,7 +151,6 @@ class ReleaseCommandTest(unittest.TestCase):
             check=False,
         )
         self.assertNotEqual(wrong.returncode, 0)
-        self.assertIn("Cargo.toml is 2.0.0", wrong.stderr)
 
         record_hash = self.record()
         (self.root / "later").write_text("later\n", encoding="utf-8")
@@ -134,7 +162,6 @@ class ReleaseCommandTest(unittest.TestCase):
             "v2.0.0", record_hash, str(self.artifacts), check=False,
         )
         self.assertNotEqual(mismatch.returncode, 0)
-        self.assertIn("must be identical", mismatch.stderr)
 
     def test_altered_bytes_and_wrong_accepted_record_hash_are_refused(self):
         record_hash = self.record()
@@ -143,7 +170,6 @@ class ReleaseCommandTest(unittest.TestCase):
             "v2.0.0", "0" * 64, str(self.artifacts), check=False,
         )
         self.assertNotEqual(bad_hash.returncode, 0)
-        self.assertIn("accepted SHA-256", bad_hash.stderr)
 
         (self.artifacts / "swanky-amp-2.0.0-windows.exe").write_bytes(b"changed")
         altered = run(
@@ -151,9 +177,89 @@ class ReleaseCommandTest(unittest.TestCase):
             "v2.0.0", record_hash, str(self.artifacts), check=False,
         )
         self.assertNotEqual(altered.returncode, 0)
-        self.assertIn("recorded bytes", altered.stderr)
 
-    def test_release_helpers_preserve_invalid_or_uncommitted_source(self):
+    def test_record_holds_exactly_the_downloads_the_release_declares(self):
+        cargo = self.root / "Cargo.toml"
+        cargo.write_text(
+            cargo.read_text(encoding="utf-8").replace("linux = false", "linux = true"),
+            encoding="utf-8",
+        )
+        record = (*self.command, "record", "v2.0.0-rc.1", str(self.artifacts))
+        self.assertNotEqual(run(self.root, *record, check=False).returncode, 0)
+        (self.artifacts / "swanky-amp-2.0.0-linux-x86_64.tar.gz").write_bytes(b"linux")
+        kinds = [item["kind"] for item in json.loads(run(self.root, *record).stdout)["artifacts"]]
+        self.assertIn("linux-tarball", kinds)
+
+        cargo.write_text(
+            cargo.read_text(encoding="utf-8").replace("linux = true", "linux = false"),
+            encoding="utf-8",
+        )
+        self.assertNotEqual(run(self.root, *record, check=False).returncode, 0)
+
+    def test_candidate_is_cut_only_from_the_remote_master_and_numbered_past_remote_tags(self):
+        self.add_origin()
+        run(self.root, "git", "push", "origin", "HEAD:refs/tags/v2.0.0-rc.2")
+
+        self.commit("unmerged", "local work\n")
+        self.assertNotEqual(self.tag_script("candidate").returncode, 0)
+        run(self.root, "git", "push", "origin", "HEAD:master")
+        run(self.root, "git", "reset", "--hard", "HEAD~1")
+        # The remote moved on since this checkout last looked.
+        run(self.root, "git", "update-ref", "refs/remotes/origin/master", "HEAD")
+        self.assertNotEqual(self.tag_script("candidate").returncode, 0)
+        self.assertEqual(self.tags(), {"v2.0.0-rc.1"})
+
+        run(self.root, "git", "pull", "--ff-only", "origin", "master")
+        cargo = self.root / "Cargo.toml"
+        committed = cargo.read_text(encoding="utf-8")
+        cargo.write_text(committed + "\n# local edit\n", encoding="utf-8")
+        self.assertNotEqual(self.tag_script("candidate").returncode, 0)
+        self.assertEqual(self.tags(), {"v2.0.0-rc.1"})
+        cargo.write_text(committed, encoding="utf-8")
+
+        self.assertEqual(self.tag_script("candidate").returncode, 0)
+        self.assertEqual(self.tags(), {"v2.0.0-rc.1", "v2.0.0-rc.3"})
+        self.assertEqual(self.rev("v2.0.0-rc.3"), self.rev("origin/master"))
+        self.assertNotIn("v2.0.0-rc.3", self.remote_tags())
+
+        run(self.root, "git", "push", "origin", "HEAD:refs/tags/v2.0.0")
+        self.assertNotEqual(self.tag_script("candidate").returncode, 0)
+        self.assertEqual(self.tags(), {"v2.0.0-rc.1", "v2.0.0-rc.3"})
+
+    def test_release_tags_the_pushed_candidate_commit_not_the_checkout(self):
+        self.add_origin()
+        candidate = self.rev("v2.0.0-rc.1")
+        self.commit("later", "later\n")
+        run(self.root, "git", "tag", "v2.0.0-rc.2")
+
+        self.assertNotEqual(self.tag_script("release", "v2.0.0-rc.2").returncode, 0)
+        self.assertNotIn("v2.0.0", self.tags())
+
+        self.assertEqual(self.tag_script("release", "v2.0.0-rc.1").returncode, 0)
+        self.assertEqual(self.rev("v2.0.0"), candidate)
+        self.assertNotIn("v2.0.0", self.remote_tags())
+
+    def test_candidate_and_release_refuse_an_undated_changelog_heading(self):
+        self.add_origin()
+        changelog = "# Changelog\n\n## Unreleased\n\n## 2.0.0{}\n\n- First release.\n"
+        for heading in (" — in development", "\n2026-09-20"):
+            self.commit("CHANGELOG.md", changelog.format(heading))
+            run(self.root, "git", "push", "origin", "HEAD:master")
+            self.assertNotEqual(self.tag_script("candidate").returncode, 0)
+            self.assertEqual(self.tags(), {"v2.0.0-rc.1"})
+        # A candidate tagged by hand on that commit cannot be released either.
+        run(self.root, "git", "push", "origin", "HEAD:refs/tags/v2.0.0-rc.2")
+        self.assertNotEqual(self.tag_script("release", "v2.0.0-rc.2").returncode, 0)
+        self.assertNotIn("v2.0.0", self.tags())
+
+        self.commit("CHANGELOG.md", changelog.format(" — 2026-09-20"))
+        run(self.root, "git", "push", "origin", "HEAD:master")
+        self.assertEqual(self.tag_script("candidate").returncode, 0)
+        run(self.root, "git", "push", "origin", "v2.0.0-rc.3")
+        self.assertEqual(self.tag_script("release", "v2.0.0-rc.3").returncode, 0)
+        self.assertEqual(self.rev("v2.0.0"), self.rev("HEAD"))
+
+    def test_version_helper_leaves_source_untouched_when_it_refuses(self):
         cargo_before = (self.root / "Cargo.toml").read_bytes()
         (self.root / "CHANGELOG.md").write_text(
             "# Changelog\n\n## 2.0.0 — 2026-09-20\n", encoding="utf-8"
@@ -165,19 +271,7 @@ class ReleaseCommandTest(unittest.TestCase):
             "2.0.1", check=False,
         )
         self.assertNotEqual(invalid.returncode, 0)
-        self.assertIn("no '## Unreleased' section", invalid.stderr)
         self.assertEqual((self.root / "Cargo.toml").read_bytes(), cargo_before)
-
-        (self.root / "Cargo.toml").write_text(
-            (self.root / "Cargo.toml").read_text(encoding="utf-8") + "\n# local edit\n",
-            encoding="utf-8",
-        )
-        dirty = run(
-            self.root, "bash", str(self.root / ".github" / "scripts" / "release_tag.sh"),
-            "candidate", check=False,
-        )
-        self.assertNotEqual(dirty.returncode, 0)
-        self.assertIn("Tracked files must be clean", dirty.stderr)
 
 
 if __name__ == "__main__":

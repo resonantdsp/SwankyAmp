@@ -119,7 +119,9 @@ jobs:
           git config --global credential."https://github.com".helper \
             '!f() { printf "username=x-access-token\npassword=%s\n" "$GH_TOKEN"; }; f'
           git clone --depth 1 --branch master "https://github.com/${WEBSITE_REPO}.git" website
-      - name: Prepare and validate the website catalogue change
+      # Before anything is published: the website must accept the entry. Its
+      # date is provisional until the release exists.
+      - name: Check the website accepts the catalogue change
         run: |
           node .github/scripts/website_release.mjs site \
             --record candidate/release-record.json --repository "$PRODUCT_REPOSITORY" \
@@ -168,6 +170,16 @@ jobs:
           echo "RELEASE_URL=$(gh release view "$TAG" --json url --jq .url)" >> "$GITHUB_ENV"
       - name: Prove public GitHub assets still match the qualified record
         run: node .github/scripts/prove_downloads.mjs downloads.json
+      # The release date is the day the stable release was published, so a
+      # rerun on a later day leaves the catalogue unchanged.
+      - name: Date the website catalogue by the published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          published=$(gh release view "$TAG" --json publishedAt --jq .publishedAt)
+          node .github/scripts/website_release.mjs site \
+            --record candidate/release-record.json --repository "$PRODUCT_REPOSITORY" \
+            --tag "$TAG" --site website/site --released-at "${published:0:10}"
       - name: Open the website catalogue pull request
         env:
           GH_TOKEN: ${{ secrets.WEBSITE_TOKEN }}

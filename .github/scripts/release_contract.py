@@ -31,30 +31,46 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def toml_text(path: Path, table: str, key: str) -> str:
+def git(*args: str, root: Path = ROOT) -> str:
+    return subprocess.run(
+        ["git", *args], cwd=root, check=True, capture_output=True, encoding="utf-8"
+    ).stdout.strip()
+
+
+def source(root: Path, name: str, commit: str | None = None) -> str:
+    """A source file from the working tree, or as committed at `commit`."""
+    if commit is None:
+        return (root / name).read_text(encoding="utf-8")
+    return git("show", f"{commit}:{name}", root=root)
+
+
+def toml_value(text: str, table: str, key: str, value: str) -> str:
     current = ""
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for line in text.splitlines():
         stripped = line.strip()
         if stripped.startswith("["):
             current = stripped
             continue
         if current != table:
             continue
-        match = re.fullmatch(rf'{re.escape(key)}\s*=\s*"([^"]+)"\s*', stripped)
+        match = re.fullmatch(rf"{re.escape(key)}\s*=\s*{value}", stripped)
         if match:
             return match.group(1)
-    raise ValueError(f"{path.name} {table} has no string {key}")
+    raise ValueError(f"{table} has no {key}")
 
 
-def git(*args: str, root: Path = ROOT) -> str:
-    return subprocess.run(
-        ["git", *args], cwd=root, check=True, text=True, capture_output=True
-    ).stdout.strip()
+def toml_text(text: str, table: str, key: str) -> str:
+    return toml_value(text, table, key, r'"([^"]+)"')
+
+
+def ships_linux(root: Path = ROOT) -> bool:
+    text = source(root, "Cargo.toml")
+    return toml_value(text, "[package.metadata.release]", "linux", r"(true|false)") == "true"
 
 
 def source_metadata(root: Path = ROOT) -> dict:
-    cargo = root / "Cargo.toml"
-    truce = root / "truce.toml"
+    cargo = source(root, "Cargo.toml")
+    truce = source(root, "truce.toml")
     vendor_id = toml_text(truce, "[vendor]", "id")
     plugin_id = toml_text(truce, "[[plugin]]", "bundle_id")
     return {
@@ -69,8 +85,12 @@ def source_metadata(root: Path = ROOT) -> dict:
     }
 
 
-def version(root: Path = ROOT) -> str:
-    return toml_text(root / "Cargo.toml", "[package]", "version")
+def version(root: Path = ROOT, commit: str | None = None) -> str:
+    return toml_text(source(root, "Cargo.toml", commit), "[package]", "version")
+
+
+def toolchain(root: Path) -> str:
+    return toml_text(source(root, "rust-toolchain.toml"), "[toolchain]", "channel")
 
 
 def tag_version(tag: str, kind: str) -> str:
@@ -82,16 +102,25 @@ def tag_version(tag: str, kind: str) -> str:
     return match.group("version")
 
 
-def validate_source_tag(tag: str, kind: str, root: Path = ROOT) -> str:
+def validate_source_tag(
+    tag: str, kind: str, root: Path = ROOT, commit: str | None = None
+) -> str:
     tagged_version = tag_version(tag, kind)
-    crate_version = version(root)
+    crate_version = version(root, commit)
     if tagged_version != crate_version:
         raise ValueError(
             f"{tag} names {tagged_version}, but Cargo.toml is {crate_version}"
         )
-    changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
-    if not re.search(rf"^## {re.escape(crate_version)}(?:\s|$)", changelog, re.MULTILINE):
+    changelog = source(root, "CHANGELOG.md", commit)
+    heading = re.search(
+        rf"^## {re.escape(crate_version)}(?:[ \t](.*))?$", changelog, re.MULTILINE
+    )
+    if not heading:
         raise ValueError(f"CHANGELOG.md has no '## {crate_version}' section")
+    # The tagged source is public and permanent, so its changelog would say
+    # "in development" for a released version forever.
+    if kind == "stable" and not re.search(r"\b\d{4}-\d{2}-\d{2}\b", heading.group(1) or ""):
+        raise ValueError(f"CHANGELOG.md's '## {crate_version}' heading has no release date")
     return crate_version
 
 
@@ -102,7 +131,7 @@ def artifact_kind(name: str) -> tuple[str, str, str] | None:
     return None
 
 
-def artifacts(directory: Path, release_version: str) -> list[dict]:
+def artifacts(directory: Path, release_version: str, root: Path = ROOT) -> list[dict]:
     found = []
     for path in sorted(directory.iterdir()):
         details = artifact_kind(path.name)
@@ -123,12 +152,9 @@ def artifacts(directory: Path, release_version: str) -> list[dict]:
                 "sha256": sha256(path),
             }
         )
-    actual = [item["kind"] for item in found]
-    mandatory = {"macos-pkg", "windows-exe"}
-    if not mandatory.issubset(actual) or any(actual.count(kind) != 1 for kind in mandatory):
-        raise ValueError("candidate needs exactly one macOS .pkg and Windows .exe")
-    if actual.count("linux-tarball") > 1:
-        raise ValueError("candidate contains more than one Linux bundle")
+    declared = ["macos-pkg", "windows-exe"] + (["linux-tarball"] if ships_linux(root) else [])
+    if sorted(item["kind"] for item in found) != sorted(declared):
+        raise ValueError(f"candidate needs exactly one of each declared download: {', '.join(declared)}")
     return found
 
 
@@ -143,18 +169,17 @@ def make_record(label: str, directory: Path, root: Path = ROOT) -> dict:
     artwork = root / "assets" / "artwork.pack"
     if not artwork.is_file():
         raise ValueError("assets/artwork.pack is missing; merge and validate the public artwork first")
-    toolchain = toml_text(root / "rust-toolchain.toml", "[toolchain]", "channel")
     return {
         "schema": 1,
         "candidate": label,
         "commit": git("rev-parse", "HEAD", root=root),
         "version": release_version,
-        "toolchain": toolchain,
+        "toolchain": toolchain(root),
         "cargo_truce": "6.3.0+resonantdsp.1",
         "cargo_lock_sha256": sha256(root / "Cargo.lock"),
         "artwork_sha256": sha256(artwork),
         "product": source_metadata(root),
-        "artifacts": artifacts(directory, release_version),
+        "artifacts": artifacts(directory, release_version, root),
     }
 
 
@@ -188,7 +213,7 @@ def verify_candidate(
         "candidate": candidate_tag,
         "commit": candidate_commit,
         "version": stable_version,
-        "toolchain": toml_text(root / "rust-toolchain.toml", "[toolchain]", "channel"),
+        "toolchain": toolchain(root),
         "cargo_truce": "6.3.0+resonantdsp.1",
         "cargo_lock_sha256": sha256(root / "Cargo.lock"),
         "artwork_sha256": sha256(root / "assets" / "artwork.pack"),
@@ -201,7 +226,7 @@ def verify_candidate(
     recorded = record.get("artifacts")
     if not isinstance(recorded, list):
         raise ValueError("candidate record has no artifact list")
-    actual = artifacts(directory, stable_version)
+    actual = artifacts(directory, stable_version, root)
     if recorded != actual:
         raise ValueError("candidate artifacts do not match their recorded bytes")
     checksum = directory / "release-record.sha256"
@@ -249,6 +274,7 @@ def main(argv: list[str]) -> int:
     check = commands.add_parser("check-tag")
     check.add_argument("kind", choices=("candidate", "stable"))
     check.add_argument("tag")
+    check.add_argument("--commit", help="check the files committed here, not the working tree")
     record = commands.add_parser("record")
     record.add_argument("label")
     record.add_argument("directory", type=Path)
@@ -261,10 +287,11 @@ def main(argv: list[str]) -> int:
     stable.add_argument("candidate", type=Path)
     stable.add_argument("published", type=Path)
     commands.add_parser("version")
+    commands.add_parser("ships-linux")
     args = parser.parse_args(argv)
     try:
         if args.command == "check-tag":
-            release_version = validate_source_tag(args.tag, args.kind)
+            release_version = validate_source_tag(args.tag, args.kind, commit=args.commit)
             print(f"{args.tag} agrees with Cargo.toml and CHANGELOG.md at {release_version}")
         elif args.command == "record":
             print(json.dumps(make_record(args.label, args.directory), indent=2))
@@ -282,6 +309,8 @@ def main(argv: list[str]) -> int:
         elif args.command == "verify-stable-assets":
             verify_stable_assets(args.candidate, args.published)
             print("Existing stable release assets exactly match the accepted candidate")
+        elif args.command == "ships-linux":
+            print("true" if ships_linux() else "false")
         else:
             print(version())
     except (KeyError, OSError, ValueError, subprocess.CalledProcessError, json.JSONDecodeError) as error:

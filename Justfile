@@ -209,8 +209,9 @@ version version:
 tag-candidate:
     bash .github/scripts/release_tag.sh candidate
 
-tag-release:
-    bash .github/scripts/release_tag.sh release
+# Tag the accepted candidate's commit as the stable release.
+tag-release candidate_tag:
+    bash .github/scripts/release_tag.sh release "{{ candidate_tag }}"
 
 release-check kind tag:
     python3 .github/scripts/release_contract.py check-tag "{{ kind }}" "{{ tag }}"
