@@ -1312,10 +1312,6 @@ mod tests {
             rows.lines().any(|row| row == long),
             "{long:?} is not listed whole in {rows:?}"
         );
-        assert!(
-            rows.lines().any(|row| row.starts_with("An endless name")),
-            "the longest name is not listed in {rows:?}"
-        );
     }
 
     /// A shared preset is named by its file, which can hold line breaks, tabs

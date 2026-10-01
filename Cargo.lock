@@ -3598,6 +3598,7 @@ dependencies = [
  "truce-standalone",
  "truce-test",
  "truce-vst3",
+ "unicode-segmentation",
  "ureq",
  "windows-sys 0.61.2",
 ]
