@@ -232,6 +232,7 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
     type Message = Action;
 
     fn new(params: Arc<SwankyAmpParams>) -> Self {
+        crate::resident::stay_loaded();
         let mut ui = Self {
             releases: Some(release_notice::Service::start()),
             meters: Some(Arc::clone(&params.meter_state)),

@@ -18,8 +18,9 @@ struct Saved {
     size: u16,
 }
 
-/// Where this installation keeps its interface size: JUCE's user application
-/// data folder, where Pro keeps its own beside the licence.
+/// Where this installation keeps its interface size and its release-notice
+/// record: JUCE's user application data folder, where Pro keeps its own
+/// beside the licence.
 pub fn folder() -> Option<PathBuf> {
     if held().is_some() {
         return None;
