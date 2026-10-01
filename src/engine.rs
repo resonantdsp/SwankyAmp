@@ -130,8 +130,12 @@ impl Engine {
             for channel in 0..channels {
                 let input = &buffer.input(channel)[start..start + length];
                 self.observe_input(channel, peak(input) * input_gain);
-                self.scratch[channel][..length].copy_from_slice(input);
-                self.paths[channel].process(&mut self.scratch[channel][..length], self.doublings);
+                let samples = &mut self.scratch[channel][..length];
+                samples.copy_from_slice(input);
+                // A bad sample from upstream becomes a dropout of one sample
+                // rather than a silenced block and a restart of the amp.
+                zero_unplayable(samples);
+                self.paths[channel].process(samples, self.doublings);
                 self.observe_output(channel, peak(&self.scratch[channel][..length]));
                 buffer.output(channel)[start..start + length]
                     .copy_from_slice(&self.scratch[channel][..length]);
@@ -206,6 +210,19 @@ impl Engine {
 /// level never releases.
 fn finite(value: f32) -> f32 {
     if value.is_finite() { value } else { 0. }
+}
+
+/// No signal reaches 120 dB above full scale, while a sample near the largest
+/// finite value overflows the amp's arithmetic and leaves its state stuck in a
+/// way its output cannot show.
+const MAX_INPUT: f32 = 1e6;
+
+fn zero_unplayable(samples: &mut [f32]) {
+    for sample in samples {
+        if sample.is_nan() || sample.abs() > MAX_INPUT {
+            *sample = 0.;
+        }
+    }
 }
 
 fn peak(samples: &[f32]) -> f32 {

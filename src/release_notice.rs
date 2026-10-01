@@ -92,13 +92,12 @@ impl Service {
         static SERVICE: OnceLock<Service> = OnceLock::new();
         let service = SERVICE
             .get_or_init(|| {
-                let cache = dirs::cache_dir().map(|directory| {
-                    directory
-                        .join("Resonant DSP")
-                        .join("Swanky Amp 2")
-                        .join("release-notice.json")
-                });
-                Self::configured(cache, ENDPOINT.into())
+                // Beside the interface size rather than in the cache folder,
+                // which cleaners empty and sandboxed hosts redirect: losing
+                // the record would count this computer as a new install.
+                let record = crate::interface::folder()
+                    .map(|folder| folder.join("Swanky Amp 2 release notice.json"));
+                Self::configured(record, ENDPOINT.into())
             })
             .clone();
         service.schedule(SystemTime::now());
@@ -161,8 +160,10 @@ impl Service {
     }
 }
 
+/// Unknown fields are ignored so a record a later version writes, with more
+/// in it, still carries this computer's last successful check.
 #[derive(Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 struct Cache {
     schema_version: u8,
     product_id: String,
@@ -173,8 +174,10 @@ struct Cache {
     current_version: Option<String>,
 }
 
+/// Unknown fields are ignored: a shipped version can never be taught a new
+/// schema, so the website must be free to add to the document.
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 struct Document {
     schema_version: u8,
     product_id: String,
@@ -610,6 +613,24 @@ mod tests {
         assert_eq!(wait_for_notice(&service).version, "2.0.1");
         cached.finish();
         assert_eq!(cached.requests.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn a_document_with_fields_this_version_does_not_know_still_announces_a_release() {
+        let directory = TestDirectory::new("extended");
+        let body = serde_json::json!({
+            "schemaVersion": 1,
+            "productId": "SwankyAmp",
+            "currentVersion": "2.0.1",
+            "downloadUrl": "https://example.com/elsewhere",
+            "minimumOs": { "macos": "12" },
+        });
+        let mut server = Server::responding(body.to_string().into_bytes());
+        let service = Service::spawn(Some(directory.cache()), server.endpoint.clone(), at(1_000));
+        let notice = wait_for_notice(&service);
+        assert_eq!(notice.version, "2.0.1");
+        assert_eq!(notice.url, CATALOGUE_URL, "the document chose the link");
+        server.finish();
     }
 
     #[test]

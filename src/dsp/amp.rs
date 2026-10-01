@@ -539,6 +539,10 @@ impl AmpChannel {
 
     pub(crate) fn reset_realtime(&mut self, controls: AmpControls) {
         self.configure(controls);
+        self.rest();
+    }
+
+    fn rest(&mut self) {
         self.host.reset_realtime();
         for path in &mut self.oversampled[..self.prepared_doublings] {
             path.settle_equilibrium();
@@ -549,18 +553,32 @@ impl AmpChannel {
         self.high_rate.fill(0.);
     }
 
+    /// Never returns a non-finite sample. The filters keep their output as
+    /// state, so once one goes non-finite it stays so until the next prepare;
+    /// a block that shows it is silenced and the path restarts from rest.
+    /// The tubes are checked as well as the output because the cabinet turns
+    /// what it cannot play into silence, which would hide the poisoned tubes.
     pub(crate) fn process(&mut self, buffer: &mut [f32], doublings: usize) {
         if doublings == 0 {
-            self.host.process(buffer);
-            return;
+            self.host.tubes.process(buffer, None);
+        } else {
+            debug_assert!(doublings <= self.prepared_doublings);
+            let high = &mut self.high_rate[..buffer.len() << doublings];
+            let oversampler = &mut self.oversamplers[doublings - 1];
+            oversampler.up(buffer, high);
+            self.oversampled[doublings - 1].process(high, None);
+            oversampler.down(high, buffer);
         }
-        debug_assert!(doublings <= self.prepared_doublings);
-        let high = &mut self.high_rate[..buffer.len() << doublings];
-        let oversampler = &mut self.oversamplers[doublings - 1];
-        oversampler.up(buffer, high);
-        self.oversampled[doublings - 1].process(high, None);
-        oversampler.down(high, buffer);
+        self.restart_if_non_finite(buffer);
         self.host.finish(buffer, None);
+        self.restart_if_non_finite(buffer);
+    }
+
+    fn restart_if_non_finite(&mut self, buffer: &mut [f32]) {
+        if !buffer.iter().all(|sample| sample.is_finite()) {
+            buffer.fill(0.);
+            self.rest();
+        }
     }
 
     pub(crate) fn process_with_seams(

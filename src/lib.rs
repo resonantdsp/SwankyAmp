@@ -15,6 +15,7 @@ pub mod params;
 pub mod preset_bar;
 pub mod presets;
 pub mod release_notice;
+mod resident;
 pub mod style;
 pub mod ui;
 pub mod widgets;
@@ -436,6 +437,44 @@ mod tests {
         let mut engine = engine::Engine::new(&params);
         engine.reset(&params, 44_100., 0);
         assert!(render(&mut engine, &params, &empty, 64)[0].is_empty());
+    }
+
+    /// A plug-in earlier on the track or a driver glitch can hand over one bad
+    /// sample. The host must never receive a non-finite sample from the amp,
+    /// and the amp must play on rather than fall silent until the next prepare.
+    #[test]
+    fn a_bad_input_sample_never_reaches_the_host_and_the_amp_plays_on() {
+        let rms_db = |samples: &[f32]| {
+            let power =
+                samples.iter().map(|sample| sample * sample).sum::<f32>() / samples.len() as f32;
+            10. * power.log10()
+        };
+        let tone = signal(48_000, 0.);
+        for cabinet in [true, false] {
+            let params = SwankyAmpParams::default();
+            params.cabinet_on.set_value(cabinet);
+            let mut clean = engine::Engine::new(&params);
+            clean.reset(&params, 48_000., 256);
+            let clean = render(&mut clean, &params, std::slice::from_ref(&tone), 256).remove(0);
+            for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, f32::MAX] {
+                let mut glitched = tone.clone();
+                glitched[1_000] = bad;
+                let mut engine = engine::Engine::new(&params);
+                engine.reset(&params, 48_000., 256);
+                let output = render(&mut engine, &params, &[glitched], 256).remove(0);
+                assert!(
+                    output.iter().all(|sample| sample.is_finite()),
+                    "an input sample of {bad} with the cabinet {cabinet} reached the host as a non-finite output"
+                );
+                let tail = 36_000..;
+                let difference = rms_db(&output[tail.clone()]) - rms_db(&clean[tail]);
+                assert!(
+                    difference.abs() < 1.,
+                    "half a second after an input sample of {bad} with the cabinet {cabinet}, \
+                     the amp played {difference:+.1} dB from an undisturbed one"
+                );
+            }
+        }
     }
 
     #[test]

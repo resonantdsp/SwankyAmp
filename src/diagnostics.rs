@@ -30,8 +30,8 @@ impl Audio {
     }
 }
 
-/// Product and version, operating system, host and format, the audio the host
-/// is running, and the licence, one fact per line.
+/// Product, version and commit, operating system, host and format, the audio
+/// the host is running, and the licence, one fact per line.
 pub fn report(params: &SwankyAmpParams) -> String {
     let audio = match params.audio.running() {
         Some((rate, block)) => format!("{rate} Hz, {block}-sample buffer"),
@@ -39,12 +39,21 @@ pub fn report(params: &SwankyAmpParams) -> String {
     };
     format!(
         "Swanky Amp Free {}\nOS: {} ({})\nHost: {}, {}\nAudio: {audio}\nLicence: free, GPL-3.0-or-later",
-        env!("CARGO_PKG_VERSION"),
+        build(),
         os(),
         std::env::consts::ARCH,
         host(),
         FORMAT,
     )
+}
+
+/// The version and, when the build knew it, the short commit, since every
+/// release candidate reports the version of the release it leads to.
+fn build() -> String {
+    match env!("SWANKY_AMP_COMMIT") {
+        "" => env!("CARGO_PKG_VERSION").to_owned(),
+        commit => format!("{} ({commit})", env!("CARGO_PKG_VERSION")),
+    }
 }
 
 /// Each shipped binary is built for exactly one format, so the feature that

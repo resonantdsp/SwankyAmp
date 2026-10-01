@@ -45,6 +45,9 @@ installs beside Swanky Amp 1.4.0.
   discretised as biquads with a spurious pole at Nyquist, which f32 rounding
   placed just outside the unit circle; they are now true first-order filters,
   with the response unchanged.
+- Kept a bad sample from upstream from silencing the amplifier until the
+  host prepares it again: a non-finite or absurdly large input sample plays
+  as a one-sample dropout, and the host never receives a non-finite sample.
 - Joined the triode soft clips' knees smoothly: the released cubic left each
   knee with slope 4/3.4, a corner at every grid, bias, plate and compression
   clip. Each triode stage carries a fixed makeup gain fitted against the
@@ -105,8 +108,8 @@ installs beside Swanky Amp 1.4.0.
 - Added an information panel, opened from the header's cog button: it
   names the product and its version, links to the website, the manual and
   support, and closes with Escape, the button again or a press outside. Its
-  Copy diagnostics link copies the version, system, host and format, sample
-  rate and buffer for a support request, and its Third-party licences link
+  Copy diagnostics link copies the version and build commit, system, host and
+  format, sample rate and buffer for a support request, and its Third-party licences link
   opens the licences of the font and open-source code the product is built
   from, generated from its dependencies.
 - Added an interface size to the information panel: the whole editor at 75,
@@ -122,7 +125,11 @@ installs beside Swanky Amp 1.4.0.
   byte.
 - Added a bounded, cached release notice: the header's cog button turns into
   a highlighted download arrow when a newer stable release is published, and the
-  panel announces it with a link to the fixed catalogue page.
+  panel announces it with a link to the fixed catalogue page. It ignores
+  fields it does not know, so the published document can grow.
+- Kept the plug-in loaded once its editor has opened, so a Windows host that
+  unloads it cannot crash when the release check, the save dialog or a preset
+  import outlives the last instance.
 - Kept the standalone app's input from falling behind its output: a guitar
   played through it stays within about one buffer, where startup, a stall or
   separate input and output devices could leave up to a tenth of a second of
