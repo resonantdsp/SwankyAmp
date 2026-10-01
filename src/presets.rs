@@ -455,6 +455,57 @@ impl Entry {
     }
 }
 
+/// The file `path` names as the folder spells it. A case-insensitive file
+/// system finds "Lead.xml" for "lead.xml", and a save keeps that spelling.
+fn on_disk(path: &Path) -> Option<PathBuf> {
+    if !path.is_file() {
+        return None;
+    }
+    let wanted = path.file_name()?.to_string_lossy().to_lowercase();
+    let mut alike = std::fs::read_dir(path.parent()?)
+        .ok()?
+        .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+        .filter(|candidate| {
+            candidate
+                .file_name()
+                .is_some_and(|name| name.to_string_lossy().to_lowercase() == wanted)
+        });
+    let spelled = match (alike.next(), alike.next()) {
+        (Some(only), None) => only,
+        _ => path.to_owned(),
+    };
+    Some(spelled)
+}
+
+/// Writes a preset whole or not at all: it is the one kind of data here that
+/// cannot be regenerated, so a crash or a full disk mid-write must leave the
+/// previous file rather than a truncated one.
+fn write_whole(target: &Path, contents: &str) -> std::io::Result<()> {
+    static NEXT_TEMPORARY: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let invalid = || std::io::Error::from(std::io::ErrorKind::InvalidInput);
+    let folder = target.parent().ok_or_else(invalid)?;
+    let name = target.file_name().ok_or_else(invalid)?;
+    let temporary = folder.join(format!(
+        ".{}.{}-{}.tmp",
+        name.to_string_lossy(),
+        std::process::id(),
+        NEXT_TEMPORARY.fetch_add(1, Ordering::Relaxed)
+    ));
+    let written = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&temporary)
+        .and_then(|mut file| {
+            file.write_all(contents.as_bytes())?;
+            file.sync_all()
+        })
+        .and_then(|()| std::fs::rename(&temporary, target));
+    if written.is_err() {
+        let _ = std::fs::remove_file(&temporary);
+    }
+    written
+}
+
 /// A preset file's name as the menu lists it. The folder holds files shared
 /// from anywhere, and the field and menu are laid out for a short name on one
 /// line, so the name is cleaned where it enters the listing. A file whose name
@@ -799,6 +850,30 @@ impl Library {
         self.write(&self.path_for(name)?, controls, true)
     }
 
+    /// Saves the controls under the name of the file a save dialog chose,
+    /// always into the preset folder so the menu lists it. The dialog asked
+    /// before replacing only a file in the folder it showed, so a preset of
+    /// that name is replaced only when that folder was the preset folder.
+    pub fn save_chosen(
+        &self,
+        chosen: &Path,
+        name: &str,
+        controls: &AmpControls,
+    ) -> Result<Entry, String> {
+        let path = self.path_for(name)?;
+        let shown_folder = chosen
+            .parent()
+            .and_then(|folder| folder.canonicalize().ok());
+        let preset_folder = path.parent().and_then(|folder| folder.canonicalize().ok());
+        if on_disk(&path).is_some() && (shown_folder.is_none() || shown_folder != preset_folder) {
+            return Err(format!(
+                "Not saved: {} is already a preset. Save it in the preset folder to replace it.",
+                file_name(&path)
+            ));
+        }
+        self.write(&path, controls, true)
+    }
+
     /// Saves the controls into a listed user preset's own file, since its
     /// listed name can read differently from the file's. A file renamed or
     /// removed since it was listed is not written again under its old name.
@@ -807,27 +882,21 @@ impl Library {
     }
 
     fn write(&self, path: &Path, controls: &AmpControls, create: bool) -> Result<Entry, String> {
+        let existing = on_disk(path);
+        if existing.is_none() && !create {
+            return Err(format!(
+                "{} is no longer in the preset folder. Use Save as… to keep this sound.",
+                file_name(path)
+            ));
+        }
+        let target = existing.unwrap_or_else(|| path.to_owned());
         // Resaving an imported preset keeps the record of where it came from.
-        let provenance = std::fs::read_to_string(path)
+        let provenance = std::fs::read_to_string(&target)
             .map(|xml| provenance(&xml))
             .unwrap_or_default();
-        std::fs::OpenOptions::new()
-            .write(true)
-            .truncate(true)
-            .create(create)
-            .open(path)
-            .and_then(|mut file| file.write_all(write_state(controls, &provenance).as_bytes()))
-            .map_err(|error| {
-                if error.kind() == std::io::ErrorKind::NotFound && !create {
-                    format!(
-                        "{} is no longer in the preset folder. Use Save as… to keep this sound.",
-                        file_name(path)
-                    )
-                } else {
-                    format!("The preset could not be saved: {error}.")
-                }
-            })?;
-        self.entry_for(path)
+        write_whole(&target, &write_state(controls, &provenance))
+            .map_err(|error| format!("The preset could not be saved: {error}."))?;
+        self.entry_for(&target)
     }
 
     /// The listed preset a file was written to. A case-insensitive file
@@ -935,23 +1004,16 @@ impl Library {
             let provenance = Provenance {
                 imported_from: Some(source_version),
             };
-            // Another editor may be importing the same folder; whichever
-            // creates the file first keeps it.
-            match std::fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&target)
-            {
-                Ok(mut file) => {
-                    file.write_all(write_state(&controls, &provenance).as_bytes())
-                        .map_err(|error| format!("{reported} could not be written: {error}."))?;
-                    report.imported.push(reported);
-                }
-                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                    report.existing.push(reported);
-                }
-                Err(error) => return Err(format!("{reported} could not be written: {error}.")),
+            // Another editor importing the same folder writes the same
+            // preset, so whichever finishes last replacing the file is
+            // harmless; a preset the player already has is never replaced.
+            if target.exists() {
+                report.existing.push(reported);
+                continue;
             }
+            write_whole(&target, &write_state(&controls, &provenance))
+                .map_err(|error| format!("{reported} could not be written: {error}."))?;
+            report.imported.push(reported);
         }
         Ok(report)
     }

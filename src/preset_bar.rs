@@ -512,8 +512,7 @@ impl PresetBar {
         Ok(())
     }
 
-    /// The name comes from the chosen file; the preset always lands in the
-    /// preset folder so the menu lists it. Some dialogs return the name
+    /// The name comes from the chosen file. Some dialogs return the name
     /// without the extension, so only a trailing .xml is dropped and a name
     /// like "Lead v1.2" keeps its dots.
     fn save_as(&mut self, path: &std::path::Path, params: &ParamCache<SwankyAmpParams>) {
@@ -527,7 +526,9 @@ impl PresetBar {
         }
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_default();
-        let saved = self.library.save(&name, &params.params().snapshot());
+        let saved = self
+            .library
+            .save_chosen(path, &name, &params.params().snapshot());
         if let Err(error) = self.keep(saved, params) {
             self.report(Err(error));
         }
@@ -920,7 +921,12 @@ mod tests {
         );
         press(PresetMsg::Remove);
         assert!(!file.exists(), "confirming Remove kept the preset");
-        assert_eq!(bar.status(), Some("Removed mine"));
+        assert!(
+            Library::with_user_root(Some(root.clone()))
+                .find(&saved.key)
+                .is_none(),
+            "the removed preset is still listed"
+        );
         std::fs::remove_dir_all(root).unwrap();
     }
 
@@ -1027,6 +1033,39 @@ mod tests {
             status.contains("no longer"),
             "Save of a missing preset reported {status:?}"
         );
+    }
+
+    /// The save dialog asks before replacing only a file in the folder it
+    /// shows. Pointed elsewhere, it saw no preset of the typed name, so the
+    /// one in the preset folder is left alone and the sound is not saved.
+    #[test]
+    fn save_as_from_another_folder_never_replaces_a_preset() {
+        let folder = Folder::new("save-as-elsewhere");
+        let elsewhere = folder.root.join("elsewhere");
+        std::fs::create_dir_all(&elsewhere).unwrap();
+        let kept = folder
+            .library()
+            .save("Lead", &AmpControls::default())
+            .unwrap();
+        let before = std::fs::read(kept.path.as_ref().unwrap()).unwrap();
+        let mut bar = PresetBar::with_library(folder.library());
+        folder.turn_output();
+
+        bar.save_as(&elsewhere.join("Lead.xml"), &folder.cache);
+        assert_eq!(
+            std::fs::read(kept.path.as_ref().unwrap()).unwrap(),
+            before,
+            "Save As from another folder replaced the preset folder's Lead"
+        );
+        assert!(bar.status().is_some(), "the refused save said nothing");
+
+        bar.save_as(&elsewhere.join("Rhythm.xml"), &folder.cache);
+        assert_eq!(
+            folder.remembered(),
+            folder.params.snapshot(),
+            "a new name from another folder was not saved into the preset folder"
+        );
+        assert_eq!(folder.files(), ["Lead.xml", "Rhythm.xml", "elsewhere"]);
     }
 
     /// Some save dialogs return the name without the extension.
