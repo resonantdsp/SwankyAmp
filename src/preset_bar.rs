@@ -411,11 +411,12 @@ impl PresetBar {
                 }
             }
             PresetMsg::Save => {
-                let outcome = if self.current.scope == Scope::User {
-                    let name = self.current.name.clone();
-                    self.save_named(&name, params)
-                } else {
-                    Err("Use Save as… to keep a copy of this preset.".into())
+                let outcome = match (&self.current.scope, self.current.path.clone()) {
+                    (Scope::User, Some(path)) => {
+                        let saved = self.library.save_to(&path, &params.params().snapshot());
+                        self.keep(saved, params)
+                    }
+                    _ => Err("Use Save as… to keep a copy of this preset.".into()),
                 };
                 if let Err(error) = outcome {
                     self.report(Err(error));
@@ -493,12 +494,13 @@ impl PresetBar {
         self.current = entry;
     }
 
-    fn save_named(
+    /// Lists and chooses a preset just saved.
+    fn keep(
         &mut self,
-        name: &str,
+        saved: Result<Entry, String>,
         params: &ParamCache<SwankyAmpParams>,
     ) -> Result<(), String> {
-        let entry = self.library.save(name, &params.params().snapshot())?;
+        let entry = saved?;
         self.refresh();
         self.report(Ok(format!("Saved {}", entry.name)));
         self.remember(entry, params.params());
@@ -512,7 +514,8 @@ impl PresetBar {
             .file_stem()
             .map(|stem| stem.to_string_lossy().into_owned())
             .unwrap_or_default();
-        if let Err(error) = self.save_named(&name, params) {
+        let saved = self.library.save(&name, &params.params().snapshot());
+        if let Err(error) = self.keep(saved, params) {
             self.report(Err(error));
         }
     }
@@ -729,15 +732,21 @@ fn fitted(name: &str, mark: &str, room: f32, size: f32) -> String {
     if fits(&whole) {
         return whole;
     }
-    let characters: Vec<char> = name.chars().collect();
-    (0..characters.len())
-        .rev()
-        .map(|kept| {
-            let short: String = characters[..kept].iter().collect();
-            format!("{}…{mark}", short.trim_end())
-        })
-        .find(|short| fits(short))
-        .unwrap_or_else(|| format!("…{mark}"))
+    use unicode_segmentation::UnicodeSegmentation;
+    let clusters: Vec<&str> = name.graphemes(true).collect();
+    let cut = |kept: usize| format!("{}…{mark}", clusters[..kept].concat().trim_end());
+    // Measuring is what costs, so the cut is found by bisection rather than by
+    // trying every length.
+    let (mut fitting, mut over) = (0, clusters.len());
+    while over - fitting > 1 {
+        let kept = (fitting + over) / 2;
+        if fits(&cut(kept)) {
+            fitting = kept;
+        } else {
+            over = kept;
+        }
+    }
+    cut(fitting)
 }
 
 /// Pro's selector menu: a raised dark panel sharing the controls' corner
@@ -820,6 +829,53 @@ mod tests {
     use super::*;
     use crate::NullHost;
     use crate::dsp::amp::AmpControls;
+
+    /// A shared file's name can read differently once listed: a double space
+    /// collapses and a zero-width character is dropped. Saving that preset
+    /// must rewrite its own file, never write a second one under the listed
+    /// name, which could replace another preset.
+    #[test]
+    fn saving_a_user_preset_rewrites_its_own_file() {
+        use truce::prelude::Params;
+        let root = std::env::temp_dir().join(format!("swanky-save-own-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let library = Library::with_user_root(Some(root.clone()));
+        let plain = library.save("plain", &AmpControls::default()).unwrap();
+        let plain = plain.path.unwrap();
+        let params = Arc::new(SwankyAmpParams::default());
+        let cache = ParamCache::new(Arc::clone(&params));
+        let ctx = PluginContext::new(Arc::new(NullHost), Arc::clone(&params));
+        let mut bar = PresetBar::with_library(library);
+        for name in ["Double  space", "Zero\u{200B}width"] {
+            let file = root.join(format!("{name}.xml"));
+            std::fs::copy(&plain, &file).unwrap();
+            let before = std::fs::read(&file).unwrap();
+            let files = || {
+                let mut names: Vec<_> = std::fs::read_dir(&root)
+                    .unwrap()
+                    .map(|entry| entry.unwrap().file_name())
+                    .collect();
+                names.sort();
+                names
+            };
+            let listed = files();
+
+            bar.update(PresetMsg::Select(format!("user:{name}.xml")), &cache, &ctx);
+            params.set_plain(params.output.id(), 0.5);
+            bar.update(PresetMsg::Save, &cache, &ctx);
+            assert_eq!(
+                files(),
+                listed,
+                "saving {name:?} changed the folder's files"
+            );
+            assert_ne!(
+                std::fs::read(&file).unwrap(),
+                before,
+                "saving {name:?} left its file as it was"
+            );
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn remove_deletes_a_user_preset_only_when_pressed_twice() {

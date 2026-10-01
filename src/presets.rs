@@ -448,15 +448,109 @@ impl Entry {
                 "user:{}",
                 path.file_name().unwrap_or_default().to_string_lossy()
             ),
-            name: path
-                .file_stem()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .into_owned(),
+            name: file_name(&path),
             scope: Scope::User,
             path: Some(path),
         }
     }
+}
+
+/// A preset file's name as the menu lists it. The folder holds files shared
+/// from anywhere, and the field and menu are laid out for a short name on one
+/// line, so the name is cleaned where it enters the listing. A file whose name
+/// has nothing visible left is listed as Untitled; its key keeps the file name.
+fn file_name(path: &Path) -> String {
+    shown(&path.file_stem().unwrap_or_default().to_string_lossy())
+}
+
+/// A name from the preset folder or a 1.x folder as menus and messages show it.
+fn shown(raw: &str) -> String {
+    Some(listed(raw))
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| "Untitled".into())
+}
+
+/// The most grapheme clusters a listed name keeps, its ellipsis
+/// included; the menu cannot show more on one line, and fitting a longer one
+/// would cost every redraw.
+const NAME_LIMIT: usize = 128;
+/// The visible characters read before the cap applies, so a cluster stacking
+/// endless marks cannot make cleaning or measuring unbounded.
+const READ_LIMIT: usize = 8 * NAME_LIMIT;
+
+/// `raw` as one line of visible text: line breaks, tabs and other control
+/// characters become spaces, zero-width characters and those that reorder
+/// the text around them are dropped so they cannot disguise a name, runs of
+/// space collapse, and the result is trimmed. One longer than [`NAME_LIMIT`]
+/// is cut between clusters to end in an ellipsis, so the player can tell it
+/// was cut. A name with nothing that draws is empty.
+fn listed(raw: &str) -> String {
+    use unicode_segmentation::UnicodeSegmentation;
+    let mut text = String::new();
+    let mut read = 0;
+    let mut gap = false;
+    let mut overflow = false;
+    for character in raw.chars() {
+        if invisible(character) {
+            continue;
+        }
+        if character.is_whitespace() || character.is_control() {
+            gap = !text.is_empty();
+            continue;
+        }
+        if read == READ_LIMIT {
+            overflow = true;
+            break;
+        }
+        if gap {
+            text.push(' ');
+            gap = false;
+        }
+        text.push(character);
+        read += 1;
+    }
+    if text.chars().all(blank) {
+        return String::new();
+    }
+    let clusters: Vec<&str> = text.graphemes(true).collect();
+    if !overflow && clusters.len() <= NAME_LIMIT {
+        return text;
+    }
+    let kept = (NAME_LIMIT - 1).min(clusters.len() - 1);
+    format!("{}…", clusters[..kept].concat().trim_end())
+}
+
+/// Zero-width and bidirectional formatting characters.
+fn invisible(character: char) -> bool {
+    matches!(
+        character,
+        '\u{00AD}'
+            | '\u{061C}'
+            | '\u{180E}'
+            | '\u{200B}'
+            | '\u{200E}'..='\u{200F}'
+            | '\u{202A}'..='\u{202E}'
+            | '\u{2060}'..='\u{206F}'
+            | '\u{FEFF}'
+            | '\u{FFF9}'..='\u{FFFB}'
+    )
+}
+
+/// Characters a name keeps that draw nothing on their own: the joiners, which
+/// shape their neighbours (Persian spelling, emoji sequences), and the filler
+/// letters of Hangul and braille.
+fn blank(character: char) -> bool {
+    matches!(
+        character,
+        ' ' | '\u{034F}'
+            | '\u{115F}'
+            | '\u{1160}'
+            | '\u{200C}'
+            | '\u{200D}'
+            | '\u{2800}'
+            | '\u{3164}'
+            | '\u{FFA0}'
+    )
 }
 
 /// Where version 2 keeps the user's presets: the platform's audio preset
@@ -624,18 +718,12 @@ impl Library {
         };
         let mut user = Vec::new();
         for path in xml_files(root) {
-            let Some(stem) = path
-                .file_stem()
-                .map(|stem| stem.to_string_lossy().into_owned())
-            else {
-                continue;
-            };
             match std::fs::read_to_string(&path)
                 .map_err(|error| error.to_string())
                 .and_then(|xml| parse_state(&xml))
             {
                 Ok(_) => user.push(Entry::user(path)),
-                Err(_) => listing.unreadable.push(stem),
+                Err(_) => listing.unreadable.push(file_name(&path)),
             }
         }
         user.sort_by_key(|entry| entry.name.to_lowercase());
@@ -708,14 +796,20 @@ impl Library {
 
     /// Saves the controls as a user preset, replacing one of the same name.
     pub fn save(&self, name: &str, controls: &AmpControls) -> Result<Entry, String> {
-        let path = self.path_for(name)?;
+        self.save_to(&self.path_for(name)?, controls)
+    }
+
+    /// Saves the controls into a user preset's file, replacing it. Saving a
+    /// listed preset goes to its own file, since its listed name can read
+    /// differently from the file's.
+    pub fn save_to(&self, path: &Path, controls: &AmpControls) -> Result<Entry, String> {
         // Resaving an imported preset keeps the record of where it came from.
-        let provenance = std::fs::read_to_string(&path)
+        let provenance = std::fs::read_to_string(path)
             .map(|xml| provenance(&xml))
             .unwrap_or_default();
-        std::fs::write(&path, write_state(controls, &provenance))
+        std::fs::write(path, write_state(controls, &provenance))
             .map_err(|error| format!("The preset could not be saved: {error}."))?;
-        self.entry_for(&path)
+        self.entry_for(path)
     }
 
     fn entry_for(&self, path: &Path) -> Result<Entry, String> {
@@ -749,17 +843,19 @@ impl Library {
         for path in xml_files(source) {
             let stem = path.file_stem().unwrap_or_default().to_string_lossy();
             let name = legacy_name(&stem).to_owned();
+            // The file keeps its own name; reports name it as the menu will.
+            let reported = shown(&name);
             let xml = match std::fs::read_to_string(&path) {
                 Ok(xml) => xml,
                 Err(_) => {
-                    report.unreadable.push(name);
+                    report.unreadable.push(reported);
                     continue;
                 }
             };
             let preset = match parse_state(&xml) {
                 Ok(preset) => preset,
                 Err(_) => {
-                    report.unreadable.push(name);
+                    report.unreadable.push(reported);
                     continue;
                 }
             };
@@ -771,11 +867,11 @@ impl Library {
                 continue;
             }
             let Ok(target) = self.path_for(&name) else {
-                report.unreadable.push(name);
+                report.unreadable.push(reported);
                 continue;
             };
             if target.exists() {
-                report.existing.push(name);
+                report.existing.push(reported);
                 continue;
             }
             let input = pluck.get_or_insert_with(|| refit::pluck(refit::SAMPLE_RATE));
@@ -808,13 +904,13 @@ impl Library {
             {
                 Ok(mut file) => {
                     file.write_all(write_state(&controls, &provenance).as_bytes())
-                        .map_err(|error| format!("{name} could not be written: {error}."))?;
-                    report.imported.push(name);
+                        .map_err(|error| format!("{reported} could not be written: {error}."))?;
+                    report.imported.push(reported);
                 }
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                    report.existing.push(name);
+                    report.existing.push(reported);
                 }
-                Err(error) => return Err(format!("{name} could not be written: {error}.")),
+                Err(error) => return Err(format!("{reported} could not be written: {error}.")),
             }
         }
         Ok(report)
