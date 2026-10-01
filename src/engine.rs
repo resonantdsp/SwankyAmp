@@ -128,14 +128,15 @@ impl Engine {
         while start < frames {
             let length = (frames - start).min(capacity);
             for channel in 0..channels {
-                let input = &buffer.input(channel)[start..start + length];
-                self.observe_input(channel, peak(input) * input_gain);
                 let samples = &mut self.scratch[channel][..length];
-                samples.copy_from_slice(input);
-                // A bad sample from upstream becomes a dropout of one sample
-                // rather than a silenced block and a restart of the amp.
+                samples.copy_from_slice(&buffer.input(channel)[start..start + length]);
+                // The soft clips hide poisoned filters from the output, so
+                // one bad sample from upstream would otherwise leave the amp
+                // silent until the next prepare with nothing to detect it by.
                 zero_unplayable(samples);
+                let input_peak = peak(samples);
                 self.paths[channel].process(samples, self.doublings);
+                self.observe_input(channel, input_peak * input_gain);
                 self.observe_output(channel, peak(&self.scratch[channel][..length]));
                 buffer.output(channel)[start..start + length]
                     .copy_from_slice(&self.scratch[channel][..length]);

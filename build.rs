@@ -44,14 +44,13 @@ fn commit() {
     };
     let commit = git(&["rev-parse", "--short=7", "HEAD"]).unwrap_or_default();
     println!("cargo:rustc-env=SWANKY_AMP_COMMIT={commit}");
-    // A commit moves HEAD, or the branch HEAD names.
-    let mut watched = vec!["HEAD".to_owned()];
-    watched.extend(git(&["symbolic-ref", "-q", "HEAD"]));
-    for reference in watched {
-        if let Some(path) = git(&["rev-parse", "--git-path", &reference])
-            && Path::new(&path).exists()
-        {
-            println!("cargo:rerun-if-changed={path}");
-        }
+    // Every commit appends to HEAD's reflog, even once `git gc` has packed
+    // the branch ref; HEAD itself is the fallback where no reflog is kept.
+    let watched = ["logs/HEAD", "HEAD"]
+        .into_iter()
+        .filter_map(|name| git(&["rev-parse", "--git-path", name]))
+        .find(|path| Path::new(path).exists());
+    if let Some(path) = watched {
+        println!("cargo:rerun-if-changed={path}");
     }
 }

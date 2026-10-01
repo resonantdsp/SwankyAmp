@@ -5,7 +5,11 @@
 //! library when its last instance goes, and a thread still running then would
 //! return into unmapped code and take the host down. Pinning the library
 //! before the first of them starts costs one mapping that outlives the last
-//! instance. macOS does not unload a bundle's image in practice.
+//! instance. macOS does not unload a bundle's image in practice. A Linux
+//! host that unloads the library can crash the same way; that is left
+//! because the Linux package is best effort, shipped only when its own
+//! validation passes, and pinning there needs `dladdr` and `dlopen`, which
+//! the Linux build has no dependency for.
 
 #[cfg(windows)]
 pub(crate) fn stay_loaded() {

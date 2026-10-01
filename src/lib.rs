@@ -470,7 +470,7 @@ mod tests {
                 let difference = rms_db(&output[tail.clone()]) - rms_db(&clean[tail]);
                 assert!(
                     difference.abs() < 1.,
-                    "half a second after an input sample of {bad} with the cabinet {cabinet}, \
+                    "three quarters of a second after an input sample of {bad} with the cabinet {cabinet}, \
                      the amp played {difference:+.1} dB from an undisturbed one"
                 );
             }

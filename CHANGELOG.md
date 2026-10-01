@@ -109,9 +109,9 @@ installs beside Swanky Amp 1.4.0.
   names the product and its version, links to the website, the manual and
   support, and closes with Escape, the button again or a press outside. Its
   Copy diagnostics link copies the version and build commit, system, host and
-  format, sample rate and buffer for a support request, and its Third-party licences link
-  opens the licences of the font and open-source code the product is built
-  from, generated from its dependencies.
+  format, sample rate and buffer for a support request, and its Third-party
+  licences link opens the licences of the font and open-source code the
+  product is built from, generated from its dependencies.
 - Added an interface size to the information panel: the whole editor at 75,
   100, 125 or 150 %, with the same layout and native text drawn sharp at every
   size. The editor resizes its window and asks the host to follow in CLAP,
