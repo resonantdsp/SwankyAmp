@@ -1,5 +1,5 @@
-//! One line about the input that the player has to see, such as why it is
-//! off at launch and what turns it on.
+//! One line about the devices that the player has to see: why the input is
+//! off, or that the output stopped and what brings the sound back.
 //!
 //! A windowed app has no console, so the line goes to a sink the plugin
 //! author supplies through [`crate::Defaults`], which shows it in the
@@ -12,7 +12,15 @@ use std::sync::{Mutex, OnceLock};
 pub type Sink = fn(Option<&str>);
 
 static SINK: OnceLock<Sink> = OnceLock::new();
-static INPUT: Mutex<Option<String>> = Mutex::new(None);
+static LINES: Mutex<Lines> = Mutex::new(Lines {
+    input: None,
+    output: None,
+});
+
+struct Lines {
+    input: Option<String>,
+    output: Option<String>,
+}
 
 pub(crate) fn set_sink(sink: Sink) {
     let _ = SINK.set(sink);
@@ -20,21 +28,34 @@ pub(crate) fn set_sink(sink: Sink) {
 
 /// Why the input is off, or `None` once it is on.
 pub(crate) fn input(line: Option<String>) {
-    let Ok(mut shown) = INPUT.lock() else {
+    post(|lines| lines.input = line);
+}
+
+/// That the output stopped and what brings the sound back, or `None` once
+/// the player has chosen an output again.
+pub(crate) fn output(line: Option<String>) {
+    post(|lines| lines.output = line);
+}
+
+fn post(change: impl FnOnce(&mut Lines)) {
+    let Ok(mut lines) = LINES.lock() else {
         return;
     };
-    if let Some(line) = &line {
+    change(&mut lines);
+    // A stopped output is the bigger surprise, and its line says what
+    // became of the input too.
+    let shown = lines.output.as_deref().or(lines.input.as_deref());
+    if let Some(line) = shown {
         eprintln!("{line}");
     }
     if let Some(sink) = SINK.get() {
-        sink(line.as_deref());
+        sink(shown);
     }
-    *shown = line;
 }
 
 /// Whether a line about the input is showing.
 pub(crate) fn input_showing() -> bool {
-    INPUT.lock().is_ok_and(|shown| shown.is_some())
+    LINES.lock().is_ok_and(|lines| lines.input.is_some())
 }
 
 /// The input toggle as the player finds it: the Settings menu item and its
@@ -45,6 +66,14 @@ pub(crate) const MIC_INPUT: &str = if cfg!(target_os = "macos") {
     "press Ctrl+I"
 } else {
     "turn on Mic Input (Ctrl+I)"
+};
+
+/// How the player chooses an output device: the Settings menu, or on Linux
+/// the launch flag.
+pub(crate) const CHOOSE_OUTPUT: &str = if cfg!(target_os = "linux") {
+    "relaunch with --output <device>"
+} else {
+    "choose it in Settings › Output Device"
 };
 
 /// How the player chooses an input device: the Settings menu, or on Linux

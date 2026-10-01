@@ -47,15 +47,14 @@ the --driver flag overrides it for one launch. An ASIO interface is one device
 for input and output: both device submenus list the installed ASIO drivers,
 and the interface is saved apart from the WASAPI devices. A buffer's input
 reaches the output in that same buffer. Streams convert to the device's sample
-format, which for ASIO is commonly 32-bit integers (`format.rs`); a driver's
-reset request reopens the streams; and a driver or interface switch that lands
+format, which for ASIO is commonly 32-bit integers (`format.rs`); and a driver or interface switch that lands
 on a device that cannot run the current rate prepares the plugin again at the
 device's rate. The fork depends on cpal 0.18, whose ASIO backend fixes duplex
 streams and driver reloading, and so on midir 0.11, which shares its ALSA
 bindings; neither adds a crate to the macOS or Windows builds. ASIO is a
 registered trademark of Steinberg Media Technologies GmbH.
 
-A latency restart reaches the output worker the way a driver's reset request
+A latency restart reaches the output worker the way a stream's reset request
 does, through the worker's bounded command queue by a weak handle, so the
 worker still ends with the host, and it reopens the device the streams run on
 rather than looking one up again.
@@ -90,7 +89,23 @@ the menu are saved with the devices (`input_channels`), and
 `--input-channels` overrides them for one launch; a saved channel the
 device does not have is left unused.
 
+The published standalone prints every stream error to a console a
+windowed app does not have, so an unplugged device left it silent with no
+word. Here any backend's report that a stream's device went away or that the
+stream must be rebuilt, which includes an ASIO driver asking to be reset
+after its settings change, reaches the output worker the same way. The
+worker looks the device up again and tries the one it ran on once more;
+when neither opens, the output stays closed rather than move to another
+device, which could be the built-in speakers beside a built-in microphone.
+The flag the audio callback reads for the input is cleared first, and the
+line says the device was disconnected only when the backend said so, and
+what brings the sound back. An input stream whose device goes away turns
+the input off with a line; turning it on again opens a new stream. A reopen
+that works leaves any line in place: only the player choosing an output, a
+driver or the input clears one.
+
 The buffer, device, ring, ASIO and zoom-pin changes follow the same fixes in Swanky Amp
-Pro's copy of this crate. Keep these fixes here until a pinned upstream
+Pro's copy of this crate; the input-choice and device-loss changes are this
+copy's own. Keep these fixes here until a pinned upstream
 release includes equivalent handling; remove the Cargo patch and this
 directory together when upgrading to that release.

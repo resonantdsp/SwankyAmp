@@ -153,6 +153,10 @@ installs beside Swanky Amp 1.4.0.
   `--input-enabled on` or `off` overrides that for one launch.
 - Remembered the standalone app's input channels, so a guitar on input 2 is
   heard at the next launch.
+- Told the player when the standalone app loses a device: a lost output is
+  tried once more and otherwise stays stopped with the input off, and a
+  lost input turns the input off, each with a line in the footer saying how
+  to get the sound back.
 - The Windows standalone app plays through an audio interface's own ASIO®
   driver when one is installed, instead of the Windows shared audio path,
   which adds about 10 ms in each direction. The Settings menu gains an Audio

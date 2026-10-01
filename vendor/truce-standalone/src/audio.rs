@@ -527,8 +527,9 @@ enum OutputCmd {
     /// plugin output onto it), so an asymmetric layout or a width the device
     /// can't open natively still works.
     SetLayout { index: usize },
-    /// The driver asked to be reset, which it does when its own settings
-    /// change, such as a buffer size set in its control panel.
+    /// A stream lost its device or must be rebuilt: an ASIO driver asks
+    /// for this when its own settings change, such as a buffer size set in
+    /// its control panel, and any backend reports a device that went away.
     Reset,
 }
 
@@ -1133,6 +1134,7 @@ pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, B
         buffer_frames: Arc::clone(&buffer_frames),
         sample_rate: stream_rate,
         reset_pending: Arc::new(AtomicBool::new(false)),
+        device_gone: Arc::new(AtomicBool::new(false)),
         commands: Arc::downgrade(&output_controller.cmd_tx),
         output_chosen,
         input_cmd: input_controller.cmd_tx.clone(),
@@ -1621,9 +1623,12 @@ struct OutputResources<P: PluginExport> {
     buffer_frames: Arc<AtomicU32>,
     /// Sample rate the streams run at; the input worker opens at it too.
     sample_rate: Arc<AtomicU32>,
-    /// Set while an ASIO driver's reset request waits for the worker, so a
-    /// burst of them, one from each stream, reopens the streams once.
+    /// Set while a stream's reset request waits for the worker, so a burst
+    /// of them, one from each stream, reopens the streams once.
     reset_pending: Arc<AtomicBool>,
+    /// Set when a stream reported its device gone rather than changed, so
+    /// the player is told it was disconnected only when it was.
+    device_gone: Arc<AtomicBool>,
     /// Where the streams send a reset request or a latency restart. Weak,
     /// so the worker still exits when the controllers are dropped.
     commands: Weak<mpsc::SyncSender<OutputCmd>>,
@@ -1826,6 +1831,7 @@ impl<P: PluginExport> OutputWorker<P> {
         if !self.switch_device(name) {
             return;
         }
+        notice::output(None);
         let chosen = self.current_name();
         if driver::on_asio() {
             if notice::input_showing()
@@ -1852,6 +1858,7 @@ impl<P: PluginExport> OutputWorker<P> {
         }
         match self.switch_driver(target) {
             Ok(()) => {
+                notice::output(None);
                 vlog!("audio driver: {}", target.name());
                 self.res.settings.update(|s| s.driver = Some(target));
             }
@@ -2004,21 +2011,50 @@ impl<P: PluginExport> OutputWorker<P> {
         }
     }
 
-    /// Answer an ASIO driver's reset request. ASIO asks for the driver to
-    /// be initialised again, and its settings may have changed, so the
-    /// device is looked up again to learn them.
+    /// Answer a stream that lost its device or must be rebuilt, such as an
+    /// ASIO driver asking to be initialised again after its settings
+    /// changed. The device is looked up again to learn its settings, and
+    /// the one it ran on is tried once more. When neither opens the output
+    /// stays closed rather than move to another device, which could be the
+    /// built-in speakers beside a built-in microphone: the input goes off
+    /// and the player is told how to get the sound back. A reopen that
+    /// works changes no line; only the player's own choice clears one.
     fn reset(&mut self) {
-        vlog!("the audio driver asked to be reset; reopening");
+        vlog!("an audio stream asked to be rebuilt; reopening");
         self.streams = None;
         // What the closed streams asked for is answered; a request from
         // the streams opened next is a new reset.
         self.res.reset_pending.store(false, Ordering::Release);
+        let gone = self.res.device_gone.swap(false, Ordering::AcqRel);
         let name = self.current_name();
         let fit = driver::on_asio();
-        if let Err(e) = self.open(name.as_deref(), false, fit) {
-            eprintln!("could not reopen the audio device: {e}");
-            self.restore(false, fit);
-        }
+        let Err(e) = self
+            .open(name.as_deref(), false, fit)
+            .or_else(|_| self.reopen(false, fit))
+        else {
+            return;
+        };
+        eprintln!("could not reopen the audio device: {e}");
+        // The flag the audio callback reads goes first; the input worker
+        // then closes its stream.
+        self.res.input_enabled.store(false, Ordering::Relaxed);
+        let _ = self.res.input_cmd.send(InputCmd::SetEnabled(false));
+        self.streams = None;
+        let device = name.unwrap_or_else(|| "the audio device".to_owned());
+        let line = if gone {
+            format!(
+                "No sound: {device} was disconnected. Reconnect it, {}, then {}.",
+                notice::CHOOSE_OUTPUT,
+                notice::MIC_INPUT
+            )
+        } else {
+            format!(
+                "No sound: {device} stopped. To retry, {}, then {}.",
+                notice::CHOOSE_OUTPUT,
+                notice::MIC_INPUT
+            )
+        };
+        notice::output(Some(line));
     }
 }
 
@@ -2056,19 +2092,26 @@ fn fit_to_device(
         .unwrap_or_else(|| supported.channels());
 }
 
-/// The error handler for the output worker's streams. An ASIO driver asks
-/// for a reset when its own settings change, which the worker answers by
-/// reopening the streams; anything else is reported.
+/// The error handler for the output worker's streams. A device that went
+/// away, or a stream that must be rebuilt, such as an ASIO driver asking
+/// for a reset when its own settings change, is answered by the worker
+/// reopening the streams; anything else is reported. Lock- and
+/// allocation-free, since some backends report from the audio thread.
 fn stream_error_handler<P: PluginExport>(
     res: &OutputResources<P>,
 ) -> impl FnMut(cpal::Error) + Send + 'static {
-    let asio = driver::on_asio();
     let pending = Arc::clone(&res.reset_pending);
+    let gone = Arc::clone(&res.device_gone);
     let commands = res.commands.clone();
     move |err| {
-        if !asio || err.kind() != cpal::ErrorKind::StreamInvalidated {
+        if !needs_reopen(&err) {
             report_stream_error("Audio error", &err);
-        } else if !pending.swap(true, Ordering::AcqRel)
+            return;
+        }
+        if err.kind() == cpal::ErrorKind::DeviceNotAvailable {
+            gone.store(true, Ordering::Release);
+        }
+        if !pending.swap(true, Ordering::AcqRel)
             && commands
                 .upgrade()
                 .is_none_or(|commands| commands.try_send(OutputCmd::Reset).is_err())
@@ -2077,6 +2120,15 @@ fn stream_error_handler<P: PluginExport>(
             pending.store(false, Ordering::Release);
         }
     }
+}
+
+/// Whether a stream error means the device went away or the stream must be
+/// rebuilt, rather than a passing glitch.
+fn needs_reopen(err: &cpal::Error) -> bool {
+    matches!(
+        err.kind(),
+        cpal::ErrorKind::DeviceNotAvailable | cpal::ErrorKind::StreamInvalidated
+    )
 }
 
 /// Report a stream error. Xruns are left out: cpal reports them from the
@@ -2484,10 +2536,13 @@ impl InputWorker {
             }
             return;
         }
-        let currently = stream.is_some();
+        // A stream whose device went away is still held but no longer
+        // enabled, and turning the input on again opens a new one.
+        let currently = stream.is_some() && self.enabled.load(Ordering::Relaxed);
         if want == currently {
             return;
         }
+        *stream = None;
         if !want {
             *stream = None;
             self.enabled.store(false, Ordering::Relaxed);
@@ -2540,11 +2595,16 @@ impl InputWorker {
             f64::from(self.sample_rate.load(Ordering::Relaxed)),
             self.buffer_frames.load(Ordering::Relaxed),
         );
+        let loss = InputLoss {
+            enabled: Arc::clone(&self.enabled),
+            label: device_label(device),
+        };
         match build_and_play_input_stream(
             device,
             &input,
             Arc::clone(&self.ring_width),
             Arc::clone(&self.ring),
+            loss.clone(),
         ) {
             Err(e) if input.stream.buffer_size != cpal::BufferSize::Default => {
                 eprintln!(
@@ -2557,6 +2617,7 @@ impl InputWorker {
                     &input,
                     Arc::clone(&self.ring_width),
                     Arc::clone(&self.ring),
+                    loss,
                 )
             }
             result => result,
@@ -2648,6 +2709,40 @@ fn resolve_input_config(
     }
 }
 
+/// What an input stream does when its device goes away or the stream must
+/// be rebuilt: the input goes off and the player is told, rather than left
+/// wondering why the guitar went quiet. The flag the audio callback reads
+/// is cleared first. The line is posted once, from the backend's error
+/// thread, which for these errors is not the capture callback.
+#[derive(Clone)]
+struct InputLoss {
+    enabled: Arc<AtomicBool>,
+    label: Option<String>,
+}
+
+impl InputLoss {
+    fn report(&self, err: &cpal::Error) {
+        if !needs_reopen(err) {
+            report_stream_error("Input error", err);
+            return;
+        }
+        if !self.enabled.swap(false, Ordering::AcqRel) {
+            return;
+        }
+        let device = self.label.as_deref().unwrap_or("the input device");
+        notice::input(Some(
+            if err.kind() == cpal::ErrorKind::DeviceNotAvailable {
+                format!(
+                    "Input is off: {device} was disconnected. Reconnect it, then {}.",
+                    notice::MIC_INPUT
+                )
+            } else {
+                format!("Input is off: {device} stopped; {} to reopen it.", notice::MIC_INPUT)
+            },
+        ));
+    }
+}
+
 /// Build an input stream against the given device that hands captured
 /// frames to `ring`. `ring_width` is the ring's frame width (the output
 /// stream's channel count); the callback normalizes the device's native
@@ -2657,6 +2752,7 @@ fn build_and_play_input_stream(
     input: &InputConfig,
     ring_width: Arc<AtomicUsize>,
     ring: Arc<InputRing>,
+    loss: InputLoss,
 ) -> Result<cpal::Stream, BoxErr> {
     // The mic's channel count (`in_ch`) is fixed for the stream's life.
     let in_ch = input.stream.channels as usize;
@@ -2671,7 +2767,7 @@ fn build_and_play_input_stream(
             // the producer.
             ring.capture(data, in_ch, ring_width.load(Ordering::Relaxed));
         },
-        |err| report_stream_error("Input error", &err),
+        move |err| loss.report(&err),
     )?;
     stream
         .play()
