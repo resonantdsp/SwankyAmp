@@ -314,10 +314,9 @@ impl PresetBar {
         self.entries = entries;
     }
 
-    /// The cached listing only draws the menu, which is rebuilt every frame;
-    /// an action that depends on the listing re-reads the folder first, since
-    /// the player may have changed it outside the editor. Returns the files
-    /// left out.
+    /// The cached listing is for drawing; an action that depends on it
+    /// re-reads the folder first, since the player may change it outside the
+    /// editor. Returns the files left out.
     fn reread(&mut self) -> Vec<String> {
         let listing = self.library.list();
         self.list(listing.entries);
@@ -377,11 +376,31 @@ impl PresetBar {
             .collect()
     }
 
-    fn step(&self, forward: bool) -> Option<Entry> {
+    /// The next preset from the current one in the listing just read.
+    /// `previous` is the listing before that read: a current preset whose
+    /// file has since gone steps from where it stood there, to the nearest
+    /// preset still listed.
+    fn step(&self, forward: bool, previous: &[Entry]) -> Option<Entry> {
         let stepping = self.stepping();
+        let listed = |key: &str| stepping.iter().find(|entry| entry.key == key);
         let position = stepping
             .iter()
             .position(|entry| entry.key == self.current.key);
+        let was = previous
+            .iter()
+            .filter(|entry| entry.scope != Scope::Init)
+            .collect::<Vec<_>>();
+        if position.is_none()
+            && let Some(old) = was.iter().position(|entry| entry.key == self.current.key)
+        {
+            let still_listed = |entry: &&Entry| listed(&entry.key);
+            let found = if forward {
+                was[old + 1..].iter().find_map(still_listed)
+            } else {
+                was[..old].iter().rev().find_map(still_listed)
+            };
+            return found.map(|entry| (*entry).clone());
+        }
         let target = match (position, forward) {
             (None, true) => Some(0),
             (None, false) => None,
@@ -420,8 +439,9 @@ impl PresetBar {
                 }
             }
             PresetMsg::Previous | PresetMsg::Next => {
+                let previous = self.entries.clone();
                 self.reread();
-                if let Some(entry) = self.step(matches!(message, PresetMsg::Next)) {
+                if let Some(entry) = self.step(matches!(message, PresetMsg::Next), &previous) {
                     self.apply(entry, params, ctx);
                 }
             }
@@ -611,8 +631,8 @@ impl PresetBar {
                 None => Element::from(glyph),
             }
         };
-        let previous = self.step(false).map(|_| PresetMsg::Previous);
-        let next = self.step(true).map(|_| PresetMsg::Next);
+        let previous = self.step(false, &self.entries).map(|_| PresetMsg::Previous);
+        let next = self.step(true, &self.entries).map(|_| PresetMsg::Next);
         let open = self.open;
         let field = container(
             row![
@@ -1033,6 +1053,28 @@ mod tests {
             "› did not step past the removed b"
         );
         assert_eq!(bar.status(), None, "› reported {:?}", bar.status());
+    }
+
+    /// The current preset's own file going is the case re-reading is for:
+    /// the arrows step on from where it stood.
+    #[test]
+    fn arrows_step_on_from_a_current_preset_removed_on_disk() {
+        let folder = Folder::new("step-current-removed");
+        let [a, b, c] = <[Entry; 3]>::try_from(user_files(&folder, &["a", "b", "c"])).unwrap();
+        for (message, expected) in [(PresetMsg::Next, &c), (PresetMsg::Previous, &a)] {
+            folder.library().save("b", &AmpControls::default()).unwrap();
+            let mut bar = listed_bar(&folder, &b);
+            std::fs::remove_file(b.path.as_ref().unwrap()).unwrap();
+
+            bar.update(message.clone(), &folder.cache, &folder.ctx);
+
+            assert_eq!(
+                folder.params.preset.read(),
+                expected.key,
+                "{message:?} from the removed b did not reach {}",
+                expected.name
+            );
+        }
     }
 
     #[test]
