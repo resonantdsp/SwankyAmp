@@ -10,7 +10,7 @@ candidate.
 
 ## Unreleased
 
-## 2.0.0 — in development
+## 2.0.0 — 2026-10-30
 
 Swanky Amp 2 preserves the released Free amplifier and cabinet sound, with the
 tone stack and soft-clip knees corrected, in a new Rust host identity that
