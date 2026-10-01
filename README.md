@@ -189,7 +189,15 @@ The final job writes `release-record.json` with the tag, commit, version, toolch
 
 ### Qualification and promotion
 
-A person qualifies the candidate's exact installers in real hosts, checks installation, the interface and audio, and records the SHA-256 printed for `release-record.json`. Acceptance is a release decision; workflow success does not make it one. After acceptance, create the stable tag on the same commit:
+A person qualifies the candidate's exact installers in real hosts, checks installation, the interface and audio, and records the SHA-256 printed for `release-record.json`. Acceptance is a release decision; workflow success does not make it one. Besides that, these can only be confirmed on a real machine:
+
+- On Windows, Website, Manual and Support in the information panel, and Download when an update is announced, open the default browser at their page.
+- On Windows, a host that unloads the plug-in while the update check, a save dialog or a preset import is running does not crash.
+- On Windows, saving a preset while another program holds its file reports an error in the footer and leaves the old preset intact.
+- On macOS, opening the Audio Unit in GarageBand twice writes the update check's record beside the interface setting.
+- On each platform, Save as… in a system dialog pointed at another folder never replaces a preset in the preset folder.
+
+After acceptance, create the stable tag on the same commit:
 
 ```sh
 just tag-release v2.0.1-rc.3   # tags the commit origin's v2.0.1-rc.3 names as v2.0.1
