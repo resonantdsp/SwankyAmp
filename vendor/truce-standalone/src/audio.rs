@@ -980,12 +980,16 @@ pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, B
         }
     } else if let Some(route) = saved.input_channels.as_deref().and_then(ChannelRoute::parse) {
         // A channel this device does not have would leave the input
-        // silent with no word, so it is kept for a device that has it.
-        let opened = input_device
-            .as_ref()
-            .and_then(|device| device.default_input_config().ok())
-            .map_or(0, |config| usize::from(config.channels()))
-            .min(channels);
+        // silent with no word, so it is kept for a device that has it. A
+        // missing device is judged when it returns, by the output width
+        // the ring carries.
+        let opened = match (&input_pick, &input_device) {
+            (InputPick::Missing(_), _) | (_, None) => channels,
+            (_, Some(device)) => device
+                .default_input_config()
+                .map_or(0, |config| usize::from(config.channels()))
+                .min(channels),
+        };
         if route.base().is_none_or(|base| base < opened) {
             input_controller
                 .channel_route
@@ -1448,6 +1452,11 @@ fn launch_output(
 fn input_held_off(input_name: Option<&str>, pick: &InputPick) -> String {
     let (choose, turn_on) = (notice::CHOOSE_INPUT, notice::MIC_INPUT);
     match (pick, input_name) {
+        // On ASIO the launch opened a stand-in interface, which turning
+        // the input on would make live, so the player chooses first.
+        (InputPick::Missing(name), _) if driver::on_asio() => format!(
+            "Input is off: {name} is not connected. Connect it, {choose}, then {turn_on}."
+        ),
         (InputPick::Missing(name), _) => {
             format!("Input is off: {name} is not connected. Connect it, then {turn_on}.")
         }
@@ -1467,9 +1476,9 @@ fn input_chosen(name: &str) -> String {
 }
 
 /// Allocate the input ring + control channels, and (for effects) spawn
-/// the input worker thread on `input_name`. Also flips
-/// `set_enabled(true)` when the user passed `--input-enabled on`, so the
-/// launch state matches the CLI ask.
+/// the input worker thread on `input_name`. Turns the input on when the
+/// launch asked for it and, where the application's default asked, the
+/// device was chosen; otherwise posts the line saying why it is off.
 fn setup_input_pipeline(
     input_name: Option<&str>,
     pick: &InputPick,

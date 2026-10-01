@@ -152,7 +152,10 @@ OPTIONS:
                             interface.
   --input-enabled <on|off>  Enable mic input at launch (default: the
                             application's own, which may keep it off
-                            until an input is chosen, else off).
+                            until an input is chosen, else off). When
+                            the ASIO interface will not open and the
+                            launch falls back to WASAPI, the input
+                            starts off regardless.
                             Press Cmd+I (macOS) or Ctrl+I in the window
                             to toggle live.
   --output-enabled <on|off> Enable speaker output at launch (default: on).

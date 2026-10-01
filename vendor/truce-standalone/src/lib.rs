@@ -114,7 +114,8 @@ pub struct Defaults {
     /// With `input_enabled` on, still start the input off unless its
     /// device is one the player chose (by flag or from the Settings menu)
     /// and is connected. A flag or environment variable that turns the
-    /// input on is obeyed as given.
+    /// input on is obeyed as given, except that on Windows a launch whose
+    /// ASIO interface will not open falls back to WASAPI with the input off.
     pub input_needs_choice: bool,
     /// Where lines the player must see about the devices go, such as why
     /// the input is off; see [`notice`].

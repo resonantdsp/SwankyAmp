@@ -75,10 +75,14 @@ input its defaults turn on stays off unless it is a device the player chose,
 by flag or from the Settings menu, and is connected: the system default, or
 a stand-in for an unplugged interface, is often a built-in microphone beside
 the speakers. A flag or environment variable that turns the input on is
-obeyed as given. A chosen input that is not connected stays the input
-worker's device, so turning the input on opens it once it is back rather
-than the system default. When a saved ASIO interface loads but will not
-open and the launch falls back to WASAPI, the input is turned off first.
+obeyed as given, with one exception: when a saved ASIO interface loads but
+will not open and the launch falls back to WASAPI, the input is turned off
+first, whatever asked for it. On WASAPI and the other hosts, a chosen input
+that is not connected stays the input worker's device, so turning the
+input on opens it once it is back rather than the system default. On ASIO
+the launch opens another installed interface in its place, which turning
+the input on would make live, so the line asks the player to choose the
+interface first.
 The line saying why the input is off goes to a sink the application
 supplies in `Defaults::notices` (`notice.rs`), since a windowed app has no
 console; Swanky Amp shows it in its footer. The input channels chosen from
