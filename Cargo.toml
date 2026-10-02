@@ -13,9 +13,11 @@ default-run = "swanky-amp-2"
 
 # The release's own statement of whether it ships a Linux download. A
 # candidate builds exactly the declared downloads and fails without any of
-# them; macOS and Windows always ship.
+# them; macOS and Windows always ship. 2.0 ships no Linux download until
+# the Linux build has been tried on a real machine (see the README's
+# qualification section).
 [package.metadata.release]
-linux = true
+linux = false
 
 [lib]
 crate-type = ["cdylib", "staticlib", "rlib"]
