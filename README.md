@@ -38,7 +38,7 @@ On Windows the standalone plays through ASIO when an ASIO driver is installed, a
 
 ## Signal path
 
-The shipping path is the 1.4.0 model with tube-only oversampling, plate and power-stage low-passes matched at every rate to their response at 96 kHz where 1.4.0 used its 44.1 kHz design, a smooth triode knee, a capped Grit mapping, the standard tone-stack mapping, and level compensation recalibrated against 1.4.0. The legacy path keeps every released mapping so that `just model-check` can prove the port against the frozen 1.4.0 renders.
+The shipping path is the 1.4.0 model with tube-only oversampling, plate and power-stage low-passes matched at every rate to their response at 96 kHz where 1.4.0 used its 44.1 kHz design, a smooth triode knee, a capped Grit mapping, the standard tone-stack mapping, a cabinet that keeps its 48 kHz response at the other common sample rates, and level compensation recalibrated against 1.4.0. The legacy path keeps every released mapping and the released cabinet design at every rate so that `just model-check` can prove the port against the frozen 1.4.0 renders.
 
 Oversampling is set in the editor's header: Auto picks the tube stages' factor from the host's sample rate, or the player fixes one. The tube stages' fixed low-passes keep the response they have at 96 kHz, the rate Auto runs them at from 48 kHz, so up to 10 kHz the factor changes aliasing and not tone; above it 4x plays up to about 1 dB brighter at 16 kHz. The plug-in reports the oversampling filter's latency to the host, always that of the factor the audio is running: a new factor takes effect at the next block, and the latency reported changes with it, except in CLAP, which keeps an active plug-in's latency fixed, so there the factor waits for the restart the plug-in asks the host for.
 
@@ -51,6 +51,7 @@ just render-model "high gain" /tmp/high-gain.wav   # one released preset through
 just dsp-report        # oversampling and the tube filters against the legacy path; also checks the real-time reset
 just knee-report       # the smooth knee against the released one at every seam, per preset and input level
 just tone-stack-soak   # 24 hours of samples through the shipping tone stack; fails on any drift (minutes)
+just fit-cabinet       # refit the cabinet sections for the common rates and rewrite src/dsp/cabinet_data.rs
 ```
 
 `dsp-report` and `knee-report` write their measurements under `target/dsp/`, and `knee-report` fails if a seam leaves the released level by more than `verification/dsp/knee.py` allows.
