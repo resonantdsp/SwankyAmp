@@ -211,6 +211,7 @@ A person qualifies the candidate's exact installers in real hosts, checks instal
 - On Windows, switching the standalone's audio driver from ASIO to Windows audio, and back, turns the input off each time.
 - On Windows, the laptop's own microphone chosen in the standalone on Windows audio shows the feedback warning.
 - On Windows, long device names in the standalone's panel are cut with an ellipsis.
+- On each platform, an oversampling change while playing switches at once in an Audio Unit or VST3 host, with a click at the switch expected, and in a CLAP host applies after the host restarts the plug-in.
 
 The Linux build has never been run on a real machine. Before a release declares a Linux download again, a person confirms there that choosing the standalone's input, input channels and output in the information panel switches the devices.
 
