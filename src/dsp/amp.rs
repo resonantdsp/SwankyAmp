@@ -743,8 +743,8 @@ mod tests {
 
     #[test]
     fn real_time_reset_keeps_the_amp_playing_at_high_rates() {
-        // Low settings whose bass section rounds its pole onto z = 1 at these
-        // rates once held in single precision.
+        // Across these Low settings a single-precision biquad for the bass
+        // section would put its pole on z = 1 at these rates.
         for sample_rate in [352_800., 384_000.] {
             for step in 0..=50 {
                 let low = step as f32 / 25. - 1.;

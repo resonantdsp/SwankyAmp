@@ -452,7 +452,9 @@ mod tests {
                         };
                         let mut voiced = ToneStack::new(96_000., ToneMapping::Standard);
                         voiced.configure(controls);
-                        for sample_rate in [44_100., 88_200., 192_000., 352_800., 384_000.] {
+                        for sample_rate in
+                            [44_100., 88_200., 176_400., 192_000., 352_800., 384_000.]
+                        {
                             let mut stack = ToneStack::new(sample_rate, ToneMapping::Standard);
                             stack.configure(controls);
                             for frequency in [20., 60., 200., 600., 2_000.] {
