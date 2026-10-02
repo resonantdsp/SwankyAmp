@@ -42,6 +42,8 @@ The shipping path is the 1.4.0 model with tube-only oversampling, a plate filter
 
 Oversampling is set in the editor's header: Auto picks the tube stages' factor from the host's sample rate, or the player fixes one. The plug-in reports the oversampling filter's latency to the host, so changing the factor restarts processing for the host to take up the new latency.
 
+To hear the plug-in itself offline, `cargo run --release -- render <preset> in.wav out.wav [id=value ...]` plays the input's first channel through the shipping engine with a preset (`init`, `factory:<name>` or `user:<file>`) and writes the stereo 32-bit float output the plug-in gives a mono track, the same length as the input and not shifted by the reported latency.
+
 These tools render, measure and stress the paths:
 
 ```sh
