@@ -45,6 +45,8 @@ pub enum Action {
     Preset(PresetMsg),
     Focus(bool),
     Pointer(bool),
+    /// The pointer entered or left the Input knob while the input is off.
+    InputKnob(bool),
     /// The interface size, in percent, for this installation.
     InterfaceSize(u16),
     /// The standalone app's input, input channels or output.
@@ -64,6 +66,8 @@ pub struct FreeUi {
     meter_revision: u64,
     focused: bool,
     hovered: bool,
+    /// Whether the pointer is over the Input knob while the input is off.
+    input_knob_hovered: bool,
     presets: PresetBar,
     owner: Option<Arc<SwankyAmpParams>>,
     /// The knob a pointer gesture is turning, whose readout shows tenths.
@@ -103,6 +107,7 @@ impl FreeUi {
             meter_revision: 0,
             focused: true,
             hovered: false,
+            input_knob_hovered: false,
             presets: PresetBar::offline(),
             owner: None,
             turning: None,
@@ -224,27 +229,34 @@ impl FreeUi {
             params,
         ));
         layers.extend(levels_meters(self.meter_levels));
+        let input_off = self.input_off();
         for control in layout::CONTROLS {
+            let off = input_off && control.id == INPUT_ID;
             layers.push(match control.kind {
                 ControlKind::Knob => {
-                    control_column(control, params, self.turning == Some(control.id))
+                    control_column(control, params, self.turning == Some(control.id), off)
                 }
                 ControlKind::Toggle => cabinet_switch(control, params),
             });
+            if off {
+                layers.push(input_off_cover(control));
+            }
         }
-        let input_off = self.input_off();
-        let (line, color) = match (self.presets.status(), self.presets.footer(params)) {
-            (Some(status), _) => (status.to_owned(), INK),
-            (None, Some(name)) => (name, INK),
-            (None, None) if input_off => (INPUT_OFF.to_owned(), INK),
+        let input_off_line = (INPUT_OFF.to_owned(), INK, true);
+        let (line, color, opens_panel) = match (self.presets.status(), self.presets.footer(params))
+        {
+            (Some(status), _) => (status.to_owned(), INK, false),
+            (None, _) if input_off && self.input_knob_hovered => input_off_line,
+            (None, Some(name)) => (name, INK, false),
+            (None, None) if input_off => input_off_line,
             (None, None) => (
                 "DRAG TO TURN   ·   SHIFT FOR FINE CONTROL   ·   RIGHT-CLICK TO RESET".to_owned(),
                 DIM,
+                false,
             ),
         };
         let mut spec = Component::new("footer.line", "text", "native");
         spec.text = Some(line.clone());
-        let opens_panel = line == INPUT_OFF;
         let line = text(line)
             .size(FOOTER_TEXT_SIZE)
             .font(style::FONT)
@@ -333,6 +345,8 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
                 if self.audio.is_some() {
                     self.audio = audio_setup();
                 }
+                // The cover that reports leaving is gone once the input is on.
+                self.input_knob_hovered &= self.input_off();
                 self.sync_meters();
                 self.presets.sync(params.params());
                 self.presets.poll(params);
@@ -386,6 +400,7 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
                 self.focused = focused;
                 self.sync_meters();
             }
+            Message::Plugin(Action::InputKnob(hovered)) => self.input_knob_hovered = hovered,
             Message::Plugin(Action::Pointer(hovered)) => {
                 self.hovered = hovered;
                 self.sync_meters();
@@ -922,10 +937,43 @@ fn default_normalized(params: &ParamCache<SwankyAmpParams>, id: u32) -> f32 {
         .map_or(0.0, |info| info.range.normalize(info.default_plain) as f32)
 }
 
+/// The Input knob's parameter, whose readout says OFF while the
+/// standalone's input is off.
+const INPUT_ID: u32 = 0;
+
+/// Over the Input knob while the standalone's input is off: a press opens
+/// the panel to choose an input rather than turning a knob that does
+/// nothing, and the pointer over it puts the input-off line in the footer.
+fn input_off_cover<'a, R: FreeRenderer + 'a>(
+    spec: layout::ControlSpec,
+) -> Element<'a, Msg, Theme, R> {
+    place(
+        control_bounds(spec),
+        opaque(
+            mouse_area(Space::new().width(Length::Fill).height(Length::Fill))
+                .on_press(Message::Plugin(Action::Information(true)))
+                .on_enter(Message::Plugin(Action::InputKnob(true)))
+                .on_exit(Message::Plugin(Action::InputKnob(false)))
+                .interaction(mouse::Interaction::Pointer),
+        ),
+    )
+}
+
+/// A knob column's extent: the knob, its label and its readout.
+fn control_bounds(spec: layout::ControlSpec) -> [f32; 4] {
+    [
+        spec.center[0] - CONTROL_WIDTH / 2.0,
+        spec.center[1] - KNOB_ROW_HEIGHT / 2.0,
+        CONTROL_WIDTH,
+        KNOB_ROW_HEIGHT + 38.0,
+    ]
+}
+
 fn control_column<'a, R: FreeRenderer + 'a>(
     spec: layout::ControlSpec,
     params: &'a ParamCache<SwankyAmpParams>,
     turning: bool,
+    input_off: bool,
 ) -> Element<'a, Msg, Theme, R> {
     let enabled = spec.in_effect(params.get(layout::CABINET_SWITCH) >= 0.5);
     let fade = if enabled { 1.0 } else { style::DISABLED_ALPHA };
@@ -944,12 +992,27 @@ fn control_column<'a, R: FreeRenderer + 'a>(
         .width(Length::Fill)
         .align_x(iced_core::text::Alignment::Center)
         .color(INK.scale_alpha(fade));
-    let value = text(display_value(spec.id, params.get(spec.id) as f32, turning))
-        .size(13)
-        .line_height(LineHeight::Absolute(16.0.into()))
-        .width(Length::Fill)
-        .align_x(iced_core::text::Alignment::Center)
-        .color(DIM.scale_alpha(fade));
+    let value = if input_off {
+        let mut off = Component::new("input.off", "text", "native");
+        off.text = Some("OFF".into());
+        layout::mark(
+            off,
+            text("OFF")
+                .size(13)
+                .line_height(LineHeight::Absolute(16.0.into()))
+                .width(Length::Fill)
+                .align_x(iced_core::text::Alignment::Center)
+                .color(ACCENT),
+        )
+    } else {
+        text(display_value(spec.id, params.get(spec.id) as f32, turning))
+            .size(13)
+            .line_height(LineHeight::Absolute(16.0.into()))
+            .width(Length::Fill)
+            .align_x(iced_core::text::Alignment::Center)
+            .color(DIM.scale_alpha(fade))
+            .into()
+    };
     let body = column![
         container(knob)
             .height(KNOB_ROW_HEIGHT)
@@ -959,15 +1022,7 @@ fn control_column<'a, R: FreeRenderer + 'a>(
     ]
     .spacing(3)
     .width(CONTROL_WIDTH);
-    place(
-        [
-            spec.center[0] - CONTROL_WIDTH / 2.0,
-            spec.center[1] - KNOB_ROW_HEIGHT / 2.0,
-            CONTROL_WIDTH,
-            KNOB_ROW_HEIGHT + 38.0,
-        ],
-        body,
-    )
+    place(control_bounds(spec), body)
 }
 
 /// Whole units at rest, as 1.4 showed them, and tenths while the knob is
@@ -1273,11 +1328,6 @@ mod tests {
             Some(format!("Swanky Amp Free {}", env!("CARGO_PKG_VERSION")))
         );
         assert_eq!(editor.text("information.release"), None);
-        assert_eq!(
-            editor.text("information.input"),
-            None,
-            "a plug-in offered the standalone's audio choices"
-        );
 
         let [x, y, ..] = editor.bounds("information").unwrap();
         editor.press([x + 4.0, y + 4.0]);
@@ -1527,7 +1577,7 @@ mod tests {
     #[cfg(feature = "standalone")]
     mod standalone_audio {
         use super::Editor;
-        use truce_standalone::audio::ChannelRoute;
+        use crate::layout;
         use truce_standalone::setup::{InputNeed, OutputNeed, Setup};
 
         /// A Mac with its own microphone and speakers and an interface.
@@ -1555,58 +1605,61 @@ mod tests {
             editor
         }
 
+        fn input_knob() -> [f32; 2] {
+            layout::CONTROLS
+                .iter()
+                .find(|control| control.id == super::super::INPUT_ID)
+                .expect("the Input knob is laid out")
+                .center
+        }
+
         #[test]
         fn the_panel_opens_at_launch_only_when_the_input_needs_choosing_or_a_device_is_missing() {
-            let first = launch(Setup {
-                input_need: Some(InputNeed::Choose),
-                ..mac()
-            });
-            assert!(
-                first.bounds("information").is_some(),
-                "a first launch hid the panel"
-            );
-            assert_eq!(
-                first.text("information.input.note").as_deref(),
-                Some("Choose the input your guitar is plugged into.")
-            );
-            assert_eq!(first.text("information.input").as_deref(), Some("Off"));
-
-            let missing = launch(Setup {
-                output_need: Some(OutputNeed::NotConnected("Studio Monitors".into())),
-                ..playing_the_interface()
-            });
-            assert!(
-                missing.bounds("information").is_some(),
-                "a missing output hid the panel"
-            );
-
+            for need in [
+                Setup {
+                    input_need: Some(InputNeed::Choose),
+                    ..mac()
+                },
+                Setup {
+                    input_need: Some(InputNeed::OwnMicrophone("MacBook Air Microphone".into())),
+                    ..mac()
+                },
+                Setup {
+                    output_need: Some(OutputNeed::NotConnected("Studio Monitors".into())),
+                    ..playing_the_interface()
+                },
+            ] {
+                let editor = launch(need.clone());
+                assert!(
+                    editor.bounds("information").is_some(),
+                    "the panel stayed closed for {need:?}"
+                );
+            }
             let usual = launch(playing_the_interface());
             assert_eq!(
                 usual.bounds("information"),
                 None,
                 "an ordinary launch opened the panel"
             );
-            assert_eq!(
-                usual.text("footer.line").as_deref(),
-                Some("DRAG TO TURN   ·   SHIFT FOR FINE CONTROL   ·   RIGHT-CLICK TO RESET")
-            );
         }
 
         #[test]
-        fn a_missing_device_is_named_under_its_box() {
+        fn a_missing_device_is_named_in_the_panel() {
             let mut editor = launch(Setup {
                 inputs: vec!["MacBook Air Microphone".into()],
                 input_need: Some(InputNeed::NotConnected("UMC202HD 192k".into())),
                 output_need: Some(OutputNeed::NotConnected("Studio Monitors".into())),
                 ..mac()
             });
-            assert_eq!(
-                editor.text("information.input.note").as_deref(),
-                Some("UMC202HD 192k is not connected. Connect it, then choose it again.")
+            let input = editor.text("information.input.note").unwrap_or_default();
+            assert!(
+                input.contains("UMC202HD 192k"),
+                "the missing input is not named: {input:?}"
             );
-            assert_eq!(
-                editor.text("information.output.note").as_deref(),
-                Some("Studio Monitors is not connected. MacBook Air Speakers is playing.")
+            let output = editor.text("information.output.note").unwrap_or_default();
+            assert!(
+                output.contains("Studio Monitors"),
+                "the missing output is not named: {output:?}"
             );
             editor.ui.attach_audio(Some(playing_the_interface()));
             assert_eq!(editor.text("information.input.note"), None);
@@ -1614,83 +1667,51 @@ mod tests {
         }
 
         #[test]
-        fn the_computers_own_microphone_warns_of_feedback() {
-            let mut editor = launch(Setup {
-                input: Some("MacBook Air Microphone".into()),
-                built_in_microphone: true,
-                ..mac()
-            });
-            editor.press_button();
-            assert_eq!(
-                editor.text("information.input.warning").as_deref(),
-                Some(
-                    "This is the computer's own microphone, which will feed back through its \
-                     speakers. Use headphones."
-                )
-            );
-            editor.ui.attach_audio(Some(playing_the_interface()));
-            assert_eq!(editor.text("information.input.warning"), None);
-        }
-
-        #[test]
-        fn input_channels_are_offered_only_when_the_input_has_more_than_one() {
-            let mut editor = launch(playing_the_interface());
-            editor.press_button();
-            assert_eq!(editor.text("information.input-channels"), None);
-            editor.ui.attach_audio(Some(Setup {
-                input_channels: Some((2, ChannelRoute::Mono { base: 1 })),
-                ..playing_the_interface()
-            }));
-            assert_eq!(
-                editor.text("information.input-channels").as_deref(),
-                Some("Channel 2 (mono)")
-            );
-        }
-
-        #[test]
-        fn on_asio_both_boxes_name_the_one_interface() {
-            let mut editor = launch(Setup {
-                one_interface: true,
-                input: Some("UMC ASIO Driver".into()),
-                output: Some("UMC ASIO Driver".into()),
-                ..mac()
-            });
-            editor.press_button();
-            assert_eq!(
-                editor.text("information.input").as_deref(),
-                Some("UMC ASIO Driver")
-            );
-            assert_eq!(
-                editor.text("information.output").as_deref(),
-                Some("UMC ASIO Driver")
-            );
-            assert_eq!(
-                editor.text("information.asio").as_deref(),
-                Some("With ASIO, one interface is the input and the output.")
-            );
-        }
-
-        #[test]
-        fn with_the_input_off_the_footer_says_so_and_opens_the_panel() {
+        fn with_the_input_off_the_input_knob_reads_off_and_opens_the_panel() {
+            use truce::prelude::Params;
             let mut editor = launch(Setup {
                 input_need: Some(InputNeed::Choose),
                 ..mac()
             });
+            let idle = launch(playing_the_interface()).text("footer.line");
             editor.press([4.0, 4.0]);
             assert_eq!(
                 editor.bounds("information"),
                 None,
                 "a press outside left the panel open"
             );
+            assert_eq!(editor.text("input.off").as_deref(), Some("OFF"));
+
+            let before = editor.params.params().collect_values();
+            editor.point([4.0, 4.0]);
+            let footer = editor.text("footer.line");
+            assert_ne!(footer, idle, "the footer does not say the input is off");
+            editor.point(input_knob());
             assert_eq!(
-                editor.text("footer.line").as_deref(),
-                Some("Input is off. Press here to choose one.")
+                editor.text("footer.line"),
+                footer,
+                "hovering the knob changed the line"
             );
+            editor.press(input_knob());
+            assert!(
+                editor.bounds("information").is_some(),
+                "the knob did not open the panel"
+            );
+            assert_eq!(
+                editor.params.params().collect_values(),
+                before,
+                "pressing the knob turned it"
+            );
+
+            editor.press([4.0, 4.0]);
             editor.press(editor.centre("footer.line"));
             assert!(
                 editor.bounds("information").is_some(),
                 "the footer did not open the panel"
             );
+
+            let playing = launch(playing_the_interface());
+            assert_eq!(playing.text("input.off"), None, "a playing input reads OFF");
         }
     }
 

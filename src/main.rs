@@ -42,9 +42,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Some("audio") => {
                 let state = arguments.get(3).map_or("", String::as_str);
                 swanky_amp::ui::capture_audio(audio_fixture(state).ok_or(
-                    "capture <dir> audio <choose|missing-input|missing-output|built-in|interface|did-not-open|asio|fell-back>",
+                    "capture <dir> audio <choose|own-microphone|missing|built-in|interface|long-names|asio|fell-back|off>",
                 )?);
-                swanky_amp::ui::capture_information(None);
+                // The input knob's OFF reads with the panel closed.
+                if state != "off" {
+                    swanky_amp::ui::capture_information(None);
+                }
                 None
             }
             _ => None,
@@ -181,14 +184,15 @@ fn audio_fixture(state: &str) -> Option<truce_standalone::setup::Setup> {
             input_need: Some(InputNeed::Choose),
             ..mac
         },
-        "missing-input" => Setup {
-            inputs: vec!["MacBook Air Microphone".to_owned()],
-            input_need: Some(InputNeed::NotConnected("UMC202HD 192k".to_owned())),
+        "own-microphone" => Setup {
+            input_need: Some(InputNeed::OwnMicrophone(
+                "MacBook Air Microphone".to_owned(),
+            )),
             ..mac
         },
-        "missing-output" => Setup {
-            input: Some("MacBook Air Microphone".to_owned()),
-            built_in_microphone: true,
+        "missing" => Setup {
+            inputs: vec!["MacBook Air Microphone".to_owned()],
+            input_need: Some(InputNeed::NotConnected("UMC202HD 192k".to_owned())),
             output_need: Some(OutputNeed::NotConnected("Studio Monitors".to_owned())),
             ..mac
         },
@@ -203,8 +207,21 @@ fn audio_fixture(state: &str) -> Option<truce_standalone::setup::Setup> {
             input_channels: Some((2, ChannelRoute::Mono { base: 0 })),
             ..mac
         },
-        "did-not-open" => Setup {
-            input_need: Some(InputNeed::DidNotOpen("UMC202HD 192k".to_owned())),
+        "long-names" => Setup {
+            inputs: vec![
+                "Microphone Array (Intel® Smart Sound Technology for Digital Microphones)"
+                    .to_owned(),
+                "Line In (Focusrite Scarlett 2i2 4th Gen USB Audio Interface)".to_owned(),
+            ],
+            outputs: vec![
+                "Speakers (Realtek(R) High Definition Audio with SST)".to_owned(),
+                "Speakers (Focusrite Scarlett 2i2 4th Gen USB Audio Interface)".to_owned(),
+            ],
+            input: Some("Line In (Focusrite Scarlett 2i2 4th Gen USB Audio Interface)".to_owned()),
+            output: Some(
+                "Speakers (Focusrite Scarlett 2i2 4th Gen USB Audio Interface)".to_owned(),
+            ),
+            input_channels: Some((2, ChannelRoute::Mono { base: 0 })),
             ..mac
         },
         "asio" => Setup {
@@ -223,6 +240,7 @@ fn audio_fixture(state: &str) -> Option<truce_standalone::setup::Setup> {
             input_need: Some(InputNeed::FellBack("UMC ASIO Driver".to_owned())),
             ..mac
         },
+        "off" => mac,
         _ => return None,
     })
 }

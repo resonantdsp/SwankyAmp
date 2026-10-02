@@ -11,7 +11,7 @@ use crate::{
 use iced_core::{Element, Length, Padding, Theme, text::LineHeight};
 use std::fmt;
 use truce_iced::Message;
-use truce_iced::iced::widget::{overlay::menu, pick_list, row, text};
+use truce_iced::iced::widget::{Column, overlay::menu, pick_list, row, text};
 use truce_iced::iced::{Alignment, Border, Color};
 use truce_standalone::audio::ChannelRoute;
 use truce_standalone::setup::{self, InputNeed, OutputNeed, Setup};
@@ -36,9 +36,11 @@ pub fn apply(choice: AudioChoice) {
     }
 }
 
-/// The rows the panel shows for `setup`.
+/// The rows the panel shows for `setup`: the pickers, then every message
+/// in one block beneath them, the box each concerns outlined.
 pub fn rows<'a, R: FreeRenderer + 'a>(setup: &Setup) -> Vec<Element<'a, Msg, Theme, R>> {
     let mut rows = Vec::new();
+    let mut notes: Vec<Element<'a, Msg, Theme, R>> = Vec::new();
     if setup.takes_input {
         let mut inputs = vec![choice(None, OFF)];
         inputs.extend(
@@ -54,19 +56,12 @@ pub fn rows<'a, R: FreeRenderer + 'a>(setup: &Setup) -> Vec<Element<'a, Msg, The
             "Input",
             inputs,
             choice(setup.input.clone(), shown),
-            need.is_some(),
+            Field {
+                attention: need.is_some(),
+                dimmed: setup.input.is_none(),
+            },
             AudioChoice::Input,
         ));
-        if let Some(need) = need {
-            rows.push(note("information.input.note", need, style::ACCENT));
-        }
-        if setup.built_in_microphone {
-            rows.push(note(
-                "information.input.warning",
-                BUILT_IN_MICROPHONE.to_owned(),
-                style::ACCENT,
-            ));
-        }
         if let Some((count, route)) = setup.input_channels {
             let routes = setup::channel_choices(count)
                 .into_iter()
@@ -77,8 +72,18 @@ pub fn rows<'a, R: FreeRenderer + 'a>(setup: &Setup) -> Vec<Element<'a, Msg, The
                 "Input channels",
                 routes,
                 choice(route, &route.label()),
-                false,
+                Field::default(),
                 AudioChoice::InputChannels,
+            ));
+        }
+        if let Some(need) = need {
+            notes.push(note("information.input.note", need, style::ACCENT));
+        }
+        if setup.built_in_microphone {
+            notes.push(note(
+                "information.input.warning",
+                BUILT_IN_MICROPHONE.to_owned(),
+                style::ACCENT,
             ));
         }
     }
@@ -97,14 +102,20 @@ pub fn rows<'a, R: FreeRenderer + 'a>(setup: &Setup) -> Vec<Element<'a, Msg, The
         "Output",
         outputs,
         choice(output.clone(), &output),
-        need.is_some(),
+        Field {
+            attention: need.is_some(),
+            dimmed: false,
+        },
         AudioChoice::Output,
     ));
     if let Some(need) = need {
-        rows.push(note("information.output.note", need, style::ACCENT));
+        notes.push(note("information.output.note", need, style::ACCENT));
     }
     if setup.one_interface {
-        rows.push(note("information.asio", ONE_INTERFACE.to_owned(), DIM));
+        notes.push(note("information.asio", ONE_INTERFACE.to_owned(), DIM));
+    }
+    if !notes.is_empty() {
+        rows.push(Column::with_children(notes).spacing(6).into());
     }
     rows
 }
@@ -123,6 +134,10 @@ fn input_need(need: &InputNeed) -> String {
         InputNeed::DidNotOpen(name) => {
             format!("{name} could not be opened. Another app may be using it.")
         }
+        InputNeed::OwnMicrophone(name) => format!(
+            "{name} starts off, so it cannot feed back through the speakers. \
+             With headphones on, choose it again."
+        ),
         InputNeed::FellBack(name) => format!(
             "{name} did not open, so Windows audio is playing. Once it is free, \
              choose ASIO under Settings › Audio Driver."
@@ -171,12 +186,20 @@ fn choice<T>(value: T, label: &str) -> Choice<T> {
     }
 }
 
+/// How a picker's box reads: outlined in the accent when it needs the
+/// player, its text dimmed for an input that is off.
+#[derive(Clone, Copy, Default)]
+struct Field {
+    attention: bool,
+    dimmed: bool,
+}
+
 fn field_row<'a, T, R>(
     id: &str,
     label: &'static str,
     options: Vec<Choice<T>>,
     selected: Choice<T>,
-    attention: bool,
+    field: Field,
     on_choose: fn(T) -> AudioChoice,
 ) -> Element<'a, Msg, Theme, R>
 where
@@ -185,7 +208,6 @@ where
 {
     let mut spec = Component::new(id, "selector", "native");
     spec.text = Some(selected.label.clone());
-    let off = selected.label == OFF;
     let picker = pick_list(options, Some(selected), move |chosen: Choice<T>| {
         Message::Plugin(Action::Audio(on_choose(chosen.value)))
     })
@@ -203,7 +225,7 @@ where
     .handle(pick_list::Handle::Arrow {
         size: Some(9.0.into()),
     })
-    .style(move |_, status| field_style(attention, off, status))
+    .style(move |_, status| field_style(field, status))
     .menu_style(|_| menu_style());
     row![
         text(label)
@@ -220,10 +242,10 @@ where
 /// The header's outlined treatment: the accent marks the box that needs
 /// the player, as it marks an open selector, and an input that is off reads
 /// dimmed as an unlit size does.
-fn field_style(attention: bool, off: bool, status: pick_list::Status) -> pick_list::Style {
-    let lit = attention || matches!(status, pick_list::Status::Opened { .. });
+fn field_style(field: Field, status: pick_list::Status) -> pick_list::Style {
+    let lit = field.attention || matches!(status, pick_list::Status::Opened { .. });
     pick_list::Style {
-        text_color: if off { DIM } else { style::INK },
+        text_color: if field.dimmed { DIM } else { style::INK },
         placeholder_color: DIM,
         handle_color: DIM,
         background: Color::TRANSPARENT.into(),

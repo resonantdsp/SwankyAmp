@@ -340,7 +340,7 @@ impl ChannelRoute {
         }
     }
 
-    /// How the Settings menu names the route.
+    /// How the settings panel names the route, in the Settings menu's words.
     #[must_use]
     pub fn label(self) -> String {
         match self {
@@ -413,6 +413,8 @@ pub struct InputController {
     output_chosen: Arc<AtomicBool>,
     /// Remembers the input channels chosen from the menu.
     pub(crate) settings: SettingsStore,
+    /// The channels the open input stream records; set by the worker.
+    opened_channels: Arc<AtomicUsize>,
 }
 
 enum InputCmd {
@@ -470,6 +472,11 @@ impl InputController {
         }
         self.set_device(Some(name));
         self.set_enabled(true);
+    }
+
+    /// The channels the input stream last opened with records.
+    pub(crate) fn opened_channels(&self) -> usize {
+        self.opened_channels.load(Ordering::Relaxed)
     }
 
     /// Currently-resolved input device name, or `None` if no
@@ -743,20 +750,18 @@ fn enumerate_devices(output: bool) -> (Option<String>, Vec<String>) {
 #[derive(Clone, Debug)]
 pub(crate) struct InputDetail {
     pub name: String,
-    /// The channels it records by default; 0 when unknown.
-    pub channels: usize,
     pub built_in_microphone: bool,
 }
 
-/// Every input with its channels and whether it is the computer's own
-/// microphone. ASIO drivers are named only: listing more would load each.
+/// Every input and whether it is the computer's own microphone, from what
+/// the host reports without opening the device: ALSA would hold each one
+/// open. ASIO drivers are named only: listing more would load each.
 fn input_details() -> Vec<InputDetail> {
     if driver::on_asio() {
         return driver::asio_drivers()
             .into_iter()
             .map(|name| InputDetail {
                 name,
-                channels: 0,
                 built_in_microphone: false,
             })
             .collect();
@@ -767,9 +772,6 @@ fn input_details() -> Vec<InputDetail> {
         .filter_map(|device| {
             let name = device_label(&device)?;
             Some(InputDetail {
-                channels: device
-                    .default_input_config()
-                    .map_or(0, |config| usize::from(config.channels())),
                 built_in_microphone: built_in.is(&device, &name),
                 name,
             })
@@ -971,6 +973,10 @@ pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, B
             || (driver::on_asio() && opts.output_device.is_some()),
         input_missing: match &input_pick {
             InputPick::Missing(name) => Some(name.clone()),
+            _ => None,
+        },
+        input_own_microphone: match &input_pick {
+            InputPick::OwnMicrophone(name) => Some(name.clone()),
             _ => None,
         },
         output_missing,
@@ -1464,6 +1470,10 @@ enum InputPick {
     Chosen,
     /// Named by a flag or the saved choice, and not connected.
     Missing(String),
+    /// Named by a flag or the saved choice, and the computer's own
+    /// microphone, which is chosen afresh each session: yesterday's
+    /// headphones may not be on today.
+    OwnMicrophone(String),
     /// Nothing was chosen.
     Default,
 }
@@ -1473,14 +1483,16 @@ fn launch_asio_interface(
     opts: &Options,
     saved: &settings::Settings,
 ) -> (Option<cpal::Device>, InputPick) {
-    let named = opts
-        .output_device
-        .as_ref()
-        .or(opts.input_device.as_ref())
-        .or(saved.asio_device.as_ref());
+    let flagged = opts.output_device.as_ref().or(opts.input_device.as_ref());
+    let named = flagged.or(saved.asio_device.as_ref());
     let mut pick = InputPick::Default;
     if let Some(name) = named {
-        if let Some(interface) = find_device(host, name, true) {
+        let found = if flagged.is_some() {
+            find_flagged_device(host, name, true)
+        } else {
+            find_device(host, name, true)
+        };
+        if let Some(interface) = found {
             return (Some(interface), InputPick::Chosen);
         }
         eprintln!("the ASIO interface '{name}' is not available; trying the others installed");
@@ -1513,17 +1525,27 @@ fn launch_input(
     opts: &Options,
     saved: &settings::Settings,
 ) -> (Option<cpal::Device>, InputPick) {
-    let named = opts.input_device.as_ref().or(saved.input_device.as_ref());
-    match named {
-        Some(name) => match find_device(host, name, false) {
-            Some(device) => (Some(device), InputPick::Chosen),
-            None => {
-                eprintln!("the input device '{name}' is not available");
-                (None, InputPick::Missing(name.clone()))
-            }
-        },
+    if let Some(name) = &opts.input_device {
+        return named_input(name, find_flagged_device(host, name, false));
+    }
+    match &saved.input_device {
+        Some(name) => named_input(name, find_device(host, name, false)),
         None => (host.default_input_device(), InputPick::Default),
     }
+}
+
+/// How an input the player named stands: chosen when it is connected,
+/// unless it is the computer's own microphone.
+fn named_input(name: &str, found: Option<cpal::Device>) -> (Option<cpal::Device>, InputPick) {
+    let Some(device) = found else {
+        eprintln!("the input device '{name}' is not available");
+        return (None, InputPick::Missing(name.to_owned()));
+    };
+    let label = device_label(&device).unwrap_or_else(|| name.to_owned());
+    if crate::microphone::BuiltIn::find().is(&device, &label) {
+        return (Some(device), InputPick::OwnMicrophone(label));
+    }
+    (Some(device), InputPick::Chosen)
 }
 
 /// The output device a launch opens, and the saved output when it was not
@@ -1538,7 +1560,7 @@ fn launch_output(
     chosen_input: Option<&cpal::Device>,
 ) -> Result<(cpal::Device, Option<String>), String> {
     if let Some(name) = &opts.output_device {
-        let device = find_device(host, name, true).ok_or_else(|| {
+        let device = find_flagged_device(host, name, true).ok_or_else(|| {
             format!(
                 "no output device matching '{name}'. \
                  Run with --list-devices to see available outputs."
@@ -1600,6 +1622,7 @@ fn setup_input_pipeline(
     let (input_cmd_tx, input_cmd_rx) = mpsc::channel::<InputCmd>();
     let input_current_name = Arc::new(Mutex::new(input_name.map(str::to_owned)));
 
+    let opened_channels = Arc::new(AtomicUsize::new(0));
     let controller = InputController {
         enabled: Arc::clone(&input_enabled),
         has_device: has_input_device,
@@ -1609,6 +1632,7 @@ fn setup_input_pipeline(
         output_cmd: links.output_cmd,
         output_chosen: links.output_chosen,
         settings: links.settings.clone(),
+        opened_channels: Arc::clone(&opened_channels),
     };
 
     if is_effect {
@@ -1620,6 +1644,7 @@ fn setup_input_pipeline(
             current_name: Arc::clone(&input_current_name),
             buffer_frames: links.buffer_frames,
             settings: links.settings,
+            opened_channels,
         };
         let device_name = input_name.map(str::to_owned);
         std::thread::Builder::new()
@@ -2491,6 +2516,7 @@ struct InputWorker {
     current_name: Arc<Mutex<Option<String>>>,
     buffer_frames: Arc<AtomicU32>,
     settings: SettingsStore,
+    opened_channels: Arc<AtomicUsize>,
 }
 
 impl InputWorker {
@@ -2534,26 +2560,29 @@ impl InputWorker {
                     stream = None;
                     self.enabled.store(false, Ordering::Relaxed);
                     self.ring.clear();
-                    if !driver::on_asio() {
-                        device_name = self.saved_device();
+                    // Only an input the player chose goes live on the new
+                    // driver. On ASIO the interface that opens is decided
+                    // after this, so the input waits for the player.
+                    if driver::on_asio() {
+                        want_enabled = false;
+                    } else {
+                        // An absent saved input stays the device, so turning
+                        // the input on says it is not connected rather than
+                        // opening the system default.
+                        device_name = self.settings.saved().input_device;
                         if let Ok(mut g) = self.current_name.lock() {
                             g.clone_from(&device_name);
                         }
+                        want_enabled &= device_name.as_deref().is_some_and(|name| {
+                            named_input(name, find_device(&driver::host(), name, false)).1
+                                == InputPick::Chosen
+                        });
                     }
                     self.apply(&mut stream, want_enabled, device_name.as_deref());
                 }
             }
         }
         drop(stream);
-    }
-
-    /// The input chosen for WASAPI, when it is present, else `None` for
-    /// the system default.
-    fn saved_device(&self) -> Option<String> {
-        let name = self.settings.saved().input_device?;
-        find_device(&driver::host(), &name, false)
-            .is_some()
-            .then_some(name)
     }
 
     fn apply(&self, stream: &mut Option<cpal::Stream>, want: bool, device_name: Option<&str>) {
@@ -2622,6 +2651,8 @@ impl InputWorker {
             f64::from(self.sample_rate.load(Ordering::Relaxed)),
             self.buffer_frames.load(Ordering::Relaxed),
         );
+        self.opened_channels
+            .store(usize::from(input.stream.channels), Ordering::Relaxed);
         match build_and_play_input_stream(
             device,
             &input,
@@ -2761,9 +2792,16 @@ fn build_and_play_input_stream(
     Ok(stream)
 }
 
+/// The device labelled exactly `name`. Saved and menu names are whole
+/// labels, so a missing device never resolves to another that shares part
+/// of its name.
+fn find_device(host: &cpal::Host, name: &str, output: bool) -> Option<cpal::Device> {
+    devices(host, output).find(|device| device_label(device).as_deref() == Some(name))
+}
+
 /// The device labelled `name`, else the first whose label contains it,
 /// ignoring case, so a flag can name a device by part of its label.
-fn find_device(host: &cpal::Host, name: &str, output: bool) -> Option<cpal::Device> {
+fn find_flagged_device(host: &cpal::Host, name: &str, output: bool) -> Option<cpal::Device> {
     let needle = name.to_lowercase();
     let mut partial = None;
     for (index, device) in devices(host, output).enumerate() {

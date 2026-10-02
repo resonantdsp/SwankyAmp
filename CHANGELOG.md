@@ -149,14 +149,16 @@ installs beside Swanky Amp 1.4.0.
   input off is silent, but only on an input the player chose and that is
   connected: on a first launch, or with the chosen interface unplugged, a
   built-in microphone would feed the amplifier into the built-in speakers,
-  so the input starts off. `--input-enabled on` or `off` overrides that for
-  one launch.
+  so the input starts off. The computer's own microphone never starts live,
+  even when it was the last input chosen. `--input-enabled on` or `off`
+  overrides that for one launch.
 - Gave the standalone app's information panel the Input, Input channels and
   Output choices of its Settings menu. Choosing an input there turns it on
   and remembers it. The panel opens by itself when no input was ever chosen
   or a remembered device is missing, and says what is missing; it warns that
   the computer's own microphone feeds back through its speakers. While the
-  input is off the footer says so, and a press on it opens the panel.
+  input is off the Input knob reads OFF and a press on it, or on the footer
+  line that says so, opens the panel.
 - Remembered the standalone app's input channels, so a guitar on input 2 is
   heard at the next launch.
 - The Windows standalone app plays through an audio interface's own ASIO®

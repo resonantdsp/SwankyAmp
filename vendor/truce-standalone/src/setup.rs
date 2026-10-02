@@ -39,10 +39,20 @@ pub struct Setup {
 }
 
 impl Setup {
-    /// Whether the editor should open its panel at launch.
+    /// Whether the editor should open its panel at launch: only for what
+    /// the launch itself found, never for a worker's later report.
     #[must_use]
     pub fn needs_attention(&self) -> bool {
-        self.input_need.is_some() || self.output_need.is_some()
+        self.output_need.is_some()
+            || matches!(
+                self.input_need,
+                Some(
+                    InputNeed::Choose
+                        | InputNeed::NotConnected(_)
+                        | InputNeed::FellBack(_)
+                        | InputNeed::OwnMicrophone(_)
+                )
+            )
     }
 }
 
@@ -56,6 +66,9 @@ pub enum InputNeed {
     DidNotOpen(String),
     /// The ASIO interface would not open, so Windows audio is playing.
     FellBack(String),
+    /// The input remembered is the computer's own microphone, which never
+    /// starts live: yesterday's headphones may not be on today.
+    OwnMicrophone(String),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -71,6 +84,8 @@ pub(crate) struct Launch {
     pub input_named: bool,
     /// The input remembered or named that was not connected.
     pub input_missing: Option<String>,
+    /// The input remembered or named that is the computer's own microphone.
+    pub input_own_microphone: Option<String>,
     /// The output remembered that was not connected.
     pub output_missing: Option<String>,
 }
@@ -170,7 +185,7 @@ pub fn current() -> Option<Setup> {
     let channel_count = if one_interface {
         registry.channels
     } else {
-        detail.map_or(0, |detail| detail.channels.min(registry.channels))
+        registry.input.opened_channels().min(registry.channels)
     };
     Some(Setup {
         takes_input: registry.takes_input,
@@ -205,6 +220,11 @@ fn input_need(
         && remembered.is_none_or(|name| name == missing)
     {
         return Some(InputNeed::NotConnected(missing.clone()));
+    }
+    if let Some(microphone) = &launch.input_own_microphone
+        && remembered.is_none_or(|name| name == microphone)
+    {
+        return Some(InputNeed::OwnMicrophone(microphone.clone()));
     }
     (remembered.is_none() && !launch.input_named).then_some(InputNeed::Choose)
 }
@@ -297,6 +317,28 @@ mod tests {
         assert_eq!(input_need(&launch, false, None, None), missing);
         assert_eq!(input_need(&launch, false, Some("Scarlett 2i2"), None), None);
         assert_eq!(input_need(&launch, true, Some("UMC202HD 192k"), None), None);
+    }
+
+    #[test]
+    fn the_computers_own_microphone_waits_to_be_chosen_again() {
+        let launch = Launch {
+            input_own_microphone: Some("MacBook Air Microphone".to_owned()),
+            ..Launch::default()
+        };
+        assert_eq!(
+            input_need(&launch, false, Some("MacBook Air Microphone"), None),
+            Some(InputNeed::OwnMicrophone(
+                "MacBook Air Microphone".to_owned()
+            ))
+        );
+        assert_eq!(
+            input_need(&launch, true, Some("MacBook Air Microphone"), None),
+            None
+        );
+        assert_eq!(
+            input_need(&launch, false, Some("UMC202HD 192k"), None),
+            None
+        );
     }
 
     #[test]
