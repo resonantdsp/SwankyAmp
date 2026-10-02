@@ -165,9 +165,6 @@ impl<P: Params + 'static, S: Sample> HotShell<P, S> {
         }
     }
 
-    /// Ensure `self.state` is a live allocation from the current dylib,
-    /// allocating it if the shell came up before any dylib was loaded.
-    /// Returns `false` if nothing is loaded (nothing to run).
     /// The configuration of the last `reset`, for replaying it.
     fn replay_config(&self) -> AudioConfig {
         let config = AudioConfig::new(self.sample_rate, self.max_block_size)
@@ -179,6 +176,9 @@ impl<P: Params + 'static, S: Sample> HotShell<P, S> {
         }
     }
 
+    /// Ensure `self.state` is a live allocation from the current dylib,
+    /// allocating it if the shell came up before any dylib was loaded.
+    /// Returns `false` if nothing is loaded (nothing to run).
     fn ensure_state(&mut self, loader: &NativeLoader<S>) -> bool {
         if !self.state.is_null() {
             return true;

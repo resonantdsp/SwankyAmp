@@ -148,6 +148,7 @@ pub(crate) struct Biquad {
     b2: f32,
     a1: f32,
     a2: f32,
+    dc_gain: f32,
     s1: f32,
     s2: f32,
 }
@@ -171,11 +172,16 @@ impl Biquad {
         self.b2 = (b0 - b1 * c + b2 * c_squared) / divisor;
         self.a1 = 2. * (a0 - c_squared) / divisor;
         self.a2 = (a0 - a1 * c + c_squared) / divisor;
+        self.dc_gain = b0 / a0;
     }
 
-    pub(crate) fn set_digital(&mut self, b: [f32; 3], a: [f32; 2]) {
+    /// Takes the analogue prototype's DC gain beside the coefficients: their
+    /// sums cancel to 0/0 when a low pole rounds onto z = 1, as a tone stack's
+    /// does at the highest tube rates.
+    pub(crate) fn set_digital(&mut self, b: [f32; 3], a: [f32; 2], dc_gain: f32) {
         [self.b0, self.b1, self.b2] = b;
         [self.a1, self.a2] = a;
+        self.dc_gain = dc_gain;
     }
 
     pub(crate) fn set_peak(
@@ -224,7 +230,7 @@ impl Biquad {
     }
 
     pub(crate) fn settle(&mut self, input: f32) -> f32 {
-        let output = (self.b0 + self.b1 + self.b2) * input / (1. + self.a1 + self.a2);
+        let output = self.dc_gain * input;
         self.s1 = output - self.b0 * input;
         self.s2 = self.b2 * input - self.a2 * output;
         output

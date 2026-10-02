@@ -689,9 +689,13 @@ mod tests {
     }
 
     fn tube_path(sample_rate: f32) -> TubePath {
+        tube_path_with(sample_rate, controls())
+    }
+
+    fn tube_path_with(sample_rate: f32, controls: AmpControls) -> TubePath {
         TubePath::new(
             sample_rate,
-            controls(),
+            controls,
             TubeFilters::AsAt96k,
             ToneMapping::Standard,
             ClipKnee::UnitSlope,
@@ -737,17 +741,24 @@ mod tests {
     }
 
     #[test]
-    fn real_time_reset_keeps_the_power_stage_playing_at_high_rates() {
-        for sample_rate in [128_000., 192_000., 384_000.] {
-            let mut path = tube_path(sample_rate);
-            path.settle_equilibrium();
-            let mut tone = sine(sample_rate, 1_000., 0.1);
-            path.process(&mut tone, None);
-            assert!(
-                tone.iter().all(|sample| sample.is_finite()) && level_db(&tone) > -60.,
-                "tubes at {sample_rate} Hz played {:.0} dB after settling at equilibrium",
-                level_db(&tone)
-            );
+    fn real_time_reset_keeps_the_amp_playing_at_high_rates() {
+        // Low settings whose bass section rounds its pole onto z = 1 at these
+        // rates once held in single precision.
+        for sample_rate in [352_800., 384_000.] {
+            for step in 0..=50 {
+                let low = step as f32 / 25. - 1.;
+                let mut path = tube_path_with(sample_rate, AmpControls { low, ..controls() });
+                path.settle_equilibrium();
+                let mut tone = sine(sample_rate, 1_000., 0.1);
+                tone.truncate(1_000);
+                path.process(&mut tone, None);
+                let level = level_db(&tone);
+                assert!(
+                    tone.iter().all(|sample| sample.is_finite()) && level > -60.,
+                    "tubes at {sample_rate} Hz with Low {low} played {level:.0} dB after a \
+                     real-time reset"
+                );
+            }
         }
     }
 
@@ -765,18 +776,21 @@ mod tests {
         };
         let sample_rate = 16_000.;
         let input = sine(sample_rate, 220., 0.2);
-        let mut activated = AmpChannel::new(sample_rate, input.len(), controls, 0);
-        let mut first_notes = input.clone();
-        activated.process(&mut first_notes, 0);
-        // A real-time reset starts from the settings' equilibrium, the level
-        // the amp holds once any start-up charge has drained.
-        activated.reset_realtime(controls);
-        let mut held = input;
-        activated.process(&mut held, 0);
-        let difference = level_db(&first_notes) - level_db(&held);
+        let level_after = |seconds: f32| {
+            let mut channel = AmpChannel::new(sample_rate, input.len(), controls, 0);
+            let mut silence = vec![0.; (sample_rate * seconds) as usize];
+            channel.process(&mut silence, 0);
+            let mut played = input.clone();
+            channel.process(&mut played, 0);
+            level_db(&played)
+        };
+        // Eight seconds of rest drain any start-up charge to the level the
+        // amp holds.
+        let difference = level_after(0.) - level_after(8.);
         assert!(
             difference.abs() < 0.5,
-            "the first notes after activation played {difference:+.1} dB from the held level"
+            "the first notes after activation played {difference:+.1} dB from the level held \
+             after a rest"
         );
     }
 }

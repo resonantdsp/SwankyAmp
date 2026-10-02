@@ -78,8 +78,8 @@ model-check:
     cargo build --quiet --no-default-features --features tools --bin render-model
     python3 verification/model/check.py target/debug/render-model
 
-# Measure oversampling and the plate filter against the legacy path.
-dsp-report output="target/dsp/oversampling-plate.json":
+# Measure oversampling and the tube filters against the legacy path.
+dsp-report output="target/dsp/oversampling-filters.json":
     cargo build --quiet --no-default-features --features tools --bin render-model --bin dsp-probe
     python3 verification/dsp/report.py \
         target/debug/render-model target/debug/dsp-probe "{{ output }}"

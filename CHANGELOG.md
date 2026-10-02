@@ -30,14 +30,13 @@ installs beside Swanky Amp 1.4.0.
   current user.
 - Oversampled the tube stages: Auto runs them at 2x at 44.1 and 48 kHz and
   1x at 88.2 kHz and above, and the header's oversampling button cycles Auto,
-  1x, 2x and 4x and names the factor the engine resolved. Every factor keeps
-  the tone Auto has at 48 kHz: the tube stages' fixed low-passes match their
-  96 kHz response at every internal rate, where 1x had played up to 2 dB
-  brighter at 8 kHz and 4x slightly darker. A new factor plays from the next
-  block, and the latency the host is told changes with the audio; in CLAP,
-  which holds the latency while the plug-in runs, it waits for the host's
-  restart. The amplifier starts at the level it holds, after activation and
-  after a CLAP reset at any rate.
+  1x, 2x and 4x and names the factor the engine resolved. Up to 10 kHz every
+  factor plays the tone Auto has at 48 kHz, within about 0.1 dB; above it 4x
+  is up to about 1 dB brighter at 16 kHz. A new factor plays from the next
+  block, and the latency the host is told is always that of the audio; CLAP,
+  which holds the latency while the plug-in runs, takes the new factor at the
+  host's restart. The amplifier starts at the level it holds, after
+  activation and after a CLAP reset, at every rate the engine runs.
 - Corrected the tone stack's discretisation: 1.4.0 voiced every tone-stack
   feature an octave above the circuit. The ten factory presets are revoiced
   for it on real guitar recordings, judged by the balance between bands at the

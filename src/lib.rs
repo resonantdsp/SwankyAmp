@@ -514,6 +514,10 @@ mod tests {
             .collect();
         let output = render(&mut engine, &params, std::slice::from_ref(&noise), 64);
         let reported = <SwankyAmp as PluginLogic>::latency(&engine);
+        assert_eq!(
+            reported, 0,
+            "1x was not running after the block that chose it"
+        );
         let correlation = |lag: usize| -> f32 {
             output[0][lag..]
                 .iter()

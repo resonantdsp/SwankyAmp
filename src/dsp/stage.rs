@@ -300,14 +300,31 @@ impl Triode {
             filters,
             span: knee.span(),
         };
+        triode.set_rate_filters();
         triode.configure(TriodeControls::default());
         triode
     }
 
     pub fn prepare(&mut self, sample_rate: f32) {
         self.sample_rate = sample_rate;
+        self.set_rate_filters();
         self.configure(self.controls);
         self.reset();
+    }
+
+    /// The plate filter depends on the rate alone, so it is set here rather
+    /// than on every control change.
+    fn set_rate_filters(&mut self) {
+        match self.filters {
+            TubeFilters::Released44k1 => {
+                self.plate_lp
+                    .set_digital(0.863_271_24, 0.863_271_24, 0.726_542_53);
+            }
+            TubeFilters::AsAt96k => {
+                self.plate_lp
+                    .set_lowpass_as_at(20_000., self.sample_rate, VOICING_RATE);
+            }
+        }
     }
 
     pub fn reset(&mut self) {
@@ -386,15 +403,6 @@ impl Triode {
         self.comp_depth = COMP_DEPTH.fixed();
         self.comp_offset = COMP_OFFSET.at(controls.comp_offset);
         self.comp_corner = Divisor::new(COMP_CORNER.fixed());
-        match self.filters {
-            TubeFilters::Released44k1 => {
-                self.plate_lp
-                    .set_digital(0.863_271_24, 0.863_271_24, 0.726_542_53);
-            }
-            TubeFilters::AsAt96k => {
-                self.plate_lp.set_lowpass_as_at(20_000., sr, VOICING_RATE);
-            }
-        }
     }
 
     #[inline]
@@ -586,14 +594,31 @@ impl Tetrode {
             drift2_depth: 0.,
             drift2_smooth: Smoother::default(),
         };
+        tetrode.set_rate_filters();
         tetrode.configure(TetrodeControls::default());
         tetrode
     }
 
     pub fn prepare(&mut self, sample_rate: f32) {
         self.sample_rate = sample_rate;
+        self.set_rate_filters();
         self.configure(self.controls);
         self.reset();
+    }
+
+    /// The band limits depend on the rate alone, so they are set here rather
+    /// than on every control change.
+    fn set_rate_filters(&mut self) {
+        use tetrode::{HP_FREQ, LP_FREQ};
+        let sr = self.sample_rate;
+        self.band_hp.set_highpass(HP_FREQ.fixed(), sr);
+        match self.filters {
+            TubeFilters::Released44k1 => self.band_lp.set_lowpass(LP_FREQ.fixed(), sr),
+            TubeFilters::AsAt96k => {
+                self.band_lp
+                    .set_lowpass_as_at(LP_FREQ.fixed(), sr, VOICING_RATE);
+            }
+        }
     }
 
     pub fn reset(&mut self) {
@@ -633,7 +658,7 @@ impl Tetrode {
     }
 
     pub(crate) fn grid_charged(&self) -> bool {
-        self.grid_charge.value() != 0.
+        self.grid_charge.value().is_normal()
     }
 
     pub fn configure(&mut self, controls: TetrodeControls) {
@@ -683,14 +708,6 @@ impl Tetrode {
         self.sag_fall = charge_rate(sag_tau * SAG_RATIO.at(controls.sag_ratio), sr);
         self.sag_gain = sag_amount;
         self.sag_makeup = 1. + sag_amount;
-        self.band_hp.set_highpass(HP_FREQ.fixed(), sr);
-        match self.filters {
-            TubeFilters::Released44k1 => self.band_lp.set_lowpass(LP_FREQ.fixed(), sr),
-            TubeFilters::AsAt96k => {
-                self.band_lp
-                    .set_lowpass_as_at(LP_FREQ.fixed(), sr, VOICING_RATE);
-            }
-        }
         self.drift2_level = DRIFT2_LEVEL.fixed();
         self.drift2_depth = DRIFT2_DEPTH.fixed();
         self.drift2_smooth.set_pole(drift_pole);
