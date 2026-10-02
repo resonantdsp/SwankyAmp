@@ -31,6 +31,10 @@ pub fn render_file(
         format!("{error}; available presets: {}", keys.join(", "))
     })?;
     for (id, value) in overrides {
+        // A mistyped id would otherwise render the preset unchanged.
+        if plugin.params().get_plain(*id).is_none() {
+            return Err(format!("no parameter with id {id}"));
+        }
         plugin.params().set_plain(*id, *value);
     }
     plugin.reset(&AudioConfig::new(f64::from(sample_rate), BLOCK));
