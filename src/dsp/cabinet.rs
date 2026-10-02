@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::array;
-use std::f32::consts::PI;
+use std::f64::consts::PI;
 
 use super::filters::Complex;
 
@@ -36,6 +36,10 @@ const MAX_DESIGN_FRACTION: f32 = 0.49;
 
 /// The released Free cabinet: a fixed parametric cabinet response whose upper
 /// range follows a 100 ms input envelope.
+///
+/// The sections run in double precision: in single precision the
+/// low-frequency sections' round-off is audible hiss that follows the note
+/// and grows with the sample rate.
 pub(crate) struct Cabinet {
     sample_rate: f32,
     brightness: f32,
@@ -44,21 +48,21 @@ pub(crate) struct Cabinet {
     dynamic_level: f32,
     envelope: f32,
     envelope_pole: f32,
-    high_pass: EvenOrderFilter<2>,
-    low_pass: OddOrderSplit<1>,
-    cabinet_shelf: OddOrderSplit<3>,
-    cabinet_shelf_gain: f32,
+    high_pass: [Biquad; 2],
+    low_pass: Split<1>,
+    cabinet_shelf: Split<3>,
+    cabinet_shelf_gain: f64,
     /// Away from the reference rate, replaces the low-pass and the cabinet
     /// shelf, whose bilinear designs match the reference only at their corners.
-    matched: Option<Cascade<MATCHED_SECTIONS>>,
-    fixed_peaks: [Peak; 10],
-    dynamic_peak: Peak,
-    fixed_notch: Peak,
-    low_shelf: OddOrderSplit<1>,
-    brightness_peak: Peak,
-    high_shelf: OddOrderSplit<1>,
-    distance_peaks: [Peak; 2],
-    output_gain: f32,
+    matched: Option<[Biquad; MATCHED_SECTIONS]>,
+    fixed_peaks: [Biquad; 10],
+    dynamic_peak: Biquad,
+    fixed_notch: Biquad,
+    low_shelf: Split<1>,
+    brightness_peak: Biquad,
+    high_shelf: Split<1>,
+    distance_peaks: [Biquad; 2],
+    output_gain: f64,
 }
 
 impl Cabinet {
@@ -82,35 +86,32 @@ impl Cabinet {
             dynamic_level: 1.0,
             envelope: 0.0,
             envelope_pole: (-10.0 / sample_rate).exp(),
-            high_pass: EvenOrderFilter::high_pass(
-                sample_rate,
-                HIGH_PASS_HZ,
-                [1.847_759, 0.765_366_85],
-            ),
-            low_pass: OddOrderSplit::new(sample_rate, LOW_PASS_HZ, [1.0]),
-            cabinet_shelf: OddOrderSplit::new(
+            high_pass: [1.847_759, 0.765_366_85]
+                .map(|damping| Biquad::new(high_pass(sample_rate, HIGH_PASS_HZ, damping))),
+            low_pass: Split::new(sample_rate, LOW_PASS_HZ, [1.0]),
+            cabinet_shelf: Split::new(
                 sample_rate,
                 CABINET_SHELF_HZ,
                 [1.801_937_7, 1.246_979_6, 0.445_041_87],
             ),
-            cabinet_shelf_gain: db_to_gain(CABINET_SHELF_DB),
+            cabinet_shelf_gain: f64::from(db_to_gain(CABINET_SHELF_DB)),
             matched: None,
-            fixed_peaks: array::from_fn(|_| Peak::default()),
-            dynamic_peak: Peak::default(),
-            fixed_notch: Peak::new(sample_rate, 100.0, -5.0, 200.0),
-            low_shelf: OddOrderSplit::new(sample_rate, 1_100.0, [1.0]),
-            brightness_peak: Peak::default(),
-            high_shelf: OddOrderSplit::new(sample_rate, 6_500.0, [1.0]),
-            distance_peaks: [Peak::default(), Peak::default()],
-            output_gain: db_to_gain(OFFSET_DB),
+            fixed_peaks: array::from_fn(|_| Biquad::default()),
+            dynamic_peak: Biquad::default(),
+            fixed_notch: Biquad::new(peak(sample_rate, 100.0, -5.0, 200.0)),
+            low_shelf: Split::new(sample_rate, 1_100.0, [1.0]),
+            brightness_peak: Biquad::default(),
+            high_shelf: Split::new(sample_rate, 6_500.0, [1.0]),
+            distance_peaks: [Biquad::default(), Biquad::default()],
+            output_gain: f64::from(db_to_gain(OFFSET_DB)),
         };
 
-        for (peak, &(frequency, level, bandwidth)) in cabinet
+        for (section, &(frequency, level, bandwidth)) in cabinet
             .fixed_peaks
             .iter_mut()
             .zip(PEAKS[..7].iter().chain(PEAKS[8..].iter()).chain([&SCOOP]))
         {
-            peak.set(sample_rate, frequency, level, bandwidth);
+            section.coefficients = peak(sample_rate, frequency, level, bandwidth);
         }
         cabinet.refresh_controls();
         cabinet
@@ -132,23 +133,19 @@ impl Cabinet {
 
     pub(crate) fn reset(&mut self) {
         self.envelope = 0.0;
-        self.high_pass.reset();
+        reset_all(&mut self.high_pass);
         self.low_pass.reset();
         self.cabinet_shelf.reset();
         if let Some(matched) = &mut self.matched {
-            matched.reset();
+            reset_all(matched);
         }
-        for peak in &mut self.fixed_peaks {
-            peak.reset();
-        }
+        reset_all(&mut self.fixed_peaks);
         self.dynamic_peak.reset();
         self.fixed_notch.reset();
         self.low_shelf.reset();
         self.brightness_peak.reset();
         self.high_shelf.reset();
-        for peak in &mut self.distance_peaks {
-            peak.reset();
-        }
+        reset_all(&mut self.distance_peaks);
     }
 
     /// Accepts the released sided mapping, -0.6..=0.6.
@@ -181,22 +178,20 @@ impl Cabinet {
                 flush_denormal(self.envelope_pole * self.envelope + detector_feed * input.abs());
             let response = dynamic_response(self.envelope, self.dynamic_level);
 
-            let mut value = self.high_pass.process(input);
+            let mut value = process_all(&mut self.high_pass, f64::from(input));
             if let Some(matched) = &mut self.matched {
-                value = matched.process(value);
+                value = process_all(matched, value);
             } else {
-                value = self.low_pass.process_low(value);
-                let (low, high, scale) = self.cabinet_shelf.process_raw(value);
-                value = scale * (low + self.cabinet_shelf_gain * high);
+                value = self.low_pass.process(value).0;
+                let (low, high) = self.cabinet_shelf.process(value);
+                value = low + self.cabinet_shelf_gain * high;
             }
 
-            for peak in &mut self.fixed_peaks[..7] {
-                value = peak.process(value);
-            }
+            value = process_all(&mut self.fixed_peaks[..7], value);
 
             // Faust evaluates this level-dependent peak for every sample. Keeping
             // that baseline avoids block-size-dependent envelope quantisation.
-            self.dynamic_peak.set(
+            self.dynamic_peak.coefficients = peak(
                 self.sample_rate,
                 PEAKS[7].0 - 250.0 * self.dynamic * response,
                 PEAKS[7].1 + 2.5 * self.dynamic * response,
@@ -204,36 +199,34 @@ impl Cabinet {
             );
             value = self.dynamic_peak.process(value);
 
-            for peak in &mut self.fixed_peaks[7..] {
-                value = peak.process(value);
-            }
+            value = process_all(&mut self.fixed_peaks[7..], value);
             value = self.fixed_notch.process(value);
 
-            let (low, high, scale) = self.low_shelf.process_raw(value);
+            let (low, high) = self.low_shelf.process(value);
             let low_gain = db_to_gain(1.5 * self.dynamic * response - 3.0 * self.brightness);
-            value = scale * (high + low_gain * low);
+            value = high + f64::from(low_gain) * low;
 
             value = self.brightness_peak.process(value);
 
-            let (low, high, scale) = self.high_shelf.process_raw(value);
+            let (low, high) = self.high_shelf.process(value);
             let high_gain = db_to_gain(-2.5 * self.dynamic * response);
-            value = scale * (high_gain * high + low);
+            value = f64::from(high_gain) * high + low;
 
-            for peak in &mut self.distance_peaks {
-                value = peak.process(value);
-            }
+            value = process_all(&mut self.distance_peaks, value);
 
-            let output = value * self.output_gain;
+            let output = (value * self.output_gain) as f32;
             *sample = if output.is_finite() { output } else { 0.0 };
         }
     }
 
     fn refresh_controls(&mut self) {
-        self.brightness_peak
-            .set(self.sample_rate, 6_000.0, 15.0 * self.brightness, 1_000.0);
-        self.distance_peaks[0].set(self.sample_rate, 70.0, -10.0 * self.distance, 100.0);
-        self.distance_peaks[1].set(self.sample_rate, 1_200.0, -17.0 * self.distance, 300.0);
-        self.output_gain = db_to_gain(OFFSET_DB) * 10.0_f32.powf(0.1 * self.distance);
+        self.brightness_peak.coefficients =
+            peak(self.sample_rate, 6_000.0, 15.0 * self.brightness, 1_000.0);
+        self.distance_peaks[0].coefficients =
+            peak(self.sample_rate, 70.0, -10.0 * self.distance, 100.0);
+        self.distance_peaks[1].coefficients =
+            peak(self.sample_rate, 1_200.0, -17.0 * self.distance, 300.0);
+        self.output_gain = f64::from(db_to_gain(OFFSET_DB) * 10.0_f32.powf(0.1 * self.distance));
     }
 
     /// Fits the sections that replace the low-pass and the cabinet shelf so
@@ -242,7 +235,7 @@ impl Cabinet {
     /// reference's top end is steeper than any same-order bilinear design
     /// here, so the sections' poles and zeros are fitted freely; the phase is
     /// left minimal.
-    fn match_reference(&self) -> Cascade<MATCHED_SECTIONS> {
+    fn match_reference(&self) -> [Biquad; MATCHED_SECTIONS] {
         let reference = Self::designed(REFERENCE_RATE);
         let sample_rate = f64::from(self.sample_rate);
         let top = MATCH_TOP_HZ.min(MATCH_TOP_FRACTION * sample_rate);
@@ -263,352 +256,170 @@ impl Cabinet {
                     - self.fixed_response(frequency, false).norm_squared().ln() / 2.
             })
             .collect();
-        let initial = matched_sections(sample_rate);
-        let sections = fit_magnitude(initial, &frequencies, &target, sample_rate);
-        Cascade::new(sections)
+        let initial = matched_sections(self.sample_rate);
+        fit_magnitude(initial, &frequencies, &target, sample_rate).map(Biquad::new)
     }
 
     /// The response of the fixed sections with the controls at rest, with or
     /// without the low-pass and the cabinet shelf.
     fn fixed_response(&self, frequency: f64, with_matched_filters: bool) -> Complex {
         let z = delay(frequency, f64::from(self.sample_rate));
-        let mut response = self.high_pass.response(z);
+        let mut response = chain_response(&self.high_pass, z);
         if with_matched_filters {
             let (low, _) = self.low_pass.response(z);
             let (shelf_low, shelf_high) = self.cabinet_shelf.response(z);
-            response =
-                response * low * (shelf_low + shelf_high * f64::from(self.cabinet_shelf_gain));
+            response = response * low * (shelf_low + shelf_high * self.cabinet_shelf_gain);
         }
-        let resting_dynamic = Peak::new(self.sample_rate, PEAKS[7].0, PEAKS[7].1, PEAKS[7].2);
-        for peak in self
+        let resting_dynamic = peak(self.sample_rate, PEAKS[7].0, PEAKS[7].1, PEAKS[7].2);
+        for coefficients in self
             .fixed_peaks
             .iter()
-            .chain([&resting_dynamic, &self.fixed_notch])
+            .map(|section| section.coefficients)
+            .chain([resting_dynamic, self.fixed_notch.coefficients])
         {
-            response = response * peak.coefficients.response(z);
+            response = response * section_response(coefficients, z);
         }
         response
     }
 }
 
+/// Biquad coefficients `[b0, b1, b2, a1, a2]`, normalised so that `a0` is 1.
+type Section = [f64; 5];
+
+/// A section in transposed direct form II, whose round-off stays low with
+/// poles close to `z = 1`.
 #[derive(Clone, Copy, Default)]
-struct BiquadState {
-    delay_1: f32,
-    delay_2: f32,
+struct Biquad {
+    coefficients: Section,
+    state: [f64; 2],
 }
 
-impl BiquadState {
-    fn process(&mut self, input: f32, coefficients: BiquadCoefficients) -> f32 {
-        let state = flush_denormal(
-            input
-                - coefficients.scale
-                    * (coefficients.a2 * self.delay_2 + coefficients.a1 * self.delay_1),
-        );
-        let output = coefficients.scale
-            * ((coefficients.b0 * state + coefficients.b1 * self.delay_1)
-                + coefficients.b2 * self.delay_2);
-        self.delay_2 = self.delay_1;
-        self.delay_1 = state;
-        output
+impl Biquad {
+    fn new(coefficients: Section) -> Self {
+        Self {
+            coefficients,
+            state: [0.; 2],
+        }
     }
 
-    fn process_raw(&mut self, input: f32, coefficients: BiquadCoefficients) -> f32 {
-        let state = flush_denormal(
-            input
-                - coefficients.scale
-                    * (coefficients.a2 * self.delay_2 + coefficients.a1 * self.delay_1),
-        );
-        let output = (coefficients.b0 * state + coefficients.b1 * self.delay_1)
-            + coefficients.b2 * self.delay_2;
-        self.delay_2 = self.delay_1;
-        self.delay_1 = state;
+    fn process(&mut self, input: f64) -> f64 {
+        let [b0, b1, b2, a1, a2] = self.coefficients;
+        let output = b0 * input + self.state[0];
+        self.state[0] = flush_denormal_wide(b1 * input - a1 * output + self.state[1]);
+        self.state[1] = flush_denormal_wide(b2 * input - a2 * output);
         output
     }
 
     fn reset(&mut self) {
-        *self = Self::default();
+        self.state = [0.; 2];
     }
 }
 
-#[derive(Clone, Copy, Default)]
-struct BiquadCoefficients {
-    b0: f32,
-    b1: f32,
-    b2: f32,
-    a1: f32,
-    a2: f32,
-    scale: f32,
+fn process_all(sections: &mut [Biquad], mut value: f64) -> f64 {
+    for section in sections {
+        value = section.process(value);
+    }
+    value
 }
 
-impl BiquadCoefficients {
-    fn low_pass(sample_rate: f32, frequency: f32, damping: f32) -> Self {
+fn reset_all(sections: &mut [Biquad]) {
+    sections.iter_mut().for_each(Biquad::reset);
+}
+
+fn chain_response(sections: &[Biquad], z: Complex) -> Complex {
+    sections
+        .iter()
+        .fold(Complex::real(1.), |response, section| {
+            response * section_response(section.coefficients, z)
+        })
+}
+
+fn section_response([b0, b1, b2, a1, a2]: Section, z: Complex) -> Complex {
+    polynomial(z, [b0, b1, b2]) / polynomial(z, [1., a1, a2])
+}
+
+fn low_pass(sample_rate: f32, frequency: f32, damping: f32) -> Section {
+    bilinear(
+        design_tangent(sample_rate, frequency),
+        [0., 0., 1.],
+        [1., f64::from(damping), 1.],
+    )
+}
+
+fn high_pass(sample_rate: f32, frequency: f32, damping: f32) -> Section {
+    bilinear(
+        design_tangent(sample_rate, frequency),
+        [1., 0., 0.],
+        [1., f64::from(damping), 1.],
+    )
+}
+
+/// The released peaking section: its centre is prewarped and its bandwidth
+/// scaled by `1 / sin(2 angle)`.
+fn peak(sample_rate: f32, frequency: f32, level: f32, bandwidth: f32) -> Section {
+    let sample_rate = f64::from(sample_rate);
+    let frequency = f64::from(frequency).clamp(1.0, sample_rate * 0.49);
+    let bandwidth = f64::from(bandwidth.max(f32::MIN_POSITIVE));
+    let angle = PI * frequency / sample_rate;
+    let tangent = angle.tan();
+    let inverse = 1.0 / tangent;
+    let sine = (2.0 * angle).sin();
+    let unscaled = (PI / sample_rate) * (bandwidth / sine);
+    let scaled = unscaled * f64::from(db_to_gain(level.abs()));
+    let (denominator_bandwidth, numerator_bandwidth) = if level > 0.0 {
+        (unscaled, scaled)
+    } else {
+        (scaled, unscaled)
+    };
+    let middle = 2.0 * (1.0 - inverse * inverse);
+    let normalise = 1.0 / (inverse * (inverse + denominator_bandwidth) + 1.0);
+    [
+        (inverse * (inverse + numerator_bandwidth) + 1.0) * normalise,
+        middle * normalise,
+        (inverse * (inverse - numerator_bandwidth) + 1.0) * normalise,
+        middle * normalise,
+        (inverse * (inverse - denominator_bandwidth) + 1.0) * normalise,
+    ]
+}
+
+/// An odd-order Butterworth crossover: complementary low and high outputs
+/// that a shelf weights and sums.
+struct Split<const SECTIONS: usize> {
+    first_low: Biquad,
+    first_high: Biquad,
+    low: [Biquad; SECTIONS],
+    high: [Biquad; SECTIONS],
+}
+
+impl<const SECTIONS: usize> Split<SECTIONS> {
+    fn new(sample_rate: f32, frequency: f32, damping: [f32; SECTIONS]) -> Self {
         let tangent = design_tangent(sample_rate, frequency);
-        let inverse = 1.0 / tangent;
-        let inverse_squared = 1.0 / (tangent * tangent);
         Self {
-            b0: 1.0,
-            b1: 2.0,
-            b2: 1.0,
-            a1: 2.0 * (1.0 - inverse_squared),
-            a2: ((inverse - damping) / tangent) + 1.0,
-            scale: 1.0 / (((inverse + damping) / tangent) + 1.0),
+            first_low: Biquad::new(bilinear(tangent, [0., 0., 1.], [0., 1., 1.])),
+            first_high: Biquad::new(bilinear(tangent, [0., 1., 0.], [0., 1., 1.])),
+            low: damping.map(|value| Biquad::new(low_pass(sample_rate, frequency, value))),
+            high: damping.map(|value| Biquad::new(high_pass(sample_rate, frequency, value))),
         }
     }
 
-    fn high_pass(sample_rate: f32, frequency: f32, damping: f32) -> Self {
-        let tangent = design_tangent(sample_rate, frequency);
-        let inverse = 1.0 / tangent;
-        let inverse_squared = 1.0 / (tangent * tangent);
-        Self {
-            b0: inverse_squared,
-            b1: -2.0 / (tangent * tangent),
-            b2: inverse_squared,
-            a1: 2.0 * (1.0 - inverse_squared),
-            a2: ((inverse - damping) / tangent) + 1.0,
-            scale: 1.0 / (((inverse + damping) / tangent) + 1.0),
-        }
-    }
-
-    fn response(self, z: Complex) -> Complex {
-        let scale = f64::from(self.scale);
-        let numerator = polynomial(z, [self.b0, self.b1, self.b2].map(f64::from));
-        let denominator = polynomial(
-            z,
-            [1., scale * f64::from(self.a1), scale * f64::from(self.a2)],
-        );
-        numerator * scale / denominator
-    }
-}
-
-#[derive(Default)]
-struct Peak {
-    state: BiquadState,
-    coefficients: PeakCoefficients,
-}
-
-impl Peak {
-    fn new(sample_rate: f32, frequency: f32, level: f32, bandwidth: f32) -> Self {
-        let mut peak = Self::default();
-        peak.set(sample_rate, frequency, level, bandwidth);
-        peak
-    }
-
-    fn set(&mut self, sample_rate: f32, frequency: f32, level: f32, bandwidth: f32) {
-        self.coefficients = PeakCoefficients::new(
-            sample_rate,
-            frequency.clamp(1.0, sample_rate * 0.49),
-            level,
-            bandwidth.max(f32::MIN_POSITIVE),
-        );
-    }
-
-    fn process(&mut self, input: f32) -> f32 {
-        let coefficients = self.coefficients;
-        let state = flush_denormal(
-            input
-                - (self.state.delay_2 * coefficients.a2 + coefficients.middle * self.state.delay_1)
-                    / coefficients.denominator,
-        );
-        let output = ((coefficients.middle * self.state.delay_1 + state * coefficients.b0)
-            + self.state.delay_2 * coefficients.b2)
-            / coefficients.denominator;
-        self.state.delay_2 = self.state.delay_1;
-        self.state.delay_1 = state;
-        output
-    }
-
-    fn reset(&mut self) {
-        self.state.reset();
-    }
-}
-
-#[derive(Clone, Copy, Default)]
-struct PeakCoefficients {
-    b0: f32,
-    b2: f32,
-    middle: f32,
-    a2: f32,
-    denominator: f32,
-}
-
-impl PeakCoefficients {
-    fn new(sample_rate: f32, frequency: f32, level: f32, bandwidth: f32) -> Self {
-        let angle = PI * frequency / sample_rate;
-        let tangent = angle.tan();
-        let inverse = 1.0 / tangent;
-        let sine = (2.0 * angle).sin();
-        let unscaled = (PI / sample_rate) * (bandwidth / sine);
-        let scaled = (PI / sample_rate) * ((bandwidth * db_to_gain(level.abs())) / sine);
-        let (denominator_bandwidth, numerator_bandwidth) = if level > 0.0 {
-            (unscaled, scaled)
-        } else {
-            (scaled, unscaled)
-        };
-        Self {
-            b0: inverse * (inverse + numerator_bandwidth) + 1.0,
-            b2: inverse * (inverse - numerator_bandwidth) + 1.0,
-            middle: 2.0 * (1.0 - 1.0 / (tangent * tangent)),
-            a2: inverse * (inverse - denominator_bandwidth) + 1.0,
-            denominator: inverse * (inverse + denominator_bandwidth) + 1.0,
-        }
-    }
-
-    fn response(self, z: Complex) -> Complex {
-        polynomial(z, [self.b0, self.middle, self.b2].map(f64::from))
-            / polynomial(z, [self.denominator, self.middle, self.a2].map(f64::from))
-    }
-}
-
-struct EvenOrderFilter<const SECTIONS: usize> {
-    states: [BiquadState; SECTIONS],
-    coefficients: [BiquadCoefficients; SECTIONS],
-}
-
-impl<const SECTIONS: usize> EvenOrderFilter<SECTIONS> {
-    fn high_pass(sample_rate: f32, frequency: f32, damping: [f32; SECTIONS]) -> Self {
-        Self {
-            states: [BiquadState::default(); SECTIONS],
-            coefficients: damping
-                .map(|value| BiquadCoefficients::high_pass(sample_rate, frequency, value)),
-        }
-    }
-
-    fn process(&mut self, mut input: f32) -> f32 {
-        for (state, &coefficients) in self.states.iter_mut().zip(&self.coefficients) {
-            input = state.process(input, coefficients);
-        }
-        input
-    }
-
-    fn response(&self, z: Complex) -> Complex {
-        self.coefficients
-            .iter()
-            .fold(Complex::real(1.), |response, coefficients| {
-                response * coefficients.response(z)
-            })
-    }
-
-    fn reset(&mut self) {
-        self.states.fill(BiquadState::default());
-    }
-}
-
-struct FirstOrderSplit {
-    inverse: f32,
-    input_delay: f32,
-    low_delay: f32,
-    high_delay: f32,
-}
-
-impl FirstOrderSplit {
-    fn new(sample_rate: f32, frequency: f32) -> Self {
-        Self {
-            inverse: 1.0 / design_tangent(sample_rate, frequency),
-            input_delay: 0.0,
-            low_delay: 0.0,
-            high_delay: 0.0,
-        }
-    }
-
-    fn process(&mut self, input: f32) -> (f32, f32) {
-        let denominator = self.inverse + 1.0;
-        let scale = 1.0 / denominator;
-        let feedback = 1.0 - self.inverse;
-        let low = flush_denormal(-scale * (feedback * self.low_delay - (input + self.input_delay)));
-        let high = flush_denormal(
-            -(self.inverse * scale) * self.input_delay
-                - scale * (feedback * self.high_delay - self.inverse * input),
-        );
-        self.input_delay = input;
-        self.low_delay = low;
-        self.high_delay = high;
+    fn process(&mut self, input: f64) -> (f64, f64) {
+        let low = process_all(&mut self.low, self.first_low.process(input));
+        let high = process_all(&mut self.high, self.first_high.process(input));
         (low, high)
     }
 
     fn response(&self, z: Complex) -> (Complex, Complex) {
-        let inverse = f64::from(self.inverse);
-        let scale = 1. / (inverse + 1.);
-        let denominator = polynomial(z, [1., scale * (1. - inverse), 0.]);
         (
-            polynomial(z, [scale, scale, 0.]) / denominator,
-            polynomial(z, [inverse * scale, -inverse * scale, 0.]) / denominator,
+            section_response(self.first_low.coefficients, z) * chain_response(&self.low, z),
+            section_response(self.first_high.coefficients, z) * chain_response(&self.high, z),
         )
     }
 
     fn reset(&mut self) {
-        self.input_delay = 0.0;
-        self.low_delay = 0.0;
-        self.high_delay = 0.0;
-    }
-}
-
-struct OddOrderSplit<const SECTIONS: usize> {
-    first_order: FirstOrderSplit,
-    low_states: [BiquadState; SECTIONS],
-    high_states: [BiquadState; SECTIONS],
-    low_coefficients: [BiquadCoefficients; SECTIONS],
-    high_coefficients: [BiquadCoefficients; SECTIONS],
-}
-
-impl<const SECTIONS: usize> OddOrderSplit<SECTIONS> {
-    fn new(sample_rate: f32, frequency: f32, damping: [f32; SECTIONS]) -> Self {
-        Self {
-            first_order: FirstOrderSplit::new(sample_rate, frequency),
-            low_states: [BiquadState::default(); SECTIONS],
-            high_states: [BiquadState::default(); SECTIONS],
-            low_coefficients: damping
-                .map(|value| BiquadCoefficients::low_pass(sample_rate, frequency, value)),
-            high_coefficients: damping
-                .map(|value| BiquadCoefficients::high_pass(sample_rate, frequency, value)),
-        }
-    }
-
-    fn process(&mut self, input: f32) -> (f32, f32) {
-        let (low, high, scale) = self.process_raw(input);
-        (scale * low, scale * high)
-    }
-
-    fn process_raw(&mut self, input: f32) -> (f32, f32, f32) {
-        let (mut low, mut high) = self.first_order.process(input);
-        for (state, &coefficients) in self.low_states[..SECTIONS - 1]
-            .iter_mut()
-            .zip(&self.low_coefficients[..SECTIONS - 1])
-        {
-            low = state.process(low, coefficients);
-        }
-        for (state, &coefficients) in self.high_states[..SECTIONS - 1]
-            .iter_mut()
-            .zip(&self.high_coefficients[..SECTIONS - 1])
-        {
-            high = state.process(high, coefficients);
-        }
-        let low_coefficients = self.low_coefficients[SECTIONS - 1];
-        let high_coefficients = self.high_coefficients[SECTIONS - 1];
-        debug_assert_eq!(low_coefficients.scale, high_coefficients.scale);
-        low = self.low_states[SECTIONS - 1].process_raw(low, low_coefficients);
-        high = self.high_states[SECTIONS - 1].process_raw(high, high_coefficients);
-        (low, high, low_coefficients.scale)
-    }
-
-    fn process_low(&mut self, input: f32) -> f32 {
-        self.process(input).0
-    }
-
-    fn response(&self, z: Complex) -> (Complex, Complex) {
-        let (mut low, mut high) = self.first_order.response(z);
-        for (low_coefficients, high_coefficients) in
-            self.low_coefficients.iter().zip(&self.high_coefficients)
-        {
-            low = low * low_coefficients.response(z);
-            high = high * high_coefficients.response(z);
-        }
-        (low, high)
-    }
-
-    fn reset(&mut self) {
-        self.first_order.reset();
-        self.low_states.fill(BiquadState::default());
-        self.high_states.fill(BiquadState::default());
+        self.first_low.reset();
+        self.first_high.reset();
+        reset_all(&mut self.low);
+        reset_all(&mut self.high);
     }
 }
 
@@ -620,43 +431,11 @@ const MATCH_TOP_HZ: f64 = 20_000.;
 const MATCH_TOP_FRACTION: f64 = 0.45;
 const MATCH_ITERATIONS: usize = 30;
 
-/// Biquad coefficients `[b0, b1, b2, a1, a2]`.
-type Section = [f64; 5];
-
-struct Cascade<const SECTIONS: usize> {
-    sections: [[f32; 5]; SECTIONS],
-    states: [[f32; 2]; SECTIONS],
-}
-
-impl<const SECTIONS: usize> Cascade<SECTIONS> {
-    fn new(sections: [Section; SECTIONS]) -> Self {
-        Self {
-            sections: sections.map(|section| section.map(|value| value as f32)),
-            states: [[0.; 2]; SECTIONS],
-        }
-    }
-
-    fn process(&mut self, mut value: f32) -> f32 {
-        for (&[b0, b1, b2, a1, a2], state) in self.sections.iter().zip(&mut self.states) {
-            let output = b0 * value + state[0];
-            state[0] = flush_denormal(b1 * value - a1 * output + state[1]);
-            state[1] = flush_denormal(b2 * value - a2 * output);
-            value = output;
-        }
-        value
-    }
-
-    fn reset(&mut self) {
-        self.states = [[0.; 2]; SECTIONS];
-    }
-}
-
 /// The bilinear designs the fit starts from: the low-pass, and the cabinet
 /// shelf factored into minimum-phase sections with the same magnitude.
-fn matched_sections(sample_rate: f64) -> [Section; MATCHED_SECTIONS] {
-    let tangent = |frequency: f32| f64::from(design_tangent(sample_rate as f32, frequency));
-    let low_pass = tangent(LOW_PASS_HZ);
-    let shelf = tangent(CABINET_SHELF_HZ);
+fn matched_sections(sample_rate: f32) -> [Section; MATCHED_SECTIONS] {
+    let low_pass_tangent = design_tangent(sample_rate, LOW_PASS_HZ);
+    let shelf = design_tangent(sample_rate, CABINET_SHELF_HZ);
     let ratio = f64::from(db_to_gain(CABINET_SHELF_DB)).powf(-1. / 7.);
     let shelf_section = |damping: f64| {
         let section = bilinear(
@@ -667,8 +446,8 @@ fn matched_sections(sample_rate: f64) -> [Section; MATCHED_SECTIONS] {
         scale_numerator(section, 1. / (ratio * ratio))
     };
     [
-        bilinear(low_pass, [0., 0., 1.], [0., 1., 1.]),
-        bilinear(low_pass, [0., 0., 1.], [1., 1., 1.]),
+        bilinear(low_pass_tangent, [0., 0., 1.], [0., 1., 1.]),
+        low_pass(sample_rate, LOW_PASS_HZ, 1.),
         scale_numerator(bilinear(shelf, [0., 1., ratio], [0., 1., 1.]), 1. / ratio),
         shelf_section(1.801_937_7),
         shelf_section(1.246_979_6),
@@ -840,15 +619,16 @@ fn solve(mut matrix: Vec<f64>, mut vector: Vec<f64>) -> Vec<f64> {
 
 /// The unit delay `z⁻¹` at a frequency.
 fn delay(frequency: f64, sample_rate: f64) -> Complex {
-    Complex::polar(-2. * std::f64::consts::PI * frequency / sample_rate)
+    Complex::polar(-2. * PI * frequency / sample_rate)
 }
 
 fn polynomial(z: Complex, [c0, c1, c2]: [f64; 3]) -> Complex {
     Complex::real(c0) + z * c1 + z * z * c2
 }
 
-fn design_tangent(sample_rate: f32, frequency: f32) -> f32 {
-    (PI * frequency.min(MAX_DESIGN_FRACTION * sample_rate) / sample_rate).tan()
+fn design_tangent(sample_rate: f32, frequency: f32) -> f64 {
+    let frequency = frequency.min(MAX_DESIGN_FRACTION * sample_rate);
+    (PI * f64::from(frequency) / f64::from(sample_rate)).tan()
 }
 
 fn dynamic_response(envelope: f32, level: f32) -> f32 {
@@ -878,9 +658,18 @@ fn flush_denormal(value: f32) -> f32 {
     }
 }
 
+fn flush_denormal_wide(value: f64) -> f64 {
+    if value.abs() < f64::MIN_POSITIVE {
+        0.0
+    } else {
+        value
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::f32::consts::PI;
 
     #[test]
     fn controls_change_observable_frequency_and_level_response() {
@@ -944,8 +733,8 @@ mod tests {
     fn sine_gain_db(cabinet: &mut Cabinet, frequency: f32) -> f32 {
         let sample_rate = cabinet.sample_rate;
         cabinet.reset();
-        let settle = (0.1 * sample_rate) as usize;
-        let window = (0.05 * sample_rate) as usize;
+        let settle = (0.05 * sample_rate) as usize;
+        let window = (0.02 * sample_rate) as usize;
         let phase = |index: usize| 2.0 * PI * ((frequency * index as f32 / sample_rate) % 1.0);
         let mut samples: Vec<f32> = (0..settle + window)
             .map(|index| 0.01 * phase(index).sin())
@@ -988,6 +777,44 @@ mod tests {
                 "1 kHz at {sample_rate} Hz: {gain:.2} dB against {reference:.2} dB at the reference rate"
             );
         }
+    }
+
+    #[test]
+    fn a_low_note_at_a_high_rate_carries_no_round_off_hiss() {
+        let sample_rate = 192_000.0;
+        let mut cabinet = resting(sample_rate);
+        cabinet.set_distance(0.5);
+        let angle = |index: usize| 2.0 * std::f64::consts::PI * 110.0 * index as f64 / 192_000.0;
+        let mut samples: Vec<f32> = (0..57_600)
+            .map(|index| (0.1 * angle(index).sin()) as f32)
+            .collect();
+        cabinet.process(&mut samples);
+        // Least-squares fit of the settled tone; what it leaves is the hiss.
+        let tail = 38_400;
+        let (mut ss, mut sc, mut cc, mut ys, mut yc) = (0.0, 0.0, 0.0, 0.0, 0.0);
+        for (index, &sample) in samples.iter().enumerate().skip(tail) {
+            let (sine, cosine) = angle(index).sin_cos();
+            let sample = f64::from(sample);
+            (ss, sc, cc) = (ss + sine * sine, sc + sine * cosine, cc + cosine * cosine);
+            (ys, yc) = (ys + sample * sine, yc + sample * cosine);
+        }
+        let determinant = ss * cc - sc * sc;
+        let (a, b) = (
+            (ys * cc - yc * sc) / determinant,
+            (yc * ss - ys * sc) / determinant,
+        );
+        let (mut tone, mut residue) = (0.0, 0.0);
+        for (index, &sample) in samples.iter().enumerate().skip(tail) {
+            let (sine, cosine) = angle(index).sin_cos();
+            let fitted = a * sine + b * cosine;
+            tone += fitted * fitted;
+            residue += (f64::from(sample) - fitted).powi(2);
+        }
+        let residue_db = 10.0 * (residue / tone).log10();
+        assert!(
+            residue_db < -100.0,
+            "residue {residue_db:.1} dB under a 110 Hz tone at 192 kHz"
+        );
     }
 
     #[test]

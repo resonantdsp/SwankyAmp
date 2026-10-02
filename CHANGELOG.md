@@ -84,6 +84,10 @@ installs beside Swanky Amp 1.4.0.
   352.8 and 384 kHz every cabinet frequency sat
   an octave high, and below 22 kHz the cabinet blew up into silence; it now
   plays at every rate the plug-in accepts. 48 kHz is unchanged.
+- Removed a hiss the cabinet added under low notes: its filters now run in
+  double precision. Under a 110 Hz note through Clean the hiss sat 66 dB
+  below the tone at 48 kHz and 48 dB below at 192 kHz; it is now 84 dB and
+  78 dB below, set by the amplifier's own noise.
 - Made the header's preset field live: `‹` and `›` step through the refitted
   factory presets and the user's own, and the name opens a menu with Init,
   every preset, Save, Save as…, Remove, Import 1.x presets and Open folder.
