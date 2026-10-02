@@ -4,7 +4,10 @@
 use std::array;
 use std::f64::consts::PI;
 
-use super::filters::Complex;
+use super::cabinet_data::MATCHED;
+
+#[cfg(feature = "tools")]
+pub mod fit;
 
 const OFFSET_DB: f32 = 19.37125;
 const HIGH_PASS_HZ: f32 = 111.0027;
@@ -52,9 +55,12 @@ pub(crate) struct Cabinet {
     low_pass: Split<1>,
     cabinet_shelf: Split<3>,
     cabinet_shelf_gain: f64,
-    /// Away from the reference rate, replaces the low-pass and the cabinet
-    /// shelf, whose bilinear designs match the reference only at their corners.
+    /// At a tabled rate other than the reference, replaces the low-pass and
+    /// the cabinet shelf, whose bilinear designs match the reference only at
+    /// their corners.
     matched: Option<[Biquad; MATCHED_SECTIONS]>,
+    /// The released path keeps the bilinear design at every rate.
+    follows_reference: bool,
     fixed_peaks: [Biquad; 10],
     dynamic_peak: Biquad,
     fixed_notch: Biquad,
@@ -66,15 +72,23 @@ pub(crate) struct Cabinet {
 }
 
 impl Cabinet {
+    /// The shipping cabinet: at the rates `just fit-cabinet` tables it plays
+    /// the reference rate's response; at any other rate, the bilinear design.
     pub(crate) fn new(sample_rate: f32) -> Self {
-        let sample_rate = valid_sample_rate(sample_rate);
-        let mut cabinet = Self::designed(sample_rate);
-        // Below twice the low-pass corner the reference's top end has no room
-        // under Nyquist, and the clamped designs play on their own.
-        if sample_rate != REFERENCE_RATE && sample_rate >= 2. * LOW_PASS_HZ {
-            cabinet.matched = Some(cabinet.match_reference());
-        }
+        let mut cabinet = Self::designed(valid_sample_rate(sample_rate));
+        cabinet.follows_reference = true;
+        cabinet.matched = MATCHED
+            .iter()
+            .find(|(rate, _)| *rate == cabinet.sample_rate)
+            .map(|(_, sections)| sections.map(Biquad::new));
         cabinet
+    }
+
+    /// Keeps the released bilinear design at every rate, as 1.4.0 did, for
+    /// the path that is checked against 1.4.0's renders.
+    pub(crate) fn use_released_design(&mut self) {
+        self.follows_reference = false;
+        self.matched = None;
     }
 
     fn designed(sample_rate: f32) -> Self {
@@ -96,6 +110,7 @@ impl Cabinet {
             ),
             cabinet_shelf_gain: f64::from(db_to_gain(CABINET_SHELF_DB)),
             matched: None,
+            follows_reference: false,
             fixed_peaks: array::from_fn(|_| Biquad::default()),
             dynamic_peak: Biquad::default(),
             fixed_notch: Biquad::new(peak(sample_rate, 100.0, -5.0, 200.0)),
@@ -124,7 +139,11 @@ impl Cabinet {
             self.dynamic,
             self.dynamic_level,
         );
+        let follows_reference = self.follows_reference;
         *self = Self::new(sample_rate);
+        if !follows_reference {
+            self.use_released_design();
+        }
         self.set_brightness(controls.0);
         self.set_distance(controls.1);
         self.set_dynamic(controls.2);
@@ -228,59 +247,6 @@ impl Cabinet {
             peak(self.sample_rate, 1_200.0, -17.0 * self.distance, 300.0);
         self.output_gain = f64::from(db_to_gain(OFFSET_DB) * 10.0_f32.powf(0.1 * self.distance));
     }
-
-    /// Fits the sections that replace the low-pass and the cabinet shelf so
-    /// that, with every other fixed section as designed at this rate, the
-    /// cabinet at rest has the reference rate's magnitude response. The
-    /// reference's top end is steeper than any same-order bilinear design
-    /// here, so the sections' poles and zeros are fitted freely; the phase is
-    /// left minimal.
-    fn match_reference(&self) -> [Biquad; MATCHED_SECTIONS] {
-        let reference = Self::designed(REFERENCE_RATE);
-        let sample_rate = f64::from(self.sample_rate);
-        let top = MATCH_TOP_HZ.min(MATCH_TOP_FRACTION * sample_rate);
-        let frequencies: Vec<f64> = (0..MATCH_POINTS)
-            .map(|index| {
-                let position = index as f64 / (MATCH_POINTS - 1) as f64;
-                MATCH_BOTTOM_HZ * (top / MATCH_BOTTOM_HZ).powf(position)
-            })
-            .collect();
-        let target: Vec<f64> = frequencies
-            .iter()
-            .map(|&frequency| {
-                reference
-                    .fixed_response(frequency, true)
-                    .norm_squared()
-                    .ln()
-                    / 2.
-                    - self.fixed_response(frequency, false).norm_squared().ln() / 2.
-            })
-            .collect();
-        let initial = matched_sections(self.sample_rate);
-        fit_magnitude(initial, &frequencies, &target, sample_rate).map(Biquad::new)
-    }
-
-    /// The response of the fixed sections with the controls at rest, with or
-    /// without the low-pass and the cabinet shelf.
-    fn fixed_response(&self, frequency: f64, with_matched_filters: bool) -> Complex {
-        let z = delay(frequency, f64::from(self.sample_rate));
-        let mut response = chain_response(&self.high_pass, z);
-        if with_matched_filters {
-            let (low, _) = self.low_pass.response(z);
-            let (shelf_low, shelf_high) = self.cabinet_shelf.response(z);
-            response = response * low * (shelf_low + shelf_high * self.cabinet_shelf_gain);
-        }
-        let resting_dynamic = peak(self.sample_rate, PEAKS[7].0, PEAKS[7].1, PEAKS[7].2);
-        for coefficients in self
-            .fixed_peaks
-            .iter()
-            .map(|section| section.coefficients)
-            .chain([resting_dynamic, self.fixed_notch.coefficients])
-        {
-            response = response * section_response(coefficients, z);
-        }
-        response
-    }
 }
 
 /// Biquad coefficients `[b0, b1, b2, a1, a2]`, normalised so that `a0` is 1.
@@ -324,18 +290,6 @@ fn process_all(sections: &mut [Biquad], mut value: f64) -> f64 {
 
 fn reset_all(sections: &mut [Biquad]) {
     sections.iter_mut().for_each(Biquad::reset);
-}
-
-fn chain_response(sections: &[Biquad], z: Complex) -> Complex {
-    sections
-        .iter()
-        .fold(Complex::real(1.), |response, section| {
-            response * section_response(section.coefficients, z)
-        })
-}
-
-fn section_response([b0, b1, b2, a1, a2]: Section, z: Complex) -> Complex {
-    polynomial(z, [b0, b1, b2]) / polynomial(z, [1., a1, a2])
 }
 
 fn low_pass(sample_rate: f32, frequency: f32, damping: f32) -> Section {
@@ -408,13 +362,6 @@ impl<const SECTIONS: usize> Split<SECTIONS> {
         (low, high)
     }
 
-    fn response(&self, z: Complex) -> (Complex, Complex) {
-        (
-            section_response(self.first_low.coefficients, z) * chain_response(&self.low, z),
-            section_response(self.first_high.coefficients, z) * chain_response(&self.high, z),
-        )
-    }
-
     fn reset(&mut self) {
         self.first_low.reset();
         self.first_high.reset();
@@ -423,37 +370,9 @@ impl<const SECTIONS: usize> Split<SECTIONS> {
     }
 }
 
-/// The low-pass's first- and second-order sections, then the cabinet shelf's.
+/// The sections that replace the low-pass and the cabinet shelf at a tabled
+/// rate.
 const MATCHED_SECTIONS: usize = 6;
-const MATCH_POINTS: usize = 60;
-const MATCH_BOTTOM_HZ: f64 = 100.;
-const MATCH_TOP_HZ: f64 = 20_000.;
-const MATCH_TOP_FRACTION: f64 = 0.45;
-const MATCH_ITERATIONS: usize = 30;
-
-/// The bilinear designs the fit starts from: the low-pass, and the cabinet
-/// shelf factored into minimum-phase sections with the same magnitude.
-fn matched_sections(sample_rate: f32) -> [Section; MATCHED_SECTIONS] {
-    let low_pass_tangent = design_tangent(sample_rate, LOW_PASS_HZ);
-    let shelf = design_tangent(sample_rate, CABINET_SHELF_HZ);
-    let ratio = f64::from(db_to_gain(CABINET_SHELF_DB)).powf(-1. / 7.);
-    let shelf_section = |damping: f64| {
-        let section = bilinear(
-            shelf,
-            [1., ratio * damping, ratio * ratio],
-            [1., damping, 1.],
-        );
-        scale_numerator(section, 1. / (ratio * ratio))
-    };
-    [
-        bilinear(low_pass_tangent, [0., 0., 1.], [0., 1., 1.]),
-        low_pass(sample_rate, LOW_PASS_HZ, 1.),
-        scale_numerator(bilinear(shelf, [0., 1., ratio], [0., 1., 1.]), 1. / ratio),
-        shelf_section(1.801_937_7),
-        shelf_section(1.246_979_6),
-        shelf_section(0.445_041_87),
-    ]
-}
 
 /// Maps a section given in the prewarped analogue variable, as `[W², W, 1]`
 /// coefficients, to the digital domain; a section without `W²` in its
@@ -476,154 +395,6 @@ fn bilinear(tangent: f64, numerator: [f64; 3], denominator: [f64; 3]) -> Section
     let [b0, b1, b2] = map(numerator);
     let [a0, a1, a2] = map(denominator);
     [b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0]
-}
-
-fn scale_numerator(section: Section, scale: f64) -> Section {
-    let [b0, b1, b2, a1, a2] = section;
-    [b0 * scale, b1 * scale, b2 * scale, a1, a2]
-}
-
-/// Levenberg-Marquardt on the log magnitude, accepting only steps that
-/// lower the error and keep every section stable, so the result is never
-/// worse than the starting design.
-fn fit_magnitude<const SECTIONS: usize>(
-    mut sections: [Section; SECTIONS],
-    frequencies: &[f64],
-    target: &[f64],
-    sample_rate: f64,
-) -> [Section; SECTIONS] {
-    let delays: Vec<Complex> = frequencies
-        .iter()
-        .map(|&frequency| delay(frequency, sample_rate))
-        .collect();
-    let residuals = |sections: &[Section; SECTIONS]| -> Vec<f64> {
-        delays
-            .iter()
-            .zip(target)
-            .map(|(&z, &target)| {
-                sections
-                    .iter()
-                    .map(|&[b0, b1, b2, a1, a2]| {
-                        (polynomial(z, [b0, b1, b2]).norm_squared()
-                            / polynomial(z, [1., a1, a2]).norm_squared())
-                        .ln()
-                            / 2.
-                    })
-                    .sum::<f64>()
-                    - target
-            })
-            .collect()
-    };
-    let cost = |residuals: &[f64]| residuals.iter().map(|value| value * value).sum::<f64>();
-    let parameters = 5 * SECTIONS;
-
-    let mut current = residuals(&sections);
-    let mut current_cost = cost(&current);
-    let mut damping = 1e-3;
-    for _ in 0..MATCH_ITERATIONS {
-        let mut normal = vec![0.; parameters * parameters];
-        let mut gradient = vec![0.; parameters];
-        let mut row = vec![0.; parameters];
-        for (&z, &residual) in delays.iter().zip(&current) {
-            let z2 = z * z;
-            for (index, &[b0, b1, b2, a1, a2]) in sections.iter().enumerate() {
-                let numerator = Complex::real(1.) / polynomial(z, [b0, b1, b2]);
-                let denominator = Complex::real(1.) / polynomial(z, [1., a1, a2]);
-                row[5 * index..5 * index + 5].copy_from_slice(&[
-                    numerator.re,
-                    (z * numerator).re,
-                    (z2 * numerator).re,
-                    -(z * denominator).re,
-                    -(z2 * denominator).re,
-                ]);
-            }
-            for ((&left, gradient), normal) in row
-                .iter()
-                .zip(&mut gradient)
-                .zip(normal.chunks_exact_mut(parameters))
-            {
-                *gradient += left * residual;
-                for (entry, &right) in normal.iter_mut().zip(&row) {
-                    *entry += left * right;
-                }
-            }
-        }
-        loop {
-            let mut system = normal.clone();
-            for i in 0..parameters {
-                system[i * parameters + i] *= 1. + damping;
-            }
-            let step = solve(system, gradient.iter().map(|value| -value).collect());
-            let mut candidate = sections;
-            for (index, section) in candidate.iter_mut().enumerate() {
-                for (value, change) in section.iter_mut().zip(&step[5 * index..]) {
-                    *value += change;
-                }
-            }
-            if candidate.iter().all(stable) {
-                let trial = residuals(&candidate);
-                let trial_cost = cost(&trial);
-                if trial_cost < current_cost {
-                    sections = candidate;
-                    current = trial;
-                    current_cost = trial_cost;
-                    damping = (damping / 3.).max(1e-9);
-                    break;
-                }
-            }
-            damping *= 4.;
-            if damping > 1e8 {
-                return sections;
-            }
-        }
-    }
-    sections
-}
-
-fn stable(&[_, _, _, a1, a2]: &Section) -> bool {
-    a2.abs() < 1. && a1.abs() < 1. + a2
-}
-
-/// Gaussian elimination with partial pivoting; a singular system gives a
-/// non-finite step, which the caller's stability check rejects.
-fn solve(mut matrix: Vec<f64>, mut vector: Vec<f64>) -> Vec<f64> {
-    let size = vector.len();
-    for column in 0..size {
-        let pivot = (column..size)
-            .max_by(|&a, &b| {
-                matrix[a * size + column]
-                    .abs()
-                    .total_cmp(&matrix[b * size + column].abs())
-            })
-            .unwrap_or(column);
-        for k in 0..size {
-            matrix.swap(column * size + k, pivot * size + k);
-        }
-        vector.swap(column, pivot);
-        for row in column + 1..size {
-            let factor = matrix[row * size + column] / matrix[column * size + column];
-            for k in column..size {
-                matrix[row * size + k] -= factor * matrix[column * size + k];
-            }
-            vector[row] -= factor * vector[column];
-        }
-    }
-    for row in (0..size).rev() {
-        let sum: f64 = (row + 1..size)
-            .map(|k| matrix[row * size + k] * vector[k])
-            .sum();
-        vector[row] = (vector[row] - sum) / matrix[row * size + row];
-    }
-    vector
-}
-
-/// The unit delay `z⁻¹` at a frequency.
-fn delay(frequency: f64, sample_rate: f64) -> Complex {
-    Complex::polar(-2. * PI * frequency / sample_rate)
-}
-
-fn polynomial(z: Complex, [c0, c1, c2]: [f64; 3]) -> Complex {
-    Complex::real(c0) + z * c1 + z * z * c2
 }
 
 fn design_tangent(sample_rate: f32, frequency: f32) -> f64 {
@@ -730,8 +501,7 @@ mod tests {
     }
 
     /// The gain in dB for a sine, measured after the cabinet settles.
-    fn sine_gain_db(cabinet: &mut Cabinet, frequency: f32) -> f32 {
-        let sample_rate = cabinet.sample_rate;
+    fn sine_gain_db(cabinet: &mut Cabinet, sample_rate: f32, frequency: f32) -> f32 {
         cabinet.reset();
         let settle = (0.05 * sample_rate) as usize;
         let window = (0.02 * sample_rate) as usize;
@@ -757,8 +527,8 @@ mod tests {
         for sample_rate in [44_100.0, 96_000.0, 384_000.0] {
             let mut cabinet = resting(sample_rate);
             for frequency in [200.0, 8_000.0, 14_000.0] {
-                let expected = sine_gain_db(&mut reference, frequency);
-                let gain = sine_gain_db(&mut cabinet, frequency);
+                let expected = sine_gain_db(&mut reference, REFERENCE_RATE, frequency);
+                let gain = sine_gain_db(&mut cabinet, sample_rate, frequency);
                 assert!(
                     (gain - expected).abs() < 0.3,
                     "{frequency} Hz at {sample_rate} Hz: {gain:.2} dB against {expected:.2} dB at the reference rate"
@@ -769,12 +539,38 @@ mod tests {
 
     #[test]
     fn low_host_rates_keep_the_midrange() {
-        let reference = sine_gain_db(&mut resting(REFERENCE_RATE), 1_000.0);
+        let reference = sine_gain_db(&mut resting(REFERENCE_RATE), REFERENCE_RATE, 1_000.0);
         for sample_rate in [8_000.0, 11_025.0, 16_000.0] {
-            let gain = sine_gain_db(&mut resting(sample_rate), 1_000.0);
+            let gain = sine_gain_db(&mut resting(sample_rate), sample_rate, 1_000.0);
             assert!(
                 (gain - reference).abs() < 1.5,
                 "1 kHz at {sample_rate} Hz: {gain:.2} dB against {reference:.2} dB at the reference rate"
+            );
+        }
+    }
+
+    #[test]
+    fn falls_silent_after_its_input_stops() {
+        for sample_rate in [22_050.0, 96_000.0] {
+            let mut cabinet = resting(sample_rate);
+            let burst = (0.05 * sample_rate) as usize;
+            let mut samples: Vec<f32> = (0..(1.05 * sample_rate) as usize)
+                .map(|index| {
+                    if index < burst {
+                        // A full-band burst that reaches Nyquist.
+                        if index % 2 == 0 { 0.5 } else { -0.3 }
+                    } else {
+                        0.0
+                    }
+                })
+                .collect();
+            cabinet.process(&mut samples);
+            let tail = samples[(0.55 * sample_rate) as usize..]
+                .iter()
+                .fold(0.0_f32, |peak, sample| peak.max(sample.abs()));
+            assert!(
+                tail < 1e-6,
+                "at {sample_rate} Hz the cabinet still plays {tail:e} half a second after its input stopped"
             );
         }
     }

@@ -103,6 +103,13 @@ calibrate:
     cargo build --quiet --no-default-features --features tools --bin calibrate
     target/debug/calibrate {{ recording_args }} --data src/dsp/calibration_data.rs
 
+# Fit the sections that give the cabinet its 48 kHz response at the other
+# common rates and rewrite them as source, printing each rate's error.
+fit-cabinet:
+    cargo build --release --quiet --no-default-features --features tools --bin fit-cabinet
+    target/release/fit-cabinet --data src/dsp/cabinet_data.rs
+    rustfmt --edition 2024 src/dsp/cabinet_data.rs
+
 # Measure the unit knee's seam residuals per factory preset and input level.
 knee-report output="target/dsp/knee.json":
     cargo build --quiet --no-default-features --features tools --bin render-model

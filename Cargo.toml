@@ -56,6 +56,11 @@ path = "src/bin/tone-stack-soak.rs"
 required-features = ["tools"]
 
 [[bin]]
+name = "fit-cabinet"
+path = "src/bin/fit-cabinet.rs"
+required-features = ["tools"]
+
+[[bin]]
 name = "calibrate"
 path = "src/bin/calibrate.rs"
 required-features = ["tools"]
