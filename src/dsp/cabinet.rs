@@ -4,6 +4,8 @@
 use std::array;
 use std::f32::consts::PI;
 
+use super::filters::Complex;
+
 const OFFSET_DB: f32 = 19.37125;
 const HIGH_PASS_HZ: f32 = 111.0027;
 const LOW_PASS_HZ: f32 = 10_998.76;
@@ -24,6 +26,14 @@ const PEAKS: [(f32, f32, f32); 10] = [
 ];
 const SCOOP: (f32, f32, f32) = (950.9019, -15.29571, 2_799.926);
 
+/// The cabinet was voiced at this rate; its response there is the reference
+/// every other host rate is matched to.
+const REFERENCE_RATE: f32 = 48_000.;
+const MAX_SAMPLE_RATE: f32 = 384_000.;
+/// Bilinear designs stay below Nyquist, where their tangent turns negative
+/// and the section unstable.
+const MAX_DESIGN_FRACTION: f32 = 0.49;
+
 /// The released Free cabinet: a fixed parametric cabinet response whose upper
 /// range follows a 100 ms input envelope.
 pub(crate) struct Cabinet {
@@ -38,6 +48,9 @@ pub(crate) struct Cabinet {
     low_pass: OddOrderSplit<1>,
     cabinet_shelf: OddOrderSplit<3>,
     cabinet_shelf_gain: f32,
+    /// Away from the reference rate, replaces the low-pass and the cabinet
+    /// shelf, whose bilinear designs match the reference only at their corners.
+    matched: Option<Cascade<MATCHED_SECTIONS>>,
     fixed_peaks: [Peak; 10],
     dynamic_peak: Peak,
     fixed_notch: Peak,
@@ -51,6 +64,16 @@ pub(crate) struct Cabinet {
 impl Cabinet {
     pub(crate) fn new(sample_rate: f32) -> Self {
         let sample_rate = valid_sample_rate(sample_rate);
+        let mut cabinet = Self::designed(sample_rate);
+        // Below twice the low-pass corner the reference's top end has no room
+        // under Nyquist, and the clamped designs play on their own.
+        if sample_rate != REFERENCE_RATE && sample_rate >= 2. * LOW_PASS_HZ {
+            cabinet.matched = Some(cabinet.match_reference());
+        }
+        cabinet
+    }
+
+    fn designed(sample_rate: f32) -> Self {
         let mut cabinet = Self {
             sample_rate,
             brightness: 0.0,
@@ -71,6 +94,7 @@ impl Cabinet {
                 [1.801_937_7, 1.246_979_6, 0.445_041_87],
             ),
             cabinet_shelf_gain: db_to_gain(CABINET_SHELF_DB),
+            matched: None,
             fixed_peaks: array::from_fn(|_| Peak::default()),
             dynamic_peak: Peak::default(),
             fixed_notch: Peak::new(sample_rate, 100.0, -5.0, 200.0),
@@ -111,6 +135,9 @@ impl Cabinet {
         self.high_pass.reset();
         self.low_pass.reset();
         self.cabinet_shelf.reset();
+        if let Some(matched) = &mut self.matched {
+            matched.reset();
+        }
         for peak in &mut self.fixed_peaks {
             peak.reset();
         }
@@ -155,9 +182,13 @@ impl Cabinet {
             let response = dynamic_response(self.envelope, self.dynamic_level);
 
             let mut value = self.high_pass.process(input);
-            value = self.low_pass.process_low(value);
-            let (low, high, scale) = self.cabinet_shelf.process_raw(value);
-            value = scale * (low + self.cabinet_shelf_gain * high);
+            if let Some(matched) = &mut self.matched {
+                value = matched.process(value);
+            } else {
+                value = self.low_pass.process_low(value);
+                let (low, high, scale) = self.cabinet_shelf.process_raw(value);
+                value = scale * (low + self.cabinet_shelf_gain * high);
+            }
 
             for peak in &mut self.fixed_peaks[..7] {
                 value = peak.process(value);
@@ -203,6 +234,60 @@ impl Cabinet {
         self.distance_peaks[0].set(self.sample_rate, 70.0, -10.0 * self.distance, 100.0);
         self.distance_peaks[1].set(self.sample_rate, 1_200.0, -17.0 * self.distance, 300.0);
         self.output_gain = db_to_gain(OFFSET_DB) * 10.0_f32.powf(0.1 * self.distance);
+    }
+
+    /// Fits the sections that replace the low-pass and the cabinet shelf so
+    /// that, with every other fixed section as designed at this rate, the
+    /// cabinet at rest has the reference rate's magnitude response. The
+    /// reference's top end is steeper than any same-order bilinear design
+    /// here, so the sections' poles and zeros are fitted freely; the phase is
+    /// left minimal.
+    fn match_reference(&self) -> Cascade<MATCHED_SECTIONS> {
+        let reference = Self::designed(REFERENCE_RATE);
+        let sample_rate = f64::from(self.sample_rate);
+        let top = MATCH_TOP_HZ.min(MATCH_TOP_FRACTION * sample_rate);
+        let frequencies: Vec<f64> = (0..MATCH_POINTS)
+            .map(|index| {
+                let position = index as f64 / (MATCH_POINTS - 1) as f64;
+                MATCH_BOTTOM_HZ * (top / MATCH_BOTTOM_HZ).powf(position)
+            })
+            .collect();
+        let target: Vec<f64> = frequencies
+            .iter()
+            .map(|&frequency| {
+                reference
+                    .fixed_response(frequency, true)
+                    .norm_squared()
+                    .ln()
+                    / 2.
+                    - self.fixed_response(frequency, false).norm_squared().ln() / 2.
+            })
+            .collect();
+        let initial = matched_sections(sample_rate);
+        let sections = fit_magnitude(initial, &frequencies, &target, sample_rate);
+        Cascade::new(sections)
+    }
+
+    /// The response of the fixed sections with the controls at rest, with or
+    /// without the low-pass and the cabinet shelf.
+    fn fixed_response(&self, frequency: f64, with_matched_filters: bool) -> Complex {
+        let z = delay(frequency, f64::from(self.sample_rate));
+        let mut response = self.high_pass.response(z);
+        if with_matched_filters {
+            let (low, _) = self.low_pass.response(z);
+            let (shelf_low, shelf_high) = self.cabinet_shelf.response(z);
+            response =
+                response * low * (shelf_low + shelf_high * f64::from(self.cabinet_shelf_gain));
+        }
+        let resting_dynamic = Peak::new(self.sample_rate, PEAKS[7].0, PEAKS[7].1, PEAKS[7].2);
+        for peak in self
+            .fixed_peaks
+            .iter()
+            .chain([&resting_dynamic, &self.fixed_notch])
+        {
+            response = response * peak.coefficients.response(z);
+        }
+        response
     }
 }
 
@@ -257,7 +342,7 @@ struct BiquadCoefficients {
 
 impl BiquadCoefficients {
     fn low_pass(sample_rate: f32, frequency: f32, damping: f32) -> Self {
-        let tangent = (PI * frequency / sample_rate).tan();
+        let tangent = design_tangent(sample_rate, frequency);
         let inverse = 1.0 / tangent;
         let inverse_squared = 1.0 / (tangent * tangent);
         Self {
@@ -271,7 +356,7 @@ impl BiquadCoefficients {
     }
 
     fn high_pass(sample_rate: f32, frequency: f32, damping: f32) -> Self {
-        let tangent = (PI * frequency / sample_rate).tan();
+        let tangent = design_tangent(sample_rate, frequency);
         let inverse = 1.0 / tangent;
         let inverse_squared = 1.0 / (tangent * tangent);
         Self {
@@ -282,6 +367,16 @@ impl BiquadCoefficients {
             a2: ((inverse - damping) / tangent) + 1.0,
             scale: 1.0 / (((inverse + damping) / tangent) + 1.0),
         }
+    }
+
+    fn response(self, z: Complex) -> Complex {
+        let scale = f64::from(self.scale);
+        let numerator = polynomial(z, [self.b0, self.b1, self.b2].map(f64::from));
+        let denominator = polynomial(
+            z,
+            [1., scale * f64::from(self.a1), scale * f64::from(self.a2)],
+        );
+        numerator * scale / denominator
     }
 }
 
@@ -357,6 +452,11 @@ impl PeakCoefficients {
             denominator: inverse * (inverse + denominator_bandwidth) + 1.0,
         }
     }
+
+    fn response(self, z: Complex) -> Complex {
+        polynomial(z, [self.b0, self.middle, self.b2].map(f64::from))
+            / polynomial(z, [self.denominator, self.middle, self.a2].map(f64::from))
+    }
 }
 
 struct EvenOrderFilter<const SECTIONS: usize> {
@@ -380,6 +480,14 @@ impl<const SECTIONS: usize> EvenOrderFilter<SECTIONS> {
         input
     }
 
+    fn response(&self, z: Complex) -> Complex {
+        self.coefficients
+            .iter()
+            .fold(Complex::real(1.), |response, coefficients| {
+                response * coefficients.response(z)
+            })
+    }
+
     fn reset(&mut self) {
         self.states.fill(BiquadState::default());
     }
@@ -395,7 +503,7 @@ struct FirstOrderSplit {
 impl FirstOrderSplit {
     fn new(sample_rate: f32, frequency: f32) -> Self {
         Self {
-            inverse: 1.0 / (PI * frequency / sample_rate).tan(),
+            inverse: 1.0 / design_tangent(sample_rate, frequency),
             input_delay: 0.0,
             low_delay: 0.0,
             high_delay: 0.0,
@@ -415,6 +523,16 @@ impl FirstOrderSplit {
         self.low_delay = low;
         self.high_delay = high;
         (low, high)
+    }
+
+    fn response(&self, z: Complex) -> (Complex, Complex) {
+        let inverse = f64::from(self.inverse);
+        let scale = 1. / (inverse + 1.);
+        let denominator = polynomial(z, [1., scale * (1. - inverse), 0.]);
+        (
+            polynomial(z, [scale, scale, 0.]) / denominator,
+            polynomial(z, [inverse * scale, -inverse * scale, 0.]) / denominator,
+        )
     }
 
     fn reset(&mut self) {
@@ -476,11 +594,261 @@ impl<const SECTIONS: usize> OddOrderSplit<SECTIONS> {
         self.process(input).0
     }
 
+    fn response(&self, z: Complex) -> (Complex, Complex) {
+        let (mut low, mut high) = self.first_order.response(z);
+        for (low_coefficients, high_coefficients) in
+            self.low_coefficients.iter().zip(&self.high_coefficients)
+        {
+            low = low * low_coefficients.response(z);
+            high = high * high_coefficients.response(z);
+        }
+        (low, high)
+    }
+
     fn reset(&mut self) {
         self.first_order.reset();
         self.low_states.fill(BiquadState::default());
         self.high_states.fill(BiquadState::default());
     }
+}
+
+/// The low-pass's first- and second-order sections, then the cabinet shelf's.
+const MATCHED_SECTIONS: usize = 6;
+const MATCH_POINTS: usize = 60;
+const MATCH_BOTTOM_HZ: f64 = 100.;
+const MATCH_TOP_HZ: f64 = 20_000.;
+const MATCH_TOP_FRACTION: f64 = 0.45;
+const MATCH_ITERATIONS: usize = 30;
+
+/// Biquad coefficients `[b0, b1, b2, a1, a2]`.
+type Section = [f64; 5];
+
+struct Cascade<const SECTIONS: usize> {
+    sections: [[f32; 5]; SECTIONS],
+    states: [[f32; 2]; SECTIONS],
+}
+
+impl<const SECTIONS: usize> Cascade<SECTIONS> {
+    fn new(sections: [Section; SECTIONS]) -> Self {
+        Self {
+            sections: sections.map(|section| section.map(|value| value as f32)),
+            states: [[0.; 2]; SECTIONS],
+        }
+    }
+
+    fn process(&mut self, mut value: f32) -> f32 {
+        for (&[b0, b1, b2, a1, a2], state) in self.sections.iter().zip(&mut self.states) {
+            let output = b0 * value + state[0];
+            state[0] = flush_denormal(b1 * value - a1 * output + state[1]);
+            state[1] = flush_denormal(b2 * value - a2 * output);
+            value = output;
+        }
+        value
+    }
+
+    fn reset(&mut self) {
+        self.states = [[0.; 2]; SECTIONS];
+    }
+}
+
+/// The bilinear designs the fit starts from: the low-pass, and the cabinet
+/// shelf factored into minimum-phase sections with the same magnitude.
+fn matched_sections(sample_rate: f64) -> [Section; MATCHED_SECTIONS] {
+    let tangent = |frequency: f32| f64::from(design_tangent(sample_rate as f32, frequency));
+    let low_pass = tangent(LOW_PASS_HZ);
+    let shelf = tangent(CABINET_SHELF_HZ);
+    let ratio = f64::from(db_to_gain(CABINET_SHELF_DB)).powf(-1. / 7.);
+    let shelf_section = |damping: f64| {
+        let section = bilinear(
+            shelf,
+            [1., ratio * damping, ratio * ratio],
+            [1., damping, 1.],
+        );
+        scale_numerator(section, 1. / (ratio * ratio))
+    };
+    [
+        bilinear(low_pass, [0., 0., 1.], [0., 1., 1.]),
+        bilinear(low_pass, [0., 0., 1.], [1., 1., 1.]),
+        scale_numerator(bilinear(shelf, [0., 1., ratio], [0., 1., 1.]), 1. / ratio),
+        shelf_section(1.801_937_7),
+        shelf_section(1.246_979_6),
+        shelf_section(0.445_041_87),
+    ]
+}
+
+/// Maps a section given in the prewarped analogue variable, as `[W², W, 1]`
+/// coefficients, to the digital domain; a section without `W²` in its
+/// denominator is first order.
+fn bilinear(tangent: f64, numerator: [f64; 3], denominator: [f64; 3]) -> Section {
+    let first_order = denominator[0] == 0.;
+    let map = |[squared, linear, constant]: [f64; 3]| {
+        if first_order {
+            [linear / tangent + constant, constant - linear / tangent, 0.]
+        } else {
+            let squared = squared / (tangent * tangent);
+            let linear = linear / tangent;
+            [
+                squared + linear + constant,
+                2. * (constant - squared),
+                squared - linear + constant,
+            ]
+        }
+    };
+    let [b0, b1, b2] = map(numerator);
+    let [a0, a1, a2] = map(denominator);
+    [b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0]
+}
+
+fn scale_numerator(section: Section, scale: f64) -> Section {
+    let [b0, b1, b2, a1, a2] = section;
+    [b0 * scale, b1 * scale, b2 * scale, a1, a2]
+}
+
+/// Levenberg-Marquardt on the log magnitude, accepting only steps that
+/// lower the error and keep every section stable, so the result is never
+/// worse than the starting design.
+fn fit_magnitude<const SECTIONS: usize>(
+    mut sections: [Section; SECTIONS],
+    frequencies: &[f64],
+    target: &[f64],
+    sample_rate: f64,
+) -> [Section; SECTIONS] {
+    let delays: Vec<Complex> = frequencies
+        .iter()
+        .map(|&frequency| delay(frequency, sample_rate))
+        .collect();
+    let residuals = |sections: &[Section; SECTIONS]| -> Vec<f64> {
+        delays
+            .iter()
+            .zip(target)
+            .map(|(&z, &target)| {
+                sections
+                    .iter()
+                    .map(|&[b0, b1, b2, a1, a2]| {
+                        (polynomial(z, [b0, b1, b2]).norm_squared()
+                            / polynomial(z, [1., a1, a2]).norm_squared())
+                        .ln()
+                            / 2.
+                    })
+                    .sum::<f64>()
+                    - target
+            })
+            .collect()
+    };
+    let cost = |residuals: &[f64]| residuals.iter().map(|value| value * value).sum::<f64>();
+    let parameters = 5 * SECTIONS;
+
+    let mut current = residuals(&sections);
+    let mut current_cost = cost(&current);
+    let mut damping = 1e-3;
+    for _ in 0..MATCH_ITERATIONS {
+        let mut normal = vec![0.; parameters * parameters];
+        let mut gradient = vec![0.; parameters];
+        let mut row = vec![0.; parameters];
+        for (&z, &residual) in delays.iter().zip(&current) {
+            let z2 = z * z;
+            for (index, &[b0, b1, b2, a1, a2]) in sections.iter().enumerate() {
+                let numerator = Complex::real(1.) / polynomial(z, [b0, b1, b2]);
+                let denominator = Complex::real(1.) / polynomial(z, [1., a1, a2]);
+                row[5 * index..5 * index + 5].copy_from_slice(&[
+                    numerator.re,
+                    (z * numerator).re,
+                    (z2 * numerator).re,
+                    -(z * denominator).re,
+                    -(z2 * denominator).re,
+                ]);
+            }
+            for ((&left, gradient), normal) in row
+                .iter()
+                .zip(&mut gradient)
+                .zip(normal.chunks_exact_mut(parameters))
+            {
+                *gradient += left * residual;
+                for (entry, &right) in normal.iter_mut().zip(&row) {
+                    *entry += left * right;
+                }
+            }
+        }
+        loop {
+            let mut system = normal.clone();
+            for i in 0..parameters {
+                system[i * parameters + i] *= 1. + damping;
+            }
+            let step = solve(system, gradient.iter().map(|value| -value).collect());
+            let mut candidate = sections;
+            for (index, section) in candidate.iter_mut().enumerate() {
+                for (value, change) in section.iter_mut().zip(&step[5 * index..]) {
+                    *value += change;
+                }
+            }
+            if candidate.iter().all(stable) {
+                let trial = residuals(&candidate);
+                let trial_cost = cost(&trial);
+                if trial_cost < current_cost {
+                    sections = candidate;
+                    current = trial;
+                    current_cost = trial_cost;
+                    damping = (damping / 3.).max(1e-9);
+                    break;
+                }
+            }
+            damping *= 4.;
+            if damping > 1e8 {
+                return sections;
+            }
+        }
+    }
+    sections
+}
+
+fn stable(&[_, _, _, a1, a2]: &Section) -> bool {
+    a2.abs() < 1. && a1.abs() < 1. + a2
+}
+
+/// Gaussian elimination with partial pivoting; a singular system gives a
+/// non-finite step, which the caller's stability check rejects.
+fn solve(mut matrix: Vec<f64>, mut vector: Vec<f64>) -> Vec<f64> {
+    let size = vector.len();
+    for column in 0..size {
+        let pivot = (column..size)
+            .max_by(|&a, &b| {
+                matrix[a * size + column]
+                    .abs()
+                    .total_cmp(&matrix[b * size + column].abs())
+            })
+            .unwrap_or(column);
+        for k in 0..size {
+            matrix.swap(column * size + k, pivot * size + k);
+        }
+        vector.swap(column, pivot);
+        for row in column + 1..size {
+            let factor = matrix[row * size + column] / matrix[column * size + column];
+            for k in column..size {
+                matrix[row * size + k] -= factor * matrix[column * size + k];
+            }
+            vector[row] -= factor * vector[column];
+        }
+    }
+    for row in (0..size).rev() {
+        let sum: f64 = (row + 1..size)
+            .map(|k| matrix[row * size + k] * vector[k])
+            .sum();
+        vector[row] = (vector[row] - sum) / matrix[row * size + row];
+    }
+    vector
+}
+
+/// The unit delay `z⁻¹` at a frequency.
+fn delay(frequency: f64, sample_rate: f64) -> Complex {
+    Complex::polar(-2. * std::f64::consts::PI * frequency / sample_rate)
+}
+
+fn polynomial(z: Complex, [c0, c1, c2]: [f64; 3]) -> Complex {
+    Complex::real(c0) + z * c1 + z * z * c2
+}
+
+fn design_tangent(sample_rate: f32, frequency: f32) -> f32 {
+    (PI * frequency.min(MAX_DESIGN_FRACTION * sample_rate) / sample_rate).tan()
 }
 
 fn dynamic_response(envelope: f32, level: f32) -> f32 {
@@ -499,7 +867,7 @@ fn finite_or(value: f32, fallback: f32) -> f32 {
 }
 
 fn valid_sample_rate(sample_rate: f32) -> f32 {
-    finite_or(sample_rate, 48_000.0).clamp(1.0, 192_000.0)
+    finite_or(sample_rate, REFERENCE_RATE).clamp(1.0, MAX_SAMPLE_RATE)
 }
 
 fn flush_denormal(value: f32) -> f32 {
@@ -564,6 +932,62 @@ mod tests {
             near > far * 2.0,
             "distance did not attenuate 1.2 kHz: {near} vs {far}"
         );
+    }
+
+    fn resting(sample_rate: f32) -> Cabinet {
+        let mut cabinet = Cabinet::new(sample_rate);
+        cabinet.set_dynamic(0.0);
+        cabinet
+    }
+
+    /// The gain in dB for a sine, measured after the cabinet settles.
+    fn sine_gain_db(cabinet: &mut Cabinet, frequency: f32) -> f32 {
+        let sample_rate = cabinet.sample_rate;
+        cabinet.reset();
+        let settle = (0.1 * sample_rate) as usize;
+        let window = (0.05 * sample_rate) as usize;
+        let phase = |index: usize| 2.0 * PI * ((frequency * index as f32 / sample_rate) % 1.0);
+        let mut samples: Vec<f32> = (0..settle + window)
+            .map(|index| 0.01 * phase(index).sin())
+            .collect();
+        cabinet.process(&mut samples);
+        let (sine, cosine) = samples[settle..].iter().enumerate().fold(
+            (0.0, 0.0),
+            |(sine, cosine), (offset, &sample)| {
+                let angle = phase(settle + offset);
+                (sine + sample * angle.sin(), cosine + sample * angle.cos())
+            },
+        );
+        let amplitude = 2.0 * (sine * sine + cosine * cosine).sqrt() / window as f32;
+        20.0 * (amplitude / 0.01).log10()
+    }
+
+    #[test]
+    fn other_host_rates_play_the_reference_response() {
+        let mut reference = resting(REFERENCE_RATE);
+        for sample_rate in [44_100.0, 96_000.0, 384_000.0] {
+            let mut cabinet = resting(sample_rate);
+            for frequency in [200.0, 8_000.0, 14_000.0] {
+                let expected = sine_gain_db(&mut reference, frequency);
+                let gain = sine_gain_db(&mut cabinet, frequency);
+                assert!(
+                    (gain - expected).abs() < 0.3,
+                    "{frequency} Hz at {sample_rate} Hz: {gain:.2} dB against {expected:.2} dB at the reference rate"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn low_host_rates_keep_the_midrange() {
+        let reference = sine_gain_db(&mut resting(REFERENCE_RATE), 1_000.0);
+        for sample_rate in [8_000.0, 11_025.0, 16_000.0] {
+            let gain = sine_gain_db(&mut resting(sample_rate), 1_000.0);
+            assert!(
+                (gain - reference).abs() < 1.5,
+                "1 kHz at {sample_rate} Hz: {gain:.2} dB against {reference:.2} dB at the reference rate"
+            );
+        }
     }
 
     #[test]
