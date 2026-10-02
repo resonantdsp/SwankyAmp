@@ -138,7 +138,10 @@ OPTIONS:
   --output <name>           Audio output device (substring match). Overrides
                             the Settings menu's choice for this launch.
   --input <name>            Audio input device (effect plugins). Overrides
-                            the Settings menu's choice for this launch.
+                            the Settings menu's choice for this launch,
+                            and counts as a choice even for the
+                            computer's own microphone, which then
+                            starts live.
   --output-channels <spec>  Route output to specific device channels:
                             `direct` (all, default), a channel like `3`
                             (mono), or a pair like `3-4` (stereo).

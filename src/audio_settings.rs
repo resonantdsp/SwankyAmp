@@ -1,6 +1,6 @@
 //! The standalone app's audio choices in the information panel: Input, its
 //! channels and Output, the same choices as the native Settings menu, with
-//! what needs the player said under the box it concerns.
+//! what needs the player in one block beneath them.
 
 use crate::{
     layout::{self, Component},
@@ -134,10 +134,6 @@ fn input_need(need: &InputNeed) -> String {
         InputNeed::DidNotOpen(name) => {
             format!("{name} could not be opened. Another app may be using it.")
         }
-        InputNeed::OwnMicrophone(name) => format!(
-            "{name} starts off, so it cannot feed back through the speakers. \
-             With headphones on, choose it again."
-        ),
         InputNeed::FellBack(name) => format!(
             "{name} did not open, so Windows audio is playing. Once it is free, \
              choose ASIO under Settings › Audio Driver."

@@ -474,7 +474,7 @@ impl InputController {
         self.set_enabled(true);
     }
 
-    /// The channels the input stream last opened with records.
+    /// How many channels the last opened input stream records.
     pub(crate) fn opened_channels(&self) -> usize {
         self.opened_channels.load(Ordering::Relaxed)
     }
@@ -754,8 +754,8 @@ pub(crate) struct InputDetail {
 }
 
 /// Every input and whether it is the computer's own microphone, from what
-/// the host reports without opening the device: ALSA would hold each one
-/// open. ASIO drivers are named only: listing more would load each.
+/// the host reports without opening the device: ALSA would open each one.
+/// ASIO drivers are named only: listing more would load each.
 fn input_details() -> Vec<InputDetail> {
     if driver::on_asio() {
         return driver::asio_drivers()
@@ -973,10 +973,6 @@ pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, B
             || (driver::on_asio() && opts.output_device.is_some()),
         input_missing: match &input_pick {
             InputPick::Missing(name) => Some(name.clone()),
-            _ => None,
-        },
-        input_own_microphone: match &input_pick {
-            InputPick::OwnMicrophone(name) => Some(name.clone()),
             _ => None,
         },
         output_missing,
@@ -1470,10 +1466,6 @@ enum InputPick {
     Chosen,
     /// Named by a flag or the saved choice, and not connected.
     Missing(String),
-    /// Named by a flag or the saved choice, and the computer's own
-    /// microphone, which is chosen afresh each session: yesterday's
-    /// headphones may not be on today.
-    OwnMicrophone(String),
     /// Nothing was chosen.
     Default,
 }
@@ -1525,27 +1517,18 @@ fn launch_input(
     opts: &Options,
     saved: &settings::Settings,
 ) -> (Option<cpal::Device>, InputPick) {
-    if let Some(name) = &opts.input_device {
-        return named_input(name, find_flagged_device(host, name, false));
-    }
-    match &saved.input_device {
-        Some(name) => named_input(name, find_device(host, name, false)),
-        None => (host.default_input_device(), InputPick::Default),
-    }
-}
-
-/// How an input the player named stands: chosen when it is connected,
-/// unless it is the computer's own microphone.
-fn named_input(name: &str, found: Option<cpal::Device>) -> (Option<cpal::Device>, InputPick) {
-    let Some(device) = found else {
-        eprintln!("the input device '{name}' is not available");
-        return (None, InputPick::Missing(name.to_owned()));
+    let found = match (&opts.input_device, &saved.input_device) {
+        (Some(name), _) => (name, find_flagged_device(host, name, false)),
+        (None, Some(name)) => (name, find_device(host, name, false)),
+        (None, None) => return (host.default_input_device(), InputPick::Default),
     };
-    let label = device_label(&device).unwrap_or_else(|| name.to_owned());
-    if crate::microphone::BuiltIn::find().is(&device, &label) {
-        return (Some(device), InputPick::OwnMicrophone(label));
+    match found {
+        (_, Some(device)) => (Some(device), InputPick::Chosen),
+        (name, None) => {
+            eprintln!("the input device '{name}' is not available");
+            (None, InputPick::Missing(name.clone()))
+        }
     }
-    (Some(device), InputPick::Chosen)
 }
 
 /// The output device a launch opens, and the saved output when it was not
@@ -2546,7 +2529,15 @@ impl InputWorker {
                         // checkmark should match the user's pick.
                         g.clone_from(&device_name);
                     }
-                    let chosen = self.current_name.lock().ok().and_then(|g| g.clone());
+                    // The computer's own microphone plays for this session
+                    // only: yesterday's headphones may not be on at the next
+                    // launch, which then asks for an input.
+                    let chosen = self
+                        .current_name
+                        .lock()
+                        .ok()
+                        .and_then(|g| g.clone())
+                        .filter(|name| !is_own_microphone(name));
                     self.settings.update(|s| s.input_device = chosen);
                 }
                 InputCmd::Reopen => {
@@ -2560,12 +2551,11 @@ impl InputWorker {
                     stream = None;
                     self.enabled.store(false, Ordering::Relaxed);
                     self.ring.clear();
-                    // Only an input the player chose goes live on the new
-                    // driver. On ASIO the interface that opens is decided
-                    // after this, so the input waits for the player.
-                    if driver::on_asio() {
-                        want_enabled = false;
-                    } else {
+                    // The new driver may open a device the player never
+                    // chose, so the input waits for them; the editor says
+                    // it is off.
+                    want_enabled = false;
+                    if !driver::on_asio() {
                         // An absent saved input stays the device, so turning
                         // the input on says it is not connected rather than
                         // opening the system default.
@@ -2573,10 +2563,6 @@ impl InputWorker {
                         if let Ok(mut g) = self.current_name.lock() {
                             g.clone_from(&device_name);
                         }
-                        want_enabled &= device_name.as_deref().is_some_and(|name| {
-                            named_input(name, find_device(&driver::host(), name, false)).1
-                                == InputPick::Chosen
-                        });
                     }
                     self.apply(&mut stream, want_enabled, device_name.as_deref());
                 }
@@ -2790,6 +2776,12 @@ fn build_and_play_input_stream(
         .play()
         .map_err(|e| format!("could not start input stream: {e}"))?;
     Ok(stream)
+}
+
+/// Whether the input labelled `name` is the computer's own microphone.
+fn is_own_microphone(name: &str) -> bool {
+    find_device(&driver::host(), name, false)
+        .is_some_and(|device| crate::microphone::BuiltIn::find().is(&device, name))
 }
 
 /// The device labelled exactly `name`. Saved and menu names are whole

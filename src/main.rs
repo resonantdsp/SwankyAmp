@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Some("audio") => {
                 let state = arguments.get(3).map_or("", String::as_str);
                 swanky_amp::ui::capture_audio(audio_fixture(state).ok_or(
-                    "capture <dir> audio <choose|own-microphone|missing|built-in|interface|long-names|asio|fell-back|off>",
+                    "capture <dir> audio <choose|missing|built-in|interface|long-names|asio|fell-back|off>",
                 )?);
                 // The input knob's OFF reads with the panel closed.
                 if state != "off" {
@@ -182,12 +182,6 @@ fn audio_fixture(state: &str) -> Option<truce_standalone::setup::Setup> {
     Some(match state {
         "choose" => Setup {
             input_need: Some(InputNeed::Choose),
-            ..mac
-        },
-        "own-microphone" => Setup {
-            input_need: Some(InputNeed::OwnMicrophone(
-                "MacBook Air Microphone".to_owned(),
-            )),
             ..mac
         },
         "missing" => Setup {

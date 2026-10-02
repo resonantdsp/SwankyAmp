@@ -149,9 +149,10 @@ installs beside Swanky Amp 1.4.0.
   input off is silent, but only on an input the player chose and that is
   connected: on a first launch, or with the chosen interface unplugged, a
   built-in microphone would feed the amplifier into the built-in speakers,
-  so the input starts off. The computer's own microphone never starts live,
-  even when it was the last input chosen. `--input-enabled on` or `off`
-  overrides that for one launch.
+  so the input starts off. The computer's own microphone is never
+  remembered, so the next launch asks for an input again, unless `--input`
+  names it. Changing the audio driver on Windows turns the input off.
+  `--input-enabled on` or `off` overrides that for one launch.
 - Gave the standalone app's information panel the Input, Input channels and
   Output choices of its Settings menu. Choosing an input there turns it on
   and remembers it. The panel opens by itself when no input was ever chosen

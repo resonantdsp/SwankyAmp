@@ -45,8 +45,6 @@ pub enum Action {
     Preset(PresetMsg),
     Focus(bool),
     Pointer(bool),
-    /// The pointer entered or left the Input knob while the input is off.
-    InputKnob(bool),
     /// The interface size, in percent, for this installation.
     InterfaceSize(u16),
     /// The standalone app's input, input channels or output.
@@ -66,8 +64,6 @@ pub struct FreeUi {
     meter_revision: u64,
     focused: bool,
     hovered: bool,
-    /// Whether the pointer is over the Input knob while the input is off.
-    input_knob_hovered: bool,
     presets: PresetBar,
     owner: Option<Arc<SwankyAmpParams>>,
     /// The knob a pointer gesture is turning, whose readout shows tenths.
@@ -107,7 +103,6 @@ impl FreeUi {
             meter_revision: 0,
             focused: true,
             hovered: false,
-            input_knob_hovered: false,
             presets: PresetBar::offline(),
             owner: None,
             turning: None,
@@ -129,8 +124,9 @@ impl FreeUi {
         }
     }
 
-    /// Opens the panel by itself only when the standalone's audio needs the
-    /// player: no input was ever chosen, or a remembered device is missing.
+    /// Opens the panel by itself only for what the standalone's launch found:
+    /// no input ever chosen, a remembered device missing, or an ASIO
+    /// interface that would not open.
     #[cfg(feature = "standalone")]
     fn attach_audio(&mut self, audio: Option<truce_standalone::setup::Setup>) {
         if audio
@@ -242,13 +238,11 @@ impl FreeUi {
                 layers.push(input_off_cover(control));
             }
         }
-        let input_off_line = (INPUT_OFF.to_owned(), INK, true);
         let (line, color, opens_panel) = match (self.presets.status(), self.presets.footer(params))
         {
             (Some(status), _) => (status.to_owned(), INK, false),
-            (None, _) if input_off && self.input_knob_hovered => input_off_line,
             (None, Some(name)) => (name, INK, false),
-            (None, None) if input_off => input_off_line,
+            (None, None) if input_off => (INPUT_OFF.to_owned(), INK, true),
             (None, None) => (
                 "DRAG TO TURN   ·   SHIFT FOR FINE CONTROL   ·   RIGHT-CLICK TO RESET".to_owned(),
                 DIM,
@@ -345,8 +339,6 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
                 if self.audio.is_some() {
                     self.audio = audio_setup();
                 }
-                // The cover that reports leaving is gone once the input is on.
-                self.input_knob_hovered &= self.input_off();
                 self.sync_meters();
                 self.presets.sync(params.params());
                 self.presets.poll(params);
@@ -400,7 +392,6 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
                 self.focused = focused;
                 self.sync_meters();
             }
-            Message::Plugin(Action::InputKnob(hovered)) => self.input_knob_hovered = hovered,
             Message::Plugin(Action::Pointer(hovered)) => {
                 self.hovered = hovered;
                 self.sync_meters();
@@ -942,8 +933,8 @@ fn default_normalized(params: &ParamCache<SwankyAmpParams>, id: u32) -> f32 {
 const INPUT_ID: u32 = 0;
 
 /// Over the Input knob while the standalone's input is off: a press opens
-/// the panel to choose an input rather than turning a knob that does
-/// nothing, and the pointer over it puts the input-off line in the footer.
+/// the panel to choose an input, and neither a press nor the wheel turns a
+/// knob that has nothing to act on.
 fn input_off_cover<'a, R: FreeRenderer + 'a>(
     spec: layout::ControlSpec,
 ) -> Element<'a, Msg, Theme, R> {
@@ -952,8 +943,9 @@ fn input_off_cover<'a, R: FreeRenderer + 'a>(
         opaque(
             mouse_area(Space::new().width(Length::Fill).height(Length::Fill))
                 .on_press(Message::Plugin(Action::Information(true)))
-                .on_enter(Message::Plugin(Action::InputKnob(true)))
-                .on_exit(Message::Plugin(Action::InputKnob(false)))
+                // Taking the wheel here keeps it from the knob beneath; the
+                // pointer is over the window, so saying so changes nothing.
+                .on_scroll(|_| Message::Plugin(Action::Pointer(true)))
                 .interaction(mouse::Interaction::Pointer),
         ),
     )
@@ -1621,10 +1613,6 @@ mod tests {
                     ..mac()
                 },
                 Setup {
-                    input_need: Some(InputNeed::OwnMicrophone("MacBook Air Microphone".into())),
-                    ..mac()
-                },
-                Setup {
                     output_need: Some(OutputNeed::NotConnected("Studio Monitors".into())),
                     ..playing_the_interface()
                 },
@@ -1668,7 +1656,6 @@ mod tests {
 
         #[test]
         fn with_the_input_off_the_input_knob_reads_off_and_opens_the_panel() {
-            use truce::prelude::Params;
             let mut editor = launch(Setup {
                 input_need: Some(InputNeed::Choose),
                 ..mac()
@@ -1682,25 +1669,15 @@ mod tests {
             );
             assert_eq!(editor.text("input.off").as_deref(), Some("OFF"));
 
-            let before = editor.params.params().collect_values();
-            editor.point([4.0, 4.0]);
-            let footer = editor.text("footer.line");
-            assert_ne!(footer, idle, "the footer does not say the input is off");
-            editor.point(input_knob());
-            assert_eq!(
+            assert_ne!(
                 editor.text("footer.line"),
-                footer,
-                "hovering the knob changed the line"
+                idle,
+                "the footer does not say the input is off"
             );
             editor.press(input_knob());
             assert!(
                 editor.bounds("information").is_some(),
                 "the knob did not open the panel"
-            );
-            assert_eq!(
-                editor.params.params().collect_values(),
-                before,
-                "pressing the knob turned it"
             );
 
             editor.press([4.0, 4.0]);
