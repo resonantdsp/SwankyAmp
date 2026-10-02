@@ -1,6 +1,6 @@
 //! Audio choices the standalone remembers on this machine: the input and
-//! output devices picked from the Settings menu, the buffer size, and on
-//! Windows the audio driver and the ASIO interface.
+//! output devices picked from the Settings menu, the input channels, the
+//! buffer size, and on Windows the audio driver and the ASIO interface.
 //!
 //! Launch flags and their environment variables override the saved values
 //! for that launch and are never written back, so a one-off `--buffer 32`
@@ -59,6 +59,9 @@ pub struct Settings {
     /// It is kept apart from the WASAPI devices so that switching driver
     /// returns to the device last used with each.
     pub asio_device: Option<String>,
+    /// The input channels chosen from the menu, as `--input-channels`
+    /// reads them.
+    pub input_channels: Option<String>,
 }
 
 const INPUT_DEVICE: &str = "input_device";
@@ -66,6 +69,7 @@ const OUTPUT_DEVICE: &str = "output_device";
 const BUFFER_SIZE: &str = "buffer_size";
 const DRIVER: &str = "driver";
 const ASIO_DEVICE: &str = "asio_device";
+const INPUT_CHANNELS: &str = "input_channels";
 
 impl Settings {
     /// Read the settings at `path`. A missing or unreadable file, and any
@@ -88,6 +92,7 @@ impl Settings {
                 BUFFER_SIZE => settings.buffer_size = value.trim().parse().ok().filter(|&n| n > 0),
                 DRIVER => settings.driver = AudioDriver::parse(value),
                 ASIO_DEVICE => settings.asio_device = name,
+                INPUT_CHANNELS => settings.input_channels = name,
                 _ => {}
             }
         }
@@ -108,6 +113,7 @@ impl Settings {
             (BUFFER_SIZE, self.buffer_size.map(|n| n.to_string())),
             (DRIVER, self.driver.map(|d| d.name().to_owned())),
             (ASIO_DEVICE, self.asio_device.clone()),
+            (INPUT_CHANNELS, self.input_channels.clone()),
         ];
         for (key, value) in lines {
             if let Some(value) = value {
@@ -233,6 +239,7 @@ mod tests {
             buffer_size: Some(64),
             driver: Some(AudioDriver::Asio),
             asio_device: Some("UMC ASIO Driver".to_owned()),
+            input_channels: Some("2".to_owned()),
         };
         saved.save(&path).expect("settings write");
         assert_eq!(Settings::load(&path), saved);
@@ -243,6 +250,7 @@ mod tests {
             buffer_size: None,
             driver: Some(AudioDriver::Wasapi),
             asio_device: None,
+            input_channels: None,
         };
         partly.save(&path).expect("settings write");
         assert_eq!(Settings::load(&path), partly);

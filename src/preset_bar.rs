@@ -761,6 +761,8 @@ impl PresetBar {
 }
 
 const MENU_PADDING: f32 = 3.0;
+/// The row under the pointer, lifted from the menu.
+pub(crate) const MENU_HOVER: Color = Color::from_rgb(0.18, 0.20, 0.21);
 const DIVIDER: f32 = 7.0;
 
 fn preset(message: PresetMsg) -> Msg {
@@ -769,7 +771,7 @@ fn preset(message: PresetMsg) -> Msg {
 
 /// The name followed by `mark`, set at `size` within `room`: whole when it
 /// fits, or cut to end in an ellipsis before the mark.
-fn fitted(name: &str, mark: &str, room: f32, size: f32) -> String {
+pub(crate) fn fitted(name: &str, mark: &str, room: f32, size: f32) -> String {
     let fits = |body: &str| measure(body, size) <= room;
     let whole = format!("{name}{mark}");
     if fits(&whole) {
@@ -794,7 +796,7 @@ fn fitted(name: &str, mark: &str, room: f32, size: f32) -> String {
 
 /// Pro's selector menu: a raised dark panel sharing the controls' corner
 /// radius, the hovered row lifted, the current preset in the accent.
-fn menu_style() -> truce_iced::iced::widget::container::Style {
+pub(crate) fn menu_style() -> truce_iced::iced::widget::container::Style {
     truce_iced::iced::widget::container::Style {
         background: Some(Color::from_rgb(0.11, 0.125, 0.135).into()),
         border: Border {
@@ -830,7 +832,7 @@ fn menu_item<'a, R: FreeRenderer + 'a>(
     .style(move |_, status| {
         let hovered = matches!(status, button::Status::Hovered | button::Status::Pressed);
         button::Style {
-            background: hovered.then(|| Color::from_rgb(0.18, 0.20, 0.21).into()),
+            background: hovered.then(|| MENU_HOVER.into()),
             text_color: if !available {
                 DIM.scale_alpha(0.5)
             } else if current || hovered {

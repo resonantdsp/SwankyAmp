@@ -70,6 +70,41 @@ application can set its own through `Defaults`, as Swanky Amp does to open
 with its input on. The help now names the application's default first
 (`cli.rs`).
 
+An application can ask, through `Defaults::input_needs_choice`, that an
+input its defaults turn on stays off unless it is a device the player chose,
+by flag or from the Settings menu, and is connected: the system default, or
+a stand-in for an unplugged interface, is often a built-in microphone beside
+the speakers. A flag or environment variable that turns the input on is
+obeyed as given, with one exception: when a saved ASIO interface loads but
+will not open and the launch falls back to WASAPI, the input is turned off
+first, whatever asked for it. The computer's own microphone is never saved
+as the input, so a launch after it was chosen asks for an input again; a
+flag that names it is obeyed. On WASAPI and the other hosts, a chosen input that is not
+connected stays the input worker's device, so turning the input on opens it
+once it is back rather than the system default. On ASIO the launch opens
+another installed interface in its place, which turning the input on would
+make live, so the editor asks the player to choose the interface first.
+The input is off after any driver switch, which may open a device the
+player never chose; a WASAPI input saved but absent stays the device. Saved and menu names
+match a device's whole label; only a flag matches part of one.
+Since a windowed app has no console and the menu is easy to miss, `setup.rs`
+gives the plugin's editor the audio choices the Settings menu offers (input,
+input channels, output), lets it change them, and reports what needs the
+player: no input ever chosen, a missing device, an input that would not open or an ASIO interface
+that fell back to WASAPI. Choosing an ASIO interface as
+the input lets its input through only once it has opened. `microphone.rs`
+says whether an input is the computer's own microphone: on macOS from Core
+Audio's built-in transport and internal-microphone source, on Windows from
+cpal's form factor and bus. Listing the inputs opens none of them, since
+ALSA would open each one; the input channels on offer are those the open
+input stream records. Swanky Amp shows these in its information panel.
+The input channels chosen from
+the menu are saved with the devices (`input_channels`), and
+`--input-channels` overrides them for one launch. Without either the input
+feeds the plugin from channel 1 alone, where upstream feeds every channel
+straight through, since a guitar is one channel; a saved channel the device
+does not have gives way to channel 1.
+
 The buffer, device, ring, ASIO and zoom-pin changes follow the same fixes in Swanky Amp
 Pro's copy of this crate. Keep these fixes here until a pinned upstream
 release includes equivalent handling; remove the Cargo patch and this
