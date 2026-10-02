@@ -11,6 +11,7 @@ pub(crate) struct OnePole {
     b0: f32,
     b1: f32,
     a1: f32,
+    dc_gain: f32,
     x1: f32,
     y1: f32,
 }
@@ -28,6 +29,51 @@ impl OnePole {
         self.b0 = b0;
         self.b1 = b1;
         self.a1 = a1;
+        self.dc_gain = (b0 + b1) / (1. + a1);
+    }
+
+    /// A low-pass whose response below the corner is the one the bilinear
+    /// design gives at `reference_rate`, so the tone holds as the rate
+    /// changes. A first-order filter with a free zero matches the reference
+    /// at two frequencies below the reference rate; above it, the
+    /// reference's zero at its own Nyquist falls inside the band, which no
+    /// real zero can follow, so the bilinear design is matched at one, six
+    /// tenths of the corner, which holds the tubes within about 0.1 dB of the
+    /// reference up to 10 kHz and leaves them brighter only above.
+    pub(crate) fn set_lowpass_as_at(
+        &mut self,
+        frequency: f32,
+        sample_rate: f32,
+        reference_rate: f32,
+    ) {
+        if sample_rate == reference_rate {
+            self.set_lowpass(frequency, sample_rate);
+            return;
+        }
+        let (frequency, sample_rate, reference_rate) = (
+            f64::from(frequency),
+            f64::from(sample_rate),
+            f64::from(reference_rate),
+        );
+        let corner = (std::f64::consts::PI * frequency / reference_rate).tan();
+        let warp = |at: f64, rate: f64| (std::f64::consts::PI * at / rate).tan();
+        let power = |at: f64| 1. / (1. + (warp(at, reference_rate) / corner).powi(2));
+        let top = frequency.min(f64::from(MAX_FREQUENCY_RATIO) * sample_rate);
+        let (low, high) = (0.5 * top, top);
+        if let Some([b0, b1, a1]) = two_point_lowpass(
+            [low, high].map(|at| (std::f64::consts::TAU * at / sample_rate).cos()),
+            [power(low), power(high)],
+        ) {
+            self.set_digital(b0 as f32, b1 as f32, a1 as f32);
+        } else {
+            let matched = 0.6 * top;
+            let c = warp(matched, reference_rate) / (warp(matched, sample_rate) * corner);
+            self.set_digital(
+                (1. / (1. + c)) as f32,
+                (1. / (1. + c)) as f32,
+                ((1. - c) / (1. + c)) as f32,
+            );
+        }
     }
 
     fn set_analogue(&mut self, b1: f32, b0: f32, a0: f32, frequency: f32, sample_rate: f32) {
@@ -37,6 +83,10 @@ impl OnePole {
         self.b0 = (b0 + b1 * c) / divisor;
         self.b1 = (b0 - b1 * c) / divisor;
         self.a1 = (a0 - c) / divisor;
+        // The bilinear transform keeps the prototype's DC gain exactly, while
+        // the digital sums cancel to 0/0 once a very low corner's pole rounds
+        // to 1, as the power stage's grid high-pass does at 128 kHz and up.
+        self.dc_gain = b0 / a0;
     }
 
     #[inline]
@@ -53,11 +103,42 @@ impl OnePole {
     }
 
     pub(crate) fn settle(&mut self, input: f32) -> f32 {
-        let output = (self.b0 + self.b1) * input / (1. + self.a1);
+        let output = self.dc_gain * input;
         self.x1 = input;
         self.y1 = output;
         output
     }
+}
+
+/// The first-order low-pass `[b0, b1, a1]` with unit DC gain whose squared
+/// magnitude takes `powers` at the frequencies whose cosines are `cosines`,
+/// if a stable one with a real zero exists. The squared magnitude of any
+/// first-order filter is `(p0 + p1 cos w) / (q0 + q1 cos w)`, linear in its
+/// terms, so the fit is solved there and factored back into coefficients.
+fn two_point_lowpass(cosines: [f64; 2], powers: [f64; 2]) -> Option<[f64; 3]> {
+    let [t1, t2] = powers;
+    let [r1, r2] = [0, 1].map(|k| (powers[k] - 1.) / (cosines[k] - 1.));
+    let q1 = (r1 - r2) / (t2 - t1);
+    let p1 = r1 + t1 * q1;
+    let (q0, p0) = (1. - q1, 1. - p1);
+    if !(q0 > 0. && p0 > 0.) {
+        return None;
+    }
+    let (rho, sigma) = (q1 / q0, p1 / p0);
+    if !(rho.abs() < 1. && sigma.abs() <= 1.) {
+        return None;
+    }
+    let root = |ratio: f64| {
+        if ratio == 0. {
+            0.
+        } else {
+            (1. - (1. - ratio * ratio).sqrt()) / ratio
+        }
+    };
+    let a1 = root(rho);
+    let zero = root(sigma);
+    let b0 = (1. + a1) / (1. + zero);
+    Some([b0, zero * b0, a1])
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -67,6 +148,7 @@ pub(crate) struct Biquad {
     b2: f32,
     a1: f32,
     a2: f32,
+    dc_gain: f32,
     s1: f32,
     s2: f32,
 }
@@ -90,11 +172,16 @@ impl Biquad {
         self.b2 = (b0 - b1 * c + b2 * c_squared) / divisor;
         self.a1 = 2. * (a0 - c_squared) / divisor;
         self.a2 = (a0 - a1 * c + c_squared) / divisor;
+        self.dc_gain = b0 / a0;
     }
 
-    pub(crate) fn set_digital(&mut self, b: [f32; 3], a: [f32; 2]) {
+    /// Takes the analogue prototype's DC gain beside the coefficients: their
+    /// sums cancel to 0/0 when a low pole rounds onto z = 1, as a tone stack's
+    /// does at the highest tube rates.
+    pub(crate) fn set_digital(&mut self, b: [f32; 3], a: [f32; 2], dc_gain: f32) {
         [self.b0, self.b1, self.b2] = b;
         [self.a1, self.a2] = a;
+        self.dc_gain = dc_gain;
     }
 
     pub(crate) fn set_peak(
@@ -143,7 +230,7 @@ impl Biquad {
     }
 
     pub(crate) fn settle(&mut self, input: f32) -> f32 {
-        let output = (self.b0 + self.b1 + self.b2) * input / (1. + self.a1 + self.a2);
+        let output = self.dc_gain * input;
         self.s1 = output - self.b0 * input;
         self.s2 = self.b2 * input - self.a2 * output;
         output
@@ -305,6 +392,10 @@ impl Charge {
         self.value = value
             + rise * (cap.value() - value).max(0.) * cap.inverse() * (signal - value).max(0.)
             - fall * value;
+        self.value
+    }
+
+    pub(crate) fn value(self) -> f32 {
         self.value
     }
 

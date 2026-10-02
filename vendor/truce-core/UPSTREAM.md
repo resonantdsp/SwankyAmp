@@ -10,3 +10,12 @@ This copy adds the format-facing `reset_realtime` lifecycle hook. Its default
 is a no-op for stateless plugins; stateful implementations override it when a
 format can reset an active instance on the audio thread. Keep this copy until
 a pinned upstream release provides an equivalent lifecycle distinction.
+
+# Latency held until reset
+
+`AudioConfig` carries `latency_held_while_active`, set with
+`with_latency_held_while_active`. A format that keeps an active plugin's
+latency fixed until the host restarts it, as CLAP does, sets it at activation,
+so the plugin knows a latency change must wait for the next `reset`; other
+formats read the latency as the plugin runs. Keep it until a pinned upstream
+release provides an equivalent.

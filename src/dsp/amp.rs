@@ -3,7 +3,7 @@ pub use super::filters::ClipKnee;
 pub use super::mapping::AmpControls;
 use super::mapping::AmpVoicing;
 use super::oversample::Oversampler;
-use super::stage::{PlateFilter, STAGES, Tetrode, Triode};
+use super::stage::{STAGES, Tetrode, Triode, TubeFilters};
 pub use super::tone_stack::ToneMapping;
 use super::tone_stack::ToneStack;
 
@@ -179,21 +179,21 @@ impl TubePath {
     fn new(
         sample_rate: f32,
         controls: AmpControls,
-        plate_filter: PlateFilter,
+        filters: TubeFilters,
         tone_mapping: ToneMapping,
         knee: ClipKnee,
         tables: LevelTables,
     ) -> Self {
         let voicing = AmpVoicing::from_controls(controls);
         let triodes = std::array::from_fn(|stage| {
-            Triode::new(stage, TRIODE_SCALE, sample_rate, plate_filter, knee)
+            Triode::new(stage, TRIODE_SCALE, sample_rate, filters, knee)
         });
         let mut path = Self {
             sample_rate,
             voicing,
             triodes,
             tone_stack: ToneStack::new(sample_rate, tone_mapping),
-            tetrode: Tetrode::new(sample_rate),
+            tetrode: Tetrode::new(sample_rate, filters),
             tables,
             input_gain: Ramp::new(1.),
             preamp_gain: Ramp::new(1.),
@@ -313,7 +313,7 @@ impl AmpPath {
         let mut path = Self::new(
             sample_rate,
             controls,
-            PlateFilter::Released44k1,
+            TubeFilters::Released44k1,
             ToneMapping::Released,
             ClipKnee::Released,
             LevelTables::RELEASED,
@@ -333,7 +333,7 @@ impl AmpPath {
         Self::new(
             sample_rate,
             controls,
-            PlateFilter::Fixed20k,
+            TubeFilters::AsAt96k,
             tone_mapping,
             knee,
             tables,
@@ -343,21 +343,14 @@ impl AmpPath {
     fn new(
         sample_rate: f32,
         controls: AmpControls,
-        plate_filter: PlateFilter,
+        filters: TubeFilters,
         tone_mapping: ToneMapping,
         knee: ClipKnee,
         tables: LevelTables,
     ) -> Self {
         let voicing = AmpVoicing::from_controls(controls);
         let mut path = Self {
-            tubes: TubePath::new(
-                sample_rate,
-                controls,
-                plate_filter,
-                tone_mapping,
-                knee,
-                tables,
-            ),
+            tubes: TubePath::new(sample_rate, controls, filters, tone_mapping, knee, tables),
             cabinet: Cabinet::new(sample_rate),
             voicing,
             tables,
@@ -480,7 +473,7 @@ impl AmpChannel {
                 TubePath::new(
                     sample_rate * (2 << index) as f32,
                     controls,
-                    PlateFilter::Fixed20k,
+                    TubeFilters::AsAt96k,
                     tone_mapping,
                     knee,
                     tables,
@@ -497,9 +490,10 @@ impl AmpChannel {
     }
 
     /// Prepares every path the rate allows but settles only the one serving
-    /// `doublings`, which changes only through another prepare. Each settle
-    /// renders a second of audio at its internal rate, and hosts re-prepare on
-    /// every latency change, so settling unused paths multiplied that cost.
+    /// `doublings`; `switch` settles another when the factor changes. Each
+    /// settle renders a second of audio at its internal rate, and hosts
+    /// re-prepare on every latency change, so settling unused paths multiplied
+    /// that cost.
     pub(crate) fn prepare(
         &mut self,
         sample_rate: f32,
@@ -524,9 +518,34 @@ impl AmpChannel {
 
     fn settle(&mut self, doublings: usize) {
         debug_assert!(doublings <= self.prepared_doublings);
+        let tubes = self.tubes(doublings);
+        tubes.settle();
+        // Waking from rest thumps the power stage's grid, and at a low Power
+        // Tight the charge takes seconds to drain, so the first notes would
+        // play quieter than the rest. The rendered state is kept wherever the
+        // grid stayed uncharged, as for Init and the factory voicing, which
+        // were judged from it.
+        if tubes.tetrode.grid_charged() {
+            tubes.settle_equilibrium();
+        }
+    }
+
+    fn tubes(&mut self, doublings: usize) -> &mut TubePath {
         match doublings {
-            0 => self.host.tubes.settle(),
-            doublings => self.oversampled[doublings - 1].settle(),
+            0 => &mut self.host.tubes,
+            doublings => &mut self.oversampled[doublings - 1],
+        }
+    }
+
+    /// Moves the audio to another prepared factor without allocating or
+    /// rendering, so it can happen on the audio thread: the incoming path
+    /// starts from the current controls' equilibrium, as a real-time reset
+    /// leaves it.
+    pub(crate) fn switch(&mut self, doublings: usize) {
+        debug_assert!(doublings <= self.prepared_doublings);
+        self.tubes(doublings).settle_equilibrium();
+        for oversampler in &mut self.oversamplers {
+            oversampler.reset();
         }
     }
 
@@ -656,5 +675,123 @@ impl CorrectedPath {
 
     pub fn factor(&self) -> usize {
         1 << self.doublings
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn controls() -> AmpControls {
+        AmpControls {
+            cabinet_on: false,
+            ..AmpControls::default()
+        }
+    }
+
+    fn tube_path(sample_rate: f32) -> TubePath {
+        tube_path_with(sample_rate, controls())
+    }
+
+    fn tube_path_with(sample_rate: f32, controls: AmpControls) -> TubePath {
+        TubePath::new(
+            sample_rate,
+            controls,
+            TubeFilters::AsAt96k,
+            ToneMapping::Standard,
+            ClipKnee::UnitSlope,
+            LevelTables::CALIBRATED,
+        )
+    }
+
+    fn sine(sample_rate: f32, frequency: f32, amplitude: f32) -> Vec<f32> {
+        (0..(sample_rate * 0.05) as usize)
+            .map(|frame| {
+                amplitude * (std::f32::consts::TAU * frequency * frame as f32 / sample_rate).sin()
+            })
+            .collect()
+    }
+
+    fn level_db(samples: &[f32]) -> f32 {
+        let power = samples.iter().map(|sample| sample * sample).sum::<f32>();
+        10. * (power / samples.len() as f32 + 1e-30).log10()
+    }
+
+    /// The level of a quiet tone through tubes at `sample_rate`, after half
+    /// the tone has passed.
+    fn tone_level(sample_rate: f32, frequency: f32) -> f32 {
+        let mut path = tube_path(sample_rate);
+        path.settle_equilibrium();
+        let mut tone = sine(sample_rate, frequency, 0.01);
+        path.process(&mut tone, None);
+        level_db(&tone[tone.len() / 2..])
+    }
+
+    #[test]
+    fn the_tubes_keep_their_tone_at_every_rate() {
+        for frequency in [5_000., 7_000., 10_000.] {
+            let voiced = tone_level(96_000., frequency);
+            for sample_rate in [44_100., 48_000., 88_200., 176_400., 192_000., 384_000.] {
+                let difference = tone_level(sample_rate, frequency) - voiced;
+                assert!(
+                    difference.abs() < 0.2,
+                    "tubes at {sample_rate} Hz play {frequency} Hz {difference:+.2} dB from 96 kHz"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn real_time_reset_keeps_the_amp_playing_at_high_rates() {
+        // Across these Low settings a single-precision biquad for the bass
+        // section would put its pole on z = 1 at these rates.
+        for sample_rate in [352_800., 384_000.] {
+            for step in 0..=50 {
+                let low = step as f32 / 25. - 1.;
+                let mut path = tube_path_with(sample_rate, AmpControls { low, ..controls() });
+                path.settle_equilibrium();
+                let mut tone = sine(sample_rate, 1_000., 0.1);
+                tone.truncate(1_000);
+                path.process(&mut tone, None);
+                let level = level_db(&tone);
+                assert!(
+                    tone.iter().all(|sample| sample.is_finite()) && level > -60.,
+                    "tubes at {sample_rate} Hz with Low {low} played {level:.0} dB after a \
+                     real-time reset"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn activation_starts_at_the_level_it_holds() {
+        // Settings whose start-up thump charges the power stage's grid, which
+        // a low Power Tight drains over seconds.
+        let controls = AmpControls {
+            low: 1.,
+            overhead: 1.,
+            preamp_drive: -0.93,
+            preamp_grit: 1.,
+            power_tight: -1.,
+            ..controls()
+        };
+        let sample_rate = 16_000.;
+        let input = sine(sample_rate, 220., 0.2);
+        let level_after = |seconds: f32| {
+            let mut channel = AmpChannel::new(sample_rate, input.len(), controls, 0);
+            let mut silence = vec![0.; (sample_rate * seconds) as usize];
+            channel.process(&mut silence, 0);
+            let mut played = input.clone();
+            channel.process(&mut played, 0);
+            level_db(&played)
+        };
+        // Eight seconds of rest drain any start-up charge to the level the
+        // amp holds.
+        let difference = level_after(0.) - level_after(8.);
+        assert!(
+            difference.abs() < 0.5,
+            "the first notes after activation played {difference:+.1} dB from the level held \
+             after a rest"
+        );
     }
 }

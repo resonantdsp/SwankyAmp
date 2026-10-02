@@ -32,7 +32,7 @@ impl ToneMapping {
     /// The treble sections are first order. The released mapping keeps the
     /// 1.4.0 second-order form, Nyquist pole included, so the legacy path
     /// stays bit-identical to the frozen renders.
-    fn first_order(self, b: [f64; 2], a: [f64; 2], c: f64) -> ([f32; 3], [f32; 2]) {
+    fn first_order(self, b: [f64; 2], a: [f64; 2], c: f64) -> Digital {
         match self {
             Self::Released => discretise([b[0], b[1], 0.], [a[0], a[1], 0.], c),
             Self::Standard => discretise_first_order(b, a, c),
@@ -40,7 +40,20 @@ impl ToneMapping {
     }
 }
 
-fn discretise(b: [f64; 3], a: [f64; 3], c: f64) -> ([f32; 3], [f32; 2]) {
+/// Above this rate an f32 biquad no longer holds a stack's low poles: the
+/// Fender bass section lands 0.18 dB off at 192 kHz and on z = 1 at 352.8 kHz,
+/// silencing the amp. Rates up to it keep the arithmetic the factory presets
+/// were voiced with at 96 kHz.
+const SPLIT_ABOVE: f32 = 96_000.;
+
+/// Digital coefficients and the analogue prototype's DC gain.
+type Digital = ([f32; 3], [f32; 2], f32);
+
+fn set(filter: &mut Biquad, (b, a, dc_gain): Digital) {
+    filter.set_digital(b, a, dc_gain);
+}
+
+fn discretise(b: [f64; 3], a: [f64; 3], c: f64) -> Digital {
     let [b0, b1, b2] = b;
     let [a0, a1, a2] = a;
     let normal = 1. / (a0 + a1 * c + a2 * c * c);
@@ -54,6 +67,7 @@ fn discretise(b: [f64; 3], a: [f64; 3], c: f64) -> ([f32; 3], [f32; 2]) {
             (normal * (2. * a0 - 2. * a2 * c * c)) as f32,
             (normal * (a0 - a1 * c + a2 * c * c)) as f32,
         ],
+        (b0 / a0) as f32,
     )
 }
 
@@ -66,7 +80,7 @@ fn discretise(b: [f64; 3], a: [f64; 3], c: f64) -> ([f32; 3], [f32; 2]) {
 /// (the Marshall treble at 88.2 kHz, the Fender treble at 176.4 kHz), so
 /// rounding noise at Nyquist grows until it swamps the signal after hours of
 /// play. The true first-order section has no such pole.
-fn discretise_first_order(b: [f64; 2], a: [f64; 2], c: f64) -> ([f32; 3], [f32; 2]) {
+fn discretise_first_order(b: [f64; 2], a: [f64; 2], c: f64) -> Digital {
     let [b0, b1] = b;
     let [a0, a1] = a;
     let normal = 1. / (a0 + a1 * c);
@@ -77,7 +91,29 @@ fn discretise_first_order(b: [f64; 2], a: [f64; 2], c: f64) -> ([f32; 3], [f32; 
             0.,
         ],
         [(normal * (a0 - a1 * c)) as f32, 0.],
+        (b0 / a0) as f32,
     )
+}
+
+/// Splits a mid/low section `(b1·s + b2·s²) / (a0 + a1·s + a2·s²)` into
+/// `s / (s - p)` at its lowest pole and the first-order rest. The passive
+/// stacks' poles are real, so each part is a first-order section whose pole
+/// f32 holds at any rate.
+fn split_mid_low(b: [f64; 3], a: [f64; 3]) -> Option<[([f64; 2], [f64; 2]); 2]> {
+    let [b0, b1, b2] = b;
+    let [a0, a1, a2] = a;
+    let discriminant = a1 * a1 - 4. * a0 * a2;
+    if b0 != 0. || a2 == 0. || a1 == 0. || discriminant.is_nan() || discriminant < 0. {
+        return None;
+    }
+    let q = -0.5 * (a1 + a1.signum() * discriminant.sqrt());
+    let (first, second) = (q / a2, a0 / q);
+    let (low, high) = if first.abs() < second.abs() {
+        (first, second)
+    } else {
+        (second, first)
+    };
+    Some([([0., 1.], [-low, 1.]), ([b1, b2], [-a2 * high, a2])])
 }
 
 fn knob(unit: f32) -> f64 {
@@ -97,29 +133,60 @@ fn tapered(unit: f32) -> f64 {
 struct Stack {
     treble: Biquad,
     mid_low: Biquad,
+    /// The second half of `mid_low` when it runs split.
+    mid_low_rest: Biquad,
+    split: bool,
     treble_gain: f32,
     mid_low_gain: f32,
 }
 
 impl Stack {
+    fn set_mid_low(&mut self, b: [f64; 3], a: [f64; 3], c: f64, split: bool) {
+        match split.then(|| split_mid_low(b, a)).flatten() {
+            Some([low, rest]) => {
+                set(&mut self.mid_low, discretise_first_order(low.0, low.1, c));
+                set(
+                    &mut self.mid_low_rest,
+                    discretise_first_order(rest.0, rest.1, c),
+                );
+                self.split = true;
+            }
+            None => {
+                set(&mut self.mid_low, discretise(b, a, c));
+                self.split = false;
+            }
+        }
+    }
+
     fn process(&mut self, input: f32) -> f32 {
-        self.treble_gain * self.treble.process(input)
-            + self.mid_low_gain * self.mid_low.process(input)
+        let mut mid_low = self.mid_low.process(input);
+        if self.split {
+            mid_low = self.mid_low_rest.process(mid_low);
+        }
+        self.treble_gain * self.treble.process(input) + self.mid_low_gain * mid_low
     }
 
     fn reset(&mut self) {
         self.treble.reset();
         self.mid_low.reset();
+        self.mid_low_rest.reset();
     }
 
     fn response(&self, omega: f64) -> Complex {
+        let mut mid_low = self.mid_low.response(omega);
+        if self.split {
+            mid_low = mid_low * self.mid_low_rest.response(omega);
+        }
         self.treble.response(omega) * f64::from(self.treble_gain)
-            + self.mid_low.response(omega) * f64::from(self.mid_low_gain)
+            + mid_low * f64::from(self.mid_low_gain)
     }
 
     fn settle(&mut self, input: f32) -> f32 {
-        self.treble_gain * self.treble.settle(input)
-            + self.mid_low_gain * self.mid_low.settle(input)
+        let mut mid_low = self.mid_low.settle(input);
+        if self.split {
+            mid_low = self.mid_low_rest.settle(mid_low);
+        }
+        self.treble_gain * self.treble.settle(input) + self.mid_low_gain * mid_low
     }
 }
 
@@ -171,6 +238,7 @@ impl ToneStack {
         self.controls = controls;
         let c = self.mapping.bilinear_constant(self.sample_rate);
         let sample_rate = self.sample_rate;
+        let split = sample_rate > SPLIT_ABOVE;
         let treble = knob(controls.treble);
         let mids = knob(controls.mids);
 
@@ -188,16 +256,16 @@ impl ToneStack {
                 + (c2 + c1) * r1
                 + ri * c2
                 + ri * c1;
-            let (b, a) = discretise([0., b1, b2], [1., a1, a2], c);
-            self.fender.mid_low.set_digital(b, a);
+            self.fender
+                .set_mid_low([0., b1, b2], [1., a1, a2], c, split);
             self.fender.mid_low_gain = 4.;
             let c1 = 250e-12;
-            let (b, a) = self.mapping.first_order(
+            let treble_section = self.mapping.first_order(
                 [0., treble * c1 * r1 * r1],
                 [r1 + ri, ((r1 + ri) * r2 + ri * r1) * c1],
                 c,
             );
-            self.fender.treble.set_digital(b, a);
+            set(&mut self.fender.treble, treble_section);
             self.fender.treble_gain = 12.;
         }
 
@@ -213,17 +281,17 @@ impl ToneStack {
                 * c1
                 * c2;
             let a1 = (-mids * c2 - c1) * r3 - bass * c1 * r2 + (-c2 - c1) * r1 - ri * c2 - ri * c1;
-            let (b, a) = discretise([0., b1, b2], [-1., a1, a2], c);
-            self.marshall.mid_low.set_digital(b, a);
+            self.marshall
+                .set_mid_low([0., b1, b2], [-1., a1, a2], c, split);
             self.marshall.mid_low_gain = 1.4;
             let c1 = 470e-12;
             let (r1, r2) = (33e3, 220e3);
-            let (b, a) = self.mapping.first_order(
+            let treble_section = self.mapping.first_order(
                 [0., treble * c1 * r1 * r1],
                 [r1 + ri, ((r1 + ri) * r2 + ri * r1) * c1],
                 c,
             );
-            self.marshall.treble.set_digital(b, a);
+            set(&mut self.marshall.treble, treble_section);
             self.marshall.treble_gain = 6.;
         }
 
@@ -265,17 +333,16 @@ impl ToneStack {
                 + bass_squared * r4 * r4
                 + ((bass - 1.) * treble * r3 - r2) * r4
                 - treble * r2 * r3;
-            let (b, a) = discretise([0., b1, b2], [a0, a1, a2], c);
-            self.ac30.mid_low.set_digital(b, a);
+            self.ac30.set_mid_low([0., b1, b2], [a0, a1, a2], c, split);
             self.ac30.mid_low_gain = 8.;
             let c1 = 560e-12;
             let ri = 48e3;
-            let (b, a) = self.mapping.first_order(
+            let treble_section = self.mapping.first_order(
                 [r2, ((r2 + treble * r1) * r3 + r1 * r2) * c1],
                 [r2 + r1 + ri, ((r2 + r1 + ri) * r3 + r1 * (r2 + ri)) * c1],
                 c,
             );
-            self.ac30.treble.set_digital(b, a);
+            set(&mut self.ac30.treble, treble_section);
             self.ac30.treble_gain = 1.5;
         }
 
@@ -361,6 +428,47 @@ mod tests {
                         "{sample_rate} Hz, stack {model}, knobs {knobs}: output still {peak:e} \
                          two seconds after a signal at level 10 stopped"
                     );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn every_tube_rate_gives_the_stack_its_response() {
+        let level = |stack: &ToneStack, frequency: f64| {
+            10. * stack.response(frequency).norm_squared().log10()
+        };
+        let knobs = [-1., -0.5, 0., 0.5, 0.86, 0.88, 0.9, 1.];
+        for model in [0., 1., 2.] {
+            for bass in knobs {
+                for mids in knobs {
+                    for treble in [-1., 0., 1.] {
+                        let controls = ToneControls {
+                            bass,
+                            mids,
+                            treble,
+                            presence: 0.,
+                            model,
+                        };
+                        let mut voiced = ToneStack::new(96_000., ToneMapping::Standard);
+                        voiced.configure(controls);
+                        for sample_rate in
+                            [44_100., 88_200., 176_400., 192_000., 352_800., 384_000.]
+                        {
+                            let mut stack = ToneStack::new(sample_rate, ToneMapping::Standard);
+                            stack.configure(controls);
+                            for frequency in [20., 60., 200., 600., 2_000.] {
+                                let difference =
+                                    level(&stack, frequency) - level(&voiced, frequency);
+                                assert!(
+                                    difference.abs() < 0.1,
+                                    "stack {model} at {sample_rate} Hz with Low {bass}, Mid \
+                                     {mids}, High {treble}: {frequency} Hz is \
+                                     {difference:+.2} dB from 96 kHz"
+                                );
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -17,6 +17,8 @@ The published adapter also updates its latency cache and calls
 reported latency to stay constant through an activation. This copy requests a
 restart when processing first observes a different requested latency, then
 publishes and notifies the freshly reset latency during the next activation.
+Activation marks its `AudioConfig` with `with_latency_held_while_active`, so
+the plugin keeps its running latency until that restart.
 An active CLAP reset calls the real-time lifecycle hook, preserving the active
 latency while clearing the current processing history. The full off-thread
 reset remains the activation path that adopts the requested latency.

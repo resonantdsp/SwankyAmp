@@ -80,6 +80,11 @@ pub struct AudioConfig {
     pub max_block_size: usize,
     /// How the host drives audio this activation. See [`ProcessMode`].
     pub process_mode: ProcessMode,
+    /// The format holds the reported latency until the host restarts the
+    /// plugin, as CLAP does, so a latency change must wait for the next
+    /// `reset`. Otherwise the host reads the latency as the plugin runs and
+    /// a change may take effect at once.
+    pub latency_held_while_active: bool,
 }
 
 impl AudioConfig {
@@ -91,6 +96,7 @@ impl AudioConfig {
             sample_rate,
             max_block_size,
             process_mode: ProcessMode::Realtime,
+            latency_held_while_active: false,
         }
     }
 
@@ -98,6 +104,13 @@ impl AudioConfig {
     #[must_use]
     pub fn with_process_mode(mut self, mode: ProcessMode) -> Self {
         self.process_mode = mode;
+        self
+    }
+
+    /// Mark the latency as held until the next `reset`.
+    #[must_use]
+    pub fn with_latency_held_while_active(mut self) -> Self {
+        self.latency_held_while_active = true;
         self
     }
 }
