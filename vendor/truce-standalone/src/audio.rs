@@ -1065,35 +1065,29 @@ pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, B
     let input_enabled = input_setup.enabled;
     let input_ring_width = input_setup.ring_width;
     let input_controller = input_setup.controller;
-    // A flag routes this launch only; the menu's choice is the saved one.
-    if let Some(spec) = opts.input_channels.as_deref() {
-        match ChannelRoute::parse(spec) {
-            Some(route) => input_controller
-                .channel_route
-                .store(route.encode(), Ordering::Relaxed),
-            None => eprintln!(
+    let flagged = opts.input_channels.as_deref().filter(|spec| {
+        let valid = ChannelRoute::parse(spec).is_some();
+        if !valid {
+            eprintln!(
                 "--input-channels: ignoring invalid '{spec}' \
                  (expected 'direct', a channel like '3', or a pair like '3-4')"
-            ),
+            );
         }
-    } else if let Some(route) = saved.input_channels.as_deref().and_then(ChannelRoute::parse) {
-        // A channel this device does not have would leave the input
-        // silent with no word, so it is kept for a device that has it. A
-        // missing device is judged when it returns, by the output width
-        // the ring carries.
-        let opened = match (&input_pick, &input_device) {
-            (InputPick::Missing(_), _) | (_, None) => channels,
-            (_, Some(device)) => device
-                .default_input_config()
-                .map_or(0, |config| usize::from(config.channels()))
-                .min(channels),
-        };
-        if route.base().is_none_or(|base| base < opened) {
-            input_controller
-                .channel_route
-                .store(route.encode(), Ordering::Relaxed);
-        }
-    }
+        valid
+    });
+    // A missing device is judged when it returns, by the output width the
+    // ring carries.
+    let device_channels = match (&input_pick, &input_device) {
+        (InputPick::Missing(_), _) | (_, None) => channels,
+        (_, Some(device)) => device
+            .default_input_config()
+            .map_or(0, |config| usize::from(config.channels()))
+            .min(channels),
+    };
+    let route = launch_input_route(flagged, saved.input_channels.as_deref(), device_channels);
+    input_controller
+        .channel_route
+        .store(route.encode(), Ordering::Relaxed);
 
     let transport = Transport::new(opts.bpm.unwrap_or(120.0), sample_rate);
 
@@ -1447,6 +1441,25 @@ fn launch_devices(
         input_pick,
         output_missing,
     })
+}
+
+/// The input channels a launch feeds the plugin from: a flag's for this
+/// launch, else the saved choice read as `--input-channels` reads it, else
+/// channel 1 alone, since a guitar is one channel. A saved channel the
+/// device does not have would leave the input silent with no word, so it
+/// gives way to channel 1 and stays saved for a device that has it.
+fn launch_input_route(
+    flagged: Option<&str>,
+    saved: Option<&str>,
+    device_channels: usize,
+) -> ChannelRoute {
+    if let Some(route) = flagged.and_then(ChannelRoute::parse) {
+        return route;
+    }
+    saved
+        .and_then(ChannelRoute::parse)
+        .filter(|route| route.base().is_none_or(|base| base < device_channels))
+        .unwrap_or(ChannelRoute::Mono { base: 0 })
 }
 
 struct LaunchDevices {
@@ -3592,6 +3605,28 @@ mod tests {
         // A freshly-zeroed atomic must decode to the default mapping.
         assert_eq!(ChannelRoute::Direct.encode(), 0);
         assert_eq!(ChannelRoute::decode(0), ChannelRoute::Direct);
+    }
+
+    #[test]
+    fn a_launch_feeds_the_amp_from_channel_one_unless_another_was_chosen() {
+        use super::launch_input_route;
+        let first = ChannelRoute::Mono { base: 0 };
+        assert_eq!(launch_input_route(None, None, 2), first);
+        assert_eq!(
+            launch_input_route(None, Some("2"), 2),
+            ChannelRoute::Mono { base: 1 },
+            "a saved Channel 2 (mono) is read as channel 2"
+        );
+        assert_eq!(launch_input_route(None, Some("direct"), 2), ChannelRoute::Direct);
+        assert_eq!(
+            launch_input_route(None, Some("2"), 1),
+            first,
+            "a saved channel the device lacks left the input silent"
+        );
+        assert_eq!(
+            launch_input_route(Some("1-2"), Some("2"), 2),
+            ChannelRoute::Stereo { base: 0 }
+        );
     }
 
     /// The input channels chosen from the menu are saved as a spec and must

@@ -147,7 +147,8 @@ OPTIONS:
                             (mono), or a pair like `3-4` (stereo).
   --input-channels <spec>   Route input from specific device channels;
                             same grammar as --output-channels. Overrides
-                            the Settings menu's choice for this launch.
+                            the Settings menu's choice for this launch
+                            (default: that choice, else channel 1).
   --driver <asio|wasapi>    Windows audio driver. Overrides the Settings
                             menu's choice for this launch (default: that
                             choice, else ASIO when a driver is installed).

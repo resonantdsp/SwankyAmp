@@ -160,8 +160,9 @@ installs beside Swanky Amp 1.4.0.
   the computer's own microphone feeds back through its speakers. While the
   input is off the Input knob reads OFF and a press on it, or on the footer
   line that says so, opens the panel.
-- Remembered the standalone app's input channels, so a guitar on input 2 is
-  heard at the next launch.
+- Fed the standalone app's amplifier from input 1 alone unless other input
+  channels are chosen, since a guitar is one channel, and remembered the
+  choice, so a guitar on input 2 is heard at the next launch.
 - The Windows standalone app plays through an audio interface's own ASIO®
   driver when one is installed, instead of the Windows shared audio path,
   which adds about 10 ms in each direction. The Settings menu gains an Audio

@@ -100,8 +100,10 @@ ALSA would open each one; the input channels on offer are those the open
 input stream records. Swanky Amp shows these in its information panel.
 The input channels chosen from
 the menu are saved with the devices (`input_channels`), and
-`--input-channels` overrides them for one launch; a saved channel the
-device does not have is left unused.
+`--input-channels` overrides them for one launch. Without either the input
+feeds the plugin from channel 1 alone, where upstream feeds every channel
+straight through, since a guitar is one channel; a saved channel the device
+does not have gives way to channel 1.
 
 The buffer, device, ring, ASIO and zoom-pin changes follow the same fixes in Swanky Amp
 Pro's copy of this crate. Keep these fixes here until a pinned upstream
