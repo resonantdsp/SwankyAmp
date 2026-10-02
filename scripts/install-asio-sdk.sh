@@ -22,7 +22,9 @@ fi
 
 mkdir -p tools
 archive=tools/asio-sdk.zip
-curl --fail --location --silent --show-error --output "$archive" "$SDK_URL"
+# A download host's transient error (a 5xx or a timeout) is retried rather
+# than failing the run; the timeouts stop a hung download.
+curl --fail --location --silent --show-error --retry 4 --connect-timeout 30 --max-time 600 --output "$archive" "$SDK_URL"
 actual=$(sha256sum "$archive" | cut -d' ' -f1)
 if [ "$actual" != "$SDK_SHA256" ]; then
   echo "$SDK_URL is $actual, expected $SDK_SHA256." >&2
