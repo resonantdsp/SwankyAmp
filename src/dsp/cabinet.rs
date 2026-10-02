@@ -30,7 +30,7 @@ const PEAKS: [(f32, f32, f32); 10] = [
 const SCOOP: (f32, f32, f32) = (950.9019, -15.29571, 2_799.926);
 
 /// The cabinet was voiced at this rate; its response there is the reference
-/// every other host rate is matched to.
+/// the tabled rates in `cabinet_data` are matched to.
 const REFERENCE_RATE: f32 = 48_000.;
 const MAX_SAMPLE_RATE: f32 = 384_000.;
 /// Bilinear designs stay below Nyquist, where their tangent turns negative
@@ -557,7 +557,7 @@ mod tests {
             let mut samples: Vec<f32> = (0..(1.05 * sample_rate) as usize)
                 .map(|index| {
                     if index < burst {
-                        // A full-band burst that reaches Nyquist.
+                        // A burst of DC and Nyquist.
                         if index % 2 == 0 { 0.5 } else { -0.3 }
                     } else {
                         0.0

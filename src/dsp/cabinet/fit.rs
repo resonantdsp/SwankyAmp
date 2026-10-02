@@ -90,15 +90,6 @@ fn fit_rate(sample_rate: f32) -> Result<Fitted, String> {
         })
         .collect();
     let initial = starting_sections(sample_rate);
-    if let Some(radius) = initial
-        .iter()
-        .map(pole_radius)
-        .find(|&r| r > MAX_POLE_RADIUS)
-    {
-        return Err(format!(
-            "{sample_rate} Hz: a starting section has a pole at radius {radius}"
-        ));
-    }
     let (sections, iterations) = fit_magnitude(initial, &frequencies, &target, rate)
         .map_err(|error| format!("{sample_rate} Hz: {error}"))?;
     let max_pole_radius = sections.iter().map(pole_radius).fold(0., f64::max);
@@ -179,8 +170,8 @@ fn scale_numerator(section: Section, scale: f64) -> Section {
     [b0 * scale, b1 * scale, b2 * scale, a1, a2]
 }
 
-/// Levenberg-Marquardt on the log magnitude, run until it converges, accepting only steps that keep every pole inside
-/// `MAX_POLE_RADIUS`. Returns the sections and the iterations taken.
+/// Levenberg-Marquardt on the log magnitude, run until it converges,
+/// accepting only steps that keep every pole inside `MAX_POLE_RADIUS`. Returns the sections and the iterations taken.
 fn fit_magnitude<const SECTIONS: usize>(
     mut sections: [Section; SECTIONS],
     frequencies: &[f64],

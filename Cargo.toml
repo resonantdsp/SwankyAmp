@@ -29,7 +29,7 @@ required-features = ["standalone"]
 
 # The offline measurement tools sit behind the `tools` feature because
 # cargo-truce builds every binary of the package for each plug-in format, and
-# link-optimising six tools per format cost minutes of each bundle build.
+# link-optimising seven tools per format cost minutes of each bundle build.
 [[bin]]
 name = "render-model"
 path = "src/bin/render-model.rs"

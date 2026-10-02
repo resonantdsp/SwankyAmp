@@ -80,10 +80,10 @@ installs beside Swanky Amp 1.4.0.
   as before.
 - The cabinet sounds the same at the common sample rates (32, 44.1, 64,
   88.2, 96, 128, 176.4, 192, 352.8 and 384 kHz), with its 48 kHz response as
-  the reference, within 0.01 dB to 20 kHz. Before, its top end moved with the
-  rate, about 1.3 dB brighter at 8 kHz at 96 kHz and 2.5 dB darker at 16 kHz
-  at 44.1 kHz; any other rate keeps the plain design. At 352.8
-  and 384 kHz every cabinet frequency sat an octave high, and below 22 kHz
+  the reference, within 0.01 dB to 20 kHz, or to the top of the band at
+  32 kHz. Any other rate keeps the plain design. Before, its top end moved
+  with the rate, about 1.3 dB brighter at 8 kHz at 96 kHz and 2.5 dB darker
+  at 16 kHz at 44.1 kHz. At 352.8 and 384 kHz every cabinet frequency sat an octave high, and below 22 kHz
   the cabinet blew up into silence; it now plays at every rate the plug-in
   accepts. 48 kHz is unchanged.
 - Removed a hiss the cabinet added under low notes: its filters now run in
