@@ -83,6 +83,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("{} {width}x{height}", path.display());
             }
         }
+    } else if arguments.first().map(String::as_str) == Some("render") {
+        const USAGE: &str = "render <preset key|init> <input.wav> <output.wav> [id=value ...]";
+        let [preset, input, output] = [1, 2, 3].map(|index| arguments.get(index));
+        let (Some(preset), Some(input), Some(output)) = (preset, input, output) else {
+            return Err(USAGE.into());
+        };
+        let overrides = arguments[4..]
+            .iter()
+            .map(|pair| {
+                let (id, value) = pair.split_once('=').ok_or(USAGE)?;
+                Ok((
+                    id.parse().map_err(|_| USAGE)?,
+                    value.parse().map_err(|_| USAGE)?,
+                ))
+            })
+            .collect::<Result<Vec<(u32, f64)>, &str>>()?;
+        let (frames, latency) =
+            swanky_amp::render::render_file(preset, input.as_ref(), output.as_ref(), &overrides)?;
+        println!("{frames} frames rendered to {output}, latency {latency} samples");
     } else if arguments.first().map(String::as_str) == Some("pack-artwork") {
         let layers = PathBuf::from(
             arguments

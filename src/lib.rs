@@ -17,6 +17,7 @@ pub mod params;
 pub mod preset_bar;
 pub mod presets;
 pub mod release_notice;
+pub mod render;
 mod resident;
 pub mod style;
 pub mod ui;
