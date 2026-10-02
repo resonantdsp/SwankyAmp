@@ -674,7 +674,11 @@ unsafe extern "C" fn clap_plugin_activate<P: PluginExport>(
         let mode = ProcessMode::from_u8(data.render_mode.load(Ordering::Relaxed));
         {
             let mut instance = enter_plugin(&data.plugin);
-            instance.reset(&AudioConfig::new(sample_rate, max_block).with_process_mode(mode));
+            instance.reset(
+                &AudioConfig::new(sample_rate, max_block)
+                    .with_process_mode(mode)
+                    .with_latency_held_while_active(),
+            );
             // Latency is constant while active. Publish the freshly reset
             // instance here, before `active` becomes true, and notify the
             // host only from this inactive-to-active lifecycle boundary.

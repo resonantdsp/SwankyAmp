@@ -33,6 +33,7 @@ pub struct Engine {
     oversampling_choice: usize,
     doublings: usize,
     requested_doublings: usize,
+    latency_held: bool,
     paths: [AmpChannel; 2],
     scratch: [Vec<f32>; 2],
     levels: [f32; 4],
@@ -57,6 +58,7 @@ impl Engine {
             oversampling_choice,
             doublings,
             requested_doublings: doublings,
+            latency_held: false,
             paths: std::array::from_fn(|_| {
                 AmpChannel::new(sample_rate as f32, INITIAL_BLOCK, controls, doublings)
             }),
@@ -80,6 +82,14 @@ impl Engine {
             scratch.resize(max_block.max(1), 0.);
         }
         self.levels = [0.; 4];
+    }
+
+    /// Whether the format holds the reported latency until the next `reset`.
+    /// Where it does, as in CLAP, an oversampling change waits for that
+    /// reset; elsewhere the audio takes the new factor at the next block and
+    /// the latency reported changes with it.
+    pub fn hold_latency_until_reset(&mut self, held: bool) {
+        self.latency_held = held;
     }
 
     pub fn reset_realtime(&mut self, params: &SwankyAmpParams) {
@@ -110,6 +120,13 @@ impl Engine {
             self.oversampling_choice = oversampling_choice;
             self.requested_doublings =
                 doublings_for(oversampling_choice, f64::from(self.sample_rate));
+        }
+        if !self.latency_held && self.requested_doublings != self.doublings {
+            self.doublings = self.requested_doublings;
+            for path in &mut self.paths {
+                path.switch(self.doublings);
+            }
+            params.resolved_oversampling.publish(self.doublings);
         }
 
         let channels = buffer
@@ -202,8 +219,17 @@ impl Engine {
         self.levels
     }
 
+    /// The latency of the audio as it runs, except where the format holds
+    /// the latency until a reset: there the format keeps reporting the
+    /// running latency itself and reads a change here as the request to
+    /// restart.
     pub fn latency(&self) -> u32 {
-        u32::try_from(self.paths[0].latency(self.requested_doublings)).unwrap_or(u32::MAX)
+        let doublings = if self.latency_held {
+            self.requested_doublings
+        } else {
+            self.doublings
+        };
+        u32::try_from(self.paths[0].latency(doublings)).unwrap_or(u32::MAX)
     }
 }
 

@@ -38,9 +38,9 @@ On Windows the standalone plays through ASIO when an ASIO driver is installed, a
 
 ## Signal path
 
-The shipping path is the 1.4.0 model with tube-only oversampling, a plate filter whose cutoff holds as the oversampled rate changes, a smooth triode knee, a capped Grit mapping, the standard tone-stack mapping, and level compensation recalibrated against 1.4.0. The legacy path keeps every released mapping so that `just model-check` can prove the port against the frozen 1.4.0 renders.
+The shipping path is the 1.4.0 model with tube-only oversampling, tube filters whose response holds as the oversampled rate changes, a smooth triode knee, a capped Grit mapping, the standard tone-stack mapping, and level compensation recalibrated against 1.4.0. The legacy path keeps every released mapping so that `just model-check` can prove the port against the frozen 1.4.0 renders.
 
-Oversampling is set in the editor's header: Auto picks the tube stages' factor from the host's sample rate, or the player fixes one. The plug-in reports the oversampling filter's latency to the host, so changing the factor restarts processing for the host to take up the new latency.
+Oversampling is set in the editor's header: Auto picks the tube stages' factor from the host's sample rate, or the player fixes one. The tube stages' fixed low-passes keep the response they have at 96 kHz, the rate Auto runs them at from 48 kHz, so the factor changes aliasing and not tone. The plug-in reports the oversampling filter's latency to the host, always that of the factor the audio is running: a new factor takes effect at the next block, and the latency reported changes with it, except in CLAP, which keeps an active plug-in's latency fixed, so there the factor waits for the restart the plug-in asks the host for.
 
 To hear the plug-in itself offline, `cargo run --release -- render <preset> in.wav out.wav [id=value ...]` plays the input's first channel through the shipping engine with a preset (`init`, `factory:<name>` or `user:<file>`) and writes the stereo 32-bit float output the plug-in gives a mono track, the same length as the input and not shifted by the reported latency.
 
@@ -48,7 +48,7 @@ These tools render, measure and stress the paths:
 
 ```sh
 just render-model "high gain" /tmp/high-gain.wav   # one released preset through the legacy path, with its internal seams
-just dsp-report        # oversampling and the plate filter against the legacy path; also checks the real-time reset
+just dsp-report        # oversampling and the tube filters against the legacy path; also checks the real-time reset
 just knee-report       # the smooth knee against the released one at every seam, per preset and input level
 just tone-stack-soak   # 24 hours of samples through the shipping tone stack; fails on any drift (minutes)
 ```
@@ -256,9 +256,9 @@ Narrow patches of the published Truce sources and of baseview, each directory ca
 
 - `vendor/baseview-truce`: frame delivery and host keyboard and modifier fixes.
 - `vendor/truce-iced`: iced input, focus, redraw and clipboard fixes.
-- `vendor/truce-clap`: host state notification required by clap-validator, dynamic-latency restart and active reset handling.
+- `vendor/truce-clap`: host state notification required by clap-validator, dynamic-latency restart with the latency held until it, and active reset handling.
 - `vendor/truce-standalone`: dynamic-latency restart on the output worker, an input kept within about one buffer of the output, a Buffer Size menu, remembered devices, input channels and buffer size, an input that starts live only on a chosen device, is off after a driver switch and never remembers the computer's own microphone, the audio choices and what needs the player offered to the plug-in's editor, and ASIO on Windows.
-- `vendor/truce-core`, `vendor/truce-plugin`, `vendor/truce-loader` and `vendor/truce`: a real-time reset lifecycle hook and its forwarding bridge.
+- `vendor/truce-core`, `vendor/truce-plugin`, `vendor/truce-loader` and `vendor/truce`: a real-time reset lifecycle hook and its forwarding bridge, and an activation flag saying the format holds latency until the next reset.
 - `vendor/truce-au`: a latency change reaches the Audio Unit host's property listeners.
 - `vendor/cargo-truce`: the source-only build tool with the Azure `ExcludeCredentials` patch, the Audio Unit Info.plist patch and the scoped Windows installer name. It is a build tool, not linked into the plug-in. The Truce Framework Rider's Section 2.2 lists audio plug-ins and suites among the uses that are not Covered Framework Offerings.
 

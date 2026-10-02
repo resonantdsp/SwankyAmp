@@ -9,3 +9,7 @@ license texts are included unchanged.
 This copy forwards `reset_realtime` through the static plugin shell used by
 the product adapters. Keep this copy until a pinned upstream release provides
 an equivalent lifecycle distinction.
+
+The shell also replays the `latency_held_while_active` flag of the last
+`reset` (see `vendor/truce-core/UPSTREAM.md`) when it resets a reloaded or
+lock-contended state.

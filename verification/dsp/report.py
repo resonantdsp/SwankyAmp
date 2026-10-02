@@ -162,7 +162,7 @@ def render(
     if oversampling is not None:
         command.extend(("--oversampling", oversampling))
     if model == "corrected":
-        # This report isolates oversampling and the plate filter, so it keeps
+        # This report isolates oversampling and the tube filters, so it keeps
         # the released tone mapping, knee and level compensation; the other
         # corrections have their own reports.
         command.extend(
@@ -235,8 +235,9 @@ def run(render_binary: Path, probe_binary: Path, destination: Path) -> None:
 
     results: dict[str, object] = {
         "scope": (
-            "seam and alias measurements isolate oversampling and the 20 kHz plate "
-            "filter with the released knee, tone mapping and level compensation; "
+            "seam and alias measurements isolate oversampling and the tube filters "
+            "matched to their 96 kHz response, with the released knee, tone mapping "
+            "and level compensation; "
             "reset audits use the shipping path"
         ),
         "policy": probe["policy"],
@@ -306,14 +307,6 @@ def run(render_binary: Path, probe_binary: Path, destination: Path) -> None:
                 )
             if sample_rate >= 88_200 and abs(alias_change) > 1.0e-9:
                 raise RuntimeError(f"Auto should resolve to 1x at {sample_rate} Hz")
-            if sample_rate == 44_100:
-                neutral = deltas(legacy_levels, one_levels)
-                if any(
-                    abs(value) > 1.0e-6
-                    for seam in neutral.values()
-                    for value in seam.values()
-                ):
-                    raise RuntimeError("the corrected 20 kHz plate filter is not neutral at 44.1 kHz")
 
         reset_cases = [
             reset_audit(render_binary, temporary, preset, sample_rate)

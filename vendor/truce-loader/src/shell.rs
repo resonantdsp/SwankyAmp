@@ -89,6 +89,9 @@ pub struct HotShell<P: Params, S: Sample = f32> {
     /// thread re-resets a freshly hot-swapped dylib so the new instance
     /// prepares for the same render mode.
     process_mode: ProcessMode,
+    /// Whether the last `reset` held latency until the next one, replayed
+    /// with the processing mode.
+    latency_held_while_active: bool,
     /// The `swap_generation` the live `self.state` allocation was born
     /// under. Every entry point that runs the current dylib's symbols
     /// against `self.state` compares this to `loader.swap_generation()`;
@@ -154,6 +157,7 @@ impl<P: Params + 'static, S: Sample> HotShell<P, S> {
             sample_rate: 44100.0,
             max_block_size: 1024,
             process_mode: ProcessMode::Realtime,
+            latency_held_while_active: false,
             state_generation: initial_swap,
             reset_pending: false,
             latency_cache: AtomicU32::new(0),
@@ -164,6 +168,17 @@ impl<P: Params + 'static, S: Sample> HotShell<P, S> {
     /// Ensure `self.state` is a live allocation from the current dylib,
     /// allocating it if the shell came up before any dylib was loaded.
     /// Returns `false` if nothing is loaded (nothing to run).
+    /// The configuration of the last `reset`, for replaying it.
+    fn replay_config(&self) -> AudioConfig {
+        let config = AudioConfig::new(self.sample_rate, self.max_block_size)
+            .with_process_mode(self.process_mode);
+        if self.latency_held_while_active {
+            config.with_latency_held_while_active()
+        } else {
+            config
+        }
+    }
+
     fn ensure_state(&mut self, loader: &NativeLoader<S>) -> bool {
         if !self.state.is_null() {
             return true;
@@ -219,8 +234,7 @@ impl<P: Params + 'static, S: Sample> HotShell<P, S> {
                          starting fresh: {e}"
                     );
                 }
-                let config = AudioConfig::new(self.sample_rate, self.max_block_size)
-                    .with_process_mode(self.process_mode);
+                let config = self.replay_config();
                 loader.reset(self.state, &config);
                 // The fresh state is prepared for the current config, so a
                 // reset missed under lock contention is satisfied.
@@ -288,6 +302,7 @@ impl<P: Params + 'static, S: Sample> PluginRuntime for HotShell<P, S> {
         self.sample_rate = config.sample_rate;
         self.max_block_size = config.max_block_size;
         self.process_mode = config.process_mode;
+        self.latency_held_while_active = config.latency_held_while_active;
         // Params plumbing is the shell's job, not the plugin's: settle
         // smoother coefficients and state before the dylib's `reset` so
         // its body reads post-snap values. Runs even when the loader
@@ -360,8 +375,7 @@ impl<P: Params + 'static, S: Sample> PluginRuntime for HotShell<P, S> {
         // or state save / load), replay it here so the sample-rate /
         // block-size change still reaches the dylib's coefficients.
         if self.reset_pending {
-            let config = AudioConfig::new(self.sample_rate, self.max_block_size)
-                .with_process_mode(self.process_mode);
+            let config = self.replay_config();
             loader.reset(self.state, &config);
             self.reset_pending = false;
         }

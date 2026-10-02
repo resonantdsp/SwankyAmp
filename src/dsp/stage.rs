@@ -67,11 +67,19 @@ fn triode_makeup(knee: ClipKnee, stage: usize) -> f32 {
     }
 }
 
+/// The tube stages' fixed low-passes: the plate filter and the power stage's
+/// band limit.
 #[derive(Debug, Clone, Copy)]
-pub(crate) enum PlateFilter {
+pub(crate) enum TubeFilters {
+    /// 1.4.0's plate coefficients, designed for 44.1 kHz.
     Released44k1,
-    Fixed20k,
+    /// The responses the shipping voicing was judged by, those of the
+    /// tubes' 96 kHz rate under Auto at 48 kHz, matched at every rate.
+    AsAt96k,
 }
+
+/// The tube rate whose filter responses every other rate reproduces.
+const VOICING_RATE: f32 = 96_000.;
 
 #[allow(clippy::excessive_precision)] // fitted values, kept verbatim
 mod triode {
@@ -243,7 +251,7 @@ pub struct Triode {
     comp_offset: f32,
     comp_corner: Divisor,
     plate_lp: OnePole,
-    plate_filter: PlateFilter,
+    filters: TubeFilters,
     span: Divisor,
 }
 
@@ -254,7 +262,7 @@ impl Triode {
         stage: usize,
         unscale: f32,
         sample_rate: f32,
-        plate_filter: PlateFilter,
+        filters: TubeFilters,
         knee: ClipKnee,
     ) -> Self {
         let mut triode = Self {
@@ -289,7 +297,7 @@ impl Triode {
             comp_offset: 0.,
             comp_corner: Divisor::default(),
             plate_lp: OnePole::default(),
-            plate_filter,
+            filters,
             span: knee.span(),
         };
         triode.configure(TriodeControls::default());
@@ -378,13 +386,13 @@ impl Triode {
         self.comp_depth = COMP_DEPTH.fixed();
         self.comp_offset = COMP_OFFSET.at(controls.comp_offset);
         self.comp_corner = Divisor::new(COMP_CORNER.fixed());
-        match self.plate_filter {
-            PlateFilter::Released44k1 => {
+        match self.filters {
+            TubeFilters::Released44k1 => {
                 self.plate_lp
                     .set_digital(0.863_271_24, 0.863_271_24, 0.726_542_53);
             }
-            PlateFilter::Fixed20k => {
-                self.plate_lp.set_lowpass(20_000., sr);
+            TubeFilters::AsAt96k => {
+                self.plate_lp.set_lowpass_as_at(20_000., sr, VOICING_RATE);
             }
         }
     }
@@ -515,6 +523,7 @@ impl Side {
 #[derive(Debug, Clone)]
 pub struct Tetrode {
     sample_rate: f32,
+    filters: TubeFilters,
     controls: TetrodeControls,
     grid_offset1: f32,
     grid_offset2: f32,
@@ -545,9 +554,10 @@ pub struct Tetrode {
 }
 
 impl Tetrode {
-    pub fn new(sample_rate: f32) -> Self {
+    pub fn new(sample_rate: f32, filters: TubeFilters) -> Self {
         let mut tetrode = Self {
             sample_rate,
+            filters,
             controls: TetrodeControls::default(),
             grid_offset1: 0.,
             grid_offset2: 0.,
@@ -622,6 +632,10 @@ impl Tetrode {
         y + drift * self.drift2_depth
     }
 
+    pub(crate) fn grid_charged(&self) -> bool {
+        self.grid_charge.value() != 0.
+    }
+
     pub fn configure(&mut self, controls: TetrodeControls) {
         use tetrode::*;
         let sr = self.sample_rate;
@@ -670,7 +684,13 @@ impl Tetrode {
         self.sag_gain = sag_amount;
         self.sag_makeup = 1. + sag_amount;
         self.band_hp.set_highpass(HP_FREQ.fixed(), sr);
-        self.band_lp.set_lowpass(LP_FREQ.fixed(), sr);
+        match self.filters {
+            TubeFilters::Released44k1 => self.band_lp.set_lowpass(LP_FREQ.fixed(), sr),
+            TubeFilters::AsAt96k => {
+                self.band_lp
+                    .set_lowpass_as_at(LP_FREQ.fixed(), sr, VOICING_RATE);
+            }
+        }
         self.drift2_level = DRIFT2_LEVEL.fixed();
         self.drift2_depth = DRIFT2_DEPTH.fixed();
         self.drift2_smooth.set_pole(drift_pole);

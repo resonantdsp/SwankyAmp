@@ -48,6 +48,7 @@ impl PluginLogic for SwankyAmp {
     }
 
     fn reset(engine: &mut Self::DspState, params: &Self::Params, config: &AudioConfig) {
+        engine.hold_latency_until_reset(config.latency_held_while_active);
         engine.reset(params, config.sample_rate, config.max_block_size);
     }
 
@@ -494,6 +495,40 @@ mod tests {
         assert_eq!(<SwankyAmp as PluginLogic>::latency(&engine), 48);
         engine.reset(&params, 96_000., 64);
         assert_eq!(<SwankyAmp as PluginLogic>::latency(&engine), 32);
+
+        // A new factor is reported with the audio that carries it, which
+        // the host may only read after the block that switched.
+        params.cabinet_on.set_value(false);
+        params.oversampling.set_value(1);
+        assert_eq!(
+            <SwankyAmp as PluginLogic>::latency(&engine),
+            32,
+            "the reported latency moved before the audio did"
+        );
+        let mut seed = 1_u32;
+        let noise: Vec<f32> = (0..4_096)
+            .map(|_| {
+                seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                0.05 * (f32::from((seed >> 16) as u16) / 32_768. - 1.)
+            })
+            .collect();
+        let output = render(&mut engine, &params, std::slice::from_ref(&noise), 64);
+        let reported = <SwankyAmp as PluginLogic>::latency(&engine);
+        let correlation = |lag: usize| -> f32 {
+            output[0][lag..]
+                .iter()
+                .zip(&noise)
+                .map(|(output, input)| output * input)
+                .sum::<f32>()
+                .abs()
+        };
+        let delay = (0..64)
+            .max_by(|&a, &b| correlation(a).total_cmp(&correlation(b)))
+            .unwrap();
+        assert!(
+            delay.abs_diff(reported as usize) <= 2,
+            "the audio ran {delay} samples late while {reported} were reported"
+        );
     }
 
     #[test]
