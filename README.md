@@ -32,7 +32,7 @@ just run        # open the standalone
 
 `setup` builds the pinned cargo-truce inside this checkout and downloads checksum-verified pluginval and clap-validator, and on Windows the ASIO SDK. `validate` builds and installs the CLAP and VST3 bundles, and on macOS the Audio Unit, and runs the validators over them, auval among them on macOS.
 
-The standalone opens with its input on, since an amplifier with its input off is silent, but only when the input is a device the player chose, from the Settings menu or with `--input`, and it is connected. The system default input is often a built-in microphone beside the built-in speakers, so on a first launch, or when the chosen interface is unplugged, the input starts off and the footer says how to turn it on; `--input-enabled on` or `off` overrides that for one launch, except that on Windows a launch whose ASIO interface will not open falls back to Windows audio with the input off. Its Settings menu chooses the input, the input channels, the output and the buffer size (128 samples unless chosen) and remembers them on the machine; `--input`, `--output` and `--buffer` override them for one launch (`cargo run --release -- --help` lists every option). Choosing an audio interface as the input takes the output to it too, unless an output has been chosen, and the input is kept within about one buffer of the output.
+The standalone opens with its input on, since an amplifier with its input off is silent, but only when the input is a device the player chose, from the information panel, the Settings menu or with `--input`, and it is connected. The system default input is often a built-in microphone beside the built-in speakers, so on a first launch, or when the chosen interface is unplugged, the input starts off and the information panel opens to say why; `--input-enabled on` or `off` overrides that for one launch, except that on Windows a launch whose ASIO interface will not open falls back to Windows audio with the input off. Its Settings menu chooses the input, the input channels, the output and the buffer size (128 samples unless chosen) and remembers them on the machine; `--input`, `--output` and `--buffer` override them for one launch (`cargo run --release -- --help` lists every option). Choosing an audio interface as the input takes the output to it too, unless an output has been chosen, and the input is kept within about one buffer of the output.
 
 On Windows the standalone plays through ASIO when an ASIO driver is installed, and its Settings menu chooses between ASIO and Windows (WASAPI); `--driver asio` or `--driver wasapi` overrides that for one launch. On ASIO the interface is one device for input and output. The Windows recipes build the standalone with the Cargo feature `asio`, which compiles the ASIO SDK that `just setup` fetches into `tools/` and needs libclang; no other build compiles it.
 
@@ -104,6 +104,8 @@ The six signal-flow groups (Levels, Cabinet, Preamp, Staging, Power Amp and Tone
 
 The cog left of the preset bar opens the product name and version, Interface size, links to the product page, the manual and support, Copy diagnostics and Third-party licences. In the Windows standalone it also shows the ASIO Compatible logo and Steinberg's trademark line.
 
+In the standalone the panel also offers Input, Output and, for an input with more than one channel, Input channels: the Settings menu's choices, remembered the same way. Choosing an input turns it on; Off turns it off for the session. The panel opens by itself at launch only when no input was ever chosen or a remembered device is missing, and the box that needs the player is outlined in the accent with what is missing below it. An input that is the computer's own microphone carries a warning that it feeds back through the speakers. macOS identifies that microphone exactly; Windows recognises a microphone on the onboard HD Audio chip, built in or plugged into its jack, and not one behind another driver such as Intel Smart Sound; Linux and ASIO do not say, so no warning shows there. While the input is off the footer says so, and a press on that line opens the panel.
+
 Interface size draws the editor at 75, 100, 125 or 150 %. It belongs to the computer: it is saved in `Swanky Amp 2 interface.json`, in `~/Library/Resonant DSP` on macOS, `%APPDATA%\Resonant DSP` on Windows and `$XDG_CONFIG_HOME/Resonant DSP` on Linux, never in presets or host state.
 
 Copy diagnostics puts a short block on the clipboard for a support request: product, version and build commit, operating system and architecture, host and plug-in format, the sample rate and buffer audio last ran at, and the licence. Nothing is sent anywhere.
@@ -131,9 +133,10 @@ just capture-preset "high gain" /tmp/swanky-capture
 just capture-live /tmp/swanky-capture
 just capture-information /tmp/swanky-capture 2.0.1
 just capture-menu "A long preset name of the player's own" /tmp/swanky-capture
+just capture-audio missing-input /tmp/swanky-capture
 ```
 
-`export-layout` writes the resolved geometry an artwork bake follows; it works when the artwork package is missing or stale. `capture` draws the editor at every interface size and needs a working GPU adapter; the other capture recipes apply a factory preset, light the meters, open the information panel (announcing the named release, if given) or open the preset menu.
+`export-layout` writes the resolved geometry an artwork bake follows; it works when the artwork package is missing or stale. `capture` draws the editor at every interface size and needs a working GPU adapter; the other capture recipes apply a factory preset, light the meters, open the information panel (announcing the named release, if given), show the standalone's audio choices in one of the states `capture-audio` lists, or open the preset menu.
 
 ### Artwork
 

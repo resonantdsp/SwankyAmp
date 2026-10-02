@@ -19,7 +19,7 @@ use truce_iced::iced::{Alignment, Border, Color, Subscription, Task, event, keyb
 use truce_iced::{IcedPlugin, Message, ParamCache, ParamMessage, PluginContext};
 
 const INK: Color = style::INK;
-const DIM: Color = Color::from_rgb(0.49, 0.53, 0.56);
+pub(crate) const DIM: Color = Color::from_rgb(0.49, 0.53, 0.56);
 const PANEL: Color = Color::from_rgb(0.014, 0.020, 0.026);
 const HEADER: Color = Color::from_rgb(0.007, 0.010, 0.013);
 /// Without a bake the groove leaves no mark, so each section rules its
@@ -47,6 +47,9 @@ pub enum Action {
     Pointer(bool),
     /// The interface size, in percent, for this installation.
     InterfaceSize(u16),
+    /// The standalone app's input, input channels or output.
+    #[cfg(feature = "standalone")]
+    Audio(crate::audio_settings::AudioChoice),
 }
 
 pub struct FreeUi {
@@ -72,25 +75,18 @@ pub struct FreeUi {
     settings: Option<PathBuf>,
     /// Why the last chosen size could not be remembered.
     size_error: Option<String>,
-    /// The standalone's line about its audio devices, as last shown.
-    device_notice: Option<String>,
+    /// The standalone app's audio choices as last read; `None` in a plug-in.
+    #[cfg(feature = "standalone")]
+    audio: Option<truce_standalone::setup::Setup>,
 }
 
-/// The standalone app's line about its audio devices, such as why the input
-/// is off. It stays in the footer until the app clears it, since the player
-/// has to act on it.
-static DEVICE_NOTICE: std::sync::RwLock<Option<String>> = std::sync::RwLock::new(None);
-
-/// Shows `line` in every open editor's footer, or clears it with `None`.
-/// The standalone app posts it from its audio workers.
-pub fn show_device_notice(line: Option<&str>) {
-    if let Ok(mut notice) = DEVICE_NOTICE.write() {
-        *notice = line.map(str::to_owned);
-    }
-}
-
-fn device_notice() -> Option<String> {
-    DEVICE_NOTICE.read().ok().and_then(|notice| notice.clone())
+/// The standalone app's audio choices, or what a capture stands in for them.
+#[cfg(feature = "standalone")]
+fn audio_setup() -> Option<truce_standalone::setup::Setup> {
+    CAPTURED_AUDIO
+        .get()
+        .cloned()
+        .or_else(truce_standalone::setup::current)
 }
 
 impl FreeUi {
@@ -113,7 +109,8 @@ impl FreeUi {
             interface_size: crate::interface::DEFAULT,
             settings: None,
             size_error: None,
-            device_notice: None,
+            #[cfg(feature = "standalone")]
+            audio: None,
         }
     }
 
@@ -125,6 +122,37 @@ impl FreeUi {
             settings,
             ..Self::resting()
         }
+    }
+
+    /// Opens the panel by itself only when the standalone's audio needs the
+    /// player: no input was ever chosen, or a remembered device is missing.
+    #[cfg(feature = "standalone")]
+    fn attach_audio(&mut self, audio: Option<truce_standalone::setup::Setup>) {
+        if audio
+            .as_ref()
+            .is_some_and(truce_standalone::setup::Setup::needs_attention)
+        {
+            self.information = true;
+        }
+        self.audio = audio;
+    }
+
+    /// Whether the standalone's input is off, which leaves the amplifier
+    /// silent.
+    fn input_off(&self) -> bool {
+        #[cfg(feature = "standalone")]
+        if let Some(audio) = &self.audio {
+            return audio.takes_input && audio.input.is_none();
+        }
+        false
+    }
+
+    fn audio_rows<'a, R: FreeRenderer + 'a>(&self) -> Vec<Element<'a, Msg, Theme, R>> {
+        #[cfg(feature = "standalone")]
+        if let Some(audio) = &self.audio {
+            return crate::audio_settings::rows(audio);
+        }
+        Vec::new()
     }
 
     /// Meters go dark while the window has lost focus and the pointer is
@@ -204,28 +232,35 @@ impl FreeUi {
                 ControlKind::Toggle => cabinet_switch(control, params),
             });
         }
-        let (line, color) = match (
-            self.presets.status(),
-            self.device_notice.clone(),
-            self.presets.footer(params),
-        ) {
-            (Some(status), _, _) => (status.to_owned(), INK),
-            (None, Some(notice), _) | (None, None, Some(notice)) => (notice, INK),
-            (None, None, None) => (
+        let input_off = self.input_off();
+        let (line, color) = match (self.presets.status(), self.presets.footer(params)) {
+            (Some(status), _) => (status.to_owned(), INK),
+            (None, Some(name)) => (name, INK),
+            (None, None) if input_off => (INPUT_OFF.to_owned(), INK),
+            (None, None) => (
                 "DRAG TO TURN   ·   SHIFT FOR FINE CONTROL   ·   RIGHT-CLICK TO RESET".to_owned(),
                 DIM,
             ),
         };
         let mut spec = Component::new("footer.line", "text", "native");
         spec.text = Some(line.clone());
+        let opens_panel = line == INPUT_OFF;
+        let line = text(line)
+            .size(FOOTER_TEXT_SIZE)
+            .font(style::FONT)
+            .color(color);
         layers.push(footer(
             FOOTER_TEXT,
             layout::mark(
                 spec,
-                text(line)
-                    .size(FOOTER_TEXT_SIZE)
-                    .font(style::FONT)
-                    .color(color),
+                if opens_panel {
+                    mouse_area(line)
+                        .on_press(Message::Plugin(Action::Information(true)))
+                        .interaction(mouse::Interaction::Pointer)
+                        .into()
+                } else {
+                    Element::from(line)
+                },
             ),
         ));
         layers.push(footer(
@@ -240,6 +275,7 @@ impl FreeUi {
         if self.information {
             layers.push(information_overlay(
                 self.notice.as_ref(),
+                self.audio_rows(),
                 self.diagnostics_copied,
                 self.interface_size,
                 self.size_error.as_deref(),
@@ -274,6 +310,8 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
             ui.notice = release_notice::notice_for(release.as_deref());
             ui.information = true;
         }
+        #[cfg(feature = "standalone")]
+        ui.attach_audio(audio_setup());
         ui.sync_meters();
         ui
     }
@@ -291,7 +329,10 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
         match message {
             Message::Tick => {
                 self.notice = self.latest_notice();
-                self.device_notice = device_notice();
+                #[cfg(feature = "standalone")]
+                if self.audio.is_some() {
+                    self.audio = audio_setup();
+                }
                 self.sync_meters();
                 self.presets.sync(params.params());
                 self.presets.poll(params);
@@ -309,6 +350,17 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
                 self.information = open;
                 self.diagnostics_copied = false;
                 self.size_error = None;
+                #[cfg(feature = "standalone")]
+                if open && self.audio.is_some() {
+                    truce_standalone::setup::refresh();
+                }
+            }
+            #[cfg(feature = "standalone")]
+            Message::Plugin(Action::Audio(choice)) => {
+                crate::audio_settings::apply(choice);
+                if self.audio.is_some() {
+                    self.audio = audio_setup();
+                }
             }
             Message::Plugin(Action::InterfaceSize(size)) => {
                 self.interface_size = size;
@@ -363,7 +415,11 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
             .owner
             .as_ref()
             .is_some_and(|params| self.presets.needs_redraw(params));
-        notice || meters || presets || device_notice() != self.device_notice
+        #[cfg(feature = "standalone")]
+        let audio = self.audio.is_some() && audio_setup() != self.audio;
+        #[cfg(not(feature = "standalone"))]
+        let audio = false;
+        notice || meters || presets || audio
     }
 
     fn title(&self) -> String {
@@ -467,6 +523,10 @@ fn footer<'a, R: iced_core::Renderer + 'a>(
         container(content).center_y(Length::Fill),
     )
 }
+
+/// The footer while the standalone's input is off. A press on it opens the
+/// panel, where the input is chosen.
+const INPUT_OFF: &str = "Input is off. Press here to choose one.";
 
 /// Where the footer's line of help or status sets, and at what size.
 pub(crate) const FOOTER_TEXT: [f32; 2] = [style::MARGIN, 680.0];
@@ -627,6 +687,17 @@ pub fn capture_information(release: Option<String>) {
     let _ = CAPTURED_INFORMATION.set(release);
 }
 
+/// Set by the capture command to stand in for the standalone's audio.
+#[cfg(feature = "standalone")]
+static CAPTURED_AUDIO: OnceLock<truce_standalone::setup::Setup> = OnceLock::new();
+
+/// Editors created after this show `audio` as the standalone's audio
+/// choices, opening the panel as a launch would.
+#[cfg(feature = "standalone")]
+pub fn capture_audio(audio: truce_standalone::setup::Setup) {
+    let _ = CAPTURED_AUDIO.set(audio);
+}
+
 /// Like the panel, the capture tool cannot open the preset menu itself.
 static CAPTURED_MENU: OnceLock<String> = OnceLock::new();
 
@@ -643,6 +714,7 @@ const INFORMATION_WIDTH: f32 = 340.0;
 /// editor behind it, and a press anywhere outside closes it.
 fn information_overlay<'a, R: FreeRenderer + 'a>(
     notice: Option<&Notice>,
+    audio: Vec<Element<'a, Msg, Theme, R>>,
     diagnostics_copied: bool,
     interface_size: u16,
     size_error: Option<&str>,
@@ -682,7 +754,7 @@ fn information_overlay<'a, R: FreeRenderer + 'a>(
             .align_y(Alignment::Center),
         );
     }
-    content = content.push(size_selector(interface_size));
+    content = content.extend(audio).push(size_selector(interface_size));
     if let Some(error) = size_error {
         content = content.push(line(
             "information.size-error",
@@ -1201,6 +1273,11 @@ mod tests {
             Some(format!("Swanky Amp Free {}", env!("CARGO_PKG_VERSION")))
         );
         assert_eq!(editor.text("information.release"), None);
+        assert_eq!(
+            editor.text("information.input"),
+            None,
+            "a plug-in offered the standalone's audio choices"
+        );
 
         let [x, y, ..] = editor.bounds("information").unwrap();
         editor.press([x + 4.0, y + 4.0]);
@@ -1445,6 +1522,176 @@ mod tests {
             Some(line.as_str()),
             "the name stays in the footer after the pointer leaves the window from the field"
         );
+    }
+
+    #[cfg(feature = "standalone")]
+    mod standalone_audio {
+        use super::Editor;
+        use truce_standalone::audio::ChannelRoute;
+        use truce_standalone::setup::{InputNeed, OutputNeed, Setup};
+
+        /// A Mac with its own microphone and speakers and an interface.
+        fn mac() -> Setup {
+            Setup {
+                takes_input: true,
+                inputs: vec!["MacBook Air Microphone".into(), "UMC202HD 192k".into()],
+                outputs: vec!["MacBook Air Speakers".into(), "UMC202HD 192k".into()],
+                output: Some("MacBook Air Speakers".into()),
+                ..Setup::default()
+            }
+        }
+
+        fn playing_the_interface() -> Setup {
+            Setup {
+                input: Some("UMC202HD 192k".into()),
+                output: Some("UMC202HD 192k".into()),
+                ..mac()
+            }
+        }
+
+        fn launch(setup: Setup) -> Editor {
+            let mut editor = Editor::new(None);
+            editor.ui.attach_audio(Some(setup));
+            editor
+        }
+
+        #[test]
+        fn the_panel_opens_at_launch_only_when_the_input_needs_choosing_or_a_device_is_missing() {
+            let first = launch(Setup {
+                input_need: Some(InputNeed::Choose),
+                ..mac()
+            });
+            assert!(
+                first.bounds("information").is_some(),
+                "a first launch hid the panel"
+            );
+            assert_eq!(
+                first.text("information.input.note").as_deref(),
+                Some("Choose the input your guitar is plugged into.")
+            );
+            assert_eq!(first.text("information.input").as_deref(), Some("Off"));
+
+            let missing = launch(Setup {
+                output_need: Some(OutputNeed::NotConnected("Studio Monitors".into())),
+                ..playing_the_interface()
+            });
+            assert!(
+                missing.bounds("information").is_some(),
+                "a missing output hid the panel"
+            );
+
+            let usual = launch(playing_the_interface());
+            assert_eq!(
+                usual.bounds("information"),
+                None,
+                "an ordinary launch opened the panel"
+            );
+            assert_eq!(
+                usual.text("footer.line").as_deref(),
+                Some("DRAG TO TURN   ·   SHIFT FOR FINE CONTROL   ·   RIGHT-CLICK TO RESET")
+            );
+        }
+
+        #[test]
+        fn a_missing_device_is_named_under_its_box() {
+            let mut editor = launch(Setup {
+                inputs: vec!["MacBook Air Microphone".into()],
+                input_need: Some(InputNeed::NotConnected("UMC202HD 192k".into())),
+                output_need: Some(OutputNeed::NotConnected("Studio Monitors".into())),
+                ..mac()
+            });
+            assert_eq!(
+                editor.text("information.input.note").as_deref(),
+                Some("UMC202HD 192k is not connected. Connect it, then choose it again.")
+            );
+            assert_eq!(
+                editor.text("information.output.note").as_deref(),
+                Some("Studio Monitors is not connected. MacBook Air Speakers is playing.")
+            );
+            editor.ui.attach_audio(Some(playing_the_interface()));
+            assert_eq!(editor.text("information.input.note"), None);
+            assert_eq!(editor.text("information.output.note"), None);
+        }
+
+        #[test]
+        fn the_computers_own_microphone_warns_of_feedback() {
+            let mut editor = launch(Setup {
+                input: Some("MacBook Air Microphone".into()),
+                built_in_microphone: true,
+                ..mac()
+            });
+            editor.press_button();
+            assert_eq!(
+                editor.text("information.input.warning").as_deref(),
+                Some(
+                    "This is the computer's own microphone, which will feed back through its \
+                     speakers. Use headphones."
+                )
+            );
+            editor.ui.attach_audio(Some(playing_the_interface()));
+            assert_eq!(editor.text("information.input.warning"), None);
+        }
+
+        #[test]
+        fn input_channels_are_offered_only_when_the_input_has_more_than_one() {
+            let mut editor = launch(playing_the_interface());
+            editor.press_button();
+            assert_eq!(editor.text("information.input-channels"), None);
+            editor.ui.attach_audio(Some(Setup {
+                input_channels: Some((2, ChannelRoute::Mono { base: 1 })),
+                ..playing_the_interface()
+            }));
+            assert_eq!(
+                editor.text("information.input-channels").as_deref(),
+                Some("Channel 2 (mono)")
+            );
+        }
+
+        #[test]
+        fn on_asio_both_boxes_name_the_one_interface() {
+            let mut editor = launch(Setup {
+                one_interface: true,
+                input: Some("UMC ASIO Driver".into()),
+                output: Some("UMC ASIO Driver".into()),
+                ..mac()
+            });
+            editor.press_button();
+            assert_eq!(
+                editor.text("information.input").as_deref(),
+                Some("UMC ASIO Driver")
+            );
+            assert_eq!(
+                editor.text("information.output").as_deref(),
+                Some("UMC ASIO Driver")
+            );
+            assert_eq!(
+                editor.text("information.asio").as_deref(),
+                Some("With ASIO, one interface is the input and the output.")
+            );
+        }
+
+        #[test]
+        fn with_the_input_off_the_footer_says_so_and_opens_the_panel() {
+            let mut editor = launch(Setup {
+                input_need: Some(InputNeed::Choose),
+                ..mac()
+            });
+            editor.press([4.0, 4.0]);
+            assert_eq!(
+                editor.bounds("information"),
+                None,
+                "a press outside left the panel open"
+            );
+            assert_eq!(
+                editor.text("footer.line").as_deref(),
+                Some("Input is off. Press here to choose one.")
+            );
+            editor.press(editor.centre("footer.line"));
+            assert!(
+                editor.bounds("information").is_some(),
+                "the footer did not open the panel"
+            );
+        }
     }
 
     #[test]

@@ -35,13 +35,14 @@ pub mod driver;
 mod format;
 pub mod keyboard;
 pub mod midi;
-pub mod notice;
+mod microphone;
 #[cfg(feature = "playback")]
 pub mod offline;
 #[cfg(feature = "playback")]
 pub mod playback;
 pub mod presets;
 pub mod settings;
+pub mod setup;
 pub mod state;
 pub mod transport;
 
@@ -112,14 +113,12 @@ pub struct Defaults {
     /// runtime default (on).
     pub output_enabled: Option<bool>,
     /// With `input_enabled` on, still start the input off unless its
-    /// device is one the player chose (by flag or from the Settings menu)
-    /// and is connected. A flag or environment variable that turns the
-    /// input on is obeyed as given, except that on Windows a launch whose
-    /// ASIO interface will not open falls back to WASAPI with the input off.
+    /// device is one the player chose (by flag, from the Settings menu or
+    /// through [`setup`]) and is connected. A flag or environment variable
+    /// that turns the input on is obeyed as given, except that on Windows a
+    /// launch whose ASIO interface will not open falls back to WASAPI with
+    /// the input off.
     pub input_needs_choice: bool,
-    /// Where lines the player must see about the devices go, such as why
-    /// the input is off; see [`notice`].
-    pub notices: Option<notice::Sink>,
 }
 
 impl Defaults {
@@ -138,13 +137,9 @@ impl Defaults {
             input_enabled,
             output_enabled,
             input_needs_choice,
-            notices,
         } = self;
         opts.input_needs_choice = opts.input_enabled.is_none() && input_needs_choice;
         opts.input_enabled = opts.input_enabled.or(input_enabled);
-        if let Some(sink) = notices {
-            notice::set_sink(sink);
-        }
         opts.output_enabled = opts.output_enabled.or(output_enabled);
     }
 }

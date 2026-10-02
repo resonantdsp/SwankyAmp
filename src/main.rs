@@ -39,6 +39,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 swanky_amp::ui::capture_information(arguments.get(3).cloned());
                 None
             }
+            Some("audio") => {
+                let state = arguments.get(3).map_or("", String::as_str);
+                swanky_amp::ui::capture_audio(audio_fixture(state).ok_or(
+                    "capture <dir> audio <choose|missing-input|missing-output|built-in|interface|did-not-open|asio|fell-back>",
+                )?);
+                swanky_amp::ui::capture_information(None);
+                None
+            }
             _ => None,
         };
         std::fs::create_dir_all(&destination)?;
@@ -140,15 +148,83 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // An amplifier with its input off makes no sound, so the standalone
         // opens listening, but only on an input the player chose: the system
         // default is often a built-in microphone beside the speakers. The
-        // footer says why when it opens with the input off.
+        // editor's panel opens to say why when it starts with the input off.
         truce_standalone::run_with::<Plugin>(truce_standalone::Defaults {
             input_enabled: Some(true),
             input_needs_choice: true,
-            notices: Some(swanky_amp::ui::show_device_notice),
             ..Default::default()
         });
     }
     Ok(())
+}
+
+/// The standalone's audio choices a capture shows, by name, with the names
+/// macOS and Windows give real devices.
+fn audio_fixture(state: &str) -> Option<truce_standalone::setup::Setup> {
+    use truce_standalone::audio::ChannelRoute;
+    use truce_standalone::setup::{InputNeed, OutputNeed, Setup};
+    let mac = Setup {
+        takes_input: true,
+        inputs: vec![
+            "MacBook Air Microphone".to_owned(),
+            "UMC202HD 192k".to_owned(),
+        ],
+        outputs: vec![
+            "MacBook Air Speakers".to_owned(),
+            "UMC202HD 192k".to_owned(),
+        ],
+        output: Some("MacBook Air Speakers".to_owned()),
+        ..Setup::default()
+    };
+    Some(match state {
+        "choose" => Setup {
+            input_need: Some(InputNeed::Choose),
+            ..mac
+        },
+        "missing-input" => Setup {
+            inputs: vec!["MacBook Air Microphone".to_owned()],
+            input_need: Some(InputNeed::NotConnected("UMC202HD 192k".to_owned())),
+            ..mac
+        },
+        "missing-output" => Setup {
+            input: Some("MacBook Air Microphone".to_owned()),
+            built_in_microphone: true,
+            output_need: Some(OutputNeed::NotConnected("Studio Monitors".to_owned())),
+            ..mac
+        },
+        "built-in" => Setup {
+            input: Some("MacBook Air Microphone".to_owned()),
+            built_in_microphone: true,
+            ..mac
+        },
+        "interface" => Setup {
+            input: Some("UMC202HD 192k".to_owned()),
+            output: Some("UMC202HD 192k".to_owned()),
+            input_channels: Some((2, ChannelRoute::Mono { base: 0 })),
+            ..mac
+        },
+        "did-not-open" => Setup {
+            input_need: Some(InputNeed::DidNotOpen("UMC202HD 192k".to_owned())),
+            ..mac
+        },
+        "asio" => Setup {
+            one_interface: true,
+            inputs: vec!["UMC ASIO Driver".to_owned(), "ASIO4ALL v2".to_owned()],
+            outputs: vec!["UMC ASIO Driver".to_owned(), "ASIO4ALL v2".to_owned()],
+            input: Some("UMC ASIO Driver".to_owned()),
+            output: Some("UMC ASIO Driver".to_owned()),
+            input_channels: Some((2, ChannelRoute::Mono { base: 0 })),
+            ..mac
+        },
+        "fell-back" => Setup {
+            inputs: vec!["Microphone Array (Realtek(R) Audio)".to_owned()],
+            outputs: vec!["Speakers (Realtek(R) Audio)".to_owned()],
+            output: Some("Speakers (Realtek(R) Audio)".to_owned()),
+            input_need: Some(InputNeed::FellBack("UMC ASIO Driver".to_owned())),
+            ..mac
+        },
+        _ => return None,
+    })
 }
 
 /// An instance that has just played a deterministic stereo note, so a

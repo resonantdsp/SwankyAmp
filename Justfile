@@ -60,10 +60,11 @@ clippy-all: clippy
 test:
     cargo test --no-default-features --features tools
 
-# Also tests the format adapters and the vendored standalone host, a patched
-# dependency whose tests the crate's own run leaves out.
+# Also tests the format adapters, the standalone's audio panel and the
+# vendored standalone host, a patched dependency whose tests the crate's own
+# run leaves out.
 test-all: test
-    cargo test --no-default-features --features clap,standalone,rt-paranoid adapter_
+    cargo test --no-default-features --features clap,standalone,rt-paranoid -- adapter_ standalone_audio
     cargo test -p truce-standalone
 
 release-tests:
@@ -151,6 +152,12 @@ capture-live output="verification/interface-live":
 # 2.0.1, to show its notice.
 capture-information output="verification/interface-information" release="":
     cargo run --quiet --bin swanky-amp-2 -- capture "{{ output }}" information {{ release }}
+
+# Capture the standalone's audio choices in the information panel, in one of
+# the states choose, missing-input, missing-output, built-in, interface,
+# did-not-open, asio or fell-back.
+capture-audio state="choose" output="verification/interface-audio":
+    cargo run --quiet --bin swanky-amp-2 -- capture "{{ output }}" audio "{{ state }}"
 
 # Capture with the preset menu open under a user preset of this name, and
 # the pointer over the field so the footer names it.

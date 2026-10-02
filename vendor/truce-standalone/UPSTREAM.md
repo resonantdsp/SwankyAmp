@@ -83,9 +83,15 @@ input on opens it once it is back rather than the system default. On ASIO
 the launch opens another installed interface in its place, which turning
 the input on would make live, so the line asks the player to choose the
 interface first.
-The line saying why the input is off goes to a sink the application
-supplies in `Defaults::notices` (`notice.rs`), since a windowed app has no
-console; Swanky Amp shows it in its footer. The input channels chosen from
+Since a windowed app has no console and the menu is easy to miss, `setup.rs`
+gives the plugin's editor the audio choices the Settings menu offers (input,
+input channels, output), lets it change them, and reports what needs the
+player: no input ever chosen, a missing device, an input that would not open
+or an ASIO interface that fell back to WASAPI. Choosing an ASIO interface as
+the input lets its input through only once it has opened. `microphone.rs`
+says whether an input is the computer's own microphone: on macOS from Core
+Audio's built-in transport and internal-microphone source, on Windows from
+cpal's form factor and bus. Swanky Amp shows these in its information panel. The input channels chosen from
 the menu are saved with the devices (`input_channels`), and
 `--input-channels` overrides them for one launch; a saved channel the
 device does not have is left unused.

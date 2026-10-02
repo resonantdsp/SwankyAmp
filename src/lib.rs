@@ -5,6 +5,8 @@ truce::enable_rt_paranoid!();
 
 pub mod artwork;
 mod asio_logo;
+#[cfg(feature = "standalone")]
+mod audio_settings;
 pub mod diagnostics;
 pub mod dsp;
 pub mod engine;

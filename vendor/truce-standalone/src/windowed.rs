@@ -74,6 +74,15 @@ where
         }
     };
 
+    crate::setup::register(
+        audio_handles.input.clone(),
+        audio_handles.output.clone(),
+        audio_handles.input.settings.clone(),
+        audio_handles.channels,
+        audio_handles.is_effect,
+        audio_handles.launch.clone(),
+    );
+
     // `--state <path>` was already applied inside `audio::start_audio`
     // - it loads BEFORE `snap_smoothers` so the editor + first audio
     // block see the restored values, not defaults ramping toward them.
@@ -101,6 +110,7 @@ where
     };
     let Some(mut editor) = editor else {
         eprintln!("Plugin returned no editor - falling back to headless mode.");
+        crate::setup::unregister();
         drop(audio_handles);
         crate::headless::run::<P>(opts);
         return;
@@ -446,6 +456,7 @@ where
         }
     });
 
+    crate::setup::unregister();
     drop(audio_handles);
     vlog!("Goodbye!");
 }
