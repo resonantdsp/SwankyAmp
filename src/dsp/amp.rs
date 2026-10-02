@@ -318,6 +318,7 @@ impl AmpPath {
             ClipKnee::Released,
             LevelTables::RELEASED,
         );
+        path.cabinet.use_released_design();
         path.tubes.settle();
         path
     }
