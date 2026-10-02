@@ -164,7 +164,7 @@ just soak-check    # verdict so far, or the final one
 
 ## Releasing
 
-A release goes candidate tag → candidate workflow → qualification → stable tag → promote workflow. The crate version in `Cargo.toml` is the version authority, and `CHANGELOG.md` must have the matching section. That section's heading carries the planned release date, such as `## 2.0.1 — 2026-11-02`, never "in development": the tagged source is public, and every candidate must be releasable as it stands. `just version` dates a new section; an existing one, such as an "in development" heading, is dated by hand before the first candidate is cut. The website catalogue's date is the day the GitHub Release is published and may differ from the heading; a moved date is never a reason for a new candidate. `[package.metadata.release]` in `Cargo.toml` states whether the release ships a Linux download.
+A release goes candidate tag → candidate workflow → qualification → stable tag → promote workflow. The crate version in `Cargo.toml` is the version authority, and `CHANGELOG.md` must have the matching section. That section's heading carries the planned release date, such as `## 2.0.1 — 2026-11-02`, never "in development": the tagged source is public, and every candidate must be releasable as it stands. `just version` dates a new section; an existing one, such as an "in development" heading, is dated by hand before the first candidate is cut. The website catalogue's date is the day the GitHub Release is published and may differ from the heading; a moved date is never a reason for a new candidate. `[package.metadata.release]` in `Cargo.toml` states whether the release ships a Linux download; 2.0 ships none, so its candidates build and publish macOS and Windows only.
 
 Prepare the version on a branch and land it through a pull request like any change:
 
@@ -208,7 +208,8 @@ A person qualifies the candidate's exact installers in real hosts, checks instal
 - On Windows, switching the standalone's audio driver from ASIO to Windows audio, and back, turns the input off each time.
 - On Windows, the laptop's own microphone chosen in the standalone on Windows audio shows the feedback warning.
 - On Windows, long device names in the standalone's panel are cut with an ellipsis.
-- On Linux, choosing the standalone's input, input channels and output in the information panel switches the devices; this has never been run.
+
+The Linux build has never been run on a real machine. Before a release declares a Linux download again, a person confirms there that choosing the standalone's input, input channels and output in the information panel switches the devices.
 
 After acceptance, create the stable tag on the same commit:
 
