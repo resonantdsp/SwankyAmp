@@ -323,17 +323,15 @@ impl<P: Params + 'static, M: IcedPlugin<P> + 'static> IcedEditor<P, M> {
 // Baseview window handler (all platforms)
 
 struct IcedBaseviewHandler<P: Params + 'static, M: IcedPlugin<P>> {
-    /// The handler owns the runtime outright. It used to hold a
-    /// `*mut IcedEditor` and reach back through it each frame, but
-    /// baseview's `WindowHandle::close()` can be asynchronous on Windows
-    /// (it posts a close message when called from inside the window's
-    /// handler or off its thread), so a host that dropped the editor
-    /// while a close was still pending left the window proc
-    /// dereferencing freed memory - a crash on plug-in switching.
-    /// Owning the runtime keeps everything `on_frame` / `on_event`
-    /// touch alive for exactly as long as the window proc can run, and
-    /// drops it (including the wgpu surface) on this handler's own
-    /// thread when the window closes.
+    /// The handler owns the runtime outright rather than reaching back
+    /// into the editor: baseview's `WindowHandle::close()` can be
+    /// asynchronous on Windows (it posts a close message when called from
+    /// inside the window's handler or off its thread), so a host may drop
+    /// the editor while a close is still pending, and a window proc
+    /// reaching through it would read freed memory. Owning the runtime
+    /// keeps everything `on_frame` / `on_event` touch alive for exactly as
+    /// long as the window proc can run, and drops it (including the wgpu
+    /// surface) on this handler's own thread when the window closes.
     runtime: IcedRuntime<P, M>,
     /// Clone of the editor's pending-size cell; `Editor::set_size`
     /// writes it, `on_frame` applies it.
@@ -721,10 +719,10 @@ impl<P: Params + 'static, M: IcedPlugin<P>> baseview::WindowHandler for IcedBase
                         }
                         // Routed through the pump's client: on Windows the
                         // reconfigure is queued latest-wins to the pump
-                        // thread, so this inline call can no longer flood
-                        // the driver with buffer destroy/create work
-                        // mid-drag (previously hung the AMD driver in
-                        // `NtGdiDdDDIDestroyAllocation2`).
+                        // thread, because reconfiguring inline floods the
+                        // driver with buffer destroy/create work mid-drag,
+                        // which hung an AMD driver in
+                        // `NtGdiDdDDIDestroyAllocation2`.
                         runtime.reconfigure_surface_px(pw, ph);
                     }
                     // The reconfigured surface must be repainted, but

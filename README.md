@@ -38,7 +38,7 @@ On Windows the standalone plays through ASIO when an ASIO driver is installed, a
 
 The [product plan](docs/product-plan.md) owns design decisions, sound acceptance
 and release qualification. The [editor review](../SwankyAmpPro/docs/editor-robustness.md)
-records findings shared by the two products and links their hardware qualification.
+records how the editor both products share runs inside a host, the decisions behind it and the exposure it keeps.
 
 ## Signal path
 
@@ -106,6 +106,8 @@ The first time version 2 runs without a preset folder, and on Import 1.x presets
 ## Editor
 
 The six signal-flow groups (Levels, Cabinet, Preamp, Staging, Power Amp and Tone) sit on graphite with 1.4's rose as the accent. The bundled CC BY 4.0 artwork package provides the graphite, brushed metal, shadows and lighting; the text is native. The input meter keeps 1.4.0's scale, so the player stages the guitar with Input by eye as before.
+
+The meters run at no more than 60 frames a second, and a frame for them alone redraws only the meters over the kept editor. The editor keeps the keys it uses, a focused knob's arrows, Home and End, and Escape while the information panel or the preset menu is open; every other key reaches the host, so Space and host shortcuts work after a knob is touched.
 
 ### Information panel
 
@@ -265,13 +267,13 @@ The information panel's Third-party licences link opens the notices the plug-in 
 Narrow patches of the published Truce sources, of baseview, of iced_wgpu and of wgpu-hal, each directory carrying its unchanged upstream licences, original manifest, source reference and an `UPSTREAM.md` describing the local changes:
 
 - `vendor/baseview-truce`: frame delivery paced by the display, host keyboard and modifier fixes, keys the editor does not use handed back to the host, no process-wide DPI change and no drag-and-drop, and a window kept alive until a detached GPU thread releases it.
-- `vendor/truce-iced`: iced input, focus, redraw and clipboard fixes, a GPU thread whose setup is bounded and final, frames built only when they can be shown, live-display frames capped at 60 a second and drawn alone over the kept editor, the low-power GPU and an sRGB surface, the editor's lifecycle records and a native note when its graphics cannot start.
-- `vendor/wgpu-hal`: on Windows the shader compiler loads from System32, compiled shaders are cached on disk, and only the GPU Windows would choose gets a device.
+- `vendor/truce-iced`: iced input, focus, redraw and clipboard fixes, a GPU thread whose setup is bounded and final, frames built only when they can be shown, live-display frames capped at 60 a second and drawn alone over the kept editor, a low-power GPU request and an sRGB surface, the editor's lifecycle records and a native note when its graphics cannot start.
+- `vendor/wgpu-hal`: on Windows the shader compiler loads from System32, compiled shaders are cached on disk, and only the GPU Windows would choose (the player's per-program setting, otherwise low power) gets a device.
 - `vendor/iced_wgpu`: multisampled meshes drawn over their own region rather than the whole frame.
 - `vendor/truce-clap`: host state notification required by clap-validator, dynamic-latency restart with the latency held until it, and active reset handling.
-- `vendor/truce-standalone`: dynamic-latency restart on the output worker, an input kept within about one buffer of the output, a Buffer Size menu, remembered devices, input channels and buffer size, an input that starts live only on a chosen device, is off after a driver switch and never remembers the computer's own microphone, the audio choices and what needs the player offered to the plug-in's editor, a window that opens without sound when the output will not start, streams faded out and stopped on close, no Ctrl+I or Ctrl+O shortcuts, and ASIO on Windows.
+- `vendor/truce-standalone`: dynamic-latency restart on the output worker, an input kept within about one buffer of the output, a Buffer Size menu, remembered devices, input channels and buffer size, an input that starts live only on a chosen device, is off after a driver switch and never remembers the computer's own microphone, the audio choices and what needs the player offered to the plug-in's editor, a window that opens without sound when the output will not start, streams faded out and stopped on close, no Ctrl+I, Ctrl+O, Ctrl+S or Ctrl+Shift+S shortcuts, and ASIO on Windows.
 - `vendor/truce-core`, `vendor/truce-plugin`, `vendor/truce-loader` and `vendor/truce`: a real-time reset lifecycle hook and its forwarding bridge. `truce-core` and `truce-loader` also carry an activation flag saying the format holds latency until the next reset.
-- `vendor/truce-au`: a latency change reaches the Audio Unit host's property listeners.
-- `vendor/cargo-truce`: the source-only build tool with the Azure `ExcludeCredentials` patch, the Audio Unit Info.plist patch and the scoped Windows installer name. It is a build tool, not linked into the plug-in. The Truce Framework Rider's Section 2.2 lists audio plug-ins and suites among the uses that are not Covered Framework Offerings.
+- `vendor/truce-au`: editor window resizing, and a latency change reaches the Audio Unit host's property listeners.
+- `vendor/cargo-truce`: the source-only build tool with the Azure `ExcludeCredentials` patch, the Audio Unit Info.plist patch and Windows installers for all users only. It is a build tool, not linked into the plug-in. The Truce Framework Rider's Section 2.2 lists audio plug-ins and suites among the uses that are not Covered Framework Offerings.
 
 Everything else resolves from the pinned Cargo lockfile.

@@ -2,7 +2,7 @@
 
 What version 2 of the free, GPLv3 Swanky Amp is, the decisions behind its sound, how it is verified and released, and what remains before the [launch](../../../company/work/RD-135.md). The implementation is the public repository `resonantdsp/SwankyAmp` (`code/SwankyAmp`): its [README](../README.md) holds the commands, the decisions and how to operate it, and its [changelog](../CHANGELOG.md) the player-facing feature list. The design detail lives beside what it describes: in the code's comments, the [voicing report](../verification/tone-stack/refit-report.md) and the [reference renderer's README](../verification/reference/README.md). The [DSP compatibility policy](../../../company/engineering/rust-dsp-plan.md) is the rule it applies; [Swanky Amp Pro 2.0](../../SwankyAmpPro/docs/product-plan.md) is its sibling, and the [convergence plan](../../../company/engineering/pro-free-convergence.md) keeps the code both products share identical. Work is tracked under [RD-240](../../../company/work/RD-240.md).
 
-The [editor robustness review](../../SwankyAmpPro/docs/editor-robustness.md) records the Windows/editor fixes, GPU rendering decisions and remaining host qualification ([RD-1157](../../../company/work/RD-1157.md)).
+The [editor robustness review](../../SwankyAmpPro/docs/editor-robustness.md) records how the editor both products share runs inside a host, the decisions behind it, the exposure it keeps and where Swanky Amp differs ([RD-1157](../../../company/work/RD-1157.md)).
 
 ## The product
 
@@ -87,7 +87,7 @@ Rust and iced own the interface definition. `export-layout` drives the private p
 
 ## Verification
 
-- **Every change.** `just` runs format, clippy and the tests locally; Each pull request runs `checks (linux)`: format, clippy, all tests including artwork validation in one optimised profile, the release-script tests, `just reference-check` and `just model-check`. Alongside it, `checks (windows)` runs clippy on Windows and builds every editor pipeline through Direct3D 12, so a shader Direct3D's compiler rejects fails with its message. Each push to `master` also builds, installs and validates the bundles on macOS and Windows (Free #124).
+- **Every change.** `just` runs format, clippy and the tests locally. Each pull request runs `checks (linux)`: format, clippy, all tests including artwork validation in one optimised profile, the release-script tests, `just reference-check` and `just model-check`. Alongside it, `checks (windows)` runs clippy on Windows and builds every editor pipeline through Direct3D 12, so a shader Direct3D's compiler rejects fails with its message. Each push to `master` also builds, installs and validates the bundles on macOS and Windows (Free #124).
 - **Pre-release.** `just tone-stack-soak`.
 - **Listening.** Garrin accepted the factory bank and the level behaviour under drive by ear against 1.4.0; listening in real hosts is part of qualification.
 
@@ -110,7 +110,7 @@ The public repository has its own `Justfile`, per-change checks and tag-gated ca
 
 ## Where it stands
 
-The current signed hardware candidates and qualification results are owned by [RD-1168](../../../company/work/RD-1168.md). Qualification and stable promotion remain open; the earlier build below records verified output and source evidence, not qualification of the newer editor candidate.
+The current candidate and its qualification are owned by [RD-249](../../../company/work/RD-249.md). Qualification and stable promotion remain open; the earlier build below records verified output and source evidence, not qualification of a newer candidate.
 
 ### Retained build evidence
 

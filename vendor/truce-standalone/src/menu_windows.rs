@@ -1,7 +1,7 @@
 //! Windows native menu bar for the standalone host.
 //!
-//! Builds a Win32 `HMENU` with one top-level "Settings" popup
-//! carrying both the audio and MIDI controls:
+//! Builds a Win32 `HMENU` with a "Settings" popup carrying the audio
+//! and MIDI controls, beside a "Presets" popup:
 //!
 //! - **Mic Input** (checkable; effect plugins only, no shortcut)
 //! - **Audio Output** (checkable mute toggle, no shortcut)
@@ -34,8 +34,8 @@
 //!   the same amount before the editor child opens - the plugin
 //!   keeps the size it asked for.
 //! - There's no auto-populated "App" menu like Cocoa's. The
-//!   window's `[X]` close button covers Quit; we ship just the
-//!   Settings menu.
+//!   window's `[X]` close button covers Quit; we ship the Settings
+//!   and Presets menus.
 //! - Cocoa's key equivalents are wired by the menu items themselves.
 //!   Win32 needs a separate `HACCEL` table + `TranslateAccelerator`
 //!   in the message loop, which baseview doesn't expose. The menu

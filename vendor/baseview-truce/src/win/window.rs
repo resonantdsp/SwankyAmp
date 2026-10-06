@@ -73,7 +73,7 @@ fn LOWORD(lparam: LPARAM) -> u16 {
 /// be started (see [`WindowState::start_frame_timer`]).
 const WIN_FRAME_TIMER: usize = 4242;
 
-/// Posted by the frame pacer to drive one `on_frame`. Replaces a
+/// Posted by the frame pacer to drive one `on_frame`, rather than a
 /// `WM_TIMER`: Windows synthesizes `WM_TIMER` only when the message
 /// queue is otherwise empty and coalesces missed intervals into a
 /// single message, so under a busy host message pump the editor's
@@ -1067,10 +1067,11 @@ impl Window<'_> {
         )
         .unwrap();
 
-        // The frame timer is started in `after_create` (see
-        // `WindowState::start_frame_timer`); its first tick fires after
-        // one interval, so the `WM_SHOWWINDOW` posted below is handled
-        // first and the child window paints in the right order.
+        // The frame pacer is started in `after_create` (see
+        // `WindowState::start_frame_timer`); its first tick follows the
+        // next composition, so the `WM_SHOWWINDOW` posted below is
+        // normally handled first and the child window paints in the right
+        // order.
         unsafe { PostMessageW(hwnd, WM_SHOWWINDOW, 0, 0) };
 
         WindowHandle { hwnd: Some(hwnd), is_open: Rc::clone(&is_open) }

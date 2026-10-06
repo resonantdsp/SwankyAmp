@@ -155,9 +155,20 @@ installs beside Swanky Amp 1.4.0.
   panel announces it with a link to the fixed catalogue page. It ignores
   fields it does not know, so the published document can grow.
 - Logged the editor's opening and closing, its graphics card and every
-  warning and error to one file per computer account, for support. An editor
-  whose graphics cannot start says so in one line, with where its log is and
-  the support address, instead of staying blank.
+  warning and error to one file per computer account, for support, at
+  `~/Library/Logs/Resonant DSP/Swanky Amp 2.log` on macOS and
+  `%LOCALAPPDATA%\Resonant DSP\Swanky Amp 2\Logs\editor.log` on Windows,
+  never more than two files of 1 MB. An editor whose graphics cannot start
+  says so in one line, with where its log is and the support address, instead
+  of staying blank.
+- Handed the host every key the editor has no use for, so Space and the
+  host's shortcuts keep working after a knob is touched. Escape stays with the
+  editor only while the information panel or the preset menu is open.
+- Drew the meters at up to 60 frames a second on any display, so the editor
+  stays smooth at a fraction of the graphics work.
+- On Windows, drew the editor on the graphics card Windows prefers for the
+  host, leaving any other asleep, opened it faster after its first time on a
+  computer, and stopped drawing while the host is minimised.
 - Kept the plug-in loaded once its editor has opened, so a Windows host that
   unloads it cannot crash when the release check, the save dialog or a preset
   import outlives the last instance.
@@ -186,6 +197,13 @@ installs beside Swanky Amp 1.4.0.
   the computer's own microphone feeds back through its speakers. While the
   input is off the Input knob reads OFF and a press on it, or on the footer
   line that says so, opens the panel.
+- Closed the standalone app cleanly: it fades its sound out and stops the
+  audio device before it quits, so an ASIO interface never repeats its last
+  buffer after the window has gone.
+- Removed the standalone app's keyboard shortcuts for switching the input
+  and output, which a stray Ctrl or Cmd with I or O could trigger, and for
+  saving presets, which saved files the preset menu never listed. The
+  Settings and Presets menu items stay.
 - Fed the standalone app's amplifier from input 1 alone unless other input
   channels are chosen, since a guitar is one channel, and remembered the
   choice, so a guitar on input 2 is heard at the next launch.
