@@ -177,9 +177,10 @@ fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
 
     // Each lit cell adds its baked response in the column's colour: the cell
     // at the level's fractional edge stays dark inside and only its spill
-    // fades in, as in Pro, so a cell never shows half lit. The meters light
-    // only the frame the displays draw over the finished editor, as what they
-    // add to the knobs' light there.
+    // fades in, as in Pro, so a cell never shows half lit. Meter light is
+    // drawn only by the displays' pass, as the difference it makes to the
+    // tone-mapped light already on screen, so the backdrop never changes with
+    // the levels.
     let metered = controls.emission.w > 0.5;
     var meter_light = vec3(0.0);
     for (var meter_index = 0u; meter_index < 4u; meter_index++) {

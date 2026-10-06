@@ -174,8 +174,8 @@ impl FreeUi {
             .map_or_else(|| self.notice.clone(), release_notice::Service::current)
     }
 
-    /// The whole editor, its live displays included, as a frame that draws
-    /// everything shows it.
+    /// The whole editor with its live displays, as a capture or a frame
+    /// without a kept panel draws it.
     pub fn view_content<'a, R: FreeRenderer + 'a>(
         &'a self,
         params: &'a ParamCache<SwankyAmpParams>,
@@ -416,8 +416,9 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
         Task::none()
     }
 
-    // A notice lands from the worker while the editor may be idle; asking for
-    // a frame lets the next tick pick it up.
+    // Frames for the meters alone skip Tick, so everything Tick refreshes must
+    // ask for a frame here: a release notice, a restored or finished preset,
+    // a changed audio setup.
     fn needs_redraw(&self) -> bool {
         let notice = self.releases.is_some() && self.latest_notice() != self.notice;
         let presets = self
