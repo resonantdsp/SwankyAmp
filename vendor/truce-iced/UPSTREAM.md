@@ -142,3 +142,116 @@ This is the same change as Swanky Amp Pro's copy of this crate.
 
 Remove the Cargo patch and this directory when a pinned upstream release
 offers an interface zoom.
+
+# An editor that says what happened to it
+
+The published editor reports GPU trouble only through `log`, says nothing of
+how long opening or closing took, and swallows the message of a panic during
+GPU setup, so an editor that stays blank or opens slowly in one host leaves
+no trace of why. The crate still installs no sink; a plug-in does, and Swanky Amp
+writes its own log file.
+
+- **Lifecycle records:** each open and close stage with its duration (open,
+  window, instance, surface, adapter, device, shaders, swapchain, first frame;
+  close, GPU released, closed), a device loss and its rebuild, at `Info` under
+  `truce_iced::diagnostics::LIFECYCLE`. A close that waits out its bound is a
+  warning. Nothing is recorded per frame.
+- **The GPU:** `truce_iced::diagnostics::gpu` names the adapter the editor
+  last chose, with its backend and driver, for a support report.
+- **A failed editor is not blank:** `IcedEditor::failure_note` gives one line
+  the window shows in native text, through baseview's `Window::show_note`,
+  once GPU setup has failed for good.
+
+Remove these when an upstream release offers the same record.
+
+# A GPU thread that is bounded, final and compiles iced's shaders
+
+The published pump releases a stale frame while still holding its slot lock,
+so the window thread can wait on a driver present for the lock; the frame is
+now taken out first. A failed GPU setup read as one still pending: the editor
+waited forever and queued every input event. Setup now reports pending, ready
+or failed; a failure is final, releases the pump, stops input queueing and
+device-loss recovery, and its cause is logged once where it happened.
+
+The pump reported its exit before its surface and device dropped, and closing
+the editor then joined it without bound. It now drops frames, surface and
+device before reporting, and the close waits one second in total, join
+included. A pump still inside a driver call past that, wedged or still
+compiling shaders on a cold cache, is detached holding its surface, and a
+setup that finishes after the close never configures it. On Windows the pump
+thread holds a lease on the window from baseview, so an editor closed before
+the host destroys its parent window is hidden and detached from it instead,
+and destroyed on its own thread once the pump has let go; a parent destroyed
+first still takes the window with it. On macOS the surface keeps its own
+retained `CAMetalLayer`. A plug-in must pin its library before opening the
+editor, as Swanky Amp does, so a detached pump never returns into unloaded code.
+
+iced's engine is built on the pump thread during setup, so its shaders compile
+there rather than on the window thread. A plugin's own pipelines and textures
+are still created on the window thread by the first frame that draws them.
+Every adapter request asks for the low-power GPU, so a dual-GPU laptop does
+not wake its discrete card for the editor. The surface format is the sRGB one
+the surface offers, as iced's own compositor chooses: iced writes linear
+colour, and Metal lists `Bgra8Unorm` first, which showed the macOS editor far
+darker than Windows and the offscreen captures.
+
+Remove these with the rest of this directory when a pinned upstream release
+covers them.
+
+# Less GPU work at open
+
+The editor's devices ask for `MemoryHints::MemoryUsage`: the default
+`Performance` has DX12 allocate in 256 MB device and 64 MB host blocks, so a
+device's first allocations commit that much for an interface that uses a few.
+Release builds create the instance without wgpu's default
+`VALIDATION_INDIRECT_CALL`, which compiles a validation compute pipeline on
+every device; nothing in iced or the product issues an indirect draw or
+dispatch. Debug builds keep wgpu's build defaults.
+
+# The host keeps its keys
+
+The published editor reports every key event `Captured`, so a host never sees
+a key while the editor has the focus and Space stops starting the transport
+once a knob is touched. A key press now runs through the widget tree at once,
+behind any input still queued, and the editor keeps it only when a widget
+captured it or a focused text field holds the keyboard (`keeps_key`), which
+keeps every key typed into the field from the host. Every other key is
+reported `Ignored` for the platform layer to hand to the host. A release, and
+an auto-repeat, goes where its press went. The messages that pass produces
+wait for the next frame, which dispatches them before building its interface,
+so no plugin message is dispatched inside the platform's key delivery. A press
+arriving while such messages still wait is queued for that frame and kept only
+if a text field holds the keyboard, so a text field never starts from a value
+that lacks an earlier key.
+
+`IcedPlugin::window_opened` hands the model the editor's native window, so a
+native dialog can take it as owner and stay in front of the host.
+
+Remove it when a pinned upstream release decides key by key.
+
+# Frames that can be shown
+
+Windows now looks for a swapchain image before building a frame, as macOS
+already did, so a frame with nothing to paint into is not built and drawn for
+nothing; its input waits for the next tick. A frame is also skipped while the
+host's top-level window is minimised: a child window reports itself visible
+and not iconic when only its host is minimised, so the published check alone
+kept the editor painting there.
+
+A panicking frame, or a panicking pump, used to arm device-loss recovery every
+time, so a failure that survives a rebuild rebuilt the GPU pipeline without
+end. Two rebuilds are now allowed without a frame reaching the screen; a third
+ends in the same final failure as a failed GPU setup. A presented frame resets
+the count, so device losses spread over a session never add up.
+
+The runtime reported the last cursor position after the pointer left the
+window, so hover highlights stayed lit. The cursor is now unavailable from
+the moment the pointer leaves until it moves over the window again, and the
+first position after it was away is preceded by an iced `CursorEntered`, so a
+plugin can follow the pointer's arrival without reacting to every move. iOS
+keeps its touch as the cursor after the touch ends, so a tap whose press and
+release share a frame still lands; there `CursorEntered` comes only with the
+first touch.
+
+Remove these with the rest of this directory when a pinned upstream release
+covers them.

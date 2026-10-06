@@ -23,6 +23,11 @@ pub fn run<P: PluginExport>(opts: &Options) {
             std::process::exit(1);
         }
     };
+    // Without a window nobody can choose another device.
+    if let Some(e) = &handles.output_error {
+        eprintln!("Error: {e}");
+        std::process::exit(1);
+    }
 
     // MIDI device input (if requested and available). On success
     // this spawns a background thread that pushes events into
@@ -111,13 +116,10 @@ pub fn run<P: PluginExport>(opts: &Options) {
         }
     }
 
-    // Finalize capture first (sets the shutdown flag, joins the
-    // writer thread). This has to happen before `drop(handles)`
-    // so the writer thread can finish writing whatever the audio
-    // callback already submitted; setting the flag also stops
-    // any further audio-thread submits, so subsequent cpal
-    // callbacks (which may keep firing for a few hundred ms on
-    // macOS) become no-ops on the capture path.
+    crate::audio::close_streams(&handles.input, &handles.output);
+
+    // Finalized before `drop(handles)`, so the writer thread finishes
+    // writing whatever the audio callback submitted.
     #[cfg(feature = "playback")]
     if let Some(sink) = handles.capture.take() {
         sink.finalize();

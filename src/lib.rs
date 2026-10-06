@@ -9,16 +9,17 @@ mod asio_logo;
 mod audio_settings;
 pub mod diagnostics;
 pub mod dsp;
+pub mod editor_log;
 pub mod engine;
 pub mod interface;
 pub mod layout;
 pub mod meters;
 pub mod params;
+mod pin;
 pub mod preset_bar;
 pub mod presets;
 pub mod release_notice;
 pub mod render;
-mod resident;
 pub mod style;
 pub mod ui;
 pub mod widgets;
@@ -84,13 +85,28 @@ impl PluginLogic for SwankyAmp {
 /// The editor opened at an interface size: it lays out at the design size and
 /// its window, which the host is told, is that size magnified.
 pub(crate) fn editor_at(params: Arc<SwankyAmpParams>, size: u16) -> Box<dyn Editor> {
+    // The editor's framework starts threads that it does not join.
+    pin::keep_loaded();
     style::load_fonts();
+    editor_log::install();
+    // Machine-local, because compiled shaders belong to this machine's
+    // shader compiler; a later editor open then skips compiling them.
+    #[cfg(target_os = "windows")]
+    if let Some(local) = editor_log::local_folder() {
+        iced_wgpu::wgpu::hal::dx12::set_shader_cache_dir(local.join("ShaderCache"));
+    }
     truce_iced::IcedEditor::<_, ui::FreeUi>::new(
         params,
         (style::WIDTH as u32, style::HEIGHT as u32),
     )
     .zoom(interface::zoom(size))
     .with_font(style::FONT_BYTES)
+    .failure_note(diagnostics::graphics_failed(
+        editor_log::path()
+            .as_deref()
+            .map(editor_log::shown)
+            .as_deref(),
+    ))
     .into_editor()
 }
 

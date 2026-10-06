@@ -1065,6 +1065,7 @@ impl ImportJob {
         }
         let result = Arc::new(Mutex::new(None));
         let shared = Arc::clone(&result);
+        crate::pin::keep_loaded();
         let spawned = std::thread::Builder::new()
             .name("swanky-preset-import".into())
             .spawn(move || {

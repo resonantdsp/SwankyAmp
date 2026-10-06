@@ -147,6 +147,9 @@ fn output_need(need: &OutputNeed, playing: Option<&str>) -> String {
             format!("{name} is not connected. {playing} is playing.")
         }
         (OutputNeed::NotConnected(name), None) => format!("{name} is not connected."),
+        (OutputNeed::DidNotStart(name), _) => {
+            format!("{name} could not be started. Another app may be using it.")
+        }
     }
 }
 

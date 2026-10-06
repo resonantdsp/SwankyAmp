@@ -376,6 +376,8 @@ impl<'a> Window<'a> {
         // and notify the window handler about it
     }
 
+    pub fn show_note(&mut self, _text: &str) {}
+
     /// Re-interpret the window at a new content-scale factor.
     ///
     /// The *physical* pixel size is left untouched - for an embedded plug-in

@@ -1,47 +1,48 @@
-use windows_core::{ComObject, Interface, Result, HSTRING};
-use windows_sys::Win32::Media::{
-    timeKillEvent, timeSetEvent, TIME_CALLBACK_FUNCTION, TIME_KILL_SYNCHRONOUS, TIME_PERIODIC,
-};
+use windows_core::{Result, HSTRING};
 use windows_sys::Win32::{
     Foundation::{HWND, LPARAM, LRESULT, RECT, WPARAM},
-    System::Ole::{OleInitialize, RevokeDragDrop},
+    Graphics::{
+        Dwm::DwmFlush,
+        Gdi::CreateFontW,
+    },
     UI::{
         Controls::{HOVER_DEFAULT, WM_MOUSELEAVE},
-        HiDpi::{
-            GetDpiForWindow, SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE,
-        },
+        HiDpi::GetDpiForWindow,
         Input::KeyboardAndMouse::{
-            GetFocus, ReleaseCapture, SetCapture, SetFocus, TrackMouseEvent, TME_LEAVE,
-            TRACKMOUSEEVENT,
+            GetCapture, GetFocus, ReleaseCapture, SetCapture, SetFocus, TrackMouseEvent, TME_LEAVE,
+            TRACKMOUSEEVENT, VK_F10, VK_MENU,
         },
         WindowsAndMessaging::{
-            AdjustWindowRectEx, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW,
-            LoadCursorW, PostMessageW, SetCursor, SetTimer, SetWindowPos, TranslateMessage,
-            HTCLIENT, MSG, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOZORDER, WHEEL_DELTA, WM_CHAR,
-            WM_CLOSE, WM_DPICHANGED, WM_INPUTLANGCHANGE, WM_KEYDOWN, WM_KEYUP, WM_KILLFOCUS,
-            WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL,
-            WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SETCURSOR, WM_SETFOCUS,
-            WM_SHOWWINDOW, WM_SIZE, WM_SYSCHAR, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_TIMER, WM_USER,
-            WM_XBUTTONDOWN, WM_XBUTTONUP, WS_CAPTION, WS_CHILD, WS_CLIPSIBLINGS, WS_MAXIMIZEBOX,
-            WS_MINIMIZEBOX, WS_POPUPWINDOW, WS_SIZEBOX, WS_VISIBLE,
+            AdjustWindowRectEx, CreateWindowExW, DefWindowProcW, DestroyWindow, GetClientRect, DispatchMessageW, GetMessageW,
+            GetParent, GetWindowThreadProcessId, LoadCursorW, PostMessageW, SendMessageW,
+            SetCursor, SetParent, SetTimer, SetWindowPos, ShowWindow, TranslateMessage, HTCLIENT,
+            HWND_MESSAGE, MSG, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOZORDER, SW_HIDE, WHEEL_DELTA,
+            WM_CHAR, WM_CLOSE, WM_DPICHANGED, WM_INPUTLANGCHANGE, WM_KEYDOWN, WM_KEYUP,
+            WM_KILLFOCUS, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP,
+            WM_MOUSEHWHEEL, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_RBUTTONDOWN, WM_RBUTTONUP,
+            WM_SETCURSOR, WM_SETFOCUS, WM_SHOWWINDOW, WM_SIZE, WM_SYSCHAR, WM_SYSKEYDOWN,
+            WM_SYSKEYUP, WM_TIMER, WM_USER, WM_XBUTTONDOWN, WM_XBUTTONUP, WS_CAPTION, WS_CHILD,
+            WS_CLIPSIBLINGS, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUPWINDOW, WS_SIZEBOX,
+            WS_VISIBLE, WM_SETFONT, WS_EX_NOPARENTNOTIFY,
         },
     },
 };
 
-use std::cell::{Cell, Ref, RefCell};
+use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
-use std::ptr::null_mut;
+use std::ptr::{null, null_mut};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, PoisonError};
+use std::time::{Duration, Instant};
 
 use raw_window_handle::{
     HasRawDisplayHandle, HasRawWindowHandle, RawDisplayHandle, RawWindowHandle, Win32WindowHandle,
     WindowsDisplayHandle,
 };
-use windows::Win32::System::Ole::IDropTarget;
 use windows_sys::Win32::Foundation::FALSE;
-use windows_sys::Win32::System::Ole::RegisterDragDrop;
+use windows_sys::Win32::System::SystemServices::SS_CENTER;
+use windows_sys::Win32::System::Threading::GetCurrentThreadId;
 
 const BV_WINDOW_MUST_CLOSE: u32 = WM_USER + 1;
 
@@ -52,7 +53,6 @@ use crate::{
 };
 
 use super::cursor::cursor_to_lpcwstr;
-use super::drop_target::DropTarget;
 use super::keyboard::KeyboardState;
 
 #[cfg(feature = "opengl")]
@@ -69,11 +69,11 @@ fn LOWORD(lparam: LPARAM) -> u16 {
     (lparam & 0xffff) as u16
 }
 
-/// Fallback `WM_TIMER` id, used only if the multimedia timer below
-/// fails to start (see [`WindowState::start_frame_timer`]).
+/// Fallback `WM_TIMER` id, used only if the frame pacer's thread can't
+/// be started (see [`WindowState::start_frame_timer`]).
 const WIN_FRAME_TIMER: usize = 4242;
 
-/// Posted by the frame timer to drive one `on_frame`. Replaces a
+/// Posted by the frame pacer to drive one `on_frame`. Replaces a
 /// `WM_TIMER`: Windows synthesizes `WM_TIMER` only when the message
 /// queue is otherwise empty and coalesces missed intervals into a
 /// single message, so under a busy host message pump the editor's
@@ -81,33 +81,80 @@ const WIN_FRAME_TIMER: usize = 4242;
 /// delivered at normal priority and is never coalesced.
 const BV_FRAME_TICK: u32 = WM_USER + 2;
 
-/// Editor frame interval in milliseconds (~66 fps).
-const FRAME_INTERVAL_MS: u32 = 15;
+/// Frame interval when the display isn't pacing frames (~60 fps).
+const FRAME_INTERVAL_MS: u32 = 16;
 
-/// Context handed to the multimedia-timer callback, which runs on a
-/// winmm-owned thread. Owned by the leaked `Box` whose pointer is the
-/// timer's `dwUser`; reclaimed in [`WindowState::stop_frame_timer`]
-/// after `timeKillEvent` (registered `TIME_KILL_SYNCHRONOUS`) has
-/// guaranteed no callback is in flight.
-struct FrameTimerCtx {
-    hwnd: HWND,
-    /// Shared with the GUI thread. The callback posts a tick only when
-    /// this is clear, bounding the queue to one outstanding frame so a
-    /// stalled pump coalesces to a single catch-up frame instead of a
+/// A composition that comes sooner than this after the last tick is not
+/// a display refresh: `DwmFlush` returns at once when nothing is being
+/// composed (a locked session, a display asleep).
+const MIN_REFRESH: Duration = Duration::from_millis(2);
+
+/// One thread per window that waits for each desktop composition and
+/// posts a [`BV_FRAME_TICK`], so frames follow the display's refresh
+/// rather than a timer that raises the process's timer resolution.
+struct FramePacer {
+    shared: Arc<PacerShared>,
+}
+
+struct PacerShared {
+    /// Cleared when the window closes. The thread holds the lock while it
+    /// posts, so once [`FramePacer::stop`] has cleared it no tick can reach
+    /// the window, or a later window given the same handle.
+    open: Mutex<bool>,
+    /// Shared with the GUI thread. A tick is posted only when this is
+    /// clear, bounding the queue to one outstanding frame so a stalled
+    /// GUI thread coalesces to a single catch-up frame instead of a
     /// backlog that floods the queue and repaints in a burst.
     pending: Arc<AtomicBool>,
 }
 
-unsafe extern "system" fn frame_timer_callback(
-    _id: u32, _msg: u32, dw_user: usize, _dw1: usize, _dw2: usize,
-) {
-    // SAFETY: `dw_user` is the `Box<FrameTimerCtx>` pointer passed to
-    // `timeSetEvent`; it stays live until `timeKillEvent` (synchronous)
-    // returns, after which no further callbacks run. `hwnd` is only
-    // passed to `PostMessageW`, which is callable from any thread.
-    let ctx = &*(dw_user as *const FrameTimerCtx);
-    if !ctx.pending.swap(true, Ordering::AcqRel) {
-        PostMessageW(ctx.hwnd, BV_FRAME_TICK, 0, 0);
+impl FramePacer {
+    fn start(hwnd: HWND, pending: Arc<AtomicBool>) -> Option<Self> {
+        let shared = Arc::new(PacerShared { open: Mutex::new(true), pending });
+        let thread_shared = shared.clone();
+        // An HWND is not `Send`; the thread only hands it to `PostMessageW`,
+        // which any thread may call.
+        let hwnd = hwnd as isize;
+        std::thread::Builder::new()
+            .name("baseview-frame-pacer".into())
+            .spawn(move || pace(&thread_shared, hwnd as HWND))
+            .ok()?;
+        Some(Self { shared })
+    }
+
+    /// Ends the thread without waiting for it: once `open` is cleared no
+    /// tick reaches the window, and the thread exits without posting when
+    /// its current wait for a composition returns, normally within one
+    /// refresh. The thread outlives the close in the library's code, which
+    /// is safe only because the embedding plug-in pins its library before
+    /// it opens a window, as both Swanky Amp products do.
+    fn stop(self) {
+        *self.shared.open.lock().unwrap_or_else(PoisonError::into_inner) = false;
+    }
+}
+
+fn pace(shared: &PacerShared, hwnd: HWND) {
+    let fallback = Duration::from_millis(u64::from(FRAME_INTERVAL_MS));
+    let mut last = Instant::now();
+    loop {
+        // SAFETY: no arguments; blocks until the next composition.
+        let composed = unsafe { DwmFlush() } >= 0;
+        if !composed || last.elapsed() < MIN_REFRESH {
+            std::thread::sleep(fallback.saturating_sub(last.elapsed()));
+        }
+        last = Instant::now();
+        let open = shared.open.lock().unwrap_or_else(PoisonError::into_inner);
+        if !*open {
+            return;
+        }
+        // A tick that never arrives would leave `pending` set, and no
+        // frame would be posted again.
+        if !shared.pending.swap(true, Ordering::AcqRel)
+            && unsafe { PostMessageW(hwnd, BV_FRAME_TICK, 0, 0) } == 0
+        {
+            shared.pending.store(false, Ordering::Release);
+        }
+        drop(open);
     }
 }
 
@@ -117,9 +164,19 @@ pub struct WindowHandle {
 }
 
 impl WindowHandle {
+    /// Closes the window at once when called on its own thread, so the
+    /// handler is dropped while the window is still attached: a host
+    /// usually destroys its parent window straight after, which would
+    /// destroy this one before a posted close arrived.
     pub fn close(&mut self) {
-        if let Some(hwnd) = self.hwnd.take() {
-            unsafe {
+        let Some(hwnd) = self.hwnd.take() else { return };
+        if !self.is_open.get() {
+            return;
+        }
+        unsafe {
+            if GetWindowThreadProcessId(hwnd, null_mut()) == GetCurrentThreadId() {
+                SendMessageW(hwnd, BV_WINDOW_MUST_CLOSE, 0, 0);
+            } else {
                 PostMessageW(hwnd, BV_WINDOW_MUST_CLOSE, 0, 0);
             }
         }
@@ -164,7 +221,6 @@ pub struct BaseviewWindow {
     // Things not directly used, but kept so their Drop impl runs when the window is destroyed
     _parent_handle: ParentHandle,
     _keyboard_hook: Cell<Option<KeyboardHookHandle>>,
-    _drop_target: Cell<Option<ComObject<DropTarget>>>,
 
     #[cfg(feature = "opengl")]
     pub gl_config: Option<crate::gl::GlConfig>,
@@ -178,9 +234,6 @@ impl WindowImpl for BaseviewWindow {
         self._keyboard_hook.set(Some(hook::init_keyboard_hook(hwnd)));
 
         unsafe {
-            // Only works on Windows 10 unfortunately.
-            SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
-
             // Now we can get the actual dpi of the window.
             let new_rect = if let WindowScalePolicy::SystemScaleFactor =
                 self.window_state.scale_policy
@@ -213,13 +266,6 @@ impl WindowImpl for BaseviewWindow {
             } else {
                 None
             };
-
-            let drop_target = ComObject::new(DropTarget::new(Rc::downgrade(window_state)));
-            self._drop_target.set(Some(drop_target.clone()));
-
-            OleInitialize(null_mut());
-
-            RegisterDragDrop(hwnd, drop_target.as_interface::<IDropTarget>().as_raw());
 
             if let Some(mut new_rect) = new_rect {
                 // Convert this desired"client rectangle" size to the actual "window rectangle"
@@ -263,9 +309,9 @@ impl WindowImpl for BaseviewWindow {
         };
         *window_state.handler.borrow_mut() = Some(handler);
 
-        // Start the frame timer last: its first tick fires ~one interval
-        // later, by which point `WM_SHOWWINDOW` (posted right after
-        // `create_window` returns) has been handled.
+        // Start the frame pacer last: its first tick follows the next
+        // composition, by which point `WM_SHOWWINDOW` (posted right after
+        // `create_window` returns) has normally been handled.
         window_state.start_frame_timer();
 
         Ok(())
@@ -296,9 +342,8 @@ impl WindowImpl for BaseviewWindow {
         result
     }
 
-    fn before_destroy(&self, window: HWnd) {
+    fn before_destroy(&self, _window: HWnd) {
         self.window_state.stop_frame_timer();
-        unsafe { RevokeDragDrop(window.as_raw()) };
     }
 }
 
@@ -436,14 +481,14 @@ unsafe fn wnd_proc_inner(
         }
         BV_FRAME_TICK => {
             // Clear before rendering so a tick that fires during this
-            // frame re-arms the timer for the next one rather than
+            // frame re-arms the pacer for the next one rather than
             // being dropped.
             window_state.frame_pending.store(false, Ordering::Release);
             window_state.handle_on_frame();
             Some(0)
         }
         WM_TIMER => {
-            // Fallback path only (multimedia timer unavailable).
+            // Fallback path only (no frame pacer thread).
             if wparam == WIN_FRAME_TIMER {
                 window_state.handle_on_frame()
             }
@@ -462,8 +507,29 @@ unsafe fn wnd_proc_inner(
             let opt_event =
                 window_state.keyboard_state.borrow_mut().process_message(hwnd, msg, wparam, lparam);
 
+            // A key the handler declines is posted on to the parent, the
+            // host's window, as if the editor had never had the focus. The
+            // keyboard hook has already kept the message from the host's own
+            // loop, so this is the only way the host sees the key; its loop
+            // then translates and dispatches it like any key of its own.
+            // Alt and F10 alone stay here: Alt is held for editor gestures,
+            // and its release would open the host's menu bar. A window with
+            // no parent, the standalone's, keeps its usual handling, so
+            // Alt+F4 still closes it.
+            let menu_key = matches!(msg, WM_SYSKEYDOWN | WM_SYSKEYUP)
+                && matches!(wparam as u16, VK_MENU | VK_F10);
+            let parent = GetParent(hwnd);
             if let Some(event) = opt_event {
-                window_state.handle_event(Event::Keyboard(event));
+                if !menu_key
+                    && !parent.is_null()
+                    && window_state.declines(Event::Keyboard(event.clone()))
+                {
+                    PostMessageW(parent, msg, wparam, lparam);
+                    return Some(0);
+                }
+                if menu_key || parent.is_null() {
+                    window_state.handle_event(Event::Keyboard(event));
+                }
             }
 
             if msg != WM_SYSKEYDOWN {
@@ -569,7 +635,7 @@ unsafe fn wnd_proc_inner(
         // NOTE: `WM_NCDESTROY` is handled in the outer function because this deallocates the window
         //        state
         BV_WINDOW_MUST_CLOSE => {
-            DestroyWindow(hwnd);
+            window_state.close();
             Some(0)
         }
         _ => None,
@@ -605,24 +671,48 @@ pub(super) struct WindowState {
     pub deferred_tasks: RefCell<VecDeque<WindowTask>>,
 
     /// Set when a frame tick has been posted and not yet handled, so the
-    /// timer callback never queues more than one. Shared with the
-    /// callback thread via [`FrameTimerCtx`].
+    /// pacer never queues more than one. Shared with the pacer thread via
+    /// [`PacerShared`].
     frame_pending: Arc<AtomicBool>,
-    /// `timeSetEvent` id (0 = unset / multimedia timer unavailable) and
-    /// the leaked callback context, reclaimed in `stop_frame_timer`.
-    frame_timer_id: Cell<u32>,
-    frame_timer_ctx: Cell<*mut FrameTimerCtx>,
+    frame_pacer: Cell<Option<FramePacer>>,
+
+    leases: Arc<Mutex<Leases>>,
 
     #[cfg(feature = "opengl")]
     pub gl_context: core::cell::OnceCell<GlContext>,
 }
 
+#[derive(Default)]
+struct Leases {
+    live: usize,
+    closed: bool,
+}
+
+/// Holds a window back from destruction by `close` while a renderer on
+/// another thread may still have a swapchain on it. A close that finds a
+/// lease outstanding drops the handler, hides the window and detaches it
+/// from its parent; the last lease to drop then has the window destroyed
+/// on its own thread.
+pub struct WindowLease {
+    hwnd: isize,
+    leases: Arc<Mutex<Leases>>,
+}
+
+impl Drop for WindowLease {
+    fn drop(&mut self) {
+        let mut leases = self.leases.lock().unwrap_or_else(PoisonError::into_inner);
+        leases.live -= 1;
+        if leases.live == 0 && leases.closed {
+            unsafe { PostMessageW(self.hwnd as HWND, BV_WINDOW_MUST_CLOSE, 0, 0) };
+        }
+    }
+}
+
 impl Drop for WindowState {
     fn drop(&mut self) {
         // Safety net for the normal `before_destroy` teardown; both are
-        // idempotent. The winmm timer lives on its own thread (not tied
-        // to the HWND), so it must be killed explicitly before the
-        // context it references is freed.
+        // idempotent. The pacer thread is not tied to the HWND, so it
+        // must be stopped explicitly.
         self.stop_frame_timer();
     }
 }
@@ -647,57 +737,69 @@ impl WindowState {
             deferred_tasks: RefCell::new(VecDeque::with_capacity(4)),
 
             frame_pending: Arc::new(AtomicBool::new(false)),
-            frame_timer_id: Cell::new(0),
-            frame_timer_ctx: Cell::new(null_mut()),
+            frame_pacer: Cell::new(None),
+
+            leases: Arc::default(),
 
             #[cfg(feature = "opengl")]
             gl_context: core::cell::OnceCell::new(),
         }
     }
 
-    /// Start driving `on_frame` from a multimedia timer that posts
-    /// [`BV_FRAME_TICK`] every [`FRAME_INTERVAL_MS`]. `uResolution = 1`
-    /// asks winmm to raise the system timer resolution for the timer's
-    /// lifetime so the interval is honoured instead of rounding up to
-    /// the ~15.6 ms default tick. Falls back to a `WM_TIMER` if the
-    /// multimedia timer can't be created.
+    /// Start driving `on_frame` from the display (see [`FramePacer`]),
+    /// or from a `WM_TIMER` if its thread can't be started.
     fn start_frame_timer(&self) {
-        let ctx = Box::into_raw(Box::new(FrameTimerCtx {
-            hwnd: self.hwnd,
-            pending: self.frame_pending.clone(),
-        }));
-        let id = unsafe {
-            timeSetEvent(
-                FRAME_INTERVAL_MS,
-                1,
-                Some(frame_timer_callback),
-                ctx as usize,
-                TIME_PERIODIC | TIME_CALLBACK_FUNCTION | TIME_KILL_SYNCHRONOUS,
-            )
-        };
-        if id == 0 {
-            // The timer never took ownership of the context; reclaim it
-            // and fall back to a low-resolution `WM_TIMER`.
-            drop(unsafe { Box::from_raw(ctx) });
-            unsafe { SetTimer(self.hwnd, WIN_FRAME_TIMER, FRAME_INTERVAL_MS, None) };
-            return;
+        match FramePacer::start(self.hwnd, self.frame_pending.clone()) {
+            Some(pacer) => self.frame_pacer.set(Some(pacer)),
+            None => unsafe {
+                SetTimer(self.hwnd, WIN_FRAME_TIMER, FRAME_INTERVAL_MS, None);
+            },
         }
-        self.frame_timer_id.set(id);
-        self.frame_timer_ctx.set(ctx);
     }
 
-    /// Stop the frame timer and free its callback context. Idempotent.
-    /// `TIME_KILL_SYNCHRONOUS` (set at creation) makes `timeKillEvent`
-    /// block until any in-flight callback returns, so the context is
-    /// safe to free afterwards.
+    /// Stop the frame pacer. Idempotent.
     fn stop_frame_timer(&self) {
-        let id = self.frame_timer_id.replace(0);
-        if id != 0 {
-            unsafe { timeKillEvent(id) };
+        if let Some(pacer) = self.frame_pacer.take() {
+            pacer.stop();
         }
-        let ctx = self.frame_timer_ctx.replace(null_mut());
-        if !ctx.is_null() {
-            drop(unsafe { Box::from_raw(ctx) });
+    }
+
+    fn lease(&self) -> WindowLease {
+        self.leases.lock().unwrap_or_else(PoisonError::into_inner).live += 1;
+        WindowLease { hwnd: self.hwnd as isize, leases: Arc::clone(&self.leases) }
+    }
+
+    /// Drops the handler while the window still exists, then destroys the
+    /// window, or hides and detaches it while a lease is outstanding.
+    fn close(&self) {
+        let Ok(mut slot) = self.handler.try_borrow_mut() else {
+            // Re-entered from inside the handler: close once it returns.
+            unsafe { PostMessageW(self.hwnd, BV_WINDOW_MUST_CLOSE, 0, 0) };
+            return;
+        };
+        let handler = slot.take();
+        drop(slot);
+        drop(handler);
+        self.stop_frame_timer();
+        let mut leases = self.leases.lock().unwrap_or_else(PoisonError::into_inner);
+        leases.closed = true;
+        let held = leases.live > 0;
+        drop(leases);
+        unsafe {
+            if held {
+                // A hidden window keeps focus and capture, and the keyboard
+                // hook would then swallow the host's keys with no handler.
+                if GetFocus() == self.hwnd {
+                    SetFocus(GetParent(self.hwnd));
+                }
+                if GetCapture() == self.hwnd {
+                    ReleaseCapture();
+                }
+                ShowWindow(self.hwnd, SW_HIDE);
+                SetParent(self.hwnd, HWND_MESSAGE);
+            } else {
+                DestroyWindow(self.hwnd);
+            }
         }
     }
 
@@ -731,12 +833,23 @@ impl WindowState {
         handler.on_event(&mut window, event)
     }
 
-    pub(super) fn window_info(&self) -> WindowInfo {
-        WindowInfo::from_physical_size(self.current_size.get(), self.current_scale_factor.get())
+    /// Whether the handler answered the event and reported it `Ignored`. A
+    /// handler that is busy, mid-frame, never saw the event, and its key is
+    /// dropped rather than handed to the host: a keystroke meant for a text
+    /// field must not reach the host's shortcuts.
+    fn declines(&self, event: Event) -> bool {
+        let Ok(mut handler) = self.handler.try_borrow_mut() else {
+            return false;
+        };
+        let Some(handler) = handler.as_mut() else {
+            return false;
+        };
+        let mut window = crate::window::Window::new(Window { state: self });
+        matches!(handler.on_event(&mut window, event), EventStatus::Ignored)
     }
 
-    pub(super) fn keyboard_state(&self) -> Ref<'_, KeyboardState> {
-        self.keyboard_state.borrow()
+    pub(super) fn window_info(&self) -> WindowInfo {
+        WindowInfo::from_physical_size(self.current_size.get(), self.current_scale_factor.get())
     }
 
     fn send_resized(&self, logical_size: Size) {
@@ -780,6 +893,38 @@ impl WindowState {
             WindowTask::Focus => unsafe {
                 SetFocus(self.hwnd);
             },
+            WindowTask::ShowNote(text) => unsafe {
+                let mut client = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+                GetClientRect(self.hwnd, &mut client);
+                let (width, height) = (client.right - client.left, client.bottom - client.top);
+                // A centred band the note wraps within, at the window's DPI;
+                // the stock GUI font is 8 pt at 96 DPI whatever the screen.
+                let dpi = GetDpiForWindow(self.hwnd).max(96) as i32;
+                let margin = dpi / 4;
+                let class: Vec<u16> = "STATIC\0".encode_utf16().collect();
+                let text: Vec<u16> = text.encode_utf16().chain([0]).collect();
+                let label = CreateWindowExW(
+                    WS_EX_NOPARENTNOTIFY,
+                    class.as_ptr(),
+                    text.as_ptr(),
+                    WS_CHILD | WS_VISIBLE | SS_CENTER,
+                    margin,
+                    height / 2 - dpi / 2,
+                    (width - 2 * margin).max(1),
+                    dpi,
+                    self.hwnd,
+                    null_mut(),
+                    null_mut(),
+                    null(),
+                );
+                let face: Vec<u16> = "Segoe UI\0".encode_utf16().collect();
+                let font = CreateFontW(-(dpi / 8), 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 0, face.as_ptr());
+                if !label.is_null() && !font.is_null() {
+                    // The font lives as long as the process: one per failed
+                    // editor, which is rare.
+                    SendMessageW(label, WM_SETFONT, font as WPARAM, 1);
+                }
+            },
         }
     }
 }
@@ -793,6 +938,8 @@ pub(super) enum WindowTask {
     Resize(Size),
     /// Request keyboard focus for the window.
     Focus,
+    /// Show one line of native text over the whole window.
+    ShowNote(String),
 }
 
 pub struct Window<'a> {
@@ -903,7 +1050,6 @@ impl Window<'_> {
                 handler_builder: Cell::new(Some(Box::new(|w| Box::new(build(w))))),
 
                 _parent_handle: parent_handle,
-                _drop_target: None.into(),
                 _keyboard_hook: None.into(),
 
                 #[cfg(feature = "opengl")]
@@ -936,6 +1082,10 @@ impl Window<'_> {
         }
     }
 
+    pub fn lease(&self) -> WindowLease {
+        self.state.lease()
+    }
+
     pub fn has_focus(&mut self) -> bool {
         let focused_window = unsafe { GetFocus() };
         focused_window == self.state.hwnd
@@ -958,6 +1108,12 @@ impl Window<'_> {
     /// the OS (`WM_DPICHANGED` / `GetDpiForWindow`) rather than a host content
     /// scale reported after attach, so this is a no-op here.
     pub fn set_scale_factor(&mut self, _scale: f64) {}
+
+    pub fn show_note(&mut self, text: &str) {
+        // Creating a child window sends messages back to this one, so it
+        // waits until the event has been handled, like a resize.
+        self.state.deferred_tasks.borrow_mut().push_back(WindowTask::ShowNote(text.to_owned()));
+    }
 
     pub fn set_mouse_cursor(&mut self, mouse_cursor: MouseCursor) {
         self.state.cursor_icon.set(mouse_cursor);

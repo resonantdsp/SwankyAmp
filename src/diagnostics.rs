@@ -31,21 +31,41 @@ impl Audio {
 }
 
 /// Product, version and commit, operating system, host and format, the audio
-/// the host is running, and the licence, one fact per line.
+/// the host is running, the licence, the GPU, where the log is and the
+/// warnings and errors it recorded lately, one fact per line.
 pub fn report(params: &SwankyAmpParams) -> String {
     let audio = match params.audio.running() {
         Some((rate, block)) => format!("{rate} Hz, {block}-sample buffer"),
         None => "not running".into(),
     };
     format!(
-        "Swanky Amp Free {}\nOS: {} ({})\nHost: {}, {}\nAudio: {audio}\nLicence: free, GPL-3.0-or-later",
-        build(),
+        "{}\nOS: {} ({})\nHost: {}, {}\nAudio: {audio}\nLicence: free, GPL-3.0-or-later\n{}",
+        heading(),
         os(),
         std::env::consts::ARCH,
         host(),
         FORMAT,
+        crate::editor_log::summary(),
     )
 }
+
+/// The product, its version and, when the build knew it, its commit.
+pub(crate) fn heading() -> String {
+    format!("Swanky Amp Free {}", build())
+}
+
+/// Shown in native text in place of an editor that cannot draw, in one line.
+pub(crate) fn graphics_failed(log: Option<&str>) -> String {
+    match log {
+        Some(log) => format!(
+            "The editor cannot draw on this computer's graphics. Send the log at {log} to {SUPPORT_ADDRESS}."
+        ),
+        None => format!(
+            "The editor cannot draw on this computer's graphics. Write to {SUPPORT_ADDRESS}."
+        ),
+    }
+}
+const SUPPORT_ADDRESS: &str = "support@resonantdsp.com";
 
 /// The version and, when the build knew it, the short commit, since every
 /// release candidate reports the version of the release it leads to.
@@ -58,7 +78,7 @@ fn build() -> String {
 
 /// Each shipped binary is built for exactly one format, so the feature that
 /// is on names it.
-const FORMAT: &str = if cfg!(feature = "clap") {
+pub(crate) const FORMAT: &str = if cfg!(feature = "clap") {
     "CLAP"
 } else if cfg!(feature = "vst3") {
     "VST3"
@@ -73,7 +93,7 @@ const FORMAT: &str = if cfg!(feature = "clap") {
 /// The application that loaded the plug-in, by the name its user knows it by:
 /// on macOS the outermost app bundle, since the executable inside is often
 /// named differently.
-fn host() -> String {
+pub(crate) fn host() -> String {
     let Ok(path) = std::env::current_exe() else {
         return "unknown".into();
     };
@@ -88,7 +108,7 @@ fn host() -> String {
 }
 
 #[cfg(target_os = "macos")]
-fn os() -> String {
+pub(crate) fn os() -> String {
     let version = std::fs::read_to_string("/System/Library/CoreServices/SystemVersion.plist")
         .ok()
         .and_then(|plist| {
@@ -103,7 +123,7 @@ fn os() -> String {
 }
 
 #[cfg(windows)]
-fn os() -> String {
+pub(crate) fn os() -> String {
     const KEY: &str = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion";
     let build = windows::registry_string(KEY, "CurrentBuildNumber");
     // Windows 11 still names itself Windows 10 in the registry; its builds
@@ -154,7 +174,7 @@ mod windows {
 }
 
 #[cfg(not(any(target_os = "macos", windows)))]
-fn os() -> String {
+pub(crate) fn os() -> String {
     std::fs::read_to_string("/etc/os-release")
         .ok()
         .and_then(|release| {

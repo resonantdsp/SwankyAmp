@@ -3,9 +3,9 @@
 //! Without an embedded application manifest declaring per-monitor v2
 //! DPI awareness, Windows treats the standalone process as DPI-unaware
 //! and the plugin editor renders blurry / wrong-sized on non-100%
-//! displays. baseview does call `SetProcessDpiAwarenessContext` at
-//! runtime, but that only gives PMA v1 and runs after the first HWND
-//! is created - too late to influence initial sizing.
+//! displays. The manifest is the only declaration: baseview no longer
+//! sets the process's awareness at runtime, because in a plug-in that
+//! process is the host's.
 //!
 //! Embedding here (rather than via a `build.rs` in the user's plugin
 //! crate) keeps `truce-standalone` and the user's crate free of any

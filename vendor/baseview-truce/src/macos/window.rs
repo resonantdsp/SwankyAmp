@@ -11,7 +11,7 @@ use objc2::runtime::NSObjectProtocol;
 use objc2::{msg_send, MainThreadMarker, MainThreadOnly};
 use objc2_app_kit::{
     NSApplication, NSApplicationActivationPolicy, NSBackingStoreType, NSEvent, NSPasteboard,
-    NSPasteboardTypeString, NSView, NSWindow, NSWindowStyleMask,
+    NSPasteboardTypeString, NSTextField, NSView, NSWindow, NSWindowStyleMask,
 };
 use objc2_core_foundation::{
     kCFAllocatorDefault, kCFRunLoopCommonModes, CFRetained, CFRunLoop, CFRunLoopSource,
@@ -528,6 +528,22 @@ impl<'a> Window<'a> {
         }
     }
 
+    pub fn show_note(&mut self, text: &str) {
+        let (Some(view), Some(mtm)) = (self.inner.ns_view.get(), MainThreadMarker::new()) else {
+            return;
+        };
+        let label = NSTextField::wrappingLabelWithString(&NSString::from_str(text), mtm);
+        let bounds = view.bounds();
+        label.setPreferredMaxLayoutWidth((bounds.size.width - 48.0).max(100.0));
+        label.sizeToFit();
+        let size = label.frame().size;
+        label.setFrameOrigin(NSPoint::new(
+            ((bounds.size.width - size.width) / 2.0).round(),
+            ((bounds.size.height - size.height) / 2.0).round(),
+        ));
+        view.addSubview(&label);
+    }
+
     /// See the X11 implementation. On macOS the Retina backing scale is driven
     /// by AppKit through the parent `NSView`/`NSWindow`, not by a host content
     /// scale reported after attach, so this is a no-op here.
@@ -665,10 +681,6 @@ impl WindowState {
             return None;
         }
         Some(unsafe { Self::from_view(view) })
-    }
-
-    pub(super) fn keyboard_state(&self) -> &KeyboardState {
-        &self.keyboard_state
     }
 
     pub(super) fn process_native_key_event(&self, event: &NSEvent) -> Option<KeyboardEvent> {

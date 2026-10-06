@@ -27,6 +27,33 @@ pub(crate) fn current_module_hinstance() -> Option<std::num::NonZeroIsize> {
     std::num::NonZeroIsize::new(hmodule)
 }
 
+/// Whether the top-level window the editor sits in is minimised. A
+/// child window minimised with its host still reports itself visible
+/// and not iconic, so the host's own top-level window is asked.
+#[cfg(target_os = "windows")]
+pub(crate) fn host_minimized(handle: raw_window_handle::RawWindowHandle) -> bool {
+    unsafe extern "system" {
+        fn GetAncestor(hwnd: *mut std::ffi::c_void, flags: u32) -> *mut std::ffi::c_void;
+        fn IsIconic(hwnd: *mut std::ffi::c_void) -> i32;
+    }
+    const GA_ROOT: u32 = 2;
+    let raw_window_handle::RawWindowHandle::Win32(handle) = handle else {
+        return false;
+    };
+    // SAFETY: state queries on the editor's own window, which baseview
+    // keeps alive while it calls `on_frame`; a null root reads as not
+    // minimised.
+    unsafe {
+        let root = GetAncestor(handle.hwnd, GA_ROOT);
+        !root.is_null() && IsIconic(root) != 0
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn host_minimized(_: raw_window_handle::RawWindowHandle) -> bool {
+    false
+}
+
 /// Bridge a baseview raw-window-handle 0.5 to the wgpu-0.19
 /// `SurfaceTargetUnsafe` type that `iced_wgpu` 0.13 expects.
 ///

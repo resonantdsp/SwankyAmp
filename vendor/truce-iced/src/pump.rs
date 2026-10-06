@@ -27,10 +27,13 @@
 use std::sync::Condvar;
 use std::sync::atomic::AtomicBool;
 #[cfg(any(target_os = "windows", target_os = "macos"))]
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex, PoisonError};
+use std::time::Instant;
 
 use iced_wgpu::wgpu;
+
+use crate::diagnostics::stage;
 
 /// What the init closure returns: the GUI-side product (device
 /// handles, ...) plus the device + configuration the pump needs for
@@ -38,20 +41,28 @@ use iced_wgpu::wgpu;
 pub(crate) type PumpInit<T> = (T, wgpu::Device, wgpu::SurfaceConfiguration);
 
 /// GPU init, run once the instance / adapter / surface exist (on the
-/// pump thread where there is one, inline elsewhere). Returns `None` on
-/// failure (editor stays blank, host survives). Must NOT configure
-/// the surface - the pump does that with the returned configuration.
+/// pump thread where there is one, inline elsewhere). Fails with the
+/// cause, which leaves the editor blank for good and the host running.
+/// Must NOT configure the surface - the pump does that with the
+/// returned configuration.
 pub(crate) type PumpInitFn<T> = Box<
-    dyn FnOnce(&wgpu::Instance, &wgpu::Adapter, &wgpu::Surface<'static>) -> Option<PumpInit<T>>
+    dyn FnOnce(
+            &wgpu::Instance,
+            &wgpu::Adapter,
+            &wgpu::Surface<'static>,
+        ) -> Result<PumpInit<T>, String>
         + Send,
 >;
 
-#[cfg(any(target_os = "windows", target_os = "macos"))]
-const STATE_INIT: u8 = 0;
-#[cfg(any(target_os = "windows", target_os = "macos"))]
-const STATE_READY: u8 = 1;
-#[cfg(any(target_os = "windows", target_os = "macos"))]
-const STATE_FAILED: u8 = 2;
+/// Where the pump's GPU init stands, as the GUI thread sees it.
+pub(crate) enum Init<T> {
+    Pending,
+    Ready(T),
+    /// Final: the pump has given up and nothing will be drawn. The
+    /// cause is already in the log. (Inline init fails in `spawn`.)
+    #[cfg_attr(not(any(target_os = "windows", target_os = "macos")), allow(dead_code))]
+    Failed,
+}
 
 /// Latest-wins mailbox between the GUI thread and the pump thread.
 // The bools are independent protocol flags (want / taken / waiting /
@@ -80,7 +91,6 @@ struct Slot {
 struct Shared {
     slot: Mutex<Slot>,
     cv: Condvar,
-    state: AtomicU8,
 }
 
 #[cfg(any(target_os = "windows", target_os = "macos"))]
@@ -139,8 +149,9 @@ impl PumpClient {
 
     /// Whether a frame is ready to paint into, asking the pump for one
     /// when it is not: the pump then wakes the GUI thread as soon as it
-    /// has it. Only meaningful where the pump has a thread.
-    #[cfg(target_os = "macos")]
+    /// has it (macOS) or for the next tick to find (Windows). Only
+    /// meaningful where the pump has a thread.
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
     pub(crate) fn request_frame(&self) -> bool {
         let mut slot = lock(&self.shared.slot);
         slot.want_frame = true;
@@ -260,6 +271,9 @@ pub(crate) struct SurfacePump<T: Send + 'static> {
 enum InitDelivery<T> {
     #[cfg_attr(any(target_os = "windows", target_os = "macos"), allow(dead_code))]
     Now(Option<T>),
+    /// One message: the product, or nothing when init failed (the
+    /// sender is dropped unsent, which also covers a thread that ends
+    /// any other way).
     #[cfg(any(target_os = "windows", target_os = "macos"))]
     Chan(std::sync::mpsc::Receiver<T>),
 }
@@ -306,60 +320,72 @@ impl<T: Send + 'static> SurfacePump<T> {
     /// Build the pump for a baseview window. On Windows and macOS this
     /// spawns the pump thread and returns immediately (poll
     /// [`Self::take_init`]); elsewhere init runs synchronously and
-    /// `take_init` succeeds on the first call.
+    /// `take_init` succeeds on the first call. Fails with the cause.
     ///
     /// # Safety
-    /// The window must remain valid while the pump lives (the editor
-    /// drops the pump before closing its child window).
+    /// The window must remain valid while the pump holds a surface on it.
+    /// On Windows the pump thread's lease keeps it alive through a close;
+    /// on macOS the surface retains its layer.
     pub(crate) unsafe fn spawn(
         window: &baseview::Window,
         device_lost: &Arc<AtomicBool>,
         init: PumpInitFn<T>,
-    ) -> Option<Self> {
+    ) -> Result<Self, String> {
         #[cfg(target_os = "windows")]
         {
             use raw_window_handle::HasRawWindowHandle;
             let raw_window_handle::RawWindowHandle::Win32(handle) = window.raw_window_handle()
             else {
-                return None;
+                return Err("the window is not a Win32 window".into());
             };
             let hwnd = handle.hwnd as isize;
             if hwnd == 0 {
-                return None;
+                return Err("the window has no handle".into());
             }
-            Self::spawn_threaded(SurfaceSource::Hwnd(hwnd), device_lost.clone(), init)
+            Self::spawn_threaded(
+                SurfaceSource::Hwnd(hwnd),
+                device_lost.clone(),
+                init,
+                window.lease(),
+            )
         }
         #[cfg(target_os = "macos")]
         {
-            let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-                backends: crate::runtime::editor_backends(),
-                ..Default::default()
-            });
-            let surface = unsafe { crate::platform::create_wgpu_surface(&instance, window) }?;
+            let started = Instant::now();
+            let instance = crate::runtime::editor_instance();
+            let started = stage("instance", started);
+            let surface = unsafe { crate::platform::create_wgpu_surface(&instance, window) }
+                .ok_or("no surface for the window")?;
+            stage("surface", started);
             Self::spawn_threaded(
                 SurfaceSource::Ready(instance, surface, window.frame_waker()),
                 device_lost.clone(),
                 init,
+                (),
             )
         }
         #[cfg(not(any(target_os = "windows", target_os = "macos")))]
         {
             let _ = device_lost;
-            let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-                backends: crate::runtime::editor_backends(),
-                ..Default::default()
-            });
-            let surface = unsafe { crate::platform::create_wgpu_surface(&instance, window) }?;
+            let started = Instant::now();
+            let instance = crate::runtime::editor_instance();
+            let started = stage("instance", started);
+            let surface = unsafe { crate::platform::create_wgpu_surface(&instance, window) }
+                .ok_or("no surface for the window")?;
+            let started = stage("surface", started);
             let adapter =
                 pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-                    power_preference: wgpu::PowerPreference::HighPerformance,
+                    power_preference: wgpu::PowerPreference::LowPower,
                     compatible_surface: Some(&surface),
                     force_fallback_adapter: false,
                 }))
-                .ok()?;
+                .map_err(|e| format!("no adapter: {e}"))?;
+            crate::diagnostics::note_adapter(&adapter.get_info(), started);
             let (product, device, config) = init(&instance, &adapter, &surface)?;
+            let started = Instant::now();
             surface.configure(&device, &config);
-            Some(Self {
+            stage("swapchain", started);
+            Ok(Self {
                 client: PumpClient {
                     state: Arc::new(Mutex::new(InlineState {
                         surface,
@@ -372,42 +398,49 @@ impl<T: Send + 'static> SurfacePump<T> {
         }
     }
 
+    /// `window_lease` keeps the native window alive while the thread
+    /// may still hold a surface on it, and drops once the thread is done.
     #[cfg(any(target_os = "windows", target_os = "macos"))]
     fn spawn_threaded(
         source: SurfaceSource,
         device_lost: Arc<AtomicBool>,
         init: PumpInitFn<T>,
-    ) -> Option<Self> {
+        window_lease: impl Send + 'static,
+    ) -> Result<Self, String> {
         let shared = Arc::new(Shared {
             slot: Mutex::new(Slot::default()),
             cv: Condvar::new(),
-            state: AtomicU8::new(STATE_INIT),
         });
         let (init_tx, init_rx) = std::sync::mpsc::channel();
         let thread_shared = shared.clone();
         let spawned = std::thread::Builder::new()
             .name("truce-iced-pump".into())
-            .spawn(move || run(&thread_shared, source, &device_lost, init, &init_tx));
-        match spawned {
-            Ok(join) => Some(Self {
-                client: PumpClient { shared },
-                init: InitDelivery::Chan(init_rx),
-                join: Some(join),
-            }),
-            Err(e) => {
-                log::error!("iced surface pump: failed to spawn: {e}");
-                None
-            }
-        }
+            .spawn(move || {
+                run(&thread_shared, source, &device_lost, init, init_tx);
+                // The lease goes before `exited`, so a close that saw the
+                // pump exit finds the window free to destroy.
+                drop(window_lease);
+                mark_exited(&thread_shared);
+            });
+        let join = spawned.map_err(|e| format!("no GPU thread: {e}"))?;
+        Ok(Self {
+            client: PumpClient { shared },
+            init: InitDelivery::Chan(init_rx),
+            join: Some(join),
+        })
     }
 
-    /// Poll for the init closure's product (non-blocking). Returns it
-    /// exactly once.
-    pub(crate) fn take_init(&mut self) -> Option<T> {
+    /// Poll for the init closure's product (non-blocking). `Ready`
+    /// comes exactly once; poll no further after it.
+    pub(crate) fn take_init(&mut self) -> Init<T> {
         match &mut self.init {
-            InitDelivery::Now(product) => product.take(),
+            InitDelivery::Now(product) => product.take().map_or(Init::Pending, Init::Ready),
             #[cfg(any(target_os = "windows", target_os = "macos"))]
-            InitDelivery::Chan(rx) => rx.try_recv().ok(),
+            InitDelivery::Chan(rx) => match rx.try_recv() {
+                Ok(product) => Init::Ready(product),
+                Err(std::sync::mpsc::TryRecvError::Empty) => Init::Pending,
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => Init::Failed,
+            },
         }
     }
 
@@ -418,27 +451,49 @@ impl<T: Send + 'static> SurfacePump<T> {
 
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 impl<T: Send + 'static> Drop for SurfacePump<T> {
+    /// Closing an editor never waits on the pump for longer than one
+    /// bound, join included. A pump still inside a driver call past it
+    /// (a wedge, or a setup still compiling shaders on a cold cache) is
+    /// detached holding its surface; when the call returns, the pump sees
+    /// the shutdown, drops the surface and ends. On Windows the pump thread
+    /// holds a lease on the window, so an editor closed before the host
+    /// destroys its parent window hides and detaches the window and
+    /// destroys it only once the lease drops; a parent destroyed first
+    /// still takes the window with it. On macOS the surface keeps its own
+    /// retained `CAMetalLayer`. The plug-in must pin its library before
+    /// opening the editor (Pro does, in `src/pin.rs`), so a detached pump
+    /// never returns into unloaded code.
     fn drop(&mut self) {
+        let started = Instant::now();
         let mut slot = lock(&self.client.shared.slot);
         slot.shutdown = true;
         self.client.shared.cv.notify_all();
-        // Bounded wait; a thread wedged inside the driver can't notice
-        // the flag, so detach instead of hanging the GUI thread.
-        let (slot, timeout) = self
+        let (slot, _) = self
             .client
             .shared
             .cv
-            .wait_timeout_while(slot, std::time::Duration::from_secs(1), |s| !s.exited)
+            .wait_timeout_while(slot, SHUTDOWN_WAIT, |s| !s.exited)
             .unwrap_or_else(PoisonError::into_inner);
+        let exited = slot.exited;
         drop(slot);
-        if timeout.timed_out() {
-            log::warn!("iced surface pump did not exit within 1s (driver stall?); detaching");
-            drop(self.join.take());
-        } else if let Some(join) = self.join.take() {
+        let Some(join) = self.join.take() else {
+            return;
+        };
+        // Past `exited` the thread holds nothing and only returns.
+        if exited {
             let _ = join.join();
+            stage("GPU released", started);
+        } else {
+            log::warn!(
+                "the GPU thread was still in the driver after {} ms; detached",
+                SHUTDOWN_WAIT.as_millis()
+            );
         }
     }
 }
+
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+const SHUTDOWN_WAIT: std::time::Duration = std::time::Duration::from_secs(1);
 
 /// Create a wgpu surface for a raw Win32 HWND (`Send`-able input, so
 /// the pump thread builds its own surface).
@@ -449,8 +504,9 @@ impl<T: Send + 'static> Drop for SurfacePump<T> {
 unsafe fn surface_from_hwnd(
     instance: &wgpu::Instance,
     hwnd: isize,
-) -> Option<wgpu::Surface<'static>> {
-    let mut win32 = wgpu::rwh::Win32WindowHandle::new(std::num::NonZeroIsize::new(hwnd)?);
+) -> Result<wgpu::Surface<'static>, String> {
+    let hwnd = std::num::NonZeroIsize::new(hwnd).ok_or("the window has no handle")?;
+    let mut win32 = wgpu::rwh::Win32WindowHandle::new(hwnd);
     win32.hinstance = crate::platform::current_module_hinstance();
     let target = wgpu::SurfaceTargetUnsafe::RawHandle {
         raw_display_handle: wgpu::rwh::RawDisplayHandle::Windows(
@@ -458,29 +514,30 @@ unsafe fn surface_from_hwnd(
         ),
         raw_window_handle: wgpu::rwh::RawWindowHandle::Win32(win32),
     };
-    unsafe { instance.create_surface_unsafe(target) }.ok()
+    unsafe { instance.create_surface_unsafe(target) }
+        .map_err(|e| format!("surface creation failed: {e}"))
 }
 
 /// Resolve the pump thread's instance + surface from its source.
 #[cfg(any(target_os = "windows", target_os = "macos"))]
-fn open_surface(source: SurfaceSource) -> Option<Opened> {
+fn open_surface(source: SurfaceSource) -> Result<Opened, String> {
     match source {
         #[cfg(target_os = "windows")]
         SurfaceSource::Hwnd(hwnd) => {
-            let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-                backends: crate::runtime::editor_backends(),
-                ..Default::default()
-            });
-            // SAFETY: the hwnd outlives the pump - see `SurfacePump::spawn`.
+            let started = Instant::now();
+            let instance = crate::runtime::editor_instance();
+            let started = stage("instance", started);
+            // SAFETY: the pump's window lease keeps the hwnd alive - see `SurfacePump::spawn`.
             let surface = unsafe { surface_from_hwnd(&instance, hwnd) }?;
-            Some(Opened {
+            stage("surface", started);
+            Ok(Opened {
                 instance,
                 surface,
                 waker: None,
             })
         }
         #[cfg(target_os = "macos")]
-        SurfaceSource::Ready(instance, surface, waker) => Some(Opened {
+        SurfaceSource::Ready(instance, surface, waker) => Ok(Opened {
             instance,
             surface,
             waker,
@@ -507,7 +564,7 @@ fn run<T: Send>(
     source: SurfaceSource,
     device_lost: &Arc<AtomicBool>,
     init: PumpInitFn<T>,
-    init_tx: &std::sync::mpsc::Sender<T>,
+    init_tx: std::sync::mpsc::Sender<T>,
 ) {
     let built = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let Opened {
@@ -515,26 +572,41 @@ fn run<T: Send>(
             surface,
             waker,
         } = open_surface(source)?;
+        let started = Instant::now();
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::HighPerformance,
+            power_preference: wgpu::PowerPreference::LowPower,
             compatible_surface: Some(&surface),
             force_fallback_adapter: false,
         }))
-        .ok()?;
+        .map_err(|e| format!("no adapter: {e}"))?;
+        crate::diagnostics::note_adapter(&adapter.get_info(), started);
         let (product, device, config) = init(&instance, &adapter, &surface)?;
+        // Setup can outlast the close's wait; a window closed meanwhile
+        // may be gone, so its surface is never configured.
+        if lock(&shared.slot).shutdown {
+            return Ok(None);
+        }
+        let started = Instant::now();
         surface.configure(&device, &config);
-        Some((product, device, config, surface, waker))
+        stage("swapchain", started);
+        Ok(Some((product, device, config, surface, waker)))
     }))
-    .ok()
-    .flatten();
-    let Some((product, device, mut config, surface, waker)) = built else {
-        shared.state.store(STATE_FAILED, Ordering::Release);
-        log::error!("iced surface pump: gpu init failed; editor stays blank");
-        mark_exited(shared);
-        return;
+    .unwrap_or_else(|e| {
+        Err(format!(
+            "panicked: {}",
+            crate::runtime::panic_message(e.as_ref())
+        ))
+    });
+    let (product, device, mut config, surface, waker) = match built {
+        Ok(Some(built)) => built,
+        Ok(None) => return,
+        Err(cause) => {
+            log::error!("iced surface pump: gpu init failed ({cause}); editor stays blank");
+            return;
+        }
     };
     let _ = init_tx.send(product);
-    shared.state.store(STATE_READY, Ordering::Release);
+    drop(init_tx);
 
     'work: loop {
         let (resize, present, need_acquire) = {
@@ -575,7 +647,11 @@ fn run<T: Send>(
                 // post-resize stall). Its recycled old-frame content
                 // matches the stretched frame the compositor is showing
                 // anyway.
-                if let Some(stale) = lock(&shared.slot).held.take() {
+                // Bound to a local first: a guard made in an `if let`
+                // scrutinee lives through the body, and the GUI thread
+                // would then wait on the slot for the driver's present.
+                let stale = lock(&shared.slot).held.take();
+                if let Some(stale) = stale {
                     release_unpainted(stale);
                 }
                 config.width = w.max(1);
@@ -585,7 +661,8 @@ fn run<T: Send>(
             // A drag queues resizes faster than configure + acquire
             // can run; if another one is already waiting, coalesce it
             // first - a frame acquired now would only be discarded.
-            if need_acquire && lock(&shared.slot).resize.is_none() {
+            let resize_queued = lock(&shared.slot).resize.is_some();
+            if need_acquire && !resize_queued {
                 let mut acquired = None;
                 for _ in 0..2 {
                     match surface.get_current_texture() {
@@ -626,30 +703,42 @@ fn run<T: Send>(
                 }
             }
         }));
-        if ok.is_err() {
+        if let Err(e) = ok {
             device_lost.store(true, Ordering::Release);
-            shared.state.store(STATE_FAILED, Ordering::Release);
-            log::error!("iced surface pump panicked; flagging device loss for rebuild");
+            log::error!(
+                "iced surface pump panicked ({}); flagging device loss for rebuild",
+                crate::runtime::panic_message(e.as_ref())
+            );
             break;
         }
     }
-    mark_exited(shared);
+    // Everything GPU goes before the thread reports `exited`, frames before the
+    // surface they came from, so a pump that reports it holds nothing a
+    // closing window could outlive. A drop can panic (wgpu discards a
+    // texture against a surface whose configure failed); swallow it so
+    // teardown always completes.
+    let (held, present) = {
+        let mut slot = lock(&shared.slot);
+        (slot.held.take(), slot.present.take())
+    };
+    let released = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+        drop(held);
+        drop(present);
+        drop(surface);
+        drop(device);
+        #[cfg(target_os = "macos")]
+        drop(waker);
+    }));
+    if let Err(e) = released {
+        log::warn!(
+            "iced surface pump panicked releasing the GPU ({})",
+            crate::runtime::panic_message(e.as_ref())
+        );
+    }
 }
 
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 fn mark_exited(shared: &Shared) {
-    let mut slot = lock(&shared.slot);
-    // Frames can't outlive the surface; drop any still queued. The
-    // drop itself can panic (wgpu discards the texture against a
-    // surface whose configure already failed); swallow it so teardown
-    // always completes.
-    let held = slot.held.take();
-    let present = slot.present.take();
-    slot.exited = true;
-    drop(slot);
-    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
-        drop(held);
-        drop(present);
-    }));
+    lock(&shared.slot).exited = true;
     shared.cv.notify_all();
 }

@@ -363,3 +363,17 @@ pub unsafe fn content_logical_size(ns_window: *mut std::ffi::c_void) -> Option<(
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     Some((w as u32, h as u32))
 }
+
+/// Take the standalone window off screen at once, ahead of the slower
+/// work closing does before `AppKit` closes it.
+///
+/// # Safety
+///
+/// Must run on the main thread with `ns_window` a live `NSWindow *`.
+pub unsafe fn hide(ns_window: *mut std::ffi::c_void) {
+    if ns_window.is_null() {
+        return;
+    }
+    let nil: *mut Object = std::ptr::null_mut();
+    let _: () = unsafe { msg_send![ns_window.cast::<Object>(), orderOut: nil] };
+}

@@ -102,6 +102,7 @@ iced_runtime = "0.14"
 iced_widget = { version = "0.14", features = ["wgpu"] }
 iced_wgpu = "0.14"
 dirs = "5"
+log = "0.4"
 rfd = "=0.15.4"
 roxmltree = "0.20"
 unicode-segmentation = "1.13.3"
@@ -125,11 +126,14 @@ libc = "0.2"
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [
   "Win32_Foundation",
-  "Win32_System_LibraryLoader",
+  # CoInitializeEx, which ShellExecuteW expects of its thread.
+  "Win32_System_Com",
   "Win32_System_Registry",
   "Win32_UI_Shell",
   "Win32_UI_WindowsAndMessaging",
 ] }
+# The owner window handed to the save dialog, in rfd's handle version.
+raw-window-handle = "0.6"
 
 [dev-dependencies]
 truce-test = "=6.3.0"
@@ -144,6 +148,7 @@ truce-core = { path = "vendor/truce-core" }
 truce-loader = { path = "vendor/truce-loader" }
 truce-plugin = { path = "vendor/truce-plugin" }
 truce-standalone = { path = "vendor/truce-standalone" }
+wgpu-hal = { path = "vendor/wgpu-hal" }
 
 [profile.dev]
 debug = 1

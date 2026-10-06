@@ -297,6 +297,110 @@ impl<'a, R: FreeRenderer + 'a> From<Knob> for Element<'a, Msg, Theme, R> {
     }
 }
 
+/// The editor's whole view, which keeps Escape while the panel or the preset
+/// menu is open and closes it. Escape is taken only then, so with nothing
+/// open the key goes on to the host as every key the editor does not use
+/// does.
+pub struct Dismissable<'a, R: iced_core::Renderer> {
+    pub content: Element<'a, Msg, Theme, R>,
+    pub open: bool,
+    pub on_escape: Msg,
+}
+
+impl<R: iced_core::Renderer> Widget<Msg, Theme, R> for Dismissable<'_, R> {
+    fn size(&self) -> Size<Length> {
+        self.content.as_widget().size()
+    }
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(self.content.as_widget())]
+    }
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(&[self.content.as_widget()]);
+    }
+    fn layout(&mut self, tree: &mut Tree, r: &R, limits: &layout::Limits) -> layout::Node {
+        self.content
+            .as_widget_mut()
+            .layout(&mut tree.children[0], r, limits)
+    }
+    fn operate(&mut self, tree: &mut Tree, l: layout::Layout<'_>, r: &R, op: &mut dyn Operation) {
+        self.content
+            .as_widget_mut()
+            .operate(&mut tree.children[0], l, r, op);
+    }
+    fn draw(
+        &self,
+        tree: &Tree,
+        r: &mut R,
+        t: &Theme,
+        s: &renderer::Style,
+        l: layout::Layout<'_>,
+        c: mouse::Cursor,
+        v: &Rectangle,
+    ) {
+        self.content
+            .as_widget()
+            .draw(&tree.children[0], r, t, s, l, c, v);
+    }
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        l: layout::Layout<'_>,
+        c: mouse::Cursor,
+        r: &R,
+        cb: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Msg>,
+        v: &Rectangle,
+    ) {
+        if self.open
+            && matches!(
+                event,
+                Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(keyboard::key::Named::Escape),
+                    ..
+                })
+            )
+        {
+            shell.publish(self.on_escape.clone());
+            shell.capture_event();
+            return;
+        }
+        self.content
+            .as_widget_mut()
+            .update(&mut tree.children[0], event, l, c, r, cb, shell, v);
+    }
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        l: layout::Layout<'_>,
+        c: mouse::Cursor,
+        v: &Rectangle,
+        r: &R,
+    ) -> mouse::Interaction {
+        self.content
+            .as_widget()
+            .mouse_interaction(&tree.children[0], l, c, v, r)
+    }
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        l: layout::Layout<'b>,
+        r: &R,
+        v: &Rectangle,
+        tr: iced_core::Vector,
+    ) -> Option<iced_core::overlay::Element<'b, Msg, Theme, R>> {
+        self.content
+            .as_widget_mut()
+            .overlay(&mut tree.children[0], l, r, v, tr)
+    }
+}
+
+impl<'a, R: iced_core::Renderer + 'a> From<Dismissable<'a, R>> for Element<'a, Msg, Theme, R> {
+    fn from(view: Dismissable<'a, R>) -> Self {
+        Element::new(view)
+    }
+}
+
 /// The information button's mark: Pro's settings cog at rest, a download
 /// arrow when a newer release is known. Neither needs an image asset nor
 /// arrow coverage in the interface font.

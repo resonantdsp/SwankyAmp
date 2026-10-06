@@ -75,6 +75,24 @@ pub(crate) fn panic_message(e: &(dyn std::any::Any + Send)) -> String {
         .unwrap_or_else(|| "unknown panic".to_string())
 }
 
+/// The editor's wgpu instance. Release builds drop wgpu's default
+/// `VALIDATION_INDIRECT_CALL`: nothing here issues an indirect draw or
+/// dispatch, and the flag costs every device a validation compute pipeline
+/// compiled at creation. Debug builds keep wgpu's build defaults.
+#[cfg(not(target_os = "ios"))]
+pub(crate) fn editor_instance() -> wgpu::Instance {
+    let flags = if cfg!(debug_assertions) {
+        wgpu::InstanceFlags::from_build_config()
+    } else {
+        wgpu::InstanceFlags::empty()
+    };
+    wgpu::Instance::new(&wgpu::InstanceDescriptor {
+        backends: editor_backends(),
+        flags,
+        ..Default::default()
+    })
+}
+
 /// wgpu backends for the editor surface. DX12 on Windows; Metal on macOS;
 /// `PRIMARY` (Vulkan) on Linux.
 #[cfg(not(target_os = "ios"))]
@@ -166,6 +184,11 @@ pub trait IcedPlugin<P: Params>: Sized + 'static {
     fn title(&self) -> String {
         String::from("Plugin")
     }
+
+    /// The editor's native window, once it exists; it lives as long as the
+    /// model does. A native dialog takes it as owner so the dialog stays in
+    /// front of the host. Default: ignored.
+    fn window_opened(&mut self, _window: raw_window_handle::RawWindowHandle) {}
 
     /// Plugin state was restored (preset recall, undo, session load).
     /// Re-read any cached custom state. Parameter values update automatically.
@@ -276,11 +299,14 @@ pub(crate) struct IcedRuntime<P: Params, M: IcedPlugin<P>> {
     /// Rendering pipeline - initialized lazily when the baseview window
     /// finishes building and a wgpu surface is available.
     pub(crate) render: Option<RenderState<P, M>>,
-    /// Subscription messages drained ahead of the idle gate and not yet
-    /// dispatched; a frame that stops short of dispatching keeps them.
+    /// Messages waiting for the next frame to dispatch them: subscription
+    /// messages drained ahead of the idle gate, and those of input a key
+    /// delivery ran early. A frame that stops short of dispatching keeps them.
     sub_backlog: Vec<Message<M::Message>>,
-    /// Current cursor position in logical coordinates.
-    pub(crate) cursor_position: Point,
+    /// Cursor position in logical coordinates, or `None` while the
+    /// pointer is outside the window (and before it first arrives), so
+    /// hover states clear when it leaves.
+    pub(crate) cursor_position: Option<Point>,
     /// Pending iced events queued by mouse callbacks.
     pub(crate) pending_events: Vec<Event>,
     /// When the oldest undrawn input arrived, for the event-to-paint trace.
@@ -340,18 +366,35 @@ pub(crate) struct IcedRuntime<P: Params, M: IcedPlugin<P>> {
     pub(crate) pump: Option<crate::pump::SurfacePump<PumpProduct>>,
     #[cfg(not(target_os = "ios"))]
     pub(crate) client: Option<crate::pump::PumpClient>,
+    /// The GPU could not be set up and never will be for this window:
+    /// nothing is drawn, recovered or queued from here on.
+    #[cfg(not(target_os = "ios"))]
+    pub(crate) gpu_failed: bool,
+    /// Pipeline rebuilds since a frame last reached the screen.
+    #[cfg(not(target_os = "ios"))]
+    rebuilds_unshown: u8,
+    /// When the editor opened, or its pipeline began a rebuild, until the
+    /// first frame that follows reaches the screen.
+    #[cfg(not(target_os = "ios"))]
+    awaiting_first_frame: Option<std::time::Instant>,
 }
 
-/// What the pump's init closure hands back to the GUI thread: the
-/// initialized device bundle the iced pipeline is built from in
-/// [`IcedRuntime::adopt_pump`]. The iced program/model must never
-/// cross threads (no `Send` bound on plugin models), so the pipeline
-/// itself is built at adoption, not inside the closure.
+/// How many times the pipeline is rebuilt without a frame reaching the
+/// screen before the editor gives up. A lost device, reported or seen as a
+/// panic, is cured by one rebuild; a failure that survives rebuilds is a
+/// bug that would otherwise rebuild the GPU pipeline without end.
+#[cfg(not(target_os = "ios"))]
+const REBUILDS_UNSHOWN: u8 = 2;
+
+/// What the pump's init closure hands back to the GUI thread: the iced
+/// engine, its shaders compiled on the pump thread. The iced
+/// program/model must never cross threads (no `Send` bound on plugin
+/// models), so the renderer around the engine is built at adoption, in
+/// [`IcedRuntime::adopt_pump`].
 #[cfg(not(target_os = "ios"))]
 pub(crate) struct PumpProduct {
-    adapter: wgpu::Adapter,
+    engine: iced_wgpu::Engine,
     device: wgpu::Device,
-    queue: wgpu::Queue,
     surface_config: wgpu::SurfaceConfiguration,
 }
 
@@ -455,7 +498,7 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
         Self {
             render: None,
             sub_backlog: Vec::new(),
-            cursor_position: Point::ORIGIN,
+            cursor_position: None,
             pending_events: Vec::new(),
             #[cfg(debug_assertions)]
             input_queued: None,
@@ -480,6 +523,12 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
             pump: None,
             #[cfg(not(target_os = "ios"))]
             client: None,
+            #[cfg(not(target_os = "ios"))]
+            gpu_failed: false,
+            #[cfg(not(target_os = "ios"))]
+            rebuilds_unshown: 0,
+            #[cfg(not(target_os = "ios"))]
+            awaiting_first_frame: Some(std::time::Instant::now()),
         }
     }
 
@@ -502,21 +551,22 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
                 window,
                 &self.device_lost,
                 Box::new(move |_, adapter, surface| {
+                    let started = std::time::Instant::now();
                     let (device, queue) =
                         match pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
                             label: Some("truce-iced"),
                             required_features: wgpu::Features::empty(),
                             required_limits: adapter.limits(),
                             experimental_features: wgpu::ExperimentalFeatures::default(),
-                            memory_hints: wgpu::MemoryHints::default(),
+                            // `Performance` has DX12 allocate in 256 MB blocks, for
+                            // an interface that needs a few MB.
+                            memory_hints: wgpu::MemoryHints::MemoryUsage,
                             trace: wgpu::Trace::Off,
                         })) {
                             Ok(dq) => dq,
-                            Err(e) => {
-                                log::error!("failed to create wgpu device: {e}");
-                                return None;
-                            }
+                            Err(e) => return Err(format!("no device: {e}")),
                         };
+                    crate::diagnostics::stage("device", started);
                     // Raise the shared flag on device loss (GPU reset) so the
                     // next `on_frame` rebuilds the pipeline instead of rendering
                     // against a dead device.
@@ -526,11 +576,8 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
                     });
 
                     let surface_caps = surface.get_capabilities(adapter);
-                    if surface_caps.formats.is_empty() {
-                        log::warn!("no surface formats available");
-                        return None;
-                    }
-                    let surface_format = surface_caps.formats[0];
+                    let surface_format = surface_format(&surface_caps.formats)
+                        .ok_or("the surface offers no formats")?;
                     let alpha_mode = if surface_caps
                         .alpha_modes
                         .contains(&wgpu::CompositeAlphaMode::PostMultiplied)
@@ -565,24 +612,41 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
                         alpha_mode,
                         view_formats: vec![],
                     };
+                    let started = std::time::Instant::now();
+                    let engine = new_engine(adapter, device.clone(), queue, surface_format);
+                    crate::diagnostics::stage("shaders", started);
                     let product = PumpProduct {
-                        adapter: adapter.clone(),
+                        engine,
                         device: device.clone(),
-                        queue,
                         surface_config: surface_config.clone(),
                     };
-                    Some((product, device, surface_config))
+                    Ok((product, device, surface_config))
                 }),
             )
         };
-        if let Some(p) = pump {
-            self.client = Some(p.client());
-            self.pump = Some(p);
-            true
-        } else {
-            log::warn!("iced: failed to spawn surface pump; editor stays blank");
-            false
+        match pump {
+            Ok(p) => {
+                self.client = Some(p.client());
+                self.pump = Some(p);
+                true
+            }
+            Err(cause) => {
+                log::error!("iced: no surface pump ({cause}); editor stays blank");
+                self.fail_gpu();
+                false
+            }
         }
+    }
+
+    /// Give up on drawing for good: release the pump, drop the queued
+    /// input and stop the subscriptions nothing will ever drain.
+    #[cfg(not(target_os = "ios"))]
+    fn fail_gpu(&mut self) {
+        self.gpu_failed = true;
+        self.pump = None;
+        self.client = None;
+        self.pending_events = Vec::new();
+        self.sub_runtime.track(std::iter::empty());
     }
 
     /// Adopt the pump's init product and build the iced pipeline
@@ -597,16 +661,20 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
         let Some(pump) = self.pump.as_mut() else {
             return;
         };
-        let Some(product) = pump.take_init() else {
-            return;
+        let product = match pump.take_init() {
+            crate::pump::Init::Pending => return,
+            crate::pump::Init::Ready(product) => product,
+            crate::pump::Init::Failed => {
+                self.fail_gpu();
+                return;
+            }
         };
         let PumpProduct {
-            adapter,
+            engine,
             device,
-            queue,
             surface_config,
         } = product;
-        self.finish_init(&adapter, device, queue, surface_config, None);
+        self.finish_init(engine, device, surface_config, None);
     }
 
     /// Reconfigure the surface to a physical size, keeping the local
@@ -649,7 +717,7 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
 
         let adapter =
             match pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::HighPerformance,
+                power_preference: wgpu::PowerPreference::LowPower,
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
             })) {
@@ -685,12 +753,10 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
         });
 
         let surface_caps = surface.get_capabilities(&adapter);
-        if surface_caps.formats.is_empty() {
+        let Some(surface_format) = surface_format(&surface_caps.formats) else {
             log::warn!("no surface formats available");
             return false;
-        }
-
-        let surface_format = surface_caps.formats[0];
+        };
         let alpha_mode = if surface_caps
             .alpha_modes
             .contains(&wgpu::CompositeAlphaMode::PostMultiplied)
@@ -712,7 +778,8 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
         };
         surface.configure(&device, &surface_config);
 
-        self.finish_init(&adapter, device, queue, surface_config, Some(surface))
+        let engine = new_engine(&adapter, device.clone(), queue, surface_config.format);
+        self.finish_init(engine, device, surface_config, Some(surface))
     }
 
     /// Resize the runtime to a new logical size (iOS host-driven
@@ -743,14 +810,13 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
         self.force_render = true;
     }
 
-    /// Build the iced `Engine` / renderer / [`RenderState`] around an
-    /// initialized device. `surface` is `Some` on iOS (inline
-    /// swapchain) and `None` on desktop, where the pump owns it.
+    /// Build the iced renderer / [`RenderState`] around an initialized
+    /// engine. `surface` is `Some` on iOS (inline swapchain) and `None`
+    /// on desktop, where the pump owns it.
     fn finish_init(
         &mut self,
-        adapter: &wgpu::Adapter,
+        engine: iced_wgpu::Engine,
         device: wgpu::Device,
-        queue: wgpu::Queue,
         mut surface_config: wgpu::SurfaceConfiguration,
         surface: Option<wgpu::Surface<'static>>,
     ) -> bool {
@@ -780,19 +846,6 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
             }
         }
 
-        // wgpu::Device / Queue are cheaply Clone-able (internally Arc'd);
-        // hand the canonical pair to `Engine::new` and keep clones for
-        // post-init surface reconfiguration.
-        let surface_device = device.clone();
-        let engine = iced_wgpu::Engine::new(
-            adapter,
-            device,
-            queue,
-            surface_config.format,
-            Some(iced_graphics::Antialiasing::MSAAx4),
-            iced_graphics::Shell::headless(),
-        );
-
         let default_font = if let Some(data) = self.font {
             crate::font::apply_font(data)
         } else {
@@ -813,7 +866,7 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
         let bg = crate::theme::truce_dark_theme().palette().background;
 
         self.render = Some(RenderState {
-            device: surface_device,
+            device,
             surface,
             surface_config,
             renderer,
@@ -839,6 +892,18 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
     /// `adopt_pump` once the new init lands.
     #[cfg(not(target_os = "ios"))]
     pub(crate) fn recover_device(&mut self, window: &baseview::Window) -> bool {
+        if self.rebuilds_unshown >= REBUILDS_UNSHOWN {
+            log::error!("iced: no frame survived {REBUILDS_UNSHOWN} rebuilds; editor stays blank");
+            self.fail_gpu();
+            return false;
+        }
+        self.rebuilds_unshown += 1;
+        log::info!(
+            target: crate::diagnostics::LIFECYCLE,
+            "device lost; rebuilding the GPU setup (attempt {})",
+            self.rebuilds_unshown
+        );
+        self.awaiting_first_frame = Some(std::time::Instant::now());
         // Give the new device generation a fresh lost-flag so the dying
         // device's own callback can't re-arm recovery and cause a redundant
         // second rebuild; `spawn_pump` clones this into the new callback.
@@ -860,6 +925,8 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
     // source order; splitting it would scatter the borrow of `render`.
     #[allow(clippy::too_many_lines)]
     pub(crate) fn tick(&mut self) {
+        #[cfg(not(target_os = "ios"))]
+        let tick_started = self.awaiting_first_frame.map(|_| std::time::Instant::now());
         // Adopt the pump's GPU init product once it lands (first tick
         // on macOS / Linux; whenever the pump thread finishes on
         // Windows - blank but responsive until then).
@@ -953,9 +1020,9 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
         }
         // The pump acquires on its own thread; a frame with no image to
         // paint into would build and draw for nothing. Leave the input
-        // queued: the pump wakes this thread the moment it has an image,
-        // and the frame then paints everything together.
-        #[cfg(target_os = "macos")]
+        // queued for the frame that has one: on macOS the pump wakes this
+        // thread the moment it lands, on Windows the next tick finds it.
+        #[cfg(any(target_os = "windows", target_os = "macos"))]
         if let Some(client) = &self.client
             && !client.request_frame()
         {
@@ -964,11 +1031,21 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
         }
         self.force_render = false;
 
-        let cursor = crate::iced::mouse::Cursor::Available(self.cursor_position);
+        let cursor = cursor_at(self.cursor_position);
         let logical_size = render.viewport.logical_size();
         let style = iced_runtime::core::renderer::Style {
             text_color: Color::from_rgb(0.90, 0.90, 0.92),
         };
+
+        // The backlog came before this frame's input. A text field edits
+        // its own copy of the model's value, so the model must hold what
+        // earlier keys typed before the tree is built for later ones.
+        if !self.sub_backlog.is_empty() {
+            for message in std::mem::take(&mut self.sub_backlog) {
+                render.program.dispatch(message);
+            }
+            let _ = render.program.poll_data();
+        }
 
         // Give the plugin its per-frame hook before the view is built,
         // so model state it derives from data the runtime cannot see is
@@ -1030,9 +1107,6 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
         while let Ok(message) = self.sub_rx.try_recv() {
             messages.push(message);
         }
-        // Subscription messages drained before the idle gate (so they
-        // could trigger this render) still need dispatching.
-        messages.append(&mut self.sub_backlog);
 
         // Captured input can open an overlay without publishing a message;
         // a host may apply a parameter edit on its own thread, after this
@@ -1193,6 +1267,22 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
         #[cfg(not(target_os = "ios"))]
         if let Some(client) = &self.client {
             client.present(frame);
+            if let (Some(since), Some(tick_started)) =
+                (self.awaiting_first_frame.take(), tick_started)
+            {
+                let after = if self.rebuilds_unshown > 0 {
+                    "the device loss"
+                } else {
+                    "open"
+                };
+                log::info!(
+                    target: crate::diagnostics::LIFECYCLE,
+                    "first frame {} ms, shown {} ms after {after}",
+                    tick_started.elapsed().as_millis(),
+                    since.elapsed().as_millis()
+                );
+            }
+            self.rebuilds_unshown = 0;
         }
         #[cfg(debug_assertions)]
         if let Some(queued) = self.input_queued.take() {
@@ -1213,11 +1303,26 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
     #[allow(clippy::cast_possible_truncation)]
     pub(crate) fn queue_cursor_move(&mut self, x: f32, y: f32) {
         let zoom = self.zoom as f32;
-        self.cursor_position = Point::new(x / zoom, y / zoom);
+        let position = Point::new(x / zoom, y / zoom);
+        // Platforms differ on whether and when they report an entry, so
+        // the first position after the pointer was away is what says it.
+        if self.cursor_position.replace(position).is_none() {
+            self.pending_events
+                .push(Event::Mouse(crate::iced::mouse::Event::CursorEntered));
+        }
         self.pending_events
             .push(Event::Mouse(crate::iced::mouse::Event::CursorMoved {
-                position: self.cursor_position,
+                position,
             }));
+    }
+
+    /// Queue the pointer leaving the window. A frame's events share the
+    /// cursor the batch ends with, as in iced's own shells.
+    #[cfg(not(target_os = "ios"))]
+    pub(crate) fn queue_cursor_left(&mut self) {
+        self.cursor_position = None;
+        self.pending_events
+            .push(Event::Mouse(crate::iced::mouse::Event::CursorLeft));
     }
 
     /// The zoom the plugin model now asks for, when it is not the one the
@@ -1247,6 +1352,78 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
         self.reconfigure_surface_px(pw, ph);
     }
 
+    /// Run a key through the interface now, behind the input still queued
+    /// ahead of it, and say whether the editor keeps it. The platform needs
+    /// the answer before the key can go on to the host. The messages wait
+    /// for the next frame, so no plugin message is dispatched inside the
+    /// platform's key delivery, which on Windows can be a host's own
+    /// message peek.
+    ///
+    /// While an earlier key's messages still wait, the tree would start from
+    /// a model that lacks them and a text field would drop what that key
+    /// typed. The key then waits for the frame too, kept only if a text
+    /// field holds the keyboard.
+    #[cfg(not(target_os = "ios"))]
+    pub(crate) fn offer_key(&mut self, key: Event) -> bool {
+        let Some(render) = self.render.as_mut() else {
+            return false;
+        };
+        let _ = render.program.poll_data();
+        let waiting = !self.sub_backlog.is_empty();
+        let mut events = if waiting {
+            Vec::new()
+        } else {
+            std::mem::take(&mut self.pending_events)
+        };
+        let cache = render
+            .ui_cache
+            .take()
+            .unwrap_or_else(iced_runtime::user_interface::Cache::new);
+        let mut user_interface = iced_runtime::UserInterface::build(
+            render.program.view(),
+            render.viewport.logical_size(),
+            cache,
+            &mut render.renderer,
+        );
+        if waiting {
+            let kept = keeps_key(
+                &mut user_interface,
+                &render.renderer,
+                iced_core::event::Status::Ignored,
+            );
+            render.ui_cache = Some(user_interface.into_cache());
+            // A declined key is the host's alone.
+            if kept {
+                self.pending_events.push(key);
+            }
+            return kept;
+        }
+        events.push(key);
+        let mut messages = Vec::new();
+        let (_, statuses) = user_interface.update(
+            &events,
+            cursor_at(self.cursor_position),
+            &mut render.renderer,
+            &mut crate::clipboard::Clipboard,
+            &mut messages,
+        );
+        let kept = statuses
+            .last()
+            .is_some_and(|status| keeps_key(&mut user_interface, &render.renderer, *status));
+        render.ui_cache = Some(user_interface.into_cache());
+        for (event, status) in events.iter().zip(&statuses) {
+            self.sub_runtime
+                .broadcast(iced_runtime::futures::subscription::Event::Interaction {
+                    window: self.window_id,
+                    event: event.clone(),
+                    status: *status,
+                });
+        }
+        self.sub_backlog.append(&mut messages);
+        self.force_render = true;
+        kept
+    }
+
     /// Whether the UI's last frame had a focused widget wanting keyboard
     /// input. Drives the iOS soft keyboard. `false` until the first frame
     /// renders.
@@ -1254,4 +1431,76 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
     pub(crate) fn wants_keyboard(&self) -> bool {
         self.render.as_ref().is_some_and(|r| r.wants_keyboard)
     }
+}
+
+/// Whether the editor keeps a key the interface was just given: a widget
+/// used it, or a focused text field holds the keyboard, which keeps even the
+/// keys the field gives no meaning so typing never reaches the host. Every
+/// other key belongs to the host, so its shortcuts work while the editor has
+/// focus.
+pub fn keeps_key<Message, Theme, Renderer: iced_core::Renderer>(
+    user_interface: &mut iced_runtime::UserInterface<'_, Message, Theme, Renderer>,
+    renderer: &Renderer,
+    status: iced_core::event::Status,
+) -> bool {
+    struct Focused(bool);
+    impl iced_core::widget::Operation for Focused {
+        fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn iced_core::widget::Operation)) {
+            operate(self);
+        }
+        fn focusable(
+            &mut self,
+            _: Option<&iced_core::widget::Id>,
+            _: iced_core::Rectangle,
+            state: &mut dyn iced_core::widget::operation::Focusable,
+        ) {
+            self.0 |= state.is_focused();
+        }
+    }
+    if status == iced_core::event::Status::Captured {
+        return true;
+    }
+    let mut focused = Focused(false);
+    user_interface.operate(renderer, &mut focused);
+    focused.0
+}
+
+fn cursor_at(position: Option<Point>) -> crate::iced::mouse::Cursor {
+    position.map_or(
+        crate::iced::mouse::Cursor::Unavailable,
+        crate::iced::mouse::Cursor::Available,
+    )
+}
+
+/// The iced engine for a device: compiles iced's own pipelines.
+fn new_engine(
+    adapter: &wgpu::Adapter,
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    format: wgpu::TextureFormat,
+) -> iced_wgpu::Engine {
+    iced_wgpu::Engine::new(
+        adapter,
+        device,
+        queue,
+        format,
+        Some(iced_graphics::Antialiasing::MSAAx4),
+        iced_graphics::Shell::headless(),
+    )
+}
+
+/// The surface format the editor draws to. iced writes linear colour
+/// (`iced_graphics::color::GAMMA_CORRECTION`, on without `web-colors`)
+/// and so does the plugin's own linear-light shading, so the target must
+/// encode to sRGB itself, as iced's own compositor chooses. The first
+/// format a surface lists is not that everywhere: Metal lists
+/// `Bgra8Unorm` first, which showed the editor far darker on macOS than
+/// on Windows or in offscreen captures. A surface with no sRGB format
+/// still gets drawn, too dark, rather than left blank.
+fn surface_format(formats: &[wgpu::TextureFormat]) -> Option<wgpu::TextureFormat> {
+    let srgb = formats.iter().copied().find(wgpu::TextureFormat::is_srgb);
+    if srgb.is_none() && !formats.is_empty() {
+        log::warn!("the surface offers no sRGB format; colours will be too dark");
+    }
+    srgb.or_else(|| formats.first().copied())
 }

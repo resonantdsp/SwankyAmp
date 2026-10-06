@@ -159,11 +159,11 @@ OPTIONS:
                             until an input is chosen, else off). When
                             the ASIO interface will not open and the
                             launch falls back to WASAPI, the input
-                            starts off regardless.
-                            Press Cmd+I (macOS) or Ctrl+I in the window
-                            to toggle live.
+                            starts off regardless. The Settings menu's
+                            Mic Input item toggles it live.
   --output-enabled <on|off> Enable speaker output at launch (default: on).
-                            Toggle live from the Plugin menu (Cmd+O / Ctrl+O).
+                            Toggle live from the Settings menu's Audio
+                            Output item.
   --qwerty-keys             Let the computer keyboard play MIDI notes
                             (default: off). Toggle live with Cmd/Ctrl+K
                             or the Settings menu's Computer Keyboard item.

@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             Some("audio") => {
                 let state = arguments.get(3).map_or("", String::as_str);
                 swanky_amp::ui::capture_audio(audio_fixture(state).ok_or(
-                    "capture <dir> audio <choose|missing|built-in|interface|long-names|asio|fell-back|off>",
+                    "capture <dir> audio <choose|missing|built-in|interface|long-names|asio|fell-back|refused|off>",
                 )?);
                 // The input knob's OFF reads with the panel closed.
                 if state != "off" {
@@ -251,6 +251,12 @@ fn audio_fixture(state: &str) -> Option<truce_standalone::setup::Setup> {
             outputs: vec!["Speakers (Realtek(R) Audio)".to_owned()],
             output: Some("Speakers (Realtek(R) Audio)".to_owned()),
             input_need: Some(InputNeed::FellBack("UMC ASIO Driver".to_owned())),
+            ..mac
+        },
+        "refused" => Setup {
+            input: Some("UMC202HD 192k".to_owned()),
+            output: Some("UMC202HD 192k".to_owned()),
+            output_need: Some(OutputNeed::DidNotStart("UMC202HD 192k".to_owned())),
             ..mac
         },
         "off" => mac,

@@ -164,8 +164,8 @@ capture-information output="verification/interface-information" release="":
     cargo run --quiet --bin swanky-amp-2 -- capture "{{ output }}" information {{ release }}
 
 # Capture the standalone's audio choices in the information panel, in one of
-# the states choose, missing, built-in, interface, long-names, asio or
-# fell-back; off shows the Input knob's OFF with the panel closed.
+# the states choose, missing, built-in, interface, long-names, asio, fell-back
+# or refused; off shows the Input knob's OFF with the panel closed.
 capture-audio state="choose" output="verification/interface-audio":
     cargo run --quiet --bin swanky-amp-2 -- capture "{{ output }}" audio "{{ state }}"
 

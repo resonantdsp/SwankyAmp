@@ -73,6 +73,9 @@ where
             std::process::exit(1);
         }
     };
+    if let Some(e) = &audio_handles.output_error {
+        eprintln!("could not start the audio output ({e}); opening without sound");
+    }
 
     crate::setup::register(
         audio_handles.input.clone(),
@@ -181,10 +184,12 @@ where
     #[cfg(feature = "playback")]
     if let Some(sink) = &capture {
         let shutdown = sink.shutdown_handle();
+        let (input, output) = (audio_handles.input.clone(), audio_handles.output.clone());
         if let Err(e) = ctrlc::set_handler(move || {
             unsafe extern "C" {
                 fn _exit(status: i32) -> !;
             }
+            audio::close_streams(&input, &output);
             shutdown.finalize_blocking();
             // SAFETY: immediate process termination from the ctrlc
             // thread once the WAV is byte-complete; nothing to unwind.
@@ -247,8 +252,9 @@ where
         };
 
         #[cfg(target_os = "macos")]
-        {
+        if let RwhHandle::AppKit(h) = window.raw_window_handle() {
             crate::menu_macos::install(
+                h.ns_window,
                 P::info().name,
                 is_effect,
                 channels,
@@ -266,6 +272,8 @@ where
         // the parent so the editor child keeps its requested size.
         // Must run BEFORE `editor.open()` below - the resize has to
         // settle before the editor's child window sizes itself.
+        #[cfg(target_os = "windows")]
+        let mut size_limits = None;
         #[cfg(target_os = "windows")]
         if let RwhHandle::Win32(h) = window.raw_window_handle() {
             crate::menu_windows::install(
@@ -299,14 +307,16 @@ where
                 // iced / Slint letterbox instead of clamping) otherwise
                 // let the window shrink below min or grow past max.
                 let (emin, emax, easpect) = editor_limits;
-                crate::windowed_windows::install_size_limits(h.hwnd, emin, emax, easpect);
+                size_limits =
+                    crate::windowed_windows::install_size_limits(h.hwnd, emin, emax, easpect);
             } else {
                 crate::windowed_windows::lock_window(h.hwnd);
                 // The cleared sizing border only stops interactive
                 // resizes; programmatic `SetWindowPos` (scripting,
                 // automation tools) bypasses window styles. Pin via
                 // the min-max path too, at the editor's natural size.
-                crate::windowed_windows::install_size_limits(h.hwnd, (lw, lh), (lw, lh), None);
+                size_limits =
+                    crate::windowed_windows::install_size_limits(h.hwnd, (lw, lh), (lw, lh), None);
             }
             // Title-bar / taskbar icon from the icon embedded in the
             // packaged .exe (no-op in un-packaged dev builds).
@@ -434,6 +444,8 @@ where
             editor,
             pending_resize,
             current_size: (lw, lh),
+            #[cfg(target_os = "windows")]
+            size_limits,
             #[cfg(target_os = "macos")]
             editor_reports_size: true,
             #[cfg(target_os = "macos")]
@@ -445,7 +457,6 @@ where
             transport,
             input_ctrl,
             output_ctrl,
-            is_effect,
             qwerty_enabled: qwerty_enabled.clone(),
             octave_offset: 0,
             presets: preset_ctrl,
@@ -458,7 +469,19 @@ where
 
     crate::setup::unregister();
     drop(audio_handles);
-    vlog!("Goodbye!");
+}
+
+/// Take the window off screen before closing does anything slower.
+fn hide_window(window: &mut Window) {
+    match window.raw_window_handle() {
+        #[cfg(target_os = "windows")]
+        RwhHandle::Win32(h) => crate::windowed_windows::hide(h.hwnd),
+        #[cfg(target_os = "macos")]
+        // SAFETY: baseview's live `ns_window`, on the main thread that
+        // delivers window events.
+        RwhHandle::AppKit(h) => unsafe { crate::windowed_macos::hide(h.ns_window) },
+        _ => {}
+    }
 }
 
 struct StandaloneHandler<P: PluginExport + 'static>
@@ -479,6 +502,10 @@ where
     /// `Resized` event -> `editor.set_size` propagation so the
     /// editor only sees real OS-driven changes.
     current_size: (u32, u32),
+    /// The outer window's size limits, moved when a fixed-size editor asks
+    /// for a new size.
+    #[cfg(target_os = "windows")]
+    size_limits: Option<crate::windowed_windows::SizeLimitsHandle>,
     /// Whether the editor reports its rendered size through
     /// `Editor::size` after a `set_size` (true for builtin / egui / iced
     /// / slint). Vizia's `set_size` is a no-op returning false; its child
@@ -508,15 +535,10 @@ where
     _plugin: Arc<Mutex<P>>,
     pending: Arc<ArrayQueue<MidiEvent>>,
     transport: Transport,
-    /// Toggle handle for mic input (sends to the worker thread
-    /// owning the cpal input stream).
+    /// The input's and output's handles, held to stop their streams on
+    /// close.
     input_ctrl: InputController,
-    /// Toggle / device-switch handle for the output. Cmd+O / Ctrl+O
-    /// dispatches mute through this; the menu owns device switching.
     output_ctrl: OutputController,
-    /// True only for effect plugins; gates the `I` keyboard
-    /// shortcut.
-    is_effect: bool,
     /// QWERTY-keyboard-to-MIDI, off by default. Shared with the
     /// Settings menu item and flipped by Cmd/Ctrl+K; the note handler
     /// only plays keys when this is set.
@@ -587,6 +609,14 @@ where
                 {
                     // SAFETY: live `ns_window`, main thread (`on_frame`).
                     unsafe { crate::windowed_macos::pin_content_size(handle.ns_window, w, h) };
+                }
+                // On Windows the pin is the size-limits subclass, which would
+                // otherwise clamp the deferred resize back to the opening size.
+                #[cfg(target_os = "windows")]
+                if !self.editor.can_resize()
+                    && let Some(limits) = &self.size_limits
+                {
+                    crate::windowed_windows::pin_size(limits, w, h);
                 }
                 let accepted = self.editor.set_size(w, h);
                 #[cfg(target_os = "macos")]
@@ -682,9 +712,7 @@ where
         }
     }
 
-    // The Linux `_exit` extern lives inline with its single caller
-    // (see comment block below) so the rationale doesn't get orphaned
-    // from the API name; hence the function-level allow.
+    // The Linux `_exit` extern lives inline with its single caller.
     #[allow(clippy::items_after_statements)]
     fn on_event(&mut self, window: &mut Window, event: Event) -> EventStatus {
         // OS-driven resize (user dragged the window edge): forward to
@@ -806,46 +834,32 @@ where
             }
         }
 
-        // On Linux X11 + NVIDIA, letting baseview unwind the parent
-        // window normally crashes inside `XCloseDisplay` - the
-        // driver's Xlib extension cleanup callback segfaults during
-        // teardown of the wgpu-bearing child window thread, even
-        // when the wgpu surface/device/instance themselves drop
-        // cleanly. The standalone has no clean-shutdown invariants
-        // we care about (audio is a passthrough; persistent state
-        // is saved on Ctrl-S, not at exit), so when the user closes
-        // the window we bypass Drop / atexit entirely via `_exit`.
-        // The OS reclaims the audio FDs, X handles, and the wgpu
-        // child thread - no driver teardown ever runs.
-        //
-        // The one piece of state we *do* finalize explicitly is the
-        // `--output-file` capture sink: skipping its writer-thread
-        // join would leave the WAV header un-rewritten and the file
-        // truncated. We take it here and call `finalize` (signals
-        // shutdown + joins the writer) before `_exit`.
-        #[cfg(target_os = "linux")]
+        // Closing runs in one order on every platform: the window goes at
+        // once, the output fades and every stream stops, and only then do
+        // the editor and the plugin go, as baseview drops this handler.
         if matches!(event, Event::Window(baseview::WindowEvent::WillClose)) {
+            hide_window(window);
+            audio::close_streams(&self.input_ctrl, &self.output_ctrl);
             vlog!("Goodbye!");
-            // The `_capture` prefix marks the field as "owned for Drop"
-            // on macOS / Windows, but on the Linux `_exit` path we *do*
-            // read it (to finalize the WAV header before bypassing
-            // Drop). Allow the leading-underscore access at this site
-            // rather than renaming the field - the Drop-only semantics
-            // on the other platforms are still the dominant case.
-            #[cfg(feature = "playback")]
-            #[allow(clippy::used_underscore_binding)]
-            if let Some(capture) = self._capture.take() {
-                capture.finalize();
+            // On Linux X11 + NVIDIA, letting baseview unwind the parent
+            // window crashes inside `XCloseDisplay`: the driver's Xlib
+            // extension cleanup segfaults while the wgpu child window's
+            // thread tears down. So the process leaves here through
+            // `_exit`, after the streams have stopped and the
+            // `--output-file` capture has rewritten its WAV header.
+            #[cfg(target_os = "linux")]
+            {
+                #[cfg(feature = "playback")]
+                #[allow(clippy::used_underscore_binding)]
+                if let Some(capture) = self._capture.take() {
+                    capture.finalize();
+                }
+                unsafe extern "C" {
+                    fn _exit(status: i32) -> !;
+                }
+                // SAFETY: immediate termination; nothing left to unwind.
+                unsafe { _exit(0) };
             }
-            // The `_exit` extern is declared next to its single caller
-            // so the comment block above stays adjacent to the API
-            // it's documenting; hoisting it would orphan the rationale
-            // from the call. Hence the function-scoped allow on the
-            // outer `on_event`.
-            unsafe extern "C" {
-                fn _exit(status: i32) -> !;
-            }
-            unsafe { _exit(0) };
         }
 
         match event {
@@ -897,46 +911,6 @@ where
             return EventStatus::Captured;
         }
 
-        // Cmd+I (macOS) / Ctrl+I (Linux / Windows) → toggle mic
-        // input (effects only). First press on macOS triggers the
-        // system permission dialog; subsequent toggles don't
-        // re-prompt. On macOS the NSMenuItem accelerator usually
-        // dispatches this before baseview sees the event - the
-        // handler below is the only path on Windows / Linux (Win32
-        // menu accelerators need an HACCEL table baseview doesn't
-        // expose) and a guard on macOS. Capture both Down and Up
-        // so the note-handler below never sees a stray modifier+I
-        // Up that would emit a NoteOff for a note we never played.
-        if kb.code == Code::KeyI && self.is_effect && is_mod_pressed(kb.modifiers) {
-            if kb.state == KeyState::Down {
-                let want = !self.input_ctrl.is_enabled();
-                self.input_ctrl.set_enabled(want);
-                vlog!("mic: {} (request)", if want { "ON" } else { "OFF" });
-            }
-            return EventStatus::Captured;
-        }
-
-        // Cmd+O (macOS) / Ctrl+O (Linux / Windows) → toggle audio
-        // output (mute / unmute). Bare `O` is reserved for the
-        // QWERTY note keyboard (C#4 by default), so a modifier is
-        // required.
-        //
-        // On macOS the NSMenuItem accelerator dispatches this
-        // before baseview sees the event, so the handler below is
-        // mainly a guard. On Windows / Linux it's the only path:
-        // Win32 menu accelerators need an HACCEL table that
-        // baseview doesn't expose. Capture both Down and Up so the
-        // note-handler below never sees a stray modifier+O Up that
-        // would emit a NoteOff for a note we never played.
-        if kb.code == Code::KeyO && is_mod_pressed(kb.modifiers) {
-            if kb.state == KeyState::Down {
-                let want = !self.output_ctrl.is_enabled();
-                self.output_ctrl.set_enabled(want);
-                vlog!("output: {} (request)", if want { "ON" } else { "OFF" });
-            }
-            return EventStatus::Captured;
-        }
-
         // Cmd+K (macOS) / Ctrl+K (Linux / Windows) → toggle the QWERTY
         // note keyboard. Bare `K` plays a note, so a modifier is required.
         // On macOS the NSMenuItem accelerator usually dispatches first;
@@ -958,6 +932,12 @@ where
         // when off, typing falls through untouched so it never surprises
         // the user with notes.
         if !self.qwerty_enabled.load(Ordering::Relaxed) {
+            return EventStatus::Ignored;
+        }
+
+        // A Cmd / Ctrl chord is a command, not a note. Releases still pass,
+        // so a note held before the modifier is never left hanging.
+        if kb.state == KeyState::Down && is_mod_pressed(kb.modifiers) {
             return EventStatus::Ignored;
         }
 

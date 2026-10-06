@@ -11,7 +11,7 @@ This is a fork of [RustAudio/baseview](https://github.com/RustAudio/baseview) (p
 - **Host-driven NSView resize → `Resized` events** on macOS — see [macOS frame-change Resized events](#macos-frame-change-resized-events).
 - **`Window::set_mouse_cursor` for macOS** — upstream is `todo!()`, see [macOS cursor implementation](#macos-cursor-implementation).
 - **`hit_test` gated behind `opengl` cfg** so CPU-only renderers (wgpu via `CAMetalLayer`, CoreGraphics blit) get AppKit's default hit-testing back — see [CPU-only hit-test gate](#cpu-only-hit-test-gate).
-- **Windows frame pacing via a multimedia timer** on Windows — replaces the low-priority, coalescing `WM_TIMER` that drove `on_frame` with a non-coalescing posted-message timer, fixing slow / bursty editor repaints inside busy DAWs, plus a re-entrancy guard so a render that pumps the message queue can't abort the host — see [Windows frame pacing](#windows-frame-pacing).
+- **Windows frame pacing from the display** on Windows — replaces the low-priority, coalescing `WM_TIMER` that drove `on_frame` with a non-coalescing posted tick paced by `DwmFlush`, fixing slow / bursty editor repaints inside busy DAWs, plus a re-entrancy guard so a render that pumps the message queue can't abort the host — see [Windows frame pacing](#windows-frame-pacing).
 - **Embed-parent resize tracking** on Linux/X11 — mirrors the host embed window's size onto the child so editors follow a host-driven resize even when the DAW resizes the parent directly instead of calling the plugin resize API (Bitwig) — see [Linux embed-parent resize](#linux-embed-parent-resize).
 
 > **Note:** This package is a temporary fork intended to live only until these patches are merged upstream into [RustAudio/baseview](https://github.com/RustAudio/baseview). Once upstream carries the fixes, switch back to the canonical crate — there is nothing here that should outlive that merge.
@@ -131,14 +131,14 @@ Upstream baseview on Windows drives `WindowHandler::on_frame` from a 15 ms `WM_T
 
 ### The fix
 
-`src/win/window.rs` replaces the `WM_TIMER` with a **winmm multimedia timer** (`timeSetEvent`, `TIME_PERIODIC`) whose callback *posts* a custom `BV_FRAME_TICK` message:
+`src/win/window.rs` replaces the `WM_TIMER` with a per-window **frame pacer thread** that waits for each desktop composition (`DwmFlush`) and *posts* a custom `BV_FRAME_TICK` message:
 
 - A **posted** message is delivered at normal priority and is never coalesced, so frames keep a steady cadence even under a saturated message pump.
-- `uResolution = 1` raises the system timer resolution for the timer's lifetime, so the 15 ms interval is honoured instead of rounding up to the default tick.
-- A shared `frame_pending` `AtomicBool` gates the callback so at most **one** frame is ever queued: a stalled pump coalesces to a single catch-up frame rather than a backlog that floods the queue and repaints in a burst.
-- Lifecycle: the timer starts in `after_create` (its first tick fires ~one interval later, so the `WM_SHOWWINDOW` posted by `open` is handled first and the child window paints in the right order) and is torn down in `before_destroy`, with a `Drop` on `WindowState` as a safety net. `TIME_KILL_SYNCHRONOUS` guarantees no callback is in flight before the callback context is freed. If `timeSetEvent` ever fails the code falls back to the original `WM_TIMER`, so the editor can never end up with no frame source.
+- Frames follow the display's refresh, and nothing changes the process's timer resolution. A composition that fails, or returns sooner than 2 ms after the last tick (as `DwmFlush` does while nothing is being composed), falls back to a 16 ms interval.
+- A shared `frame_pending` `AtomicBool` gates the posting so at most **one** frame is ever queued: a stalled pump coalesces to a single catch-up frame rather than a backlog that floods the queue and repaints in a burst.
+- Lifecycle: the pacer starts in `after_create` (its first tick follows the next composition, so the `WM_SHOWWINDOW` posted by `open` is normally handled first) and is stopped in `before_destroy`, with a `Drop` on `WindowState` as a safety net. The thread posts under a lock the close clears, so no tick reaches the window after it; the thread exits when its current wait returns, and the close waits up to 100 ms for that. If the thread can't be started the code falls back to the original `WM_TIMER`, so the editor can never end up with no frame source.
 
-Enabling the API only adds the `Win32_Media` feature to the existing `windows-sys` dependency.
+Enabling the API only adds the `Win32_Graphics_Dwm` feature to the existing `windows-sys` dependency.
 
 ### Re-entrancy guard
 

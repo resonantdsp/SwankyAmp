@@ -284,9 +284,11 @@ fn runtime_scene() -> Option<&'static RuntimeScene> {
     SCENE.get_or_init(load_runtime_scene).as_ref()
 }
 
-/// Loading checks the package's structure and checksums but inflates nothing:
-/// the editor inflates each level when it first draws, and `validate-assets`
-/// inflates and range-checks every level before a build ships.
+/// Loading checks the package's structure but neither hashes nor inflates its
+/// pixels: the editor inflates each level when it first draws, and the
+/// committed package is hashed, inflated and range-checked by the tests and by
+/// `validate-assets` before a build ships, so hashing it again at every launch
+/// would only delay the editor.
 fn load_runtime_scene() -> Option<RuntimeScene> {
     let header = validate_package_bytes(PACKAGE, true, false).ok()?;
     let header_length = u32::from_le_bytes(PACKAGE.get(8..12)?.try_into().ok()?) as usize;
@@ -1257,12 +1259,12 @@ fn validate_receipt_layer(
     require_hash(file, &layer.sha256)
 }
 
-/// The package's structure and checksums, and with `inflate` every level's
+/// The package's structure, and with `check_pixels` every level's checksum,
 /// size and values too.
 fn validate_package_bytes(
     bytes: &[u8],
     require_current_layout: bool,
-    inflate: bool,
+    check_pixels: bool,
 ) -> Result<PackageHeader, String> {
     if bytes.get(..8) != Some(SIGNATURE) {
         return Err("invalid artwork package signature".into());
@@ -1339,10 +1341,10 @@ fn validate_package_bytes(
             let stored = payload
                 .get(level.offset..end)
                 .ok_or("truncated artwork pixels")?;
-            if sha256(stored) != level.sha256 {
-                return Err(format!("packed {} layer checksum mismatch", layer.role));
-            }
-            if inflate {
+            if check_pixels {
+                if sha256(stored) != level.sha256 {
+                    return Err(format!("packed {} layer checksum mismatch", layer.role));
+                }
                 for word in layer.texels(payload, index)?.chunks_exact(4) {
                     let decoded = decode_rgb9e5(u32::from_le_bytes(word.try_into().unwrap()));
                     if decoded
@@ -1668,7 +1670,7 @@ mod tests {
 
     #[test]
     fn bundled_artwork_rejects_corrupt_and_unreferenced_payload_bytes() {
-        let header = validate_package_bytes(PACKAGE, true, false).unwrap();
+        let header = validate_package_bytes(PACKAGE, true, true).unwrap();
         // The bundle carries the switch disc the compositor stamps.
         assert!(
             DISC_LAYERS
@@ -1679,10 +1681,10 @@ mod tests {
         let mut corrupt = PACKAGE.to_vec();
         let header_length = u32::from_le_bytes(corrupt[8..12].try_into().unwrap()) as usize;
         corrupt[12 + header_length] ^= 1;
-        assert!(validate_package_bytes(&corrupt, true, false).is_err());
+        assert!(validate_package_bytes(&corrupt, true, true).is_err());
 
         let mut trailing = PACKAGE.to_vec();
         trailing.push(0);
-        assert!(validate_package_bytes(&trailing, true, false).is_err());
+        assert!(validate_package_bytes(&trailing, true, true).is_err());
     }
 }
