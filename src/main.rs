@@ -255,7 +255,7 @@ fn audio_fixture(state: &str) -> Option<truce_standalone::setup::Setup> {
         },
         "refused" => Setup {
             input: Some("UMC202HD 192k".to_owned()),
-            output: Some("UMC202HD 192k".to_owned()),
+            output: None,
             output_need: Some(OutputNeed::DidNotStart("UMC202HD 192k".to_owned())),
             ..mac
         },

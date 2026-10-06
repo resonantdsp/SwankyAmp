@@ -142,16 +142,6 @@ pub(crate) fn report_refused_output(name: Option<String>) {
     }
 }
 
-/// A device that refused at launch and has since started is no longer
-/// unavailable, whichever change reopened it.
-pub(crate) fn output_started(name: &str) {
-    if let Ok(mut refused) = REFUSED_OUTPUT.lock()
-        && refused.as_deref() == Some(name)
-    {
-        *refused = None;
-    }
-}
-
 fn registry() -> Option<Arc<Registry>> {
     REGISTRY.lock().ok().and_then(|slot| slot.clone())
 }

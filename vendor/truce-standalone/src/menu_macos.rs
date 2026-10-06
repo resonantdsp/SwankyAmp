@@ -385,9 +385,7 @@ pub fn install(
 
         let save_sep: *mut Object = msg_send![class!(NSMenuItem), separatorItem];
         let _: () = msg_send![presets_menu, addItem: save_sep];
-        // No key equivalents: Cmd-S / Cmd-Shift-S are handled by the
-        // window's own key handler; a menu item with the same
-        // shortcut would shadow it. The title is set on open.
+        // The title is set on open.
         let save_item = make_toggle_item("Save Preset", "", sel!(savePresetAction:), target);
         let _: () = msg_send![presets_menu, addItem: save_item];
         let save_as_item =

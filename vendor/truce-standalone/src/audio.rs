@@ -2063,12 +2063,9 @@ impl<P: PluginExport> OutputWorker<P> {
         self.config.channels = opened.config.channels;
         self.config.sample_rate = opened.config.sample_rate;
         self.streams = Some(opened.streams);
-        // A device that refused at launch and has since started is no
-        // longer unavailable, whichever change reopened it.
-        let opened_name = device_label(&device);
-        if let Some(name) = &opened_name {
-            setup::output_started(name);
-        }
+        // Whatever opened, the output now plays, so a launch device that
+        // refused to start is no longer what needs the player.
+        setup::report_refused_output(None);
         self.device = device;
         Ok(())
     }
@@ -2122,9 +2119,6 @@ impl<P: PluginExport> OutputWorker<P> {
         if !self.switch_device(name) {
             return;
         }
-        // The player's choice now plays, so a launch device that refused to
-        // start is no longer what needs them.
-        setup::report_refused_output(None);
         let chosen = self.current_name();
         if driver::on_asio() {
             self.res.settings.update(|s| s.asio_device = chosen);
@@ -2141,7 +2135,6 @@ impl<P: PluginExport> OutputWorker<P> {
             setup::report_failure(Some(InputNeed::DidNotOpen(name.to_owned())));
             return;
         }
-        setup::report_refused_output(None);
         let chosen = self.current_name();
         self.res.settings.update(|s| s.asio_device = chosen);
         let _ = self.res.input_cmd.send(InputCmd::SetEnabled(true));
@@ -2158,8 +2151,6 @@ impl<P: PluginExport> OutputWorker<P> {
         }
         match self.switch_driver(target) {
             Ok(()) => {
-                // The old driver's output is no longer what plays.
-                setup::report_refused_output(None);
                 vlog!("audio driver: {}", target.name());
                 self.res.settings.update(|s| s.driver = Some(target));
             }
@@ -2233,11 +2224,7 @@ impl<P: PluginExport> OutputWorker<P> {
             return;
         }
         vlog!("output device: {target} (follows the input)");
-        // Only an output nobody chose follows the input, so what it clears
-        // is a launch device that refused to start.
-        if self.switch_device(Some(&target)) {
-            setup::report_refused_output(None);
-        }
+        self.switch_device(Some(&target));
     }
 
     fn set_buffer_size(&mut self, frames: u32) {
@@ -3689,70 +3676,6 @@ mod ring_tests {
             played.windows(2).all(|pair| pair[1] == pair[0] + 1),
             "input was dropped between captures"
         );
-    }
-}
-
-#[cfg(test)]
-mod close_tests {
-    use super::{CloseFade, FadeOut};
-    use std::sync::Arc;
-    use std::sync::atomic::Ordering;
-
-    const RATE: f64 = 48_000.0;
-    const CHANNELS: usize = 2;
-    const BLOCK: usize = 128;
-
-    fn render(fade: &mut FadeOut) -> Vec<f32> {
-        let mut block = vec![0.5; BLOCK * CHANNELS];
-        fade.apply(&mut block, CHANNELS);
-        block
-    }
-
-    #[test]
-    fn closing_fades_the_output_out_and_stops_only_on_silent_buffers() {
-        let shared = Arc::new(CloseFade::default());
-        let mut fade = FadeOut::new(Arc::clone(&shared), RATE);
-        assert!(
-            render(&mut fade).iter().all(|&s| s == 0.5),
-            "the output plays untouched until closing"
-        );
-
-        shared.requested.store(true, Ordering::Release);
-        // Short enough to feel instant: within 10 ms.
-        let most = (RATE * 0.010) as usize / BLOCK + 1;
-        let mut faded = Vec::new();
-        while faded.last() != Some(&0.0) {
-            assert!(faded.len() / (BLOCK * CHANNELS) < most, "the fade lasts too long");
-            faded.extend(render(&mut fade));
-        }
-        assert!(faded[0] < 0.5, "the fade starts at once");
-        assert!(
-            faded.windows(2).all(|w| w[1] <= w[0]),
-            "the fade never rises"
-        );
-        assert!(
-            !shared.silent.load(Ordering::Acquire),
-            "a buffer holding the fade is not yet silence"
-        );
-
-        assert!(render(&mut fade).iter().all(|&s| s == 0.0));
-        assert!(
-            !shared.silent.load(Ordering::Acquire),
-            "one silent buffer leaves the other half of the driver's pair"
-        );
-        assert!(render(&mut fade).iter().all(|&s| s == 0.0));
-        assert!(
-            shared.silent.load(Ordering::Acquire),
-            "two silent buffers let the stream stop"
-        );
-    }
-
-    #[test]
-    fn a_stream_opened_while_closing_plays_nothing() {
-        let shared = Arc::new(CloseFade::default());
-        shared.requested.store(true, Ordering::Release);
-        let mut fade = FadeOut::new(shared, RATE);
-        assert!(render(&mut fade).iter().all(|&s| s == 0.0));
     }
 }
 

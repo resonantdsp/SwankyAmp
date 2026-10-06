@@ -476,8 +476,7 @@ unsafe fn build_presets_menu(menu_bar: HMENU, presets: &PresetController) -> (HM
             next_label.as_ptr(),
         );
         AppendMenuW(presets_menu, MF_SEPARATOR, 0, std::ptr::null());
-        // No accelerator hint: Ctrl+S / Ctrl+Shift+S are dispatched by
-        // the window's own key handler. The Save title is set on open.
+        // The Save title is set on open.
         let save_label = wide("Save Preset");
         AppendMenuW(
             presets_menu,
