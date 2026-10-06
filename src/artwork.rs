@@ -610,8 +610,8 @@ struct Store {
     view: wgpu::TextureView,
     copy: wgpu::BindGroup,
     size: iced_core::Size<u32>,
-    /// The placement and controls every pixel of the store shows.
-    shows: Option<(Rectangle, Uniform)>,
+    /// The artwork, placement and controls every pixel of the store shows.
+    shows: Option<(String, Rectangle, Uniform)>,
 }
 
 /// The compositor, held across frames. `iced_wgpu` stores pipelines per
@@ -799,18 +799,18 @@ impl Store {
         }
     }
     /// The whole-pixel regions of the frame whose pixels must be drawn again
-    /// so the store shows `uniform` at `bounds`.
-    fn stale(&self, bounds: Rectangle, uniform: &Uniform) -> Vec<Rectangle<u32>> {
+    /// so the store shows `uniform` from the artwork `view` at `bounds`.
+    fn stale(&self, view: &str, bounds: Rectangle, uniform: &Uniform) -> Vec<Rectangle<u32>> {
         let whole = Rectangle {
             x: 0,
             y: 0,
             width: self.size.width,
             height: self.size.height,
         };
-        let Some((at, before)) = &self.shows else {
+        let Some((shown, at, before)) = &self.shows else {
             return vec![whole];
         };
-        if *at != bounds {
+        if shown != view || *at != bounds {
             return vec![whole];
         }
         let Some(areas) = changed_areas(before, uniform) else {
@@ -860,47 +860,46 @@ impl Primitive for ScenePrimitive {
         bounds: &Rectangle,
         viewport: &iced_graphics::Viewport,
     ) {
-        if pipeline.binding.as_ref().map(|(key, _)| key) != Some(&self.scene.physical_sha256) {
-            let base = upload_layer(device, queue, self.scene, &self.scene.base);
-            let shadow = upload_layer(device, queue, self.scene, &self.scene.shadow);
-            let responses = upload_array(device, queue, self.scene, &self.scene.responses);
-            let disc = upload_array(device, queue, self.scene, &self.scene.disc);
-            let binding = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("Free artwork binding"),
-                layout: &pipeline.layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&base),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::TextureView(&shadow),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: wgpu::BindingResource::TextureView(&responses),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 3,
-                        resource: pipeline.controls.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 4,
-                        resource: wgpu::BindingResource::Sampler(&pipeline.sampler),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 5,
-                        resource: wgpu::BindingResource::TextureView(&disc),
-                    },
-                ],
-            });
-            pipeline.binding = Some((self.scene.physical_sha256.clone(), binding));
-            // The store shows the artwork it was drawn from.
-            pipeline.store = None;
-        }
-        let Some((_, binding)) = &pipeline.binding else {
-            return;
+        let key = &self.scene.physical_sha256;
+        let binding = match &mut pipeline.binding {
+            Some((shown, binding)) if shown == key => binding,
+            slot => {
+                let base = upload_layer(device, queue, self.scene, &self.scene.base);
+                let shadow = upload_layer(device, queue, self.scene, &self.scene.shadow);
+                let responses = upload_array(device, queue, self.scene, &self.scene.responses);
+                let disc = upload_array(device, queue, self.scene, &self.scene.disc);
+                let binding = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("Free artwork binding"),
+                    layout: &pipeline.layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(&base),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::TextureView(&shadow),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 2,
+                            resource: wgpu::BindingResource::TextureView(&responses),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 3,
+                            resource: pipeline.controls.as_entire_binding(),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 4,
+                            resource: wgpu::BindingResource::Sampler(&pipeline.sampler),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 5,
+                            resource: wgpu::BindingResource::TextureView(&disc),
+                        },
+                    ],
+                });
+                &mut slot.insert((key.clone(), binding)).1
+            }
         };
         let scale = viewport.scale_factor();
         let mut uniform = self.uniform;
@@ -924,7 +923,7 @@ impl Primitive for ScenePrimitive {
                 size,
             )),
         };
-        let stale = store.stale(placed, &uniform);
+        let stale = store.stale(key, placed, &uniform);
         if !stale.is_empty() {
             // Submitted here, ahead of the frame, which reads the store only
             // once this has drawn: the queue runs submissions in order, and the
@@ -948,7 +947,7 @@ impl Primitive for ScenePrimitive {
                 });
                 draw.set_viewport(placed.x, placed.y, placed.width, placed.height, 0., 1.);
                 draw.set_pipeline(&pipeline.pipeline);
-                draw.set_bind_group(0, binding, &[]);
+                draw.set_bind_group(0, &*binding, &[]);
                 for region in stale {
                     draw.set_scissor_rect(region.x, region.y, region.width, region.height);
                     draw.draw(0..3, 0..1);
@@ -956,7 +955,7 @@ impl Primitive for ScenePrimitive {
             }
             queue.submit([encoder.finish()]);
         }
-        store.shows = Some((placed, uniform));
+        store.shows = Some((key.clone(), placed, uniform));
     }
 
     fn draw(&self, pipeline: &ScenePipeline, pass: &mut wgpu::RenderPass<'_>) -> bool {
