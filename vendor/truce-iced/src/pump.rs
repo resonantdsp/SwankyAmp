@@ -461,8 +461,8 @@ impl<T: Send + 'static> Drop for SurfacePump<T> {
     /// destroys it only once the lease drops; a parent destroyed first
     /// still takes the window with it. On macOS the surface keeps its own
     /// retained `CAMetalLayer`. The plug-in must pin its library before
-    /// opening the editor (Pro does, in `src/pin.rs`), so a detached pump
-    /// never returns into unloaded code.
+    /// opening the editor (both Swanky Amp products do, in `src/pin.rs`), so
+    /// a detached pump never returns into unloaded code.
     fn drop(&mut self) {
         let started = Instant::now();
         let mut slot = lock(&self.client.shared.slot);

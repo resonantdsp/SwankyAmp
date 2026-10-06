@@ -1,18 +1,17 @@
 # Vendored cargo-truce patches
 
-Source: crates.io `cargo-truce` 6.3.0 with the three patches below. The first is
-kept on
+Source: crates.io `cargo-truce` 6.3.0. The credential change is kept on
 [`azure-exclude-credentials`](https://github.com/gmcgoldr/truce/tree/azure-exclude-credentials)
 in a fork of [truce](https://github.com/truce-audio/truce), branched from tag
-`v6.3.0`. The upstream `LICENSE` (Truce License 1.0), `LICENSE-MIT` and
-`LICENSE-APACHE` texts are included unchanged. Section 2.2 of the Truce
-Framework Rider explicitly excludes audio plug-ins, plug-in suites, analyzers
-and validators from Covered Framework Offerings; the Rider separately governs
-covered commercial framework products and services.
+`v6.3.0`.
+The upstream `LICENSE` (Truce License 1.0), `LICENSE-MIT` and `LICENSE-APACHE`
+texts are included unchanged. Section 2.2 of the Truce Framework Rider
+explicitly excludes audio plug-ins, plug-in suites, analyzers and validators
+from Covered Framework Offerings; the Rider separately governs covered
+commercial framework products and services.
 
-This source-only copy was taken from `resonantdsp/SwankyAmpPro` commit
-`47842d2ece1a558fbab85cb8cd68564654414d35` on September 20, 2026. The Free
-repository carries no other Pro release, licensing, bake-store or product code.
+Both Swanky Amp products carry this crate. Every section before "Where the
+products differ" is the same change in both copies.
 
 ## Trusted Signing credential chain
 
@@ -33,21 +32,6 @@ metadata is byte-for-byte what 6.3.0 produced. Microsoft's own
 excludes every type but `azureclicredential` by default, for the same reason;
 the candidate workflow sets the same list.
 
-## Windows installers for all users only
-
-6.3.0's unscoped Windows installer opens Inno Setup's "Choose installation
-mode" page, and installing only for the current user puts the VST3 in
-`%LOCALAPPDATA%\Programs\Common\VST3`. Ableton Live 10 and a default Reaper
-never scan that folder, so the plug-in silently goes missing. A Windows package
-run therefore always builds the all-users installer: administrator elevation,
-the common CLAP, VST3 and Program Files folders, and no mode page. `--system`
-is accepted, and `--user`, `--ask` and any other `preferred_scope` are refused.
-The installer keeps the unsuffixed `<crate>-<version>-windows.exe` name. The
-`.iss` generator's per-user branches stay as upstream wrote them, unreachable
-from a package run. macOS packaging is unchanged and still offers both. This
-is product policy rather than an upstream fix, so an upstream release replaces
-it only with a setting that pins Windows packages to all users.
-
 ## Audio Unit version 2 Info.plist
 
 6.3.0 writes every AU v2 component with `CFBundleVersion` 1 and component
@@ -67,8 +51,37 @@ table in `truce.toml` (`network_client`, `files_read_write`) replaces
 `sandboxSafe` with the matching `resourceUsage` keys; without it the component
 is sandbox-safe as before.
 
+## Windows installers for all users only
+
+6.3.0's unscoped Windows installer opens Inno Setup's "Choose installation
+mode" page, and installing only for the current user puts the VST3 in
+`%LOCALAPPDATA%\Programs\Common\VST3`. Ableton Live 10 and a default Reaper
+never scan that folder, so the plug-in silently goes missing. A Windows package
+run therefore always builds the all-users installer: administrator elevation,
+the common CLAP, VST3 and Program Files folders, and no mode page. `--system`
+is accepted, and `--user`, `--ask` and any other `preferred_scope` are refused.
+The installer keeps the unsuffixed `<crate>-<version>-windows.exe` name. The
+`.iss` generator's per-user branches stay as upstream wrote them, unreachable
+from a package run. macOS packaging is unchanged and still offers both. This
+is product policy rather than an upstream fix, so an upstream release replaces
+it only with a setting that pins Windows packages to all users.
+
 ## Removal
 
 `just setup` installs cargo-truce from this directory instead of crates.io.
-Remove the directory, the setup recipe's `--path` and this file together once a
-pinned upstream release carries all three changes.
+Remove the directory, the setup recipe's `--path` and this file together once
+a pinned upstream release carries these changes.
+
+## Where the products differ
+
+### Swanky Amp
+
+This source-only copy was first taken from `resonantdsp/SwankyAmpPro` commit
+`47842d2ece1a558fbab85cb8cd68564654414d35` on September 20, 2026.
+
+This copy has no `previous_names` key, so its installers replace only bundles
+of the current name, as 6.3.0's do. The `cargo truce screenshot` help no
+longer names the standalone's Cmd+S / Ctrl+S, which Swanky Amp's standalone
+does not have (see `vendor/truce-standalone/UPSTREAM.md`). The Swanky Amp
+repository carries no other Swanky Amp Pro release, licensing, bake-store or
+product code.

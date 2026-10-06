@@ -1639,8 +1639,8 @@ fn new_engine(
 /// and so does the plugin's own linear-light shading, so the target must
 /// encode to sRGB itself, as iced's own compositor chooses. The first
 /// format a surface lists is not that everywhere: Metal lists
-/// `Bgra8Unorm` first, which showed the editor far darker on macOS than
-/// on Windows or in offscreen captures. A surface with no sRGB format
+/// `Bgra8Unorm` first, which drew the editor far darker on macOS
+/// than on Windows or in offscreen captures. A surface with no sRGB format
 /// still gets drawn, too dark, rather than left blank.
 fn surface_format(formats: &[wgpu::TextureFormat]) -> Option<wgpu::TextureFormat> {
     let srgb = formats.iter().copied().find(wgpu::TextureFormat::is_srgb);

@@ -1,23 +1,27 @@
-# Native focus and view updates
+# Vendored truce-iced patches
 
 Source: crates.io `truce-iced` 6.3.0, upstream commit
 `ff6b573c7d845638656b03bbe4b4436559dd9725`, `crates/truce-iced` in
 [truce](https://github.com/truce-audio/truce).
 The upstream `LICENSE` (Truce License 1.0), `LICENSE-MIT` and `LICENSE-APACHE`
-texts are included unchanged.
+texts are included unchanged. No product control, layout, rendering or
+parameter definitions belong here.
+
+Remove the Cargo patch and this directory when a pinned upstream release
+covers every change below.
+
+# Native focus and view updates
 
 The published editor drops native focus events before they reach iced widgets.
 Consequently a knob cannot end its drag when another window takes focus.
-The source change forwards baseview Focused/Unfocused as their iced equivalents.
-No product control, layout, rendering or parameter definitions belong here.
+The source change forwards baseview Focused/Unfocused as their iced equivalents;
+whether a given host delivers them still needs qualifying in that host.
 
 Mouse moves, button presses and releases, and wheel events carry their own
 modifier snapshot. The published bridge discards it, so a host that keeps
 keyboard focus leaves Alt and Shift unknown to the widgets on their first
 gesture. The bridge now queues an iced `ModifiersChanged` event before each
-corresponding mouse event, using the same conversion as keyboard input. Native
-host qualification is still needed to establish which events a host delivers;
-the product interaction tests exercise the resulting iced event contract.
+corresponding mouse event, using the same conversion as keyboard input.
 
 The runtime also draws before dispatching messages, then can idle when only
 plugin view state changed. Every click consequently shows its result a frame
@@ -35,17 +39,13 @@ tick - input processing included - whenever the previous swapchain acquire waite
 more than a few milliseconds, which under vsync is every paint; the veto is gone,
 leaving vsync to pace the swapchain and the Windows pump thread to keep the host's
 GUI thread clear. The surface also queued two display frames where the editor
-renders in well under one, so it now asks for one.
+renders in well under one, so on Windows and Linux it now asks for one; macOS
+keeps three drawables, below.
 
 `Message::Tick` reaches `IcedPlugin::update` once per rendered frame, after the
 host parameter sync and before `view`, so a plugin can refresh model state from
 data the runtime cannot see without a shared-mutability workaround around the
 immutable `view`.
-
-The product's widget event check protects drag interruption. Native focus switching
-and editor closure still need real-host qualification; forwarding an event is not
-proof that every host delivers it. Remove the Cargo patch and this directory when
-a pinned upstream release provides the same event contract.
 
 # Swapchain waits off the window thread on macOS
 
@@ -72,9 +72,9 @@ The published runtime hands iced's widgets `clipboard::Null`, so no editor can
 copy or paste: text copied, cut or pasted in a field is dropped. The source
 change adds `truce_iced::clipboard`, a text-only `iced_core::Clipboard` over
 [`arboard`](https://crates.io/crates/arboard) (MIT OR Apache-2.0), and hands it
-to both `UserInterface::update` calls in the runtime. The information panel's
-Copy diagnostics writes through the same module. The screenshot path keeps
+to both `UserInterface::update` calls in the runtime. The screenshot path keeps
 `Null`: it renders a frame and dispatches no input, so no widget there can ask.
+A plug-in can write to the clipboard through the same module.
 
 The connection is thread-local and kept open, because X11 serves a paste from
 the process that owns the selection and a connection opened per call would take
@@ -90,9 +90,6 @@ what it needs - `objc2`, `objc2-app-kit` and `objc2-foundation` on macOS,
 `error-code` and `windows-sys` 0.52 on Windows - only `clipboard-win` and
 `error-code` are new to the tree; the rest, `windows-sys` 0.52 included, were
 already locked.
-
-Remove the Cargo patch and this directory when a pinned upstream release gives
-its widgets a real clipboard.
 
 # A frame for the keystroke that asked for it
 
@@ -111,12 +108,9 @@ frame that finds no drawable still defers to the pump.
 key event arriving and the frame that answered it being handed to the
 compositor, for measuring input response inside a host where no profiler
 reaches. A file rather than standard error or `log`: a plug-in's standard
-error belongs to the host and nothing in the stack installs a log sink. The
-trace is compiled out of a release build and costs one atomic load when the
+error belongs to the host, and the products' log sinks keep only lifecycle
+records, warnings and errors. The trace is compiled out of a release build and costs one atomic load when the
 variable is unset.
-
-Remove the Cargo patch and this directory when a pinned upstream release
-answers input the same way.
 
 # Interface zoom
 
@@ -138,31 +132,25 @@ because a host answering the request compares the size it is given with the
 one the editor reports. The editor stays fixed-size to the host
 (`can_resize` false), so no host offers a drag handle or feeds a size back
 through `set_size`; CLAP and VST3 both let a fixed-size view request a resize.
-This is the same change as Swanky Amp Pro's copy of this crate.
-
-Remove the Cargo patch and this directory when a pinned upstream release
-offers an interface zoom.
 
 # An editor that says what happened to it
 
 The published editor reports GPU trouble only through `log`, says nothing of
 how long opening or closing took, and swallows the message of a panic during
 GPU setup, so an editor that stays blank or opens slowly in one host leaves
-no trace of why. The crate still installs no sink; a plug-in does, and Swanky Amp
-writes its own log file.
+no trace of why. The crate still installs no `log` sink; each product installs
+its own and writes a log file.
 
 - **Lifecycle records:** each open and close stage with its duration (open,
-  window, instance, surface, adapter, device, shaders, swapchain, first frame;
-  close, GPU released, closed), a device loss and its rebuild, at `Info` under
-  `truce_iced::diagnostics::LIFECYCLE`. A close that waits out its bound is a
+  open returned, instance, surface, adapter, device, shaders, swapchain, first
+  frame; close, GPU released, closed), a device loss and its rebuild, at
+  `Info` under `truce_iced::diagnostics::LIFECYCLE`. A close that waits out its bound is a
   warning. Nothing is recorded per frame.
 - **The GPU:** `truce_iced::diagnostics::gpu` names the adapter the editor
   last chose, with its backend and driver, for a support report.
 - **A failed editor is not blank:** `IcedEditor::failure_note` gives one line
   the window shows in native text, through baseview's `Window::show_note`,
   once GPU setup has failed for good.
-
-Remove these when an upstream release offers the same record.
 
 # A GPU thread that is bounded, final and compiles iced's shaders
 
@@ -184,7 +172,8 @@ the host destroys its parent window is hidden and detached from it instead,
 and destroyed on its own thread once the pump has let go; a parent destroyed
 first still takes the window with it. On macOS the surface keeps its own
 retained `CAMetalLayer`. A plug-in must pin its library before opening the
-editor, as Swanky Amp does, so a detached pump never returns into unloaded code.
+editor, as both products do, so a detached pump never returns into unloaded
+code.
 
 iced's engine is built on the pump thread during setup, so its shaders compile
 there rather than on the window thread. A plugin's own pipelines and textures
@@ -194,9 +183,6 @@ not wake its discrete card for the editor. The surface format is the sRGB one
 the surface offers, as iced's own compositor chooses: iced writes linear
 colour, and Metal lists `Bgra8Unorm` first, which showed the macOS editor far
 darker than Windows and the offscreen captures.
-
-Remove these with the rest of this directory when a pinned upstream release
-covers them.
 
 # Less GPU work at open
 
@@ -227,8 +213,6 @@ that lacks an earlier key.
 `IcedPlugin::window_opened` hands the model the editor's native window, so a
 native dialog can take it as owner and stay in front of the host.
 
-Remove it when a pinned upstream release decides key by key.
-
 # Frames that can be shown
 
 Windows now looks for a swapchain image before building a frame, as macOS
@@ -253,22 +237,18 @@ keeps its touch as the cursor after the touch ends, so a tap whose press and
 release share a frame still lands; there `CursorEntered` comes only with the
 first touch.
 
-Remove these with the rest of this directory when a pinned upstream release
-covers them.
-
 # Live displays capped at 60 frames a second
 
 The published idle gate renders whenever the plugin asks, so an editor with a
 running scope or meter repaints on every panel refresh: 120 or 144 times a
 second on a fast display, for animation that reads the same at 60. A new
-`IcedPlugin::displays_changed` reports data that only the live displays
-(scope, meters, tuner) need,
-and a frame asked for that way alone runs only once a deadline 1/60 s after
-the previous one has come. Deadlines advance by whole frames with 2 ms of
+`IcedPlugin::displays_changed` reports data that only the live displays (a
+scope, meters, a tuner) need, and a frame asked for that way alone runs only
+once a deadline 1/60 s after the previous one has come. Deadlines advance by whole frames with 2 ms of
 slack, so a 60 Hz panel keeps its frames through ticks a couple of
-milliseconds late or early, and a faster panel averages 60. The data stays pending until a frame shows it, so a held-back
-frame is drawn by the next tick past its deadline and the last update after
-the signal stops still lands. Input, hover, resize, animation and
+milliseconds late or early, and a faster panel averages 60. The data stays
+pending until a frame shows it, so a held-back frame is drawn by the next tick
+past its deadline and the last update after the signal stops still lands. Input, hover, resize, animation and
 `needs_redraw` frames are not paced and keep following the display on both
 macOS and Windows; there is no second clock, only a timestamp check on the
 ticks the display already sends.

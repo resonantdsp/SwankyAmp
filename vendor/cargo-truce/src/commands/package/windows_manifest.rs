@@ -3,8 +3,8 @@
 //! Without an embedded application manifest declaring per-monitor v2
 //! DPI awareness, Windows treats the standalone process as DPI-unaware
 //! and the plugin editor renders blurry / wrong-sized on non-100%
-//! displays. The manifest is the only declaration: baseview no longer
-//! sets the process's awareness at runtime, because in a plug-in that
+//! displays. The manifest is the only declaration: baseview does not
+//! set the process's awareness at runtime, because in a plug-in that
 //! process is the host's.
 //!
 //! Embedding here (rather than via a `build.rs` in the user's plugin
