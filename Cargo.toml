@@ -101,6 +101,7 @@ iced_graphics = "0.14"
 iced_runtime = "0.14"
 iced_widget = { version = "0.14", features = ["wgpu"] }
 iced_wgpu = "0.14"
+pollster = "0.4"
 dirs = "5"
 log = "0.4"
 rfd = "=0.15.4"

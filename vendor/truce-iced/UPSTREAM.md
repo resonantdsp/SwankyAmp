@@ -255,3 +255,51 @@ first touch.
 
 Remove these with the rest of this directory when a pinned upstream release
 covers them.
+
+# Live displays capped at 60 frames a second
+
+The published idle gate renders whenever the plugin asks, so an editor with a
+running scope or meter repaints on every panel refresh: 120 or 144 times a
+second on a fast display, for animation that reads the same at 60. A new
+`IcedPlugin::displays_changed` reports data that only the live displays
+(scope, meters, tuner) need,
+and a frame asked for that way alone runs only once a deadline 1/60 s after
+the previous one has come. Deadlines advance by whole frames with 2 ms of
+slack, so a 60 Hz panel keeps its frames through ticks a couple of
+milliseconds late or early, and a faster panel averages 60. The data stays pending until a frame shows it, so a held-back
+frame is drawn by the next tick past its deadline and the last update after
+the signal stops still lands. Input, hover, resize, animation and
+`needs_redraw` frames are not paced and keep following the display on both
+macOS and Windows; there is no second clock, only a timestamp check on the
+ticks the display already sends.
+
+# Frames for the live displays alone
+
+The published runtime builds, lays out and draws the whole widget tree on the
+host's GUI thread for every frame, and iced redraws the whole window, so a
+scope or meter that moves under a twentieth of the window costs as much as a
+click. Three `IcedPlugin` methods let a plugin keep everything else:
+`retains_displays` says the view leaves its live displays out,
+`draw_displays` draws them onto a renderer, and `refresh_displays` updates
+only their data. While the plugin retains them, a full frame renders the tree
+into a texture the size of the frame (`src/panel.rs`), then presents a copy of
+it with the displays drawn over. A frame asked for only by `displays_changed`
+skips the view, the layout, the plugin's `Tick` and the widget drawing: it
+refreshes the displays, copies the kept texture and draws them. Anything else
+takes the full path and replaces the texture; a full frame that never reaches
+the screen leaves none behind, so the next frame is full too.
+
+iced draws into whatever target it is handed and keeps nothing, so keeping
+the panel means drawing it into our own texture and copying that onto the
+swapchain image on every frame, one extra full-window pass on a full frame.
+The copy is a draw rather than a texture copy, so the surface needs no copy
+usage on any platform. A frame with retained displays presents twice, which
+iced supports for several windows sharing one renderer; the second present
+trims the text buffers the first shaped for `fill_text`, so a full frame
+shapes those again.
+
+A displays-only frame that finds no swapchain image to draw into is retried
+as one on the next tick, outside the 60 a second cap that admitted it, rather
+than becoming a full frame. The panel and the displays of a full frame are
+drawn from the model its view was built from, before the messages the
+rebuilt tree publishes are dispatched.

@@ -38,6 +38,8 @@ pub mod iced;
 mod keyboard;
 pub mod param_cache;
 pub mod param_message;
+// The editor kept between frames for plugins that retain their displays.
+pub mod panel;
 #[cfg(not(target_os = "ios"))]
 pub mod platform;
 // Surface pump: owns the wgpu surface + every blocking swapchain call

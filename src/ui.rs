@@ -60,7 +60,7 @@ pub struct FreeUi {
     /// Whether the diagnostics were copied since the panel opened.
     diagnostics_copied: bool,
     meters: Option<Arc<MeterState>>,
-    meter_levels: [f32; 4],
+    pub(crate) meter_levels: [f32; 4],
     meter_revision: u64,
     presets: PresetBar,
     owner: Option<Arc<SwankyAmpParams>>,
@@ -76,6 +76,10 @@ pub struct FreeUi {
     /// The standalone app's audio choices as last read; `None` in a plug-in.
     #[cfg(feature = "standalone")]
     audio: Option<truce_standalone::setup::Setup>,
+    /// Whether the editor is in a window, whose runtime keeps the finished
+    /// panel between frames. A capture draws one frame with nothing kept, so
+    /// its view must carry the live displays itself.
+    pub(crate) windowed: bool,
 }
 
 /// The standalone app's audio choices, or what a capture stands in for them.
@@ -107,6 +111,7 @@ impl FreeUi {
             size_error: None,
             #[cfg(feature = "standalone")]
             audio: None,
+            windowed: false,
         }
     }
 
@@ -169,9 +174,27 @@ impl FreeUi {
             .map_or_else(|| self.notice.clone(), release_notice::Service::current)
     }
 
+    /// The whole editor with its live displays, as a capture or a frame
+    /// without a kept panel draws it.
     pub fn view_content<'a, R: FreeRenderer + 'a>(
         &'a self,
         params: &'a ParamCache<SwankyAmpParams>,
+    ) -> Element<'a, Msg, Theme, R> {
+        self.compose(params, false)
+    }
+
+    /// Whether anything can be drawn over the live displays: the information
+    /// panel, or the preset menu, which can widen across the meters.
+    fn covers_displays(&self) -> bool {
+        self.information || self.presets.open
+    }
+
+    /// The editor, leaving the live displays to `draw_displays` when
+    /// `retained`.
+    pub(crate) fn compose<'a, R: FreeRenderer + 'a>(
+        &'a self,
+        params: &'a ParamCache<SwankyAmpParams>,
+        retained: bool,
     ) -> Element<'a, Msg, Theme, R> {
         let mut layers: Vec<Element<'a, Msg, Theme, R>> = Vec::new();
         let baked = R::LOAD_ARTWORK && crate::artwork::loaded();
@@ -189,7 +212,7 @@ impl FreeUi {
             layers.push(surface(section, None));
         }
         layers.push(surface(layout::SWITCH, None));
-        if baked && let Some(backdrop) = crate::artwork::backdrop::<R>(params, self.meter_levels) {
+        if baked && let Some(backdrop) = crate::artwork::backdrop::<R>(params) {
             layers.push(backdrop);
         }
         for section in layout::SECTIONS {
@@ -266,6 +289,14 @@ impl FreeUi {
                 .width(Length::Fill)
                 .align_x(iced_core::text::Alignment::Right),
         ));
+        // Over every control and caption, as `draw_displays` draws them over
+        // the kept panel, and under anything that covers them.
+        if baked
+            && !retained
+            && let Some(displays) = crate::artwork::displays::<R>(self.meter_levels)
+        {
+            layers.push(displays);
+        }
         layers.extend(self.presets.menu(PRESET_FIELD, params));
         if self.information {
             layers.push(information_overlay(
@@ -293,6 +324,7 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
 
     fn window_opened(&mut self, window: truce_iced::raw_window_handle::RawWindowHandle) {
         self.presets.set_window(window);
+        self.windowed = true;
     }
 
     fn new(params: Arc<SwankyAmpParams>) -> Self {
@@ -384,16 +416,11 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
         Task::none()
     }
 
-    // A notice lands from the worker and meter levels from the audio thread
-    // while the editor may be idle; asking for a frame lets the next tick
-    // pick them up. Settled meters publish no new revision, so a quiet
-    // instance stops asking.
+    // Frames for the meters alone skip Tick, so everything Tick refreshes must
+    // ask for a frame here: a release notice, a restored or finished preset,
+    // a changed audio setup.
     fn needs_redraw(&self) -> bool {
         let notice = self.releases.is_some() && self.latest_notice() != self.notice;
-        let meters = self
-            .meters
-            .as_ref()
-            .is_some_and(|meters| meters.revision() != self.meter_revision);
         let presets = self
             .owner
             .as_ref()
@@ -402,7 +429,33 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
         let audio = self.audio.is_some() && audio_setup() != self.audio;
         #[cfg(not(feature = "standalone"))]
         let audio = false;
-        notice || meters || presets || audio
+        notice || presets || audio
+    }
+
+    // Meter levels land from the audio thread. Settled meters publish no new
+    // revision, so a quiet instance stops asking.
+    fn displays_changed(&self) -> bool {
+        self.meters
+            .as_ref()
+            .is_some_and(|meters| meters.revision() != self.meter_revision)
+    }
+
+    fn retains_displays(&self, _: &ParamCache<SwankyAmpParams>) -> bool {
+        self.windowed && crate::artwork::loaded() && !self.covers_displays()
+    }
+
+    fn draw_displays(&self, _: &ParamCache<SwankyAmpParams>, renderer: &mut iced_wgpu::Renderer) {
+        use iced_wgpu::primitive::Renderer as _;
+        if let Some(displays) = crate::artwork::Displays::new(self.meter_levels) {
+            renderer.draw_primitive(
+                iced_core::Rectangle::with_size(iced_core::Size::new(style::WIDTH, style::HEIGHT)),
+                crate::artwork::ScenePrimitive::Displays(displays),
+            );
+        }
+    }
+
+    fn refresh_displays(&mut self, _: &ParamCache<SwankyAmpParams>) {
+        self.sync_meters();
     }
 
     fn title(&self) -> String {
@@ -417,7 +470,7 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
         &'a self,
         params: &'a ParamCache<SwankyAmpParams>,
     ) -> Element<'a, Msg, Theme, iced_wgpu::Renderer> {
-        self.view_content(params)
+        self.compose(params, self.retains_displays(params))
     }
 }
 
@@ -1726,6 +1779,28 @@ mod tests {
         assert_eq!(display_value(7, 0.51, true), "3.0");
         assert_eq!(display_value(14, 0.337, true), "3.4");
         assert_eq!(display_value(14, 0.337, false), "03");
+    }
+
+    /// Levels the audio thread publishes ask for a frame only until a frame
+    /// that draws the displays alone shows them, so settled meters let the
+    /// editor idle.
+    #[test]
+    fn new_meter_levels_ask_for_a_frame_until_the_displays_show_them() {
+        let params = Arc::new(SwankyAmpParams::default());
+        let cache = ParamCache::new(Arc::clone(&params));
+        let mut ui = FreeUi {
+            meters: Some(Arc::clone(&params.meter_state)),
+            ..FreeUi::resting()
+        };
+        let asks = |ui: &FreeUi| ui.needs_redraw() || ui.displays_changed();
+        assert!(!asks(&ui), "A silent editor must be free to idle");
+        params.meter_state.publish([0.6, 0.5, 0.4, 0.3]);
+        assert!(asks(&ui), "New meter levels must ask for a frame");
+        ui.refresh_displays(&cache);
+        assert!(
+            !asks(&ui),
+            "Meters a display frame has shown must let the editor idle"
+        );
     }
 
     #[test]

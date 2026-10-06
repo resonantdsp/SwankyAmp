@@ -22,6 +22,7 @@ pub mod release_notice;
 pub mod render;
 pub mod style;
 pub mod ui;
+pub mod verification;
 pub mod widgets;
 
 pub use params::SwankyAmpParams;
