@@ -177,9 +177,13 @@ fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
 
     // Each lit cell adds its baked response in the column's colour: the cell
     // at the level's fractional edge stays dark inside and only its spill
-    // fades in, as in Pro, so a cell never shows half lit.
+    // fades in, as in Pro, so a cell never shows half lit. The meters light
+    // only the frame the displays draw over the finished editor, as what they
+    // add to the knobs' light there.
+    let metered = controls.emission.w > 0.5;
+    var meter_light = vec3(0.0);
     for (var meter_index = 0u; meter_index < 4u; meter_index++) {
-        if f32(meter_index) >= controls.meter_style.w {
+        if !metered || f32(meter_index) >= controls.meter_style.w {
             break;
         }
         let meter = controls.meters[meter_index];
@@ -220,7 +224,7 @@ fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
                     select(0.0, 1.0, f32(bar) < floor(position)),
                     inside,
                 );
-                light += response * color * activation * tail;
+                meter_light += response * color * activation * tail;
             }
         }
     }
@@ -231,6 +235,11 @@ fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
         radiance = radiance * (1.0 - cover) + sprite;
     }
 
-    let display_linear = (radiance + light) / (vec3(1.0) + radiance + light) * multiplier;
+    let lit = radiance + light;
+    let display_linear = lit / (vec3(1.0) + lit) * multiplier;
+    if metered {
+        let metered_lit = lit + meter_light;
+        return vec4(metered_lit / (vec3(1.0) + metered_lit) * multiplier - display_linear, 0.0);
+    }
     return vec4(display_linear, 1.0);
 }

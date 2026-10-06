@@ -58,20 +58,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         for size in interface::SIZES {
             interface::hold(size);
             for scale in [1.0, 2.0] {
-                let (pixels, width, height) = if fixture == Some("live") {
-                    truce::core::screenshot::render_pixels_for_at_scale(&mut playing(), scale)
-                } else if let Some(name) = preset {
+                let mut plugin = if fixture == Some("live") {
+                    playing()
+                } else {
                     let mut plugin = Plugin::create();
                     plugin.init();
-                    presets::apply_offline(
-                        &presets::Library::with_user_root(None),
-                        &format!("factory:{name}"),
-                        plugin.params(),
-                    )?;
-                    truce::core::screenshot::render_pixels_for_at_scale(&mut plugin, scale)
-                } else {
-                    truce::core::screenshot::render_with_state_at_scale::<Plugin>(None, scale)
+                    if let Some(name) = preset {
+                        presets::apply_offline(
+                            &presets::Library::with_user_root(None),
+                            &format!("factory:{name}"),
+                            plugin.params(),
+                        )?;
+                    }
+                    plugin
                 };
+                let (pixels, width, height) =
+                    truce::core::screenshot::render_pixels_for_at_scale(&mut plugin, scale);
+                swanky_amp::verification::retained_frame_matches(
+                    plugin.params_arc(),
+                    (scale * interface::zoom(size)) as f32,
+                )
+                .map_err(|error| format!("{error} at {size}% and {scale}x"))?;
                 let suffix = scale as u32;
                 let name = if size == interface::DEFAULT {
                     format!("amp-{suffix}x.png")

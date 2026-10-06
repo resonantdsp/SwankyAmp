@@ -362,19 +362,33 @@ pub fn loaded() -> bool {
     runtime_scene().is_some()
 }
 
-/// The baked scene with the knobs at their values and each meter column
-/// lit to its fraction in `meter_levels` (input L/R, output L/R).
+/// The baked scene with the knobs at their values. The meters' light is the
+/// live displays' to add; see [`Displays`].
 pub fn backdrop<'a, R>(
     params: &truce_iced::ParamCache<SwankyAmpParams>,
-    meter_levels: [f32; 4],
 ) -> Option<Element<'a, Msg, Theme, R>>
 where
     R: iced_core::Renderer + iced_wgpu::primitive::Renderer + 'a,
 {
     let scene = runtime_scene()?;
-    let uniform = Uniform::new(params, scene, meter_levels);
+    let uniform = Uniform::new(params, scene);
     Some(
         iced_widget::shader(SceneProgram { scene, uniform })
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into(),
+    )
+}
+
+/// The live displays as an element of the view, to be laid over everything
+/// but what may cover them.
+pub fn displays<'a, R>(meter_levels: [f32; 4]) -> Option<Element<'a, Msg, Theme, R>>
+where
+    R: iced_core::Renderer + iced_wgpu::primitive::Renderer + 'a,
+{
+    let displays = Displays::new(meter_levels)?;
+    Some(
+        iced_widget::shader(DisplaysProgram(displays))
             .width(Length::Fill)
             .height(Length::Fill)
             .into(),
@@ -409,11 +423,7 @@ struct Uniform {
 }
 
 impl Uniform {
-    fn new(
-        params: &truce_iced::ParamCache<SwankyAmpParams>,
-        scene: &RuntimeScene,
-        meter_levels: [f32; 4],
-    ) -> Self {
+    fn new(params: &truce_iced::ParamCache<SwankyAmpParams>, scene: &RuntimeScene) -> Self {
         let physical = style::PhysicalStyle::default();
         let marker = style::MarkerStyle::default();
         let mut result = Self {
@@ -466,11 +476,12 @@ impl Uniform {
                 state: [0.0; 4],
             }; 32],
         };
-        for (index, (meter, level)) in layout::METERS.iter().zip(meter_levels).enumerate() {
+        for (index, meter) in layout::METERS.iter().enumerate() {
+            // The level is the live displays' to set; see `Displays`.
             result.meters[index] = Control {
                 geometry: meter.bounds,
                 state: [
-                    level,
+                    0.0,
                     scene.meter_response_layers[index] as f32,
                     f32::from(meter.appearance.starts_with("output")),
                     0.0,
@@ -518,15 +529,55 @@ impl iced_widget::shader::Program<Msg> for SceneProgram {
     type Primitive = ScenePrimitive;
 
     fn draw(&self, _: &(), _: mouse::Cursor, _: Rectangle) -> ScenePrimitive {
-        ScenePrimitive {
+        ScenePrimitive::Composite(Composite {
             scene: self.scene,
             uniform: self.uniform,
-        }
+        })
     }
 }
 
+/// What draws with the baked resources. iced keeps one pipeline for each type
+/// of primitive, so the live displays, which read the composite's store, are a
+/// kind of scene primitive rather than a type of their own.
+// iced boxes every primitive it is handed, so neither variant is copied about.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
-struct ScenePrimitive {
+pub enum ScenePrimitive {
+    Composite(Composite),
+    Displays(Displays),
+}
+
+impl Primitive for ScenePrimitive {
+    type Pipeline = ScenePipeline;
+
+    fn prepare(
+        &self,
+        pipeline: &mut ScenePipeline,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        bounds: &Rectangle,
+        viewport: &iced_graphics::Viewport,
+    ) {
+        match self {
+            Self::Composite(composite) => {
+                composite.prepare(pipeline, device, queue, bounds, viewport);
+            }
+            Self::Displays(displays) => displays.prepare(pipeline, queue),
+        }
+    }
+
+    fn draw(&self, pipeline: &ScenePipeline, pass: &mut wgpu::RenderPass<'_>) -> bool {
+        match self {
+            Self::Composite(composite) => composite.draw(pipeline, pass),
+            Self::Displays(_) => Displays::draw(pipeline, pass),
+        }
+        true
+    }
+}
+
+/// The backdrop's compositor at the controls' state.
+#[derive(Debug)]
+pub struct Composite {
     scene: &'static RuntimeScene,
     uniform: Uniform,
 }
@@ -563,7 +614,7 @@ fn knob_reach(uniform: &Uniform, knob: &Control) -> f32 {
 fn changed_areas(old: &Uniform, new: &Uniform) -> Option<Vec<[f32; 4]>> {
     let fixed = |uniform: &Uniform| {
         let mut fixed = *uniform;
-        for control in fixed.meters.iter_mut().chain(&mut fixed.controls) {
+        for control in &mut fixed.controls {
             control.state = [0.; 4];
         }
         fixed.disc = [0.; 4];
@@ -587,18 +638,6 @@ fn changed_areas(old: &Uniform, new: &Uniform) -> Option<Vec<[f32; 4]>> {
             areas.push([x - EDGE, y - EDGE, width + 2. * EDGE, height + 2. * EDGE]);
         }
     }
-    let extent = new.meter_style[2] + EDGE;
-    for (now, before) in new.meters.iter().zip(&old.meters) {
-        if !same(now, before) {
-            let [x, y, width, height] = now.geometry;
-            areas.push([
-                x - extent,
-                y - extent,
-                width + 2. * extent,
-                height + 2. * extent,
-            ]);
-        }
-    }
     Some(areas)
 }
 
@@ -617,7 +656,7 @@ struct Store {
 /// The compositor, held across frames. `iced_wgpu` stores pipelines per
 /// `Engine`, and every editor window and offscreen renderer builds its own, so
 /// the store is never shared between editors.
-struct ScenePipeline {
+pub struct ScenePipeline {
     /// The compositor, drawn into the store.
     pipeline: wgpu::RenderPipeline,
     /// Copies the store onto the frame.
@@ -627,8 +666,17 @@ struct ScenePipeline {
     copy_layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
     controls: wgpu::Buffer,
-    binding: Option<(String, wgpu::BindGroup)>,
+    /// Adds the meters' light to the frame, inside the meters' own reach.
+    meter_light: wgpu::RenderPipeline,
+    meter_controls: wgpu::Buffer,
+    /// The artwork's resources, read through `controls` by the compositor
+    /// and through `meter_controls` by the meters' light.
+    binding: Option<(String, [wgpu::BindGroup; 2])>,
     store: Option<Store>,
+    /// Where the displays last prepared draw, in whole frame pixels, and the
+    /// placement of the compositor they continue.
+    meter_regions: Vec<Rectangle<u32>>,
+    placed: Rectangle,
 }
 
 const COPY_SHADER: &str = "
@@ -691,12 +739,14 @@ impl Pipeline for ScenePipeline {
                 count: None,
             }],
         });
-        let controls = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Free artwork controls"),
-            size: std::mem::size_of::<Uniform>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let controls_buffer = || {
+            device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("Free artwork controls"),
+                size: std::mem::size_of::<Uniform>() as u64,
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            })
+        };
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::Repeat,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
@@ -713,7 +763,9 @@ impl Pipeline for ScenePipeline {
             label: Some("Free artwork copy"),
             source: wgpu::ShaderSource::Wgsl(COPY_SHADER.into()),
         });
-        let make_pipeline = |module: &wgpu::ShaderModule, resources: &wgpu::BindGroupLayout| {
+        let make_pipeline = |module: &wgpu::ShaderModule,
+                             resources: &wgpu::BindGroupLayout,
+                             blend: Option<wgpu::BlendState>| {
             let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: None,
                 bind_group_layouts: &[resources],
@@ -734,7 +786,7 @@ impl Pipeline for ScenePipeline {
                     compilation_options: Default::default(),
                     targets: &[Some(wgpu::ColorTargetState {
                         format,
-                        blend: None,
+                        blend,
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
                 }),
@@ -745,16 +797,32 @@ impl Pipeline for ScenePipeline {
                 cache: None,
             })
         };
+        let add = wgpu::BlendState {
+            color: wgpu::BlendComponent {
+                src_factor: wgpu::BlendFactor::One,
+                dst_factor: wgpu::BlendFactor::One,
+                operation: wgpu::BlendOperation::Add,
+            },
+            alpha: wgpu::BlendComponent {
+                src_factor: wgpu::BlendFactor::Zero,
+                dst_factor: wgpu::BlendFactor::One,
+                operation: wgpu::BlendOperation::Add,
+            },
+        };
         Self {
-            pipeline: make_pipeline(&shader, &layout),
-            copy: make_pipeline(&copy_shader, &copy_layout),
+            pipeline: make_pipeline(&shader, &layout, None),
+            copy: make_pipeline(&copy_shader, &copy_layout, None),
+            meter_light: make_pipeline(&shader, &layout, Some(add)),
             format,
             layout,
             copy_layout,
             sampler,
-            controls,
+            controls: controls_buffer(),
+            meter_controls: controls_buffer(),
             binding: None,
             store: None,
+            meter_regions: Vec::new(),
+            placed: Rectangle::default(),
         }
     }
 }
@@ -816,28 +884,9 @@ impl Store {
         let Some(areas) = changed_areas(before, uniform) else {
             return vec![whole];
         };
-        // A point maps onto the frame the way the shader's uv does: across the
-        // backdrop's bounds, the scene's width and height spanning them.
-        let [width, height] = [uniform.scene[0], uniform.scene[1]];
         let regions = areas
             .into_iter()
-            .filter_map(|[x, y, w, h]| {
-                let left = bounds.x + x / width * bounds.width;
-                let top = bounds.y + y / height * bounds.height;
-                let right = bounds.x + (x + w) / width * bounds.width;
-                let bottom = bounds.y + (y + h) / height * bounds.height;
-                let clamp = |v: f32, most: u32| v.max(0.).min(most as f32) as u32;
-                let x0 = clamp(left.floor() - 1., self.size.width);
-                let y0 = clamp(top.floor() - 1., self.size.height);
-                let x1 = clamp(right.ceil() + 1., self.size.width);
-                let y1 = clamp(bottom.ceil() + 1., self.size.height);
-                (x1 > x0 && y1 > y0).then_some(Rectangle {
-                    x: x0,
-                    y: y0,
-                    width: x1 - x0,
-                    height: y1 - y0,
-                })
-            })
+            .filter_map(|area| frame_region(area, uniform, bounds, self.size))
             .collect::<Vec<_>>();
         // Neighbouring knobs' reaches overlap, so several changes at once can
         // cost more than one whole redraw.
@@ -849,9 +898,35 @@ impl Store {
     }
 }
 
-impl Primitive for ScenePrimitive {
-    type Pipeline = ScenePipeline;
+/// The whole frame pixels an area of the view, in its points, covers, with a
+/// pixel to spare on each side. A point maps onto the frame the way the
+/// shader's uv does: across the backdrop's `bounds`, the scene's width and
+/// height spanning them.
+fn frame_region(
+    [x, y, w, h]: [f32; 4],
+    uniform: &Uniform,
+    bounds: Rectangle,
+    size: iced_core::Size<u32>,
+) -> Option<Rectangle<u32>> {
+    let [width, height] = [uniform.scene[0], uniform.scene[1]];
+    let left = bounds.x + x / width * bounds.width;
+    let top = bounds.y + y / height * bounds.height;
+    let right = bounds.x + (x + w) / width * bounds.width;
+    let bottom = bounds.y + (y + h) / height * bounds.height;
+    let clamp = |v: f32, most: u32| v.max(0.).min(most as f32) as u32;
+    let x0 = clamp(left.floor() - 1., size.width);
+    let y0 = clamp(top.floor() - 1., size.height);
+    let x1 = clamp(right.ceil() + 1., size.width);
+    let y1 = clamp(bottom.ceil() + 1., size.height);
+    (x1 > x0 && y1 > y0).then_some(Rectangle {
+        x: x0,
+        y: y0,
+        width: x1 - x0,
+        height: y1 - y0,
+    })
+}
 
+impl Composite {
     fn prepare(
         &self,
         pipeline: &mut ScenePipeline,
@@ -868,36 +943,39 @@ impl Primitive for ScenePrimitive {
                 let shadow = upload_layer(device, queue, self.scene, &self.scene.shadow);
                 let responses = upload_array(device, queue, self.scene, &self.scene.responses);
                 let disc = upload_array(device, queue, self.scene, &self.scene.disc);
-                let binding = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    label: Some("Free artwork binding"),
-                    layout: &pipeline.layout,
-                    entries: &[
-                        wgpu::BindGroupEntry {
-                            binding: 0,
-                            resource: wgpu::BindingResource::TextureView(&base),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 1,
-                            resource: wgpu::BindingResource::TextureView(&shadow),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 2,
-                            resource: wgpu::BindingResource::TextureView(&responses),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 3,
-                            resource: pipeline.controls.as_entire_binding(),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 4,
-                            resource: wgpu::BindingResource::Sampler(&pipeline.sampler),
-                        },
-                        wgpu::BindGroupEntry {
-                            binding: 5,
-                            resource: wgpu::BindingResource::TextureView(&disc),
-                        },
-                    ],
-                });
+                let bind = |controls: &wgpu::Buffer| {
+                    device.create_bind_group(&wgpu::BindGroupDescriptor {
+                        label: Some("Free artwork binding"),
+                        layout: &pipeline.layout,
+                        entries: &[
+                            wgpu::BindGroupEntry {
+                                binding: 0,
+                                resource: wgpu::BindingResource::TextureView(&base),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 1,
+                                resource: wgpu::BindingResource::TextureView(&shadow),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 2,
+                                resource: wgpu::BindingResource::TextureView(&responses),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 3,
+                                resource: controls.as_entire_binding(),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 4,
+                                resource: wgpu::BindingResource::Sampler(&pipeline.sampler),
+                            },
+                            wgpu::BindGroupEntry {
+                                binding: 5,
+                                resource: wgpu::BindingResource::TextureView(&disc),
+                            },
+                        ],
+                    })
+                };
+                let binding = [bind(&pipeline.controls), bind(&pipeline.meter_controls)];
                 &mut slot.insert((key.clone(), binding)).1
             }
         };
@@ -947,7 +1025,7 @@ impl Primitive for ScenePrimitive {
                 });
                 draw.set_viewport(placed.x, placed.y, placed.width, placed.height, 0., 1.);
                 draw.set_pipeline(&pipeline.pipeline);
-                draw.set_bind_group(0, &*binding, &[]);
+                draw.set_bind_group(0, &binding[0], &[]);
                 for region in stale {
                     draw.set_scissor_rect(region.x, region.y, region.width, region.height);
                     draw.draw(0..3, 0..1);
@@ -958,13 +1036,136 @@ impl Primitive for ScenePrimitive {
         store.shows = Some((key.clone(), placed, uniform));
     }
 
-    fn draw(&self, pipeline: &ScenePipeline, pass: &mut wgpu::RenderPass<'_>) -> bool {
+    fn draw(&self, pipeline: &ScenePipeline, pass: &mut wgpu::RenderPass<'_>) {
         if let Some(store) = &pipeline.store {
             pass.set_pipeline(&pipeline.copy);
             pass.set_bind_group(0, &store.copy, &[]);
             pass.draw(0..3, 0..1);
         }
-        true
+    }
+}
+
+/// The live displays: the light the meters add, drawn over the finished
+/// editor inside the meters' reach.
+///
+/// The backdrop draws no meter light, so a frame that changes only the
+/// meters can keep the rest of the editor as it was and draw just this (see
+/// `IcedPlugin::retains_displays`). The light is what the meters add to the
+/// knobs' light around them, tone-mapped and shaded together as the
+/// compositor would, and is added over whatever the view drew there.
+#[derive(Debug, Clone)]
+pub struct Displays {
+    /// Each meter's fraction, input L/R then output L/R.
+    levels: [f32; 4],
+}
+
+impl Displays {
+    /// The displays at `levels`, or nothing without baked artwork, where the
+    /// view draws flat meter cells itself.
+    pub fn new(levels: [f32; 4]) -> Option<Self> {
+        loaded().then_some(Self { levels })
+    }
+}
+
+struct DisplaysProgram(Displays);
+
+impl iced_widget::shader::Program<Msg> for DisplaysProgram {
+    type State = ();
+    type Primitive = ScenePrimitive;
+
+    fn draw(&self, _: &(), _: mouse::Cursor, _: Rectangle) -> ScenePrimitive {
+        ScenePrimitive::Displays(self.0.clone())
+    }
+}
+
+/// `regions` with every overlapping pair replaced by the rectangle around
+/// both, since the meters' light is added and must reach a pixel once.
+fn disjoint(mut regions: Vec<Rectangle<u32>>) -> Vec<Rectangle<u32>> {
+    let overlap = |a: &Rectangle<u32>, b: &Rectangle<u32>| {
+        a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+    };
+    let mut merged = Vec::new();
+    while let Some(mut region) = regions.pop() {
+        while let Some(i) = regions.iter().position(|other| overlap(&region, other)) {
+            let other = regions.swap_remove(i);
+            let (x, y) = (region.x.min(other.x), region.y.min(other.y));
+            region = Rectangle {
+                x,
+                y,
+                width: (region.x + region.width).max(other.x + other.width) - x,
+                height: (region.y + region.height).max(other.y + other.height) - y,
+            };
+            // A grown rectangle can reach one already set aside.
+            regions.append(&mut merged);
+        }
+        merged.push(region);
+    }
+    merged
+}
+
+impl Displays {
+    fn prepare(&self, pipeline: &mut ScenePipeline, queue: &wgpu::Queue) {
+        pipeline.meter_regions.clear();
+        // Drawn over a backdrop the compositor has drawn, whose light this
+        // continues; nothing is drawn before it has.
+        let Some(Store {
+            shows: Some((shown, placed, composed)),
+            size,
+            ..
+        }) = &pipeline.store
+        else {
+            return;
+        };
+        if pipeline
+            .binding
+            .as_ref()
+            .is_none_or(|(bound, _)| bound != shown)
+        {
+            return;
+        }
+        let mut uniform = *composed;
+        uniform.emission[3] = 1.0;
+        for (meter, level) in uniform.meters.iter_mut().zip(self.levels) {
+            meter.state[0] = level;
+        }
+        queue.write_buffer(&pipeline.meter_controls, 0, bytemuck::bytes_of(&uniform));
+        let extent = uniform.meter_style[2] + EDGE;
+        let regions = uniform.meters[..uniform.meter_style[3] as usize]
+            .iter()
+            .filter_map(|meter| {
+                let [x, y, width, height] = meter.geometry;
+                frame_region(
+                    [
+                        x - extent,
+                        y - extent,
+                        width + 2. * extent,
+                        height + 2. * extent,
+                    ],
+                    &uniform,
+                    *placed,
+                    *size,
+                )
+            })
+            .collect();
+        pipeline.meter_regions = disjoint(regions);
+        pipeline.placed = *placed;
+    }
+
+    fn draw(pipeline: &ScenePipeline, pass: &mut wgpu::RenderPass<'_>) {
+        let Some((_, [_, binding])) = &pipeline.binding else {
+            return;
+        };
+        if pipeline.meter_regions.is_empty() {
+            return;
+        }
+        let placed = pipeline.placed;
+        pass.set_viewport(placed.x, placed.y, placed.width, placed.height, 0., 1.);
+        pass.set_pipeline(&pipeline.meter_light);
+        pass.set_bind_group(0, binding, &[]);
+        for region in &pipeline.meter_regions {
+            pass.set_scissor_rect(region.x, region.y, region.width, region.height);
+            pass.draw(0..3, 0..1);
+        }
     }
 }
 

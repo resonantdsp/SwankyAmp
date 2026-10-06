@@ -147,7 +147,7 @@ just capture-menu "A long preset name of the player's own" /tmp/swanky-capture
 just capture-audio missing-input /tmp/swanky-capture
 ```
 
-`export-layout` writes the resolved geometry an artwork bake follows; it works when the artwork package is missing or stale. `capture` draws the editor at every interface size and needs a working GPU adapter; the other capture recipes apply a factory preset, light the meters, open the information panel (announcing the named release, if given), show the standalone's audio choices in one of the states `capture-audio` lists, or open the preset menu.
+`export-layout` writes the resolved geometry an artwork bake follows; it works when the artwork package is missing or stale. `capture` draws the editor at every interface size and needs a working GPU adapter, and fails if a frame that draws only the meters over the kept editor differs from a full frame; the other capture recipes apply a factory preset, light the meters, open the information panel (announcing the named release, if given), show the standalone's audio choices in one of the states `capture-audio` lists, or open the preset menu.
 
 ### Artwork
 
@@ -265,7 +265,7 @@ The information panel's Third-party licences link opens the notices the plug-in 
 Narrow patches of the published Truce sources, of baseview, of iced_wgpu and of wgpu-hal, each directory carrying its unchanged upstream licences, original manifest, source reference and an `UPSTREAM.md` describing the local changes:
 
 - `vendor/baseview-truce`: frame delivery paced by the display, host keyboard and modifier fixes, keys the editor does not use handed back to the host, no process-wide DPI change and no drag-and-drop, and a window kept alive until a detached GPU thread releases it.
-- `vendor/truce-iced`: iced input, focus, redraw and clipboard fixes, a GPU thread whose setup is bounded and final, frames built only when they can be shown, the low-power GPU and an sRGB surface, the editor's lifecycle records and a native note when its graphics cannot start.
+- `vendor/truce-iced`: iced input, focus, redraw and clipboard fixes, a GPU thread whose setup is bounded and final, frames built only when they can be shown, live-display frames capped at 60 a second and drawn alone over the kept editor, the low-power GPU and an sRGB surface, the editor's lifecycle records and a native note when its graphics cannot start.
 - `vendor/wgpu-hal`: on Windows the shader compiler loads from System32, compiled shaders are cached on disk, and only the GPU Windows would choose gets a device.
 - `vendor/iced_wgpu`: multisampled meshes drawn over their own region rather than the whole frame.
 - `vendor/truce-clap`: host state notification required by clap-validator, dynamic-latency restart with the latency held until it, and active reset handling.

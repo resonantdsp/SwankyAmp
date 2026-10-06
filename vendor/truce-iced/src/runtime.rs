@@ -140,8 +140,8 @@ pub trait IcedPlugin<P: Params>: Sized + 'static {
 
     /// Handle a message (param change or plugin-specific).
     ///
-    /// `Message::Tick` arrives once per rendered frame, after the host
-    /// parameter sync and before `view`; use it to refresh model state
+    /// `Message::Tick` arrives once per frame that builds the view, after
+    /// the host parameter sync and before `view`; use it to refresh model state
     /// derived from data the runtime cannot see. Default: no-op.
     fn update(
         &mut self,
@@ -202,6 +202,65 @@ pub trait IcedPlugin<P: Params>: Sized + 'static {
     /// for a stray UI event.
     fn needs_redraw(&self) -> bool {
         false
+    }
+
+    /// Whether the plugin's live displays (scopes, meters) have data the
+    /// screen does not show yet. Default `false`. Frames asked for only
+    /// this way run at no more than 60 a second whatever the panel's
+    /// refresh rate, since a faster display is not worth its GPU cost;
+    /// anything that must follow the display belongs in
+    /// [`Self::needs_redraw`]. Keep returning `true` until a frame shows
+    /// the data, so a frame the cap holds back is drawn by a later one.
+    fn displays_changed(&self) -> bool {
+        false
+    }
+
+    /// Whether the view leaves the live displays out, for
+    /// [`Self::draw_displays`] to draw over a kept image of the rest of the
+    /// editor. While it is true, a frame asked for only by
+    /// [`Self::displays_changed`] skips the view, layout and widget drawing:
+    /// it calls [`Self::refresh_displays`], copies the kept image and draws
+    /// the displays over it. Return false whenever anything could be drawn
+    /// over the displays, such as a menu or a panel, since they are drawn
+    /// last. Default `false`.
+    fn retains_displays(&self, _params: &ParamCache<P>) -> bool {
+        false
+    }
+
+    /// Draw the live displays, while [`Self::retains_displays`] is true, onto
+    /// a renderer holding the rest of the editor.
+    fn draw_displays(&self, _params: &ParamCache<P>, _renderer: &mut iced_wgpu::Renderer) {}
+
+    /// Bring the live displays' data up to date for a frame that draws only
+    /// them. Nothing else may change here, since such a frame never rebuilds
+    /// the view.
+    fn refresh_displays(&mut self, _params: &ParamCache<P>) {}
+}
+
+/// Holds frames drawn only for a plugin's live displays to
+/// [`DisplayPacer::FRAME`] apart on average, whatever the panel's refresh.
+#[derive(Default)]
+pub(crate) struct DisplayPacer {
+    due: Option<std::time::Instant>,
+}
+
+impl DisplayPacer {
+    const FRAME: std::time::Duration = std::time::Duration::from_nanos(1_000_000_000 / 60);
+    /// A 60 Hz panel's ticks land a little either side of the interval;
+    /// without slack every other one would miss and the displays run at 30.
+    const SLACK: std::time::Duration = std::time::Duration::from_millis(2);
+
+    /// Whether a display-only frame may run at `now`. Deadlines advance by
+    /// whole frames, so the slack never adds frames over a second.
+    pub(crate) fn admit(&mut self, now: std::time::Instant) -> bool {
+        let next = match self.due {
+            Some(due) if now + Self::SLACK < due => return false,
+            // Behind by under a frame: keep the cadence.
+            Some(due) if now < due + Self::FRAME => due + Self::FRAME,
+            _ => now + Self::FRAME,
+        };
+        self.due = Some(next);
+        true
     }
 }
 
@@ -358,6 +417,12 @@ pub(crate) struct IcedRuntime<P: Params, M: IcedPlugin<P>> {
     /// (`RedrawRequest::At`, e.g. a `text_input` caret blink). `tick()`
     /// renders once this instant passes.
     pub(crate) redraw_at: Option<std::time::Instant>,
+    /// Idle gate: caps frames asked for only by the plugin's live displays.
+    display_pacer: DisplayPacer,
+    /// Idle gate: a frame the pacer admitted for the displays alone found no
+    /// image to draw into, so the next tick retries it on the same terms
+    /// rather than as a full frame.
+    displays_pending: bool,
     /// Owns the wgpu surface + every blocking swapchain call (see
     /// `crate::pump`); [`Self::adopt_pump`] builds the pipeline from
     /// its init product. Desktop only - iOS keeps the surface inline
@@ -442,6 +507,9 @@ pub(crate) struct RenderState<P: Params + 'static, M: IcedPlugin<P>> {
     pub(crate) viewport: iced_graphics::Viewport,
     pub(crate) theme: crate::iced::Theme,
     pub(crate) bg_color: Color,
+    /// The last full frame without its live displays, while the plugin
+    /// retains them; a frame for the displays alone starts from it.
+    panel: Option<crate::panel::Panel>,
 }
 
 /// What a `UserInterface::update` pass reported about the tree it left
@@ -519,6 +587,8 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
             force_render: true,
             animate: false,
             redraw_at: None,
+            display_pacer: DisplayPacer::default(),
+            displays_pending: false,
             #[cfg(not(target_os = "ios"))]
             pump: None,
             #[cfg(not(target_os = "ios"))]
@@ -877,6 +947,7 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
             viewport,
             theme,
             bg_color: bg,
+            panel: None,
         });
 
         // The fresh pipeline must paint even if the idle gate sees no
@@ -1006,7 +1077,7 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
         // message pump to free), and its per-frame `RedrawRequested`
         // re-issues `request_input_method` to keep the soft keyboard up,
         // so every frame must run.
-        let should_render = cfg!(target_os = "ios")
+        let full = cfg!(target_os = "ios")
             || self.force_render
             || scale_changed
             || !self.pending_events.is_empty()
@@ -1015,9 +1086,19 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
             || timer_due
             || render.program.plugin.needs_redraw()
             || !self.sub_backlog.is_empty();
-        if !should_render {
+        if !full
+            && !self.displays_pending
+            && !(render.program.plugin.displays_changed()
+                && self.display_pacer.admit(std::time::Instant::now()))
+        {
             return;
         }
+        // Only the displays changed, and the panel under them is the size
+        // of the frame it would be copied onto.
+        let displays_only = !full
+            && render.panel.as_ref().is_some_and(|panel| {
+                panel.size() == (render.surface_config.width, render.surface_config.height)
+            });
         // The pump acquires on its own thread; a frame with no image to
         // paint into would build and draw for nothing. Leave the input
         // queued for the frame that has one: on macOS the pump wakes this
@@ -1026,177 +1107,228 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
         if let Some(client) = &self.client
             && !client.request_frame()
         {
-            self.force_render = true;
+            self.retry(full);
             return;
         }
         self.force_render = false;
+        self.displays_pending = false;
 
-        let cursor = cursor_at(self.cursor_position);
-        let logical_size = render.viewport.logical_size();
-        let style = iced_runtime::core::renderer::Style {
-            text_color: Color::from_rgb(0.90, 0.90, 0.92),
+        // A full frame replaces the panel, and leaves none behind if it
+        // never reaches the screen.
+        let previous_panel = if displays_only {
+            None
+        } else {
+            render.panel.take()
         };
-
-        // The backlog came before this frame's input. A text field edits
-        // its own copy of the model's value, so the model must hold what
-        // earlier keys typed before the tree is built for later ones.
-        if !self.sub_backlog.is_empty() {
-            for message in std::mem::take(&mut self.sub_backlog) {
-                render.program.dispatch(message);
+        let kept_panel = if displays_only {
+            render
+                .program
+                .plugin
+                .refresh_displays(&render.program.param_cache);
+            if let Some(panel) = &render.panel {
+                panel.show(&mut render.renderer, &render.viewport);
+                render
+                    .program
+                    .plugin
+                    .draw_displays(&render.program.param_cache, &mut render.renderer);
             }
-            let _ = render.program.poll_data();
-        }
+            None
+        } else {
+            let cursor = cursor_at(self.cursor_position);
+            let logical_size = render.viewport.logical_size();
+            let style = iced_runtime::core::renderer::Style {
+                text_color: Color::from_rgb(0.90, 0.90, 0.92),
+            };
 
-        // Give the plugin its per-frame hook before the view is built,
-        // so model state it derives from data the runtime cannot see is
-        // fresh in the frame that shows it.
-        render.program.notify_frame();
-
-        // Build the user interface for this frame from the current
-        // model. The borrow of `render.program` is dropped at
-        // `into_cache()`, after which we can re-enter `dispatch` for
-        // each collected message.
-        let mut messages: Vec<Message<M::Message>> = Vec::new();
-        let cache = render
-            .ui_cache
-            .take()
-            .unwrap_or_else(iced_runtime::user_interface::Cache::new);
-        let view_element = render.program.view();
-        let mut user_interface = iced_runtime::UserInterface::build(
-            view_element,
-            logical_size,
-            cache,
-            &mut render.renderer,
-        );
-
-        let mut pending_events = std::mem::take(&mut self.pending_events);
-        // Feed a per-frame `RedrawRequested` like iced_winit does: focused
-        // widgets re-evaluate on it (text_input blinks its caret and, while
-        // focused, re-issues its `request_input_method` - the signal the iOS
-        // host reads to keep the soft keyboard up). Without it, on a frame
-        // with no input events nothing requests IME and the keyboard would
-        // drop. Appended last so it observes focus set by this frame's input.
-        pending_events.push(Event::Window(crate::iced::window::Event::RedrawRequested(
-            std::time::Instant::now(),
-        )));
-        let (ui_state, statuses) = user_interface.update(
-            &pending_events,
-            cursor,
-            &mut render.renderer,
-            &mut crate::clipboard::Clipboard,
-            &mut messages,
-        );
-        let mut report = UiReport::read(ui_state);
-
-        // Subscription pump: keep `IcedPlugin::subscription` recipes tracked
-        // and broadcast this frame's events to them, so `keyboard::listen` /
-        // `event::listen_with` fire. The worker thread polls the streams, so
-        // their messages may land a frame later; drain whatever is ready and
-        // fold it in with the widget messages.
-        let recipes =
-            iced_runtime::futures::subscription::into_recipes(render.program.plugin.subscription());
-        self.sub_runtime.track(recipes);
-        for (event, status) in pending_events.iter().zip(&statuses) {
-            self.sub_runtime
-                .broadcast(iced_runtime::futures::subscription::Event::Interaction {
-                    window: self.window_id,
-                    event: event.clone(),
-                    status: *status,
-                });
-        }
-        while let Ok(message) = self.sub_rx.try_recv() {
-            messages.push(message);
-        }
-
-        // Captured input can open an overlay without publishing a message;
-        // a host may apply a parameter edit on its own thread, after this
-        // frame has already re-read it. Either way, repaint next tick.
-        if !messages.is_empty()
-            || statuses
-                .iter()
-                .any(|status| *status == iced_runtime::core::event::Status::Captured)
-        {
-            self.force_render = true;
-        }
-
-        // Messages the rebuilt tree publishes arrive too late to be shown
-        // this frame; they are dispatched below, once nothing borrows the
-        // program, and the forced repaint above carries them.
-        let mut late_messages: Vec<Message<M::Message>> = Vec::new();
-        if !messages.is_empty() {
-            // Draw the model the messages produced, not the one they
-            // replaced. `into_cache()` releases the view's borrow of the
-            // program so the messages can be dispatched, and the tree is
-            // rebuilt from the result before anything is drawn.
-            render.ui_cache = Some(user_interface.into_cache());
-            for message in messages {
-                render.program.dispatch(message);
+            // The backlog came before this frame's input. A text field edits
+            // its own copy of the model's value, so the model must hold what
+            // earlier keys typed before the tree is built for later ones.
+            if !self.sub_backlog.is_empty() {
+                for message in std::mem::take(&mut self.sub_backlog) {
+                    render.program.dispatch(message);
+                }
+                let _ = render.program.poll_data();
             }
-            // Parameter edits the plugin just made reach the shadow cache
-            // only by way of the host, so re-read before the rebuild, and
-            // give the plugin its frame hook again: a message can move the
-            // model onto a view whose derived state the first hook never saw.
-            let _ = render.program.poll_data();
+
+            // Give the plugin its per-frame hook before the view is built,
+            // so model state it derives from data the runtime cannot see is
+            // fresh in the frame that shows it.
             render.program.notify_frame();
 
+            // Build the user interface for this frame from the current
+            // model. The borrow of `render.program` is dropped at
+            // `into_cache()`, after which we can re-enter `dispatch` for
+            // each collected message.
+            let mut messages: Vec<Message<M::Message>> = Vec::new();
             let cache = render
                 .ui_cache
                 .take()
                 .unwrap_or_else(iced_runtime::user_interface::Cache::new);
             let view_element = render.program.view();
-            user_interface = iced_runtime::UserInterface::build(
+            let mut user_interface = iced_runtime::UserInterface::build(
                 view_element,
                 logical_size,
                 cache,
                 &mut render.renderer,
             );
-            // Only the redraw event: the input events were consumed by the
-            // tree that produced the messages, and the subscriptions have
-            // already seen them.
-            let redraw = [Event::Window(crate::iced::window::Event::RedrawRequested(
+
+            let mut pending_events = std::mem::take(&mut self.pending_events);
+            // Feed a per-frame `RedrawRequested` like iced_winit does: focused
+            // widgets re-evaluate on it (text_input blinks its caret and, while
+            // focused, re-issues its `request_input_method` - the signal the iOS
+            // host reads to keep the soft keyboard up). Without it, on a frame
+            // with no input events nothing requests IME and the keyboard would
+            // drop. Appended last so it observes focus set by this frame's input.
+            pending_events.push(Event::Window(crate::iced::window::Event::RedrawRequested(
                 std::time::Instant::now(),
-            ))];
-            let (ui_state, _) = user_interface.update(
-                &redraw,
+            )));
+            let (ui_state, statuses) = user_interface.update(
+                &pending_events,
                 cursor,
                 &mut render.renderer,
                 &mut crate::clipboard::Clipboard,
-                &mut late_messages,
+                &mut messages,
             );
-            report = UiReport::read(ui_state);
-        }
+            let mut report = UiReport::read(ui_state);
 
-        user_interface.draw(&mut render.renderer, &render.theme, &style, cursor);
-
-        render.ui_cache = Some(user_interface.into_cache());
-
-        // Nothing borrows the program any more, so the late messages and
-        // the frame's report can land.
-        for message in late_messages {
-            render.program.dispatch(message);
-        }
-        if let Some(report) = report {
-            render.interaction = report.interaction;
-            render.wants_keyboard = report.wants_keyboard;
-            match report.redraw {
-                crate::iced::window::RedrawRequest::NextFrame => {
-                    self.animate = true;
-                    self.redraw_at = None;
-                }
-                crate::iced::window::RedrawRequest::At(t) => {
-                    self.animate = false;
-                    self.redraw_at = Some(t);
-                }
-                crate::iced::window::RedrawRequest::Wait => {
-                    self.animate = false;
-                    self.redraw_at = None;
-                }
+            // Subscription pump: keep `IcedPlugin::subscription` recipes tracked
+            // and broadcast this frame's events to them, so `keyboard::listen` /
+            // `event::listen_with` fire. The worker thread polls the streams, so
+            // their messages may land a frame later; drain whatever is ready and
+            // fold it in with the widget messages.
+            let recipes = iced_runtime::futures::subscription::into_recipes(
+                render.program.plugin.subscription(),
+            );
+            self.sub_runtime.track(recipes);
+            for (event, status) in pending_events.iter().zip(&statuses) {
+                self.sub_runtime.broadcast(
+                    iced_runtime::futures::subscription::Event::Interaction {
+                        window: self.window_id,
+                        event: event.clone(),
+                        status: *status,
+                    },
+                );
             }
-        } else {
-            // `Outdated`: the widget tree changed under us; rebuild and
-            // repaint next frame rather than trusting this frame's state.
-            self.force_render = true;
-        }
+            while let Ok(message) = self.sub_rx.try_recv() {
+                messages.push(message);
+            }
+
+            // Captured input can open an overlay without publishing a message;
+            // a host may apply a parameter edit on its own thread, after this
+            // frame has already re-read it. Either way, repaint next tick.
+            if !messages.is_empty()
+                || statuses
+                    .iter()
+                    .any(|status| *status == iced_runtime::core::event::Status::Captured)
+            {
+                self.force_render = true;
+            }
+
+            // Messages the rebuilt tree publishes arrive too late to be shown
+            // this frame; they are dispatched below, once nothing borrows the
+            // program, and the forced repaint above carries them.
+            let mut late_messages: Vec<Message<M::Message>> = Vec::new();
+            if !messages.is_empty() {
+                // Draw the model the messages produced, not the one they
+                // replaced. `into_cache()` releases the view's borrow of the
+                // program so the messages can be dispatched, and the tree is
+                // rebuilt from the result before anything is drawn.
+                render.ui_cache = Some(user_interface.into_cache());
+                for message in messages {
+                    render.program.dispatch(message);
+                }
+                // Parameter edits the plugin just made reach the shadow cache
+                // only by way of the host, so re-read before the rebuild, and
+                // give the plugin its frame hook again: a message can move the
+                // model onto a view whose derived state the first hook never saw.
+                let _ = render.program.poll_data();
+                render.program.notify_frame();
+
+                let cache = render
+                    .ui_cache
+                    .take()
+                    .unwrap_or_else(iced_runtime::user_interface::Cache::new);
+                let view_element = render.program.view();
+                user_interface = iced_runtime::UserInterface::build(
+                    view_element,
+                    logical_size,
+                    cache,
+                    &mut render.renderer,
+                );
+                // Only the redraw event: the input events were consumed by the
+                // tree that produced the messages, and the subscriptions have
+                // already seen them.
+                let redraw = [Event::Window(crate::iced::window::Event::RedrawRequested(
+                    std::time::Instant::now(),
+                ))];
+                let (ui_state, _) = user_interface.update(
+                    &redraw,
+                    cursor,
+                    &mut render.renderer,
+                    &mut crate::clipboard::Clipboard,
+                    &mut late_messages,
+                );
+                report = UiReport::read(ui_state);
+            }
+
+            user_interface.draw(&mut render.renderer, &render.theme, &style, cursor);
+
+            render.ui_cache = Some(user_interface.into_cache());
+            // The panel and its displays are drawn from the model the view
+            // was built from, before the late messages move it on.
+            let kept_panel = render
+                .program
+                .plugin
+                .retains_displays(&render.program.param_cache)
+                .then(|| {
+                    let size = (render.surface_config.width, render.surface_config.height);
+                    let panel = previous_panel
+                        .filter(|panel| panel.size() == size)
+                        .unwrap_or_else(|| {
+                            crate::panel::Panel::new(
+                                &render.device,
+                                render.surface_config.format,
+                                size.0,
+                                size.1,
+                            )
+                        });
+                    panel.retain(&mut render.renderer, render.bg_color, &render.viewport);
+                    render
+                        .program
+                        .plugin
+                        .draw_displays(&render.program.param_cache, &mut render.renderer);
+                    panel
+                });
+
+            // Nothing borrows the program any more, so the late messages and
+            // the frame's report can land.
+            for message in late_messages {
+                render.program.dispatch(message);
+            }
+            if let Some(report) = report {
+                render.interaction = report.interaction;
+                render.wants_keyboard = report.wants_keyboard;
+                match report.redraw {
+                    crate::iced::window::RedrawRequest::NextFrame => {
+                        self.animate = true;
+                        self.redraw_at = None;
+                    }
+                    crate::iced::window::RedrawRequest::At(t) => {
+                        self.animate = false;
+                        self.redraw_at = Some(t);
+                    }
+                    crate::iced::window::RedrawRequest::Wait => {
+                        self.animate = false;
+                        self.redraw_at = None;
+                    }
+                }
+            } else {
+                // `Outdated`: the widget tree changed under us; rebuild and
+                // repaint next frame rather than trusting this frame's state.
+                self.force_render = true;
+            }
+            kept_panel
+        };
 
         // Present: get surface texture, render, submit. iced 0.14's
         // `Renderer::present` builds its own encoder + submits to the
@@ -1229,7 +1361,7 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
                     // Pump still acquiring, or a transient error - the
                     // frame's CPU work is done; repaint once one is
                     // ready instead of waiting for the next change.
-                    self.force_render = true;
+                    self.retry(full);
                     return;
                 };
                 if (frame.texture.width(), frame.texture.height())
@@ -1255,6 +1387,9 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
             &view,
             &render.viewport,
         );
+        if !displays_only {
+            render.panel = kept_panel;
+        }
 
         if inline_surface {
             frame.present();
@@ -1287,6 +1422,16 @@ impl<P: Params + 'static, M: IcedPlugin<P>> IcedRuntime<P, M> {
         #[cfg(debug_assertions)]
         if let Some(queued) = self.input_queued.take() {
             input_trace::painted(queued);
+        }
+    }
+
+    /// Draw the frame that found no image to paint into once one is ready,
+    /// as full a frame as it was.
+    fn retry(&mut self, full: bool) {
+        if full {
+            self.force_render = true;
+        } else {
+            self.displays_pending = true;
         }
     }
 
