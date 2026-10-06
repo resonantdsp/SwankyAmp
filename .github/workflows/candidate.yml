@@ -201,7 +201,7 @@ jobs:
         with:
           cache-on-failure: true
           shared-key: bundles-windows-2025
-      # The ASIO SDK, as in check.yml's Windows job.
+      # The ASIO SDK, as in check.yml's Windows jobs.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: tools/ASIOSDK

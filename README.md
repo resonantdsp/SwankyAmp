@@ -12,12 +12,12 @@ Install Rust through [rustup](https://rustup.rs/) and [just](https://github.com/
 just
 ```
 
-It checks formatting, runs clippy and runs the crate's tests. CI runs the rest on every pull request, as `.github/workflows/check.yml` defines. Run a part of it locally only when a change touches that area:
+It checks formatting, runs clippy and runs the crate's tests. On every pull request and every push to master that changes more than prose CI runs `just ci-checks` on Linux (every clippy set, every test in one optimised profile, the release scripts' tests and the reference and model comparisons) and clippy on Windows, where the ASIO host compiles. Only a push to master also builds the bundles on macOS and Windows and runs the format validators, so a change to the bundles or the formats is worth `just validate` locally before it lands. `.github/workflows/check.yml` defines both tiers. Run a part of the Linux checks locally only when a change touches that area:
 
 - `just release-tests`: the release scripts' tests;
 - `just reference-check`: the [released reference renderer](verification/reference/README.md) still reproduces its frozen 1.4.0 renders;
 - `just model-check`: the legacy path still matches the released 1.4.0 chain on the ten factory presets;
-- `just validate-assets`: an artwork package matches its receipt and the layers it was packed from;
+- `just validate-assets`: an artwork package matches its receipt and the layers it was packed from (CI's tests check the committed package);
 - `just clippy-all` and `just test-all`: the vendored host, the format adapters and the standalone.
 
 The offline tools in `src/bin` build only with the `tools` feature, which keeps them out of the format builds; the recipes that run them turn it on.

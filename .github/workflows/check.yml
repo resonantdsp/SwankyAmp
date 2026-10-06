@@ -1,36 +1,46 @@
 name: check
 
-# Prose cannot change what these jobs measure.
+# Two tiers. Every pull request and every push to master that changes a
+# buildable path runs the checks: `checks (linux)` (formatting, clippy on every
+# feature set, every test in one optimised profile, which checks the committed
+# artwork package too, the release scripts' tests and the reference and model
+# comparisons) and `checks (windows)` (clippy on the code only Windows
+# compiles, the ASIO host among it), side by side. Pushes to master also build
+# the release bundles on macOS and Windows and run the format validators over
+# them; a pull request never does, and candidate.yml builds them again for
+# every release candidate. So nothing compiles the macOS-only code, the Audio
+# Unit among it, before a change reaches master: a break there turns master
+# red, and fixing it is the next piece of work.
+#
+# The master ruleset requires checks by job name, so its required checks must
+# be exactly `checks (linux)` and `checks (windows)`. Renaming either job
+# without changing the ruleset leaves every pull request waiting for a check
+# that never reports.
+#
+# The only paths that skip the checks are ones that can never affect a build or
+# a test: prose. Nothing is skipped because it seems unlikely to matter; add a
+# path below only when no build or test can read it.
 #
 # The skip is decided by the `changes` job rather than by `paths-ignore`,
 # because a workflow filtered out by path never reports its checks at all, and
-# a required check that never reports leaves a pull request confined to prose
-# waiting forever. A skipped job satisfies a required check, so the jobs always
+# a pull request confined to prose would wait forever for required checks that
+# cannot happen. A skipped job satisfies a required check, so the jobs always
 # exist and decline to do the work instead.
 #
-# `checks` declines at the job level. `bundles` cannot: a matrix job whose
-# job-level `if` is false never expands its matrix, so it reports one check
-# named for the unresolved expression and the two per-platform names never
-# appear. Its legs therefore always start, and every step declines instead,
-# so each leg reports its real name and finishes in seconds.
-#
-# Within `checks`, the reference and model comparisons run only when one of
-# their inputs changed: the frozen 1.4.0 fixture cannot move otherwise, and
-# the model comparison renders nothing that other code can change.
-#
-# `bundles` also waits for `checks`, so the twenty-minute builds are not spent
-# on a change that already failed. Its legs start even when `checks` fails or
-# is skipped; after a failure, or a failed `changes`, each leg fails at once
-# rather than declining, so no green bundle check stands for work never done.
+# Caches are saved only from master, so the 10 GB the repository is allowed
+# holds master's dependency builds; a pull request restores them and saves
+# nothing.
 on:
   push:
     branches: [master]
   pull_request:
 
-# A newer push to the same ref makes the older answer irrelevant.
+# A newer push to a pull request makes the older answer irrelevant. On master
+# every push runs to the end: the next push may change only prose and skip the
+# bundles, which would leave the earlier change's bundles never built.
 concurrency:
   group: check-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -41,7 +51,10 @@ env:
 # A hung step, such as a stalled package install, otherwise runs to GitHub's
 # six-hour limit. Each timeout is at least twice the job's slowest run from
 # September 23 to October 1, 2026, cold dependency caches included: changes
-# under a minute, checks 13 minutes, bundles 30 minutes (Windows; macOS 26).
+# under a minute, bundles 30 minutes (Windows; macOS 26). The Linux checks
+# took up to 13 minutes, but now run the reference and model comparisons every
+# time and build the crate optimised, and the Windows lints have no history
+# yet, so both limits are estimates until they have one.
 jobs:
   changes:
     name: changes
@@ -49,8 +62,6 @@ jobs:
     timeout-minutes: 10
     outputs:
       code: ${{ steps.filter.outputs.code }}
-      reference: ${{ steps.filter.outputs.reference }}
-      model: ${{ steps.filter.outputs.model }}
     steps:
       # The base commit has to be in the clone for the diff below, and neither
       # a pull request's base nor the commit a push started from is reachable
@@ -69,7 +80,7 @@ jobs:
           if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ] \
             || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
             echo "No usable base commit; treating every path as changed."
-            printf 'code=true\nreference=true\nmodel=true\n' >> "$GITHUB_OUTPUT"
+            echo "code=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           # On a pull request HEAD is the merge of the head into the base, so
@@ -79,31 +90,26 @@ jobs:
           echo "Changed files:"
           echo "$files"
           code=false
-          reference=false
-          model=false
           while IFS= read -r file; do
             [ -n "$file" ] || continue
             case "$file" in
-              *.md) continue ;;
-            esac
-            code=true
-            case "$file" in
-              verification/reference/* | Justfile | .github/workflows/check.yml) reference=true ;;
-            esac
-            case "$file" in
-              src/dsp/* | src/bin/render-model.rs | src/engine.rs | src/presets.rs \
-                | verification/* | Cargo.toml | Cargo.lock | rust-toolchain.toml \
-                | Justfile | .github/workflows/check.yml)
-                model=true ;;
+              *.md) ;;
+              *)
+                echo "Outside the ignored set: $file"
+                code=true
+                break
+                ;;
             esac
           done <<< "$files"
-          echo "code=$code reference=$reference model=$model"
-          printf 'code=%s\nreference=%s\nmodel=%s\n' "$code" "$reference" "$model" >> "$GITHUB_OUTPUT"
+          echo "code=$code"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
 
-  checks:
+  checks-linux:
     name: checks (linux)
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    # Runs unless `changes` positively found nothing to build: a `changes` that
+    # failed gives no answer, and a skipped required check would pass.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
@@ -116,6 +122,7 @@ jobs:
       - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
         with:
           just-version: "1.58.0"
+      # The release scripts' tests run on the node the promote tier pins.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24.21.0"
@@ -123,16 +130,50 @@ jobs:
         with:
           # A failed check is the usual outcome, and it must not discard the dependency build.
           cache-on-failure: true
+          save-if: ${{ github.ref == 'refs/heads/master' }}
       - run: just ci-checks
-      - run: just reference-check
-        if: needs.changes.outputs.reference == 'true'
-      - run: just model-check
-        if: needs.changes.outputs.model == 'true'
 
+  checks-windows:
+    name: checks (windows)
+    needs: changes
+    # Runs unless `changes` positively found nothing to build: a `changes` that
+    # failed gives no answer, and a skipped required check would pass.
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
+    runs-on: windows-2025
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+        with:
+          just-version: "1.58.0"
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          cache-on-failure: true
+          save-if: ${{ github.ref == 'refs/heads/master' }}
+      # The ASIO SDK the asio feature compiles against, which the recipe
+      # downloads on a miss.
+      - id: asio-sdk
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: tools/ASIOSDK
+          key: asio-sdk-${{ hashFiles('scripts/install-asio-sdk.sh') }}
+      # Windows has no POSIX shell by default; the recipes are written for bash,
+      # which the runner image provides.
+      - run: just ci-checks
+        shell: bash
+      - if: github.ref == 'refs/heads/master' && steps.asio-sdk.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: tools/ASIOSDK
+          key: asio-sdk-${{ hashFiles('scripts/install-asio-sdk.sh') }}
+
+  # The costly part of a run, so it builds only on master and only once the
+  # Linux checks passed. Nothing requires these names; a failure here is
+  # master's red build, the next piece of work for whoever merged last.
   bundles:
     name: bundles (${{ matrix.os }})
-    needs: [changes, checks]
-    if: ${{ !cancelled() }}
+    needs: checks-linux
+    if: github.event_name == 'push'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
@@ -140,22 +181,12 @@ jobs:
       matrix:
         os: [macos-15, windows-2025]
     steps:
-      - name: Require passing checks
-        if: needs.changes.result != 'success' || (needs.checks.result != 'success' && needs.checks.result != 'skipped')
-        shell: bash
-        run: |
-          echo "changes: ${{ needs.changes.result }}, checks: ${{ needs.checks.result }}; bundles not built."
-          exit 1
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-        if: needs.changes.outputs.code == 'true'
       - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
-        if: needs.changes.outputs.code == 'true'
         with:
           just-version: "1.58.0"
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        if: needs.changes.outputs.code == 'true'
         with:
-          # A failed check is the usual outcome, and it must not discard the dependency build.
           cache-on-failure: true
           # One cache per platform rather than per job, so the candidate tier
           # starts from the dependency build this tier already paid for.
@@ -163,15 +194,11 @@ jobs:
       # The ASIO SDK the Windows standalone builds with, which `just setup`
       # downloads on a miss. Restored unchanged, it leaves asio-sys built.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: needs.changes.outputs.code == 'true' && runner.os == 'Windows'
+        if: runner.os == 'Windows'
         with:
           path: tools/ASIOSDK
           key: asio-sdk-${{ hashFiles('scripts/install-asio-sdk.sh') }}
-      # Windows has no POSIX shell by default; the recipes are written for bash,
-      # which the runner image provides.
       - run: just setup
-        if: needs.changes.outputs.code == 'true'
         shell: bash
       - run: just ci-bundles
-        if: needs.changes.outputs.code == 'true'
         shell: bash

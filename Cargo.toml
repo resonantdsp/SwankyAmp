@@ -154,3 +154,13 @@ opt-level = 2
 [profile.release]
 lto = "thin"
 strip = true
+
+# Every test in CI runs in this one build, and so does the model comparison's
+# renderer: the level tests render the guitar recordings and are slow with the
+# crate itself unoptimised. Debug assertions and overflow checks stay on for
+# the tests, and since Rust never reorders or fuses floating point the
+# optimisation changes no measured level.
+[profile.checks]
+inherits = "dev"
+opt-level = 2
+debug = false

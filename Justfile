@@ -62,10 +62,12 @@ test:
 
 # Also tests the format adapters, the standalone's audio panel and the
 # vendored standalone host, a patched dependency whose tests the crate's own
-# run leaves out.
-test-all: test
-    cargo test --no-default-features --features clap,standalone,rt-paranoid -- adapter_ standalone_audio
-    cargo test -p truce-standalone
+# run leaves out. Every test here builds in the one optimised `checks`
+# profile, so CI compiles the crate once for all of them.
+test-all:
+    cargo test --profile checks --no-default-features --features tools
+    cargo test --profile checks --no-default-features --features clap,standalone,rt-paranoid -- adapter_ standalone_audio
+    cargo test --profile checks -p truce-standalone
 
 release-tests:
     python3 -m unittest discover -s .github/scripts -p 'test_*.py'
@@ -74,9 +76,10 @@ release-tests:
 reference-check:
     bash verification/reference/check.sh
 
+# Built with the tests' profile, so CI compiles no third configuration for it.
 model-check:
-    cargo build --quiet --no-default-features --features tools --bin render-model
-    python3 verification/model/check.py target/debug/render-model
+    cargo build --quiet --profile checks --no-default-features --features tools --bin render-model
+    python3 verification/model/check.py target/checks/render-model
 
 # Measure oversampling and the tube filters against the legacy path.
 dsp-report output="target/dsp/oversampling-filters.json":
@@ -229,8 +232,20 @@ promote-check candidate_tag tag record_sha256 directory:
     python3 .github/scripts/release_contract.py verify-candidate \
         "{{ candidate_tag }}" "{{ tag }}" "{{ record_sha256 }}" "{{ directory }}"
 
-# Everything CI's Linux job proves before any bundle is built, besides the
-# reference and model comparisons, which it runs when their inputs change.
-ci-checks: fmt clippy-all test-all release-tests
+# What CI runs on Linux for every pull request. The tests check the
+# committed artwork package against its receipt, so the artwork is checked
+# here once.
+[unix]
+ci-checks: fmt clippy-all test-all release-tests reference-check model-check
 
+# Windows compiles code no other platform does, the ASIO host among it, so its
+# lints run there; everything else runs once, on Linux.
+# What CI runs on Windows for every pull request.
+[windows]
+ci-checks:
+    bash scripts/install-asio-sdk.sh
+    cargo clippy --all-targets --features tools {{ bundle_features }} -- -D warnings
+    cargo clippy --all-targets --no-default-features --features tools -- -D warnings
+
+# What CI runs on macOS and Windows after a push to master.
 ci-bundles: build-standalone (validate "--skip-gui-tests")
