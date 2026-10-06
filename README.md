@@ -12,7 +12,7 @@ Install Rust through [rustup](https://rustup.rs/) and [just](https://github.com/
 just
 ```
 
-It checks formatting, runs clippy and runs the crate's tests. On every pull request and every push to master that changes more than prose CI runs `just ci-checks` on Linux (every clippy set, every test in one optimised profile, the release scripts' tests and the reference and model comparisons) and clippy on Windows, where the ASIO host compiles. Only a push to master also builds the bundles on macOS and Windows and runs the format validators, so a change to the bundles or the formats is worth `just validate` locally before it lands. `.github/workflows/check.yml` defines both tiers. Run a part of the Linux checks locally only when a change touches that area:
+It checks formatting, runs clippy and runs the crate's tests. On every pull request and every push to master that changes more than prose CI runs `just ci-checks` on Linux (every clippy set, every test in one optimised profile, the release scripts' tests and the reference and model comparisons) and, on Windows, clippy, where the ASIO host compiles, and a test that builds every editor pipeline through Direct3D 12, whose shader compiler rejects programs Metal accepts. Only a push to master also builds the bundles on macOS and Windows and runs the format validators, so a change to the bundles or the formats is worth `just validate` locally before it lands. `.github/workflows/check.yml` defines both tiers. Run a part of the Linux checks locally only when a change touches that area:
 
 - `just release-tests`: the release scripts' tests;
 - `just reference-check`: the [released reference renderer](verification/reference/README.md) still reproduces its frozen 1.4.0 renders;

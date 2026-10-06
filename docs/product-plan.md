@@ -87,7 +87,7 @@ Rust and iced own the interface definition. `export-layout` drives the private p
 
 ## Verification
 
-- **Every change.** `just` runs format, clippy and the tests locally; Each pull request runs `checks (linux)`: format, clippy, all tests including artwork validation in one optimised profile, the release-script tests, `just reference-check` and `just model-check`. Alongside it, `checks (windows)` runs clippy on Windows. Each push to `master` also builds, installs and validates the bundles on macOS and Windows (Free #124).
+- **Every change.** `just` runs format, clippy and the tests locally; Each pull request runs `checks (linux)`: format, clippy, all tests including artwork validation in one optimised profile, the release-script tests, `just reference-check` and `just model-check`. Alongside it, `checks (windows)` runs clippy on Windows and builds every editor pipeline through Direct3D 12, so a shader Direct3D's compiler rejects fails with its message. Each push to `master` also builds, installs and validates the bundles on macOS and Windows (Free #124).
 - **Pre-release.** `just tone-stack-soak`.
 - **Listening.** Garrin accepted the factory bank and the level behaviour under drive by ear against 1.4.0; listening in real hosts is part of qualification.
 
