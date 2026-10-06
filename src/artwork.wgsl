@@ -24,6 +24,9 @@ struct Controls {
 @group(0) @binding(3) var<uniform> controls: Controls;
 @group(0) @binding(4) var linear_sampler: sampler;
 @group(0) @binding(5) var disc: texture_2d_array<f32>;
+/// Past this many points beyond a lit ring both of its halo's gaussians
+/// underflow to exactly zero; artwork.rs mirrors it.
+const HALO_REACH: f32 = 64.0;
 
 struct VertexOut {
     @builtin(position) position: vec4<f32>,
@@ -110,7 +113,14 @@ fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
         let local = point - knob.geometry.xy;
         let value = clamp(knob.state.x, 0.0, 1.0);
         let enabled = knob.state.y;
-        if knob.geometry.w >= 0.0 {
+        // Past its reflection's tail and its halo's reach a knob adds exactly
+        // no light, so a pixel there skips the ring maths; `knob_reach` in
+        // artwork.rs bounds the same distance.
+        let lit_reach = max(
+            radius * controls.extent.x,
+            radius * (controls.ring.x + controls.ring.y) + HALO_REACH,
+        ) * 1.001;
+        if knob.geometry.w >= 0.0 && length(local) < lit_reach {
             let normalized = local / radius;
             let uv = response_uv(normalized);
             let tail = 1.0 - smoothstep(
@@ -121,8 +131,15 @@ fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
             let position = value * controls.scene.w;
             let upper = min(i32(floor(position)), i32(controls.scene.w) - 1);
             let fraction = position - f32(upper);
-            let previous = textureSampleLevel(responses, linear_sampler, uv, max(upper - 1, 0), 0.0).rgb;
-            let next = textureSampleLevel(responses, linear_sampler, uv, upper, 0.0).rgb;
+            // The tail is exactly zero from the extent on, which the margin
+            // keeps clear of smoothstep's rounding, so the samples there add
+            // nothing and are skipped.
+            var previous = vec3(0.0);
+            var next = vec3(0.0);
+            if length(normalized) < controls.extent.x * 1.001 {
+                previous = textureSampleLevel(responses, linear_sampler, uv, max(upper - 1, 0), 0.0).rgb;
+                next = textureSampleLevel(responses, linear_sampler, uv, upper, 0.0).rgb;
+            }
             light += mix(select(vec3(0.0), previous, upper > 0), next, fraction) * enabled * tail;
 
             let distance = arc_distance(local, radius * controls.ring.x, value);
@@ -136,11 +153,17 @@ fn fs_main(input: VertexOut) -> @location(0) vec4<f32> {
         }
 
         let marker_radius = radius * controls.marker.x;
+        let width = radius * controls.marker.y;
+        // The marker lies on its circle, so a point this far from the circle
+        // is beyond the divot and its bevel, where both are exactly zero and
+        // leave the radiance as it is.
+        if abs(length(local) - marker_radius) > width + 0.5 + aa + 1.0 {
+            continue;
+        }
         let nearest = segment_nearest(local, marker_radius, controls.ring.z - value * controls.ring.w, 0.0);
         let offset = local - nearest;
         let distance = length(offset);
         let outward = offset / max(distance, 0.001);
-        let width = radius * controls.marker.y;
         let inside = 1.0 - smoothstep(width - aa * 0.5, width + aa * 0.5, distance);
         let amount = clamp(distance / width, 0.0, 1.0);
         // A knob with no effect keeps its divot as a shallow shade in the
