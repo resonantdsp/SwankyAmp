@@ -258,11 +258,12 @@ The information panel's Third-party licences link opens the notices the plug-in 
 
 ### Vendored crates
 
-Narrow patches of the published Truce sources, of baseview and of wgpu-hal, each directory carrying its unchanged upstream licences, original manifest, source reference and an `UPSTREAM.md` describing the local changes:
+Narrow patches of the published Truce sources, of baseview, of iced_wgpu and of wgpu-hal, each directory carrying its unchanged upstream licences, original manifest, source reference and an `UPSTREAM.md` describing the local changes:
 
 - `vendor/baseview-truce`: frame delivery paced by the display, host keyboard and modifier fixes, keys the editor does not use handed back to the host, no process-wide DPI change and no drag-and-drop, and a window kept alive until a detached GPU thread releases it.
 - `vendor/truce-iced`: iced input, focus, redraw and clipboard fixes, a GPU thread whose setup is bounded and final, frames built only when they can be shown, the low-power GPU and an sRGB surface, the editor's lifecycle records and a native note when its graphics cannot start.
 - `vendor/wgpu-hal`: on Windows the shader compiler loads from System32, compiled shaders are cached on disk, and only the GPU Windows would choose gets a device.
+- `vendor/iced_wgpu`: multisampled meshes drawn over their own region rather than the whole frame.
 - `vendor/truce-clap`: host state notification required by clap-validator, dynamic-latency restart with the latency held until it, and active reset handling.
 - `vendor/truce-standalone`: dynamic-latency restart on the output worker, an input kept within about one buffer of the output, a Buffer Size menu, remembered devices, input channels and buffer size, an input that starts live only on a chosen device, is off after a driver switch and never remembers the computer's own microphone, the audio choices and what needs the player offered to the plug-in's editor, a window that opens without sound when the output will not start, streams faded out and stopped on close, no Ctrl+I or Ctrl+O shortcuts, and ASIO on Windows.
 - `vendor/truce-core`, `vendor/truce-plugin`, `vendor/truce-loader` and `vendor/truce`: a real-time reset lifecycle hook and its forwarding bridge. `truce-core` and `truce-loader` also carry an activation flag saying the format holds latency until the next reset.

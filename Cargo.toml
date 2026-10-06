@@ -148,6 +148,7 @@ truce-core = { path = "vendor/truce-core" }
 truce-loader = { path = "vendor/truce-loader" }
 truce-plugin = { path = "vendor/truce-plugin" }
 truce-standalone = { path = "vendor/truce-standalone" }
+iced_wgpu = { path = "vendor/iced_wgpu" }
 wgpu-hal = { path = "vendor/wgpu-hal" }
 
 [profile.dev]

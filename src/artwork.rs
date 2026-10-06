@@ -531,14 +531,115 @@ struct ScenePrimitive {
     uniform: Uniform,
 }
 
+/// How far past a lit ring its halo can still add light. Both of the halo's
+/// gaussians underflow to exactly zero in single precision beyond this many
+/// points, so a pixel further out shows the same value whatever the knob does.
+/// artwork.wgsl skips a knob's light beyond the same reach, so the two agree.
+const HALO_REACH: f32 = 64.;
+/// Room for the shader's antialiasing width, which is a device pixel and so
+/// under two points at the smallest interface size, and the divot's rim.
+const EDGE: f32 = 4.;
+
+/// The bytes the shader reads, so equal bytes mean an identical draw, NaN included.
+fn same<T: bytemuck::Pod>(a: &T, b: &T) -> bool {
+    bytemuck::bytes_of(a) == bytemuck::bytes_of(b)
+}
+/// The radius, in points around a knob's centre, past which nothing the knob
+/// draws reaches: its reflection's tail, its ring and halo, and its marker.
+fn knob_reach(uniform: &Uniform, knob: &Control) -> f32 {
+    let radius = knob.geometry[2];
+    let marker = radius * (uniform.marker[0] + uniform.marker[1]);
+    // A knob without a ring has no reflection or light either.
+    if knob.geometry[3] < 0. {
+        return marker + EDGE;
+    }
+    let reflection = radius * uniform.extent[0];
+    let ring = radius * (uniform.ring[0] + uniform.ring[1]) + HALO_REACH;
+    reflection.max(ring).max(marker) + EDGE
+}
+/// The areas, in the view's points, where `new` can paint differently from
+/// `old`, or `None` when something other than a control's own state changed
+/// and every pixel must be drawn again.
+fn changed_areas(old: &Uniform, new: &Uniform) -> Option<Vec<[f32; 4]>> {
+    let fixed = |uniform: &Uniform| {
+        let mut fixed = *uniform;
+        for control in fixed.meters.iter_mut().chain(&mut fixed.controls) {
+            control.state = [0.; 4];
+        }
+        fixed.disc = [0.; 4];
+        fixed
+    };
+    if !same(&fixed(old), &fixed(new)) {
+        return None;
+    }
+    let mut areas = Vec::new();
+    for (now, before) in new.controls.iter().zip(&old.controls) {
+        if !same(now, before) {
+            let reach = knob_reach(new, now);
+            let [x, y, ..] = now.geometry;
+            areas.push([x - reach, y - reach, 2. * reach, 2. * reach]);
+        }
+    }
+    // The switch's disc moves its whole sprite and the shadow under it, so
+    // the place it left changes too.
+    if !same(&new.disc, &old.disc) {
+        for [x, y, width, height] in [new.disc, old.disc] {
+            areas.push([x - EDGE, y - EDGE, width + 2. * EDGE, height + 2. * EDGE]);
+        }
+    }
+    let extent = new.meter_style[2] + EDGE;
+    for (now, before) in new.meters.iter().zip(&old.meters) {
+        if !same(now, before) {
+            let [x, y, width, height] = now.geometry;
+            areas.push([
+                x - extent,
+                y - extent,
+                width + 2. * extent,
+                height + 2. * extent,
+            ]);
+        }
+    }
+    Some(areas)
+}
+
+/// The composited backdrop's finished pixels, kept between frames so a frame
+/// only runs the compositor where a control changed. The compositor writes
+/// opaque pixels with no blending, so the store is in the frame's own format
+/// and copies across exactly.
+struct Store {
+    view: wgpu::TextureView,
+    copy: wgpu::BindGroup,
+    size: iced_core::Size<u32>,
+    /// The artwork, placement and controls every pixel of the store shows.
+    shows: Option<(String, Rectangle, Uniform)>,
+}
+
+/// The compositor, held across frames. `iced_wgpu` stores pipelines per
+/// `Engine`, and every editor window and offscreen renderer builds its own, so
+/// the store is never shared between editors.
 struct ScenePipeline {
+    /// The compositor, drawn into the store.
     pipeline: wgpu::RenderPipeline,
+    /// Copies the store onto the frame.
+    copy: wgpu::RenderPipeline,
+    format: wgpu::TextureFormat,
     layout: wgpu::BindGroupLayout,
+    copy_layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
     controls: wgpu::Buffer,
     binding: Option<(String, wgpu::BindGroup)>,
-    bounds: Option<Rectangle>,
+    store: Option<Store>,
 }
+
+const COPY_SHADER: &str = "
+@group(0) @binding(0) var stored: texture_2d<f32>;
+@vertex fn vs_main(@builtin(vertex_index) index: u32) -> @builtin(position) vec4<f32> {
+    let positions = array<vec2<f32>, 3>(vec2(-1., -1.), vec2(3., -1.), vec2(-1., 3.));
+    return vec4(positions[index], 0., 1.);
+}
+@fragment fn fs_main(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
+    return textureLoad(stored, vec2<i32>(position.xy), 0);
+}";
 
 impl Pipeline for ScenePipeline {
     fn new(device: &wgpu::Device, _: &wgpu::Queue, format: wgpu::TextureFormat) -> Self {
@@ -577,6 +678,19 @@ impl Pipeline for ScenePipeline {
                 },
             ],
         });
+        let copy_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Free artwork store"),
+            entries: &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    multisampled: false,
+                },
+                count: None,
+            }],
+        });
         let controls = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Free artwork controls"),
             size: std::mem::size_of::<Uniform>() as u64,
@@ -595,44 +709,143 @@ impl Pipeline for ScenePipeline {
             label: Some("Free linear-light artwork compositor"),
             source: wgpu::ShaderSource::Wgsl(include_str!("artwork.wgsl").into()),
         });
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Free artwork pipeline layout"),
-            bind_group_layouts: &[&layout],
-            push_constant_ranges: &[],
+        let copy_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Free artwork copy"),
+            source: wgpu::ShaderSource::Wgsl(COPY_SHADER.into()),
         });
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Free artwork"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                compilation_options: Default::default(),
-                buffers: &[],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                compilation_options: Default::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format,
-                    blend: None,
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            primitive: Default::default(),
-            depth_stencil: None,
-            multisample: Default::default(),
-            multiview: None,
-            cache: None,
-        });
+        let make_pipeline = |module: &wgpu::ShaderModule, resources: &wgpu::BindGroupLayout| {
+            let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: None,
+                bind_group_layouts: &[resources],
+                push_constant_ranges: &[],
+            });
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Free artwork"),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module,
+                    entry_point: Some("vs_main"),
+                    compilation_options: Default::default(),
+                    buffers: &[],
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module,
+                    entry_point: Some("fs_main"),
+                    compilation_options: Default::default(),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format,
+                        blend: None,
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                }),
+                primitive: Default::default(),
+                depth_stencil: None,
+                multisample: Default::default(),
+                multiview: None,
+                cache: None,
+            })
+        };
         Self {
-            pipeline,
+            pipeline: make_pipeline(&shader, &layout),
+            copy: make_pipeline(&copy_shader, &copy_layout),
+            format,
             layout,
+            copy_layout,
             sampler,
             controls,
             binding: None,
-            bounds: None,
+            store: None,
         }
+    }
+}
+
+impl Store {
+    fn new(
+        device: &wgpu::Device,
+        layout: &wgpu::BindGroupLayout,
+        format: wgpu::TextureFormat,
+        size: iced_core::Size<u32>,
+    ) -> Self {
+        let view = device
+            .create_texture(&wgpu::TextureDescriptor {
+                label: Some("Free artwork store"),
+                size: wgpu::Extent3d {
+                    width: size.width,
+                    height: size.height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                    | wgpu::TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            })
+            .create_view(&Default::default());
+        let copy = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
+            layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&view),
+            }],
+        });
+        Self {
+            view,
+            copy,
+            size,
+            shows: None,
+        }
+    }
+    /// The whole-pixel regions of the frame whose pixels must be drawn again
+    /// so the store shows `uniform` from the artwork `view` at `bounds`.
+    fn stale(&self, view: &str, bounds: Rectangle, uniform: &Uniform) -> Vec<Rectangle<u32>> {
+        let whole = Rectangle {
+            x: 0,
+            y: 0,
+            width: self.size.width,
+            height: self.size.height,
+        };
+        let Some((shown, at, before)) = &self.shows else {
+            return vec![whole];
+        };
+        if shown != view || *at != bounds {
+            return vec![whole];
+        }
+        let Some(areas) = changed_areas(before, uniform) else {
+            return vec![whole];
+        };
+        // A point maps onto the frame the way the shader's uv does: across the
+        // backdrop's bounds, the scene's width and height spanning them.
+        let [width, height] = [uniform.scene[0], uniform.scene[1]];
+        let regions = areas
+            .into_iter()
+            .filter_map(|[x, y, w, h]| {
+                let left = bounds.x + x / width * bounds.width;
+                let top = bounds.y + y / height * bounds.height;
+                let right = bounds.x + (x + w) / width * bounds.width;
+                let bottom = bounds.y + (y + h) / height * bounds.height;
+                let clamp = |v: f32, most: u32| v.max(0.).min(most as f32) as u32;
+                let x0 = clamp(left.floor() - 1., self.size.width);
+                let y0 = clamp(top.floor() - 1., self.size.height);
+                let x1 = clamp(right.ceil() + 1., self.size.width);
+                let y1 = clamp(bottom.ceil() + 1., self.size.height);
+                (x1 > x0 && y1 > y0).then_some(Rectangle {
+                    x: x0,
+                    y: y0,
+                    width: x1 - x0,
+                    height: y1 - y0,
+                })
+            })
+            .collect::<Vec<_>>();
+        // Neighbouring knobs' reaches overlap, so several changes at once can
+        // cost more than one whole redraw.
+        let area = |r: &Rectangle<u32>| u64::from(r.width) * u64::from(r.height);
+        if regions.iter().map(area).sum::<u64>() >= area(&whole) {
+            return vec![whole];
+        }
+        regions
     }
 }
 
@@ -647,89 +860,111 @@ impl Primitive for ScenePrimitive {
         bounds: &Rectangle,
         viewport: &iced_graphics::Viewport,
     ) {
-        if pipeline.binding.as_ref().map(|(key, _)| key) != Some(&self.scene.physical_sha256) {
-            let base = upload_layer(device, queue, self.scene, &self.scene.base);
-            let shadow = upload_layer(device, queue, self.scene, &self.scene.shadow);
-            let responses = upload_array(device, queue, self.scene, &self.scene.responses);
-            let disc = upload_array(device, queue, self.scene, &self.scene.disc);
-            let binding = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                label: Some("Free artwork binding"),
-                layout: &pipeline.layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&base),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::TextureView(&shadow),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 2,
-                        resource: wgpu::BindingResource::TextureView(&responses),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 3,
-                        resource: pipeline.controls.as_entire_binding(),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 4,
-                        resource: wgpu::BindingResource::Sampler(&pipeline.sampler),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 5,
-                        resource: wgpu::BindingResource::TextureView(&disc),
-                    },
-                ],
-            });
-            pipeline.binding = Some((self.scene.physical_sha256.clone(), binding));
-        }
+        let key = &self.scene.physical_sha256;
+        let binding = match &mut pipeline.binding {
+            Some((shown, binding)) if shown == key => binding,
+            slot => {
+                let base = upload_layer(device, queue, self.scene, &self.scene.base);
+                let shadow = upload_layer(device, queue, self.scene, &self.scene.shadow);
+                let responses = upload_array(device, queue, self.scene, &self.scene.responses);
+                let disc = upload_array(device, queue, self.scene, &self.scene.disc);
+                let binding = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("Free artwork binding"),
+                    layout: &pipeline.layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(&base),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::TextureView(&shadow),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 2,
+                            resource: wgpu::BindingResource::TextureView(&responses),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 3,
+                            resource: pipeline.controls.as_entire_binding(),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 4,
+                            resource: wgpu::BindingResource::Sampler(&pipeline.sampler),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 5,
+                            resource: wgpu::BindingResource::TextureView(&disc),
+                        },
+                    ],
+                });
+                &mut slot.insert((key.clone(), binding)).1
+            }
+        };
         let scale = viewport.scale_factor();
         let mut uniform = self.uniform;
         uniform.sampling[0] = level_of_detail(scale);
         queue.write_buffer(&pipeline.controls, 0, bytemuck::bytes_of(&uniform));
-        pipeline.bounds = Some(Rectangle {
+        // The same placement iced gives the backdrop when it draws over the
+        // frame, so a stored pixel is the one the frame would have drawn.
+        let placed = Rectangle {
             x: bounds.x * scale,
             y: bounds.y * scale,
             width: bounds.width * scale,
             height: bounds.height * scale,
-        });
+        };
+        let size = viewport.physical_size();
+        let store = match &mut pipeline.store {
+            Some(store) if store.size == size => store,
+            slot => slot.insert(Store::new(
+                device,
+                &pipeline.copy_layout,
+                pipeline.format,
+                size,
+            )),
+        };
+        let stale = store.stale(key, placed, &uniform);
+        if !stale.is_empty() {
+            // Submitted here, ahead of the frame, which reads the store only
+            // once this has drawn: the queue runs submissions in order, and the
+            // controls written above land before either.
+            let mut encoder = device.create_command_encoder(&Default::default());
+            {
+                let mut draw = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    label: Some("Free artwork composite"),
+                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                        view: &store.view,
+                        resolve_target: None,
+                        ops: wgpu::Operations {
+                            load: wgpu::LoadOp::Load,
+                            store: wgpu::StoreOp::Store,
+                        },
+                        depth_slice: None,
+                    })],
+                    depth_stencil_attachment: None,
+                    timestamp_writes: None,
+                    occlusion_query_set: None,
+                });
+                draw.set_viewport(placed.x, placed.y, placed.width, placed.height, 0., 1.);
+                draw.set_pipeline(&pipeline.pipeline);
+                draw.set_bind_group(0, &*binding, &[]);
+                for region in stale {
+                    draw.set_scissor_rect(region.x, region.y, region.width, region.height);
+                    draw.draw(0..3, 0..1);
+                }
+            }
+            queue.submit([encoder.finish()]);
+        }
+        store.shows = Some((key.clone(), placed, uniform));
     }
 
-    fn render(
-        &self,
-        pipeline: &ScenePipeline,
-        encoder: &mut wgpu::CommandEncoder,
-        target: &wgpu::TextureView,
-        clip: &Rectangle<u32>,
-    ) {
-        let (Some(bounds), Some((_, binding))) = (pipeline.bounds, pipeline.binding.as_ref())
-        else {
-            return;
-        };
-        if clip.width == 0 || clip.height == 0 {
-            return;
+    fn draw(&self, pipeline: &ScenePipeline, pass: &mut wgpu::RenderPass<'_>) -> bool {
+        if let Some(store) = &pipeline.store {
+            pass.set_pipeline(&pipeline.copy);
+            pass.set_bind_group(0, &store.copy, &[]);
+            pass.draw(0..3, 0..1);
         }
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Free artwork composite"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: target,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Load,
-                    store: wgpu::StoreOp::Store,
-                },
-                depth_slice: None,
-            })],
-            depth_stencil_attachment: None,
-            timestamp_writes: None,
-            occlusion_query_set: None,
-        });
-        pass.set_viewport(bounds.x, bounds.y, bounds.width, bounds.height, 0.0, 1.0);
-        pass.set_scissor_rect(clip.x, clip.y, clip.width, clip.height);
-        pass.set_pipeline(&pipeline.pipeline);
-        pass.set_bind_group(0, binding, &[]);
-        pass.draw(0..3, 0..1);
+        true
     }
 }
 
