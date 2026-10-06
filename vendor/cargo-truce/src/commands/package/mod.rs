@@ -550,12 +550,14 @@ Format selection:
                        features (e.g. ara) to each per-format build.
 
 Install scope (where the resulting installer puts files at the end user's machine):
-  --ask                End user picks at install time. Default.
+  --ask                End user picks at install time. Default on macOS.
   --user               User-scope. CLAP/VST3 land in user paths with no
-                       admin prompt. System-only formats (AAX, AU v3, Windows
-                       VST2) stay system-scope; the user sees one admin prompt.
+                       admin prompt. System-only formats (AAX, AU v3) stay
+                       system-scope; the user sees one admin prompt.
   --system             Hard-lock to system paths.
   Override the default project-wide via `[packaging] preferred_scope` in truce.toml.
+  Windows installers install for all users only: --system is accepted and
+  --user / --ask are refused.
 
 Signing / notarization (macOS / Windows):
   --no-notarize        Skip macOS notarization (still codesigns).

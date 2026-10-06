@@ -33,23 +33,20 @@ metadata is byte-for-byte what 6.3.0 produced. Microsoft's own
 excludes every type but `azureclicredential` by default, for the same reason;
 the candidate workflow sets the same list.
 
-## Scoped Windows installer name
+## Windows installers for all users only
 
-A package run given an install scope (`--user`, `--system`, or
-`preferred_scope` in `truce.toml`) looks for
-`<crate>-<version>-windows-<scope>.exe`, the same suffix the macOS `.pkg`
-carries, but the Inno Setup script it generates names the output without the
-suffix. ISCC succeeds and the run then fails with "ISCC reported success but
-installer is missing". Only the unscoped default (`ask`) worked, which is why
-Pro, which passes no scope, never saw it. The candidate workflow now packages
-unscoped too, as Pro does, so the patch is inert there; it stays so a scoped
-package run keeps working.
-
-The change adds the scope suffix to `OutputBaseFilename` in both the per-plugin
-and suite `[Setup]` sections of `src/commands/package/windows.rs`, so the file
-ISCC writes is the one the run expects. An unscoped run names its installer
-exactly as 6.3.0 did. Upstream `main` still writes the unsuffixed name as of
-`truce-audio/truce@25791270cf7ca1309cb6bdc6fa75a6fe94617d1c`.
+6.3.0's unscoped Windows installer opens Inno Setup's "Choose installation
+mode" page, and installing only for the current user puts the VST3 in
+`%LOCALAPPDATA%\Programs\Common\VST3`. Ableton Live 10 and a default Reaper
+never scan that folder, so the plug-in silently goes missing. A Windows package
+run therefore always builds the all-users installer: administrator elevation,
+the common CLAP, VST3 and Program Files folders, and no mode page. `--system`
+is accepted, and `--user`, `--ask` and any other `preferred_scope` are refused.
+The installer keeps the unsuffixed `<crate>-<version>-windows.exe` name. The
+`.iss` generator's per-user branches stay as upstream wrote them, unreachable
+from a package run. macOS packaging is unchanged and still offers both. This
+is product policy rather than an upstream fix, so an upstream release replaces
+it only with a setting that pins Windows packages to all users.
 
 ## Audio Unit version 2 Info.plist
 

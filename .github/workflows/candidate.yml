@@ -131,8 +131,8 @@ jobs:
           xcrun notarytool store-credentials TRUCE_NOTARY --key "$key" \
             --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID" --keychain "$KEYCHAIN"
           rm -f "$key"
-      # Unscoped, both installers let the customer choose all users or the
-      # current user. The silent CI installs run as an administrator and take
+      # Unscoped, the macOS installer lets the customer choose all users or the
+      # current user; the silent CI install runs as an administrator and takes
       # the all-users paths the checks read.
       - run: just package
         env:

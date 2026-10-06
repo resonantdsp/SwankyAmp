@@ -20,7 +20,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::PkgFormat;
-use crate::install_scope::{PkgScope, note_once};
+use crate::install_scope::PkgScope;
 use crate::{
     Config, PluginDef, Res, build_aax_template, cargo_build, detect_default_features, load_config,
     project_root, read_workspace_version, release_lib_for_target, resolve_aax_sdk_path,
@@ -149,32 +149,12 @@ pub(crate) fn cmd_package_windows(args: &[String], selection: &super::SuiteSelec
     };
     let need_staging_for_suites = !selection.want_per_plugin() && !suites.is_empty();
 
-    // Scope resolution: CLI > truce.toml [packaging] preferred_scope >
-    // OS default (`--ask`).
-    let scope = resolve_pkg_scope(opts.cli_scope, &config)?;
+    // Windows installers install for all users only. A per-user VST3 lands
+    // in %LOCALAPPDATA%\Programs\Common\VST3, which Ableton Live 10 and a
+    // default Reaper never scan, so the plug-in would silently go missing.
+    reject_per_user_scope(&config)?;
+    let scope = PkgScope::System;
     eprintln!("Package scope: {}", scope.label());
-
-    // System-only formats (AAX, VST2 on Windows) stay in the package
-    // even under `--user`. The note tells the developer the end
-    // user will see a UAC prompt for those. The `.iss` template
-    // routes CLAP / VST3 to user paths and AAX / VST2 to system
-    // paths in that mode (and bumps `PrivilegesRequired` to admin
-    // so the installer can write to `{commoncf}` / `{commonpf}`).
-    if matches!(scope, PkgScope::User) {
-        for f in &formats {
-            match f {
-                PkgFormat::Aax => note_once(
-                    "AAX is system-only; --user package keeps AAX but installs it to \
-                     %COMMONPROGRAMFILES%\\Avid (end user will see one UAC prompt).",
-                ),
-                PkgFormat::Vst2 => note_once(
-                    "VST2 on Windows is system-only; --user package keeps VST2 but installs \
-                     it to %PROGRAMFILES%\\Steinberg\\VstPlugins (end user will see one UAC prompt).",
-                ),
-                _ => {}
-            }
-        }
-    }
 
     if universal && formats.iter().any(|f| matches!(f, PkgFormat::Aax)) {
         eprintln!(
@@ -266,12 +246,7 @@ pub(crate) fn cmd_package_windows(args: &[String], selection: &super::SuiteSelec
         fs::write(&iss_path, &iss)?;
         run_iscc(&iss_path)?;
 
-        let installer = dist_dir.join(format!(
-            "{}-{}-windows{}.exe",
-            p.crate_name,
-            version,
-            scope.dist_suffix()
-        ));
+        let installer = dist_dir.join(format!("{}-{}-windows.exe", p.crate_name, version));
         if !installer.exists() {
             return Err(format!(
                 "ISCC reported success but installer is missing: {}",
@@ -339,11 +314,6 @@ struct Opts {
     /// single `cargo truce package` run produces the release artefact users
     /// expect; `--host-only` opts out for dev iteration speed.
     host_only: bool,
-    /// Install scope the resulting installer targets. `--ask` (the
-    /// default) lets the end user pick at install time via Inno
-    /// Setup's "Choose installation mode" page; `--user` /
-    /// `--system` hard-lock to one mode.
-    cli_scope: Option<PkgScope>,
     /// Raw `--target-cpu` value (parsed into `TargetCpu` via
     /// `parse_target_cpu_arg`). `None` keeps the per-arch default.
     target_cpu_arg: Option<String>,
@@ -359,27 +329,15 @@ impl Opts {
     }
 }
 
-fn set_cli_scope(slot: &mut Option<PkgScope>, want: PkgScope) -> Res {
-    if let Some(prev) = *slot
-        && prev != want
-    {
-        return Err("--user, --system, and --ask are mutually exclusive".into());
+fn reject_per_user_scope(config: &Config) -> Res {
+    match config.packaging.preferred_scope.as_deref() {
+        None => Ok(()),
+        Some(raw) if raw.parse::<PkgScope>()? == PkgScope::System => Ok(()),
+        Some(raw) => Err(format!(
+            "[packaging] preferred_scope = {raw:?}: Windows installers install for all users only"
+        )
+        .into()),
     }
-    *slot = Some(want);
-    Ok(())
-}
-
-fn resolve_pkg_scope(
-    cli: Option<PkgScope>,
-    config: &Config,
-) -> Result<PkgScope, crate::CargoTruceError> {
-    if let Some(s) = cli {
-        return Ok(s);
-    }
-    if let Some(ref raw) = config.packaging.preferred_scope {
-        return raw.parse::<PkgScope>().map_err(Into::into);
-    }
-    Ok(PkgScope::os_default())
 }
 
 fn parse_args(args: &[String]) -> std::result::Result<Opts, crate::CargoTruceError> {
@@ -397,9 +355,14 @@ fn parse_args(args: &[String]) -> std::result::Result<Opts, crate::CargoTruceErr
             "--no-sign" => opts.no_sign = true,
             "--no-pace-sign" => opts.no_pace_sign = true,
             "--no-installer" => opts.no_installer = true,
-            "--user" => set_cli_scope(&mut opts.cli_scope, PkgScope::User)?,
-            "--system" => set_cli_scope(&mut opts.cli_scope, PkgScope::System)?,
-            "--ask" => set_cli_scope(&mut opts.cli_scope, PkgScope::Ask)?,
+            // Accepted so a cross-platform invocation keeps working; it is
+            // the only scope a Windows installer has.
+            "--system" => {}
+            "--user" | "--ask" => {
+                return Err(
+                    format!("{}: Windows installers install for all users only", args[i]).into(),
+                );
+            }
             // Universal is the default; accepted explicitly as a no-op so
             // existing CI scripts (and cross-platform invocations) keep working.
             // Bodies match `--no-notarize` - kept as separate arms so each
@@ -1560,10 +1523,9 @@ fn render_iss(
     // (set above as the `AppName`); only the .exe filename changes.
     let _ = write!(
         setup,
-        "OutputBaseFilename={}-{}-windows{}\r\n",
+        "OutputBaseFilename={}-{}-windows\r\n",
         iss_escape_directive(&p.crate_name),
         iss_escape_directive(version),
-        scope.dist_suffix(),
     );
     setup.push_str("Compression=lzma2\r\n");
     setup.push_str("SolidCompression=yes\r\n");
@@ -1801,10 +1763,8 @@ fn package_one_suite(
     run_iscc(&iss_path)?;
 
     let installer = dist_dir.join(format!(
-        "{}-{}-windows{}.exe",
-        suite.def.bundle_id,
-        suite_version,
-        scope.dist_suffix()
+        "{}-{}-windows.exe",
+        suite.def.bundle_id, suite_version
     ));
     if !installer.exists() {
         return Err(format!(
@@ -2027,10 +1987,9 @@ fn write_suite_setup_section(
     let _ = write!(setup, "OutputDir={}\r\n", iss_escape_path(dist_dir));
     let _ = write!(
         setup,
-        "OutputBaseFilename={}-{}-windows{}\r\n",
+        "OutputBaseFilename={}-{}-windows\r\n",
         iss_escape_directive(&suite.def.bundle_id),
         iss_escape_directive(version),
-        scope.dist_suffix(),
     );
     setup.push_str("Compression=lzma2\r\n");
     setup.push_str("SolidCompression=yes\r\n");

@@ -69,6 +69,8 @@ impl std::str::FromStr for PkgScope {
 impl PkgScope {
     /// `cargo truce package` default when no flag and no
     /// `[packaging] preferred_scope` is set: ask the end user.
+    // Windows packages are all-users only, so only macOS reads this.
+    #[cfg_attr(target_os = "windows", allow(dead_code))]
     pub(crate) fn os_default() -> Self {
         Self::Ask
     }
@@ -86,6 +88,8 @@ impl PkgScope {
     /// overwrite each other in `dist/`. `--ask` (the default)
     /// produces the unsuffixed filename so existing release artefacts
     /// keep their canonical name.
+    // Windows packages are all-users only, so only macOS reads this.
+    #[cfg_attr(target_os = "windows", allow(dead_code))]
     pub(crate) fn dist_suffix(self) -> &'static str {
         match self {
             Self::User => "-user",
