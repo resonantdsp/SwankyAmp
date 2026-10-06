@@ -186,18 +186,15 @@ Build / Install / Package:
       Build, sign, and package plugins into macOS .pkg / Windows .exe
       installers. Output goes to `target/dist/`.
 
-      Scope flags pick how the resulting installer behaves at the
-      end user's machine:
+      Scope flags pick how the resulting macOS installer behaves at
+      the end user's machine. Windows installers install for all
+      users only: --system is accepted, --user and --ask are refused.
       --ask        End user picks at install time via the macOS
-                   Installer.app destination page or the Inno Setup
-                   \"Choose installation mode\" page (default).
+                   Installer.app destination page (default).
       --user       Hard-lock to user-scope. CLAP/VST3 land in user
-                   paths with no admin prompt. AAX, AU v3, and
-                   Windows VST2 are kept and installed to the system
-                   path (one admin prompt at install time on Windows;
-                   on macOS the whole pkg widens to system-domain
-                   when AAX/AU v3 are present).
-      --system     Hard-lock to system paths (today's behavior).
+                   paths with no admin prompt; the whole pkg widens
+                   to system-domain when AAX/AU v3 are present.
+      --system     Hard-lock to system paths.
 
       Set `[packaging] preferred_scope = \"user\" | \"system\" | \"ask\"`
       in `truce.toml` to override the default for a project.

@@ -26,8 +26,9 @@ installs beside Swanky Amp 1.4.0.
   sandboxed host such as GarageBand that it checks for releases over the
   network and opens preset files outside the host, and it finds the user
   presets in the account's home folder there, as every other format does.
-- Let the macOS and Windows installers install for all users or only the
-  current user.
+- Let the macOS installer install for all users or only the current user.
+  The Windows installer installs for every account on the computer, where
+  every host finds the plug-in.
 - Oversampled the tube stages: Auto runs them at 2x at 44.1 and 48 kHz and
   1x at 88.2 kHz and above, and the header's oversampling button cycles Auto,
   1x, 2x and 4x and names the factor the engine resolved. Up to 10 kHz every
