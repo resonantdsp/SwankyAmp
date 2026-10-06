@@ -25,6 +25,8 @@
 pub mod auto_layout;
 // The system clipboard, so a widget iced hands one to can read and write text.
 pub mod clipboard;
+// The editor's lifecycle records and chosen GPU, for a plug-in's support log.
+pub mod diagnostics;
 #[cfg(not(target_os = "ios"))]
 pub mod editor;
 pub mod font;
@@ -57,7 +59,9 @@ mod editor_ios;
 // Re-export primary types for convenience. The plugin-facing traits live
 // in the shared `runtime` module (all platforms); only the windowing
 // `IcedEditor` differs per platform.
-pub use runtime::{AutoPlugin, IcedPlugin};
+pub use runtime::{AutoPlugin, IcedPlugin, keeps_key};
+// The handle `IcedPlugin::window_opened` names.
+pub use raw_window_handle;
 
 #[cfg(not(target_os = "ios"))]
 pub use editor::IcedEditor;

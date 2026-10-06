@@ -133,9 +133,11 @@ installs beside Swanky Amp 1.4.0.
   names the product and its version, links to the website, the manual and
   support, and closes with Escape, the button again or a press outside. Its
   Copy diagnostics link copies the version and build commit, system, host and
-  format, sample rate and buffer for a support request, and its Third-party
-  licences link opens the licences of the font and open-source code the
-  product is built from, generated from its dependencies.
+  format, sample rate and buffer, the graphics card and driver, where the
+  editor log is and its latest warnings and errors for a support request, and
+  its Third-party licences link opens the licences of the font and
+  open-source code the product is built from, generated from its
+  dependencies.
 - Added an interface size to the information panel: the whole editor at 75,
   100, 125 or 150 %, with the same layout and native text drawn sharp at every
   size. The editor resizes its window and asks the host to follow in CLAP,
@@ -151,6 +153,10 @@ installs beside Swanky Amp 1.4.0.
   a highlighted download arrow when a newer stable release is published, and the
   panel announces it with a link to the fixed catalogue page. It ignores
   fields it does not know, so the published document can grow.
+- Logged the editor's opening and closing, its graphics card and every
+  warning and error to one file per computer account, for support. An editor
+  whose graphics cannot start says so in one line, with where its log is and
+  the support address, instead of staying blank.
 - Kept the plug-in loaded once its editor has opened, so a Windows host that
   unloads it cannot crash when the release check, the save dialog or a preset
   import outlives the last instance.
@@ -173,8 +179,9 @@ installs beside Swanky Amp 1.4.0.
   `--input-enabled on` or `off` overrides that for one launch.
 - Gave the standalone app's information panel the Input, Input channels and
   Output choices of its Settings menu. Choosing an input there turns it on
-  and remembers it. The panel opens by itself when no input was ever chosen
-  or a remembered device is missing, and says what is missing; it warns that
+  and remembers it. The panel opens by itself when no input was ever chosen,
+  a remembered device is missing or the output would not start, which no
+  longer ends the launch, and says what needs choosing; it warns that
   the computer's own microphone feeds back through its speakers. While the
   input is off the Input knob reads OFF and a press on it, or on the footer
   line that says so, opens the panel.

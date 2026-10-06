@@ -94,6 +94,7 @@ version = "0.6.4"
 version = "0.3.2"
 features = [
     "NSApplication",
+    "NSControl",
     "NSCursor",
     "NSDragging",
     "NSEvent",
@@ -101,6 +102,7 @@ features = [
     "NSPasteboard",
     "NSResponder",
     "NSRunningApplication",
+    "NSTextField",
     "NSTrackingArea",
     "NSView",
     "NSWindow",
@@ -131,29 +133,17 @@ version = "0.8"
 features = ["v4"]
 optional = true
 
-[target.'cfg(target_os="windows")'.dependencies.windows]
-version = "=0.61.3"
-features = [
-    "Win32_Graphics_Gdi",
-    "Win32_Graphics_OpenGL",
-    "Win32_System_Com_StructuredStorage",
-    "Win32_System_Ole",
-    "Win32_System_SystemServices",
-    "Win32_UI_WindowsAndMessaging",
-]
-
 [target.'cfg(target_os="windows")'.dependencies.windows-core]
 version = "=0.61.2"
 
 [target.'cfg(target_os="windows")'.dependencies.windows-sys]
 version = "0.61.2"
 features = [
+    "Win32_Graphics_Dwm",
     "Win32_Graphics_Gdi",
     "Win32_Graphics_OpenGL",
-    "Win32_Media",
     "Win32_System_Rpc",
     "Win32_System_LibraryLoader",
-    "Win32_System_Ole",
     "Win32_System_SystemServices",
     "Win32_System_Threading",
     "Win32_UI_Controls",

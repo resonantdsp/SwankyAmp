@@ -262,10 +262,6 @@ impl KeyboardState {
         KeyboardState { last_mods }
     }
 
-    pub(crate) fn last_mods(&self) -> NSEventModifierFlags {
-        self.last_mods.get()
-    }
-
     pub(crate) fn process_native_event(&self, event: &NSEvent) -> Option<KeyboardEvent> {
         let event_type = event.r#type();
         let key_code = event.keyCode();

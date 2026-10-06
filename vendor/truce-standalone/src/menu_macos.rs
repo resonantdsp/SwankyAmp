@@ -4,8 +4,8 @@
 //! App menu (Quit / Hide / About) and a single "Settings" menu
 //! carrying both the audio and MIDI controls:
 //!
-//! - **Mic Input** (toggle, ⌘I, checkmark when on; effect plugins only)
-//! - **Audio Output** (toggle, ⌘O, checkmark when unmuted)
+//! - **Mic Input** (toggle, checkmark when on; effect plugins only, no shortcut)
+//! - **Audio Output** (toggle, checkmark when unmuted, no shortcut)
 //! - **Input Device** submenu - lists cpal-visible inputs (effects only)
 //! - **Output Device** submenu - same for outputs
 //! - **Buffer Size** submenu - the sizes in [`BUFFER_SIZES`], checkmark on
@@ -103,9 +103,12 @@ struct MenuState {
 ///
 /// `is_effect` controls whether mic-input and input-device items
 /// appear - input-side controls are useless for instruments and
-/// analyzers since the runner feeds them silence.
+/// analyzers since the runner feeds them silence. Quit closes
+/// `window`, the standalone's `NSWindow`, so it closes the way the close
+/// button does.
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 pub fn install(
+    window: *mut std::ffi::c_void,
     app_name: &str,
     is_effect: bool,
     channels: usize,
@@ -122,7 +125,7 @@ pub fn install(
         // App menu - "About <App>" / "Hide <App>" / "Quit <App>".
         let app_menu_item = make_menu_item(app_name);
         let app_menu = make_menu(app_name);
-        add_app_menu_items(app_menu, app_name);
+        add_app_menu_items(app_menu, app_name, window.cast());
         let _: () = msg_send![app_menu_item, setSubmenu: app_menu];
 
         // Settings menu (audio + MIDI) and its action target.
@@ -136,17 +139,19 @@ pub fn install(
             qwerty.clone(),
         );
 
-        // Mic toggle (⌘I) - only meaningful for effects.
+        // Mic toggle - only meaningful for effects. It has no key
+        // equivalent: a stray key press must never silence the input.
         let mic_item = if is_effect {
-            let item = make_toggle_item("Mic Input", "i", sel!(toggleInputAction:), target);
+            let item = make_toggle_item("Mic Input", "", sel!(toggleInputAction:), target);
             let _: () = msg_send![plugin_menu, addItem: item];
             item
         } else {
             std::ptr::null_mut()
         };
 
-        // Output toggle (⌘O) - applies to every plugin category.
-        let output_item = make_toggle_item("Audio Output", "o", sel!(toggleOutputAction:), target);
+        // Output toggle - applies to every plugin category. It has no
+        // key equivalent: a stray key press must never silence the output.
+        let output_item = make_toggle_item("Audio Output", "", sel!(toggleOutputAction:), target);
         let _: () = msg_send![plugin_menu, addItem: output_item];
 
         // Computer-keyboard-to-MIDI toggle (⌘K) - off by default. Added
@@ -448,7 +453,11 @@ unsafe fn make_toggle_item(
 
 /// Add the standard App-menu items. macOS does NOT auto-fill the
 /// app name here - we have to spell out `Quit <App>` ourselves.
-unsafe fn add_app_menu_items(menu: *mut Object, app_name: &str) {
+///
+/// Quit closes the window rather than terminating the app, because
+/// `terminate:` exits the process from inside `AppKit` without the
+/// window closing, so the audio would stop only when the process died.
+unsafe fn add_app_menu_items(menu: *mut Object, app_name: &str, window: *mut Object) {
     unsafe {
         let title = ns_string(&format!("Quit {app_name}"));
         let key = ns_string("q");
@@ -456,9 +465,10 @@ unsafe fn add_app_menu_items(menu: *mut Object, app_name: &str) {
         let quit_item: *mut Object = msg_send![
             quit_item,
             initWithTitle: title
-            action: sel!(terminate:)
+            action: sel!(performClose:)
             keyEquivalent: key
         ];
+        let _: () = msg_send![quit_item, setTarget: window];
         let _: () = msg_send![menu, addItem: quit_item];
     }
 }

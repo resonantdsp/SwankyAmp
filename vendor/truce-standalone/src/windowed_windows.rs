@@ -28,10 +28,11 @@ use windows_sys::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWi
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     GWL_EXSTYLE, GWL_STYLE, GetMenu, GetSystemMetrics, GetWindowLongW, ICON_BIG, ICON_SMALL,
     IMAGE_ICON, LR_DEFAULTSIZE, LR_SHARED, LoadImageW, MINMAXINFO, SM_CXSMICON, SM_CYMENU,
-    SM_CYSMICON, SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE, SWP_NOSIZE as SWP_NOSIZE_FLAG,
-    SWP_NOZORDER, SendMessageW, SetWindowLongW, SetWindowPos, WINDOWPOS, WM_GETMINMAXINFO,
-    WM_NCDESTROY, WM_SETICON, WM_SIZING, WM_WINDOWPOSCHANGING, WMSZ_BOTTOM, WMSZ_LEFT, WMSZ_RIGHT,
-    WMSZ_TOP, WMSZ_TOPLEFT, WMSZ_TOPRIGHT, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_SIZEBOX,
+    SM_CYSMICON, SW_HIDE, SWP_FRAMECHANGED, SWP_NOMOVE, SWP_NOSIZE, SWP_NOSIZE as SWP_NOSIZE_FLAG,
+    SWP_NOZORDER, SendMessageW, SetWindowLongW, SetWindowPos, ShowWindow, WINDOWPOS,
+    WM_GETMINMAXINFO, WM_NCDESTROY, WM_SETICON, WM_SIZING, WM_WINDOWPOSCHANGING, WMSZ_BOTTOM,
+    WMSZ_LEFT, WMSZ_RIGHT, WMSZ_TOP, WMSZ_TOPLEFT, WMSZ_TOPRIGHT, WS_MAXIMIZEBOX, WS_MINIMIZEBOX,
+    WS_SIZEBOX,
 };
 
 /// Resource name of the embedded app-icon group. `cargo truce`'s
@@ -143,6 +144,10 @@ struct SizeLimits {
 /// within this window).
 const SIZE_LIMITS_SUBCLASS: usize = 0x7472_6373; // "trcs"
 
+/// The limits [`install_size_limits`] gave a window, for [`pin_size`].
+/// Valid until the window is destroyed, which frees them.
+pub struct SizeLimitsHandle(*mut SizeLimits);
+
 /// Clamp a physical window extent to `[min, max]`, flooring `max` at
 /// `min` first. An editor with inconsistent bounds can report a max
 /// below its min; `i32::clamp` panics when its lo > hi, and a panic
@@ -175,9 +180,9 @@ pub fn install_size_limits(
     min: (u32, u32),
     max: (u32, u32),
     aspect: Option<(u32, u32)>,
-) {
+) -> Option<SizeLimitsHandle> {
     if hwnd.is_null() {
-        return;
+        return None;
     }
     let limits = Box::new(SizeLimits {
         min_w: min.0,
@@ -189,14 +194,36 @@ pub fn install_size_limits(
     // SAFETY: `hwnd` is the live baseview window on its own thread.
     // The box rides along as the subclass reference data and is
     // reclaimed in the `WM_NCDESTROY` arm of `size_limits_proc`.
-    unsafe {
+    let limits = Box::into_raw(limits);
+    let installed = unsafe {
         SetWindowSubclass(
             hwnd as HWND,
             Some(size_limits_proc),
             SIZE_LIMITS_SUBCLASS,
-            Box::into_raw(limits) as usize,
-        );
+            limits as usize,
+        )
+    };
+    if installed == 0 {
+        // SAFETY: the subclass refused the box, so nothing else owns it.
+        drop(unsafe { Box::from_raw(limits) });
+        return None;
     }
+    Some(SizeLimitsHandle(limits))
+}
+
+/// Move the limits [`install_size_limits`] pinned a fixed-size window to
+/// onto `(w, h)` logical points, so a size the editor asked for (an
+/// interface zoom) is not clamped back to the size it opened at. Must run
+/// on the window's thread while the window is alive.
+pub fn pin_size(limits: &SizeLimitsHandle, w: u32, h: u32) {
+    // SAFETY: the window is alive, so its subclass still owns the box, and
+    // on its own thread no subclass message holds a borrow of it while
+    // this runs.
+    let limits = unsafe { &mut *limits.0 };
+    limits.min_w = w;
+    limits.min_h = h;
+    limits.max_w = w;
+    limits.max_h = h;
 }
 
 /// Physical pixels the window's non-client frame (border + caption +
@@ -458,6 +485,18 @@ pub fn menu_reserve_logical(hwnd: *mut c_void) -> u32 {
 /// to write the resource we're loading here.
 fn make_int_resource(id: u16) -> *const u16 {
     std::ptr::without_provenance(id as usize)
+}
+
+/// Take the standalone window off screen at once, ahead of the slower
+/// work closing does before the window is destroyed.
+pub fn hide(hwnd: *mut c_void) {
+    if hwnd.is_null() {
+        return;
+    }
+    // SAFETY: `hwnd` is the live baseview window, on its own thread.
+    unsafe {
+        ShowWindow(hwnd as HWND, SW_HIDE);
+    }
 }
 
 #[cfg(test)]

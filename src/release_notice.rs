@@ -59,11 +59,26 @@ pub fn open_in_browser(url: &str) {
 /// every tagged link here does.
 #[cfg(windows)]
 fn shell_open(target: &str) {
+    use windows_sys::Win32::System::Com::{
+        COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE, CoInitializeEx, CoUninitialize,
+    };
     use windows_sys::Win32::UI::Shell::ShellExecuteW;
     use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
 
     let wide = |text: &str| text.encode_utf16().chain([0]).collect::<Vec<u16>>();
     let (verb, target) = (wide("open"), wide(target));
+    // The shell may hand the link to a COM extension, so the thread must be in
+    // a COM apartment. A host's thread usually is already, but nothing else in
+    // the editor makes sure of it. A successful call, including the one that
+    // finds the apartment already there, is balanced so the thread is left as
+    // it was.
+    // SAFETY: the reserved pointer must be null.
+    let com = unsafe {
+        CoInitializeEx(
+            std::ptr::null(),
+            (COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) as u32,
+        )
+    };
     // SAFETY: both strings are NUL-terminated and outlive the call; a null
     // window, parameters and directory are documented as accepted.
     unsafe {
@@ -75,6 +90,10 @@ fn shell_open(target: &str) {
             std::ptr::null(),
             SW_SHOWNORMAL,
         );
+    }
+    if com >= 0 {
+        // SAFETY: balances the successful initialisation above.
+        unsafe { CoUninitialize() };
     }
 }
 
@@ -175,6 +194,7 @@ impl Service {
         }
         let shared = Arc::clone(&self.shared);
         let endpoint = Arc::clone(&self.endpoint);
+        crate::pin::keep_loaded();
         if std::thread::Builder::new()
             .name("swanky-release-notice".into())
             .spawn(move || {
@@ -293,22 +313,9 @@ fn install_query(succeeded_at: Option<u64>, now: u64) -> &'static str {
     }
 }
 
-/// Months since January of year 0 in the proleptic Gregorian calendar, from
-/// Hinnant's `civil_from_days`.
+/// Months since January of year 0 in the proleptic Gregorian calendar.
 fn utc_month(unix_seconds: u64) -> u64 {
-    let days = unix_seconds / 86_400 + 719_468;
-    let era = days / 146_097;
-    let day_of_era = days % 146_097;
-    let year_of_era =
-        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
-    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
-    let shifted_month = (5 * day_of_year + 2) / 153;
-    let month = if shifted_month < 10 {
-        shifted_month + 3
-    } else {
-        shifted_month - 9
-    };
-    let year = year_of_era + era * 400 + u64::from(month <= 2);
+    let (year, month, _) = crate::editor_log::civil_date(unix_seconds / 86_400);
     year * 12 + month - 1
 }
 

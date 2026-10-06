@@ -2,6 +2,7 @@
 //! single field Free has room for, with the actions in the menu.
 
 use std::cell::RefCell;
+use std::num::NonZeroIsize;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -94,6 +95,12 @@ pub struct PresetBar {
     /// preset or its modified state changes, since the view is rebuilt with
     /// every display frame.
     shown: RefCell<Option<Shown>>,
+    /// The editor's window on Windows, whose top-level window owns the save
+    /// dialog so it stays in front of the host. macOS needs none: the panel
+    /// already sits above every window, and an owner there would make it a
+    /// sheet on a window the host owns and may close before the panel opens.
+    #[cfg(windows)]
+    window: Option<NonZeroIsize>,
 }
 
 /// The current preset's name fitted to the field, to the menu's Remove
@@ -223,7 +230,34 @@ impl PresetBar {
             naming: None,
             removing: None,
             shown: RefCell::new(None),
+            #[cfg(windows)]
+            window: None,
         }
+    }
+
+    pub fn set_window(&mut self, window: truce_iced::raw_window_handle::RawWindowHandle) {
+        #[cfg(windows)]
+        if let truce_iced::raw_window_handle::RawWindowHandle::Win32(handle) = window {
+            self.window = NonZeroIsize::new(handle.hwnd as isize);
+        }
+        #[cfg(not(windows))]
+        let _ = window;
+    }
+
+    /// The top-level window holding the editor, read while the editor's
+    /// window is known to exist. The dialog disables it while open: a floating
+    /// plug-in window alone, or the whole host where the editor is docked.
+    #[cfg(windows)]
+    fn owner(&self) -> Option<NonZeroIsize> {
+        use windows_sys::Win32::UI::WindowsAndMessaging::{GA_ROOT, GetAncestor};
+        // SAFETY: the editor's window outlives the model that holds its handle.
+        let root = unsafe { GetAncestor(self.window?.get() as _, GA_ROOT) };
+        NonZeroIsize::new(root as isize)
+    }
+
+    #[cfg(not(windows))]
+    fn owner(&self) -> Option<NonZeroIsize> {
+        None
     }
 
     /// Follows the preset host state names, which a session restore changes
@@ -581,12 +615,14 @@ impl PresetBar {
         };
         let pending: Pending<Option<PathBuf>> = Arc::new(Mutex::new(None));
         let shared = Arc::clone(&pending);
+        let owner = self.owner();
+        crate::pin::keep_loaded();
         // A native modal loop must not run inside the editor's frame
         // callback, so the dialog runs on its own thread as in Pro.
         let spawned = std::thread::Builder::new()
             .name("swanky-preset-name".into())
             .spawn(move || {
-                let chosen = rfd::FileDialog::new()
+                let chosen = owned(rfd::FileDialog::new(), owner)
                     .set_title("Save preset as")
                     .add_filter("Swanky Amp preset", &["xml"])
                     .set_directory(directory)
@@ -867,6 +903,37 @@ fn place<'a, R: iced_core::Renderer + 'a>(
     content: impl Into<Element<'a, Msg, Theme, R>>,
 ) -> Element<'a, Msg, Theme, R> {
     crate::ui::place(bounds, content)
+}
+
+#[cfg(windows)]
+fn owned(dialog: rfd::FileDialog, owner: Option<NonZeroIsize>) -> rfd::FileDialog {
+    use raw_window_handle::{
+        DisplayHandle, HandleError, HasDisplayHandle, HasWindowHandle, RawWindowHandle,
+        Win32WindowHandle, WindowHandle,
+    };
+    struct Owner(NonZeroIsize);
+    impl HasWindowHandle for Owner {
+        fn window_handle(&self) -> Result<WindowHandle<'_>, HandleError> {
+            let handle = RawWindowHandle::Win32(Win32WindowHandle::new(self.0));
+            // SAFETY: a window handle is only an identifier to the dialog; if
+            // the host destroys the window meanwhile, the dialog ends with it.
+            Ok(unsafe { WindowHandle::borrow_raw(handle) })
+        }
+    }
+    impl HasDisplayHandle for Owner {
+        fn display_handle(&self) -> Result<DisplayHandle<'_>, HandleError> {
+            Ok(DisplayHandle::windows())
+        }
+    }
+    match owner {
+        Some(owner) => dialog.set_parent(&Owner(owner)),
+        None => dialog,
+    }
+}
+
+#[cfg(not(windows))]
+fn owned(dialog: rfd::FileDialog, _: Option<NonZeroIsize>) -> rfd::FileDialog {
+    dialog
 }
 
 #[cfg(test)]

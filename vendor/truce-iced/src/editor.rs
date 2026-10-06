@@ -14,6 +14,7 @@ use truce_gui::EditorScale;
 use truce_gui::layout::GridLayout;
 use truce_params::Params;
 
+use crate::diagnostics::{LIFECYCLE, stage};
 use crate::param_cache::ParamCache;
 use crate::runtime::{
     AutoPlugin, IcedPlugin, IcedProgram, IcedRuntime, panic_message, viewport_scale, zoomed,
@@ -117,6 +118,9 @@ where
     max_size: (u32, u32),
     aspect_ratio: Option<(u32, u32)>,
     prefers_pow2: bool,
+    /// One line of native text shown in place of an editor whose GPU setup
+    /// failed for good, so the player is not left with a blank window.
+    failure_note: Option<String>,
 }
 
 // SAFETY: `baseview::WindowHandle` holds a raw native window pointer
@@ -183,6 +187,7 @@ impl<P: Params + 'static> IcedEditor<P, AutoPlugin> {
             max_size: (u32::MAX, u32::MAX),
             aspect_ratio: None,
             prefers_pow2: false,
+            failure_note: None,
         }
     }
 }
@@ -209,6 +214,7 @@ impl<P: Params + 'static, M: IcedPlugin<P> + 'static> IcedEditor<P, M> {
             max_size: (u32::MAX, u32::MAX),
             aspect_ratio: None,
             prefers_pow2: false,
+            failure_note: None,
         }
     }
 
@@ -303,6 +309,15 @@ impl<P: Params + 'static, M: IcedPlugin<P> + 'static> IcedEditor<P, M> {
         self.prefers_pow2 = prefers;
         self
     }
+
+    /// One line the window shows in native text when the GPU cannot be set
+    /// up, such as where the log is and whom to write to. Without one a
+    /// failed editor stays blank.
+    #[must_use]
+    pub fn failure_note(mut self, note: impl Into<String>) -> Self {
+        self.failure_note = Some(note.into());
+        self
+    }
 }
 
 // Baseview window handler (all platforms)
@@ -310,14 +325,15 @@ impl<P: Params + 'static, M: IcedPlugin<P> + 'static> IcedEditor<P, M> {
 struct IcedBaseviewHandler<P: Params + 'static, M: IcedPlugin<P>> {
     /// The handler owns the runtime outright. It used to hold a
     /// `*mut IcedEditor` and reach back through it each frame, but
-    /// baseview's `WindowHandle::close()` is asynchronous on Windows
-    /// (it posts a close message rather than joining), so a host that
-    /// dropped the editor while a close was still pending left the
-    /// window proc dereferencing freed memory - a crash on plug-in
-    /// switching. Owning the runtime keeps everything `on_frame` /
-    /// `on_event` touch alive for exactly as long as the window proc
-    /// can run, and drops it (including the wgpu surface) on this
-    /// handler's own thread when the window is destroyed.
+    /// baseview's `WindowHandle::close()` can be asynchronous on Windows
+    /// (it posts a close message when called from inside the window's
+    /// handler or off its thread), so a host that dropped the editor
+    /// while a close was still pending left the window proc
+    /// dereferencing freed memory - a crash on plug-in switching.
+    /// Owning the runtime keeps everything `on_frame` / `on_event`
+    /// touch alive for exactly as long as the window proc can run, and
+    /// drops it (including the wgpu surface) on this handler's own
+    /// thread when the window closes.
     runtime: IcedRuntime<P, M>,
     /// Clone of the editor's pending-size cell; `Editor::set_size`
     /// writes it, `on_frame` applies it.
@@ -341,6 +357,9 @@ struct IcedBaseviewHandler<P: Params + 'static, M: IcedPlugin<P>> {
     /// without the editor and baseview fighting over the scale.
     host_driven_scale: bool,
     last_cursor: Option<baseview::MouseCursor>,
+    /// Keys whose press the editor kept. A release goes where its press
+    /// went, so the host never sees half of a key.
+    kept_keys: std::collections::HashSet<keyboard_types::Code>,
     /// Constraint copy from the parent `IcedEditor`, applied to
     /// host-driven `Resized` events that bypassed the format's
     /// negotiation hooks (Linux hosts resizing the embed window
@@ -354,6 +373,8 @@ struct IcedBaseviewHandler<P: Params + 'static, M: IcedPlugin<P>> {
     /// inside the host's own resize dispatch.
     #[cfg(not(target_os = "linux"))]
     pending_correct: Option<(u32, u32)>,
+    /// Shown once, when the GPU setup has failed for good.
+    failure_note: Option<String>,
 }
 
 // The explicit `Idle | None => Default` arm documents iced's known
@@ -395,6 +416,12 @@ fn convert_mouse_button(button: baseview::MouseButton) -> Option<crate::iced::mo
 
 impl<P: Params + 'static, M: IcedPlugin<P>> baseview::WindowHandler for IcedBaseviewHandler<P, M> {
     fn on_frame(&mut self, window: &mut baseview::Window) {
+        if self.runtime.gpu_failed {
+            if let Some(note) = self.failure_note.take() {
+                window.show_note(&note);
+            }
+            return;
+        }
         // Catch panics at the FFI boundary: baseview drives this from an
         // `extern "system"` window proc (Windows) / AppKit callback (macOS),
         // so an unwinding panic - e.g. a wgpu device loss mid-resize - would
@@ -408,7 +435,10 @@ impl<P: Params + 'static, M: IcedPlugin<P>> baseview::WindowHandler for IcedBase
             // the host while its FX window is closed.
             {
                 use raw_window_handle::HasRawWindowHandle;
-                if truce_gui::platform::should_skip_frame(window.raw_window_handle()) {
+                let handle = window.raw_window_handle();
+                if truce_gui::platform::should_skip_frame(handle)
+                    || crate::platform::host_minimized(handle)
+                {
                     return;
                 }
             }
@@ -429,8 +459,7 @@ impl<P: Params + 'static, M: IcedPlugin<P>> baseview::WindowHandler for IcedBase
                 .device_lost
                 .load(std::sync::atomic::Ordering::Acquire)
             {
-                let ok = self.runtime.recover_device(window);
-                log::warn!("iced device-loss recovery: rebuilt ok={ok}");
+                self.runtime.recover_device(window);
                 return;
             }
             // Issue a queued corrective resize (see `pending_correct`)
@@ -498,9 +527,9 @@ impl<P: Params + 'static, M: IcedPlugin<P>> baseview::WindowHandler for IcedBase
         }));
         if let Err(e) = result {
             log::error!("iced on_frame panic swallowed: {}", panic_message(&e));
-            // A render panic almost always means the device is dead (e.g.
-            // `queue.write_buffer_with` -> None after a loss that didn't fire
-            // the callback). Arm recovery so the next frame rebuilds.
+            // A render panic usually means the device died without wgpu
+            // reporting it (e.g. `queue.write_buffer_with` -> None), so the
+            // next frame rebuilds; `recover_device` bounds the retries.
             self.runtime
                 .device_lost
                 .store(true, std::sync::atomic::Ordering::Release);
@@ -513,6 +542,10 @@ impl<P: Params + 'static, M: IcedPlugin<P>> baseview::WindowHandler for IcedBase
         window: &mut baseview::Window,
         event: baseview::Event,
     ) -> baseview::EventStatus {
+        // An editor that can never draw would only pile up input.
+        if self.runtime.gpu_failed {
+            return baseview::EventStatus::Ignored;
+        }
         // Catch panics at the FFI boundary, like `on_frame`; report the event
         // as `Ignored` on panic instead of aborting the host.
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -549,11 +582,7 @@ impl<P: Params + 'static, M: IcedPlugin<P>> baseview::WindowHandler for IcedBase
                             let pos = (position.x as f32, position.y as f32);
                             runtime.queue_cursor_move(pos.0, pos.1);
                         }
-                        baseview::MouseEvent::CursorLeft => {
-                            runtime
-                                .pending_events
-                                .push(Event::Mouse(crate::iced::mouse::Event::CursorLeft));
-                        }
+                        baseview::MouseEvent::CursorLeft => runtime.queue_cursor_left(),
                         baseview::MouseEvent::ButtonPressed { button, .. } => {
                             let Some(button) = convert_mouse_button(button) else {
                                 return baseview::EventStatus::Ignored;
@@ -705,14 +734,32 @@ impl<P: Params + 'static, M: IcedPlugin<P>> baseview::WindowHandler for IcedBase
                     baseview::EventStatus::Captured
                 }
                 baseview::Event::Keyboard(kb) => {
-                    // Feed native keys into the `UserInterface` event queue;
-                    // iced widgets (text_input, a custom key-capture widget)
-                    // then receive them. Keys only arrive when the host grants
-                    // the editor window OS focus, which varies by DAW.
+                    // Keys only arrive when the host grants the editor window
+                    // OS focus, which varies by DAW. A key the editor declines
+                    // is reported `Ignored`, and the platform layer hands it
+                    // on to the host.
                     runtime.note_input();
-                    runtime
-                        .pending_events
-                        .push(Event::Keyboard(crate::keyboard::to_iced_event(&kb)));
+                    let event = Event::Keyboard(crate::keyboard::to_iced_event(&kb));
+                    let kept = match kb.state {
+                        // A held key stays where its press went.
+                        keyboard_types::KeyState::Down if kb.repeat => {
+                            runtime.pending_events.push(event);
+                            self.kept_keys.contains(&kb.code)
+                        }
+                        keyboard_types::KeyState::Down => {
+                            let kept = runtime.offer_key(event);
+                            if kept {
+                                self.kept_keys.insert(kb.code);
+                            } else {
+                                self.kept_keys.remove(&kb.code);
+                            }
+                            kept
+                        }
+                        keyboard_types::KeyState::Up => {
+                            runtime.pending_events.push(event);
+                            self.kept_keys.remove(&kb.code)
+                        }
+                    };
                     // Nothing else asks for a frame: the queue waits for
                     // whichever frame the display clock next schedules, so a
                     // keystroke spends up to a refresh before its frame even
@@ -725,7 +772,11 @@ impl<P: Params + 'static, M: IcedPlugin<P>> baseview::WindowHandler for IcedBase
                     if let Some(waker) = window.frame_waker() {
                         waker.wake();
                     }
-                    baseview::EventStatus::Captured
+                    if kept {
+                        baseview::EventStatus::Captured
+                    } else {
+                        baseview::EventStatus::Ignored
+                    }
                 }
                 baseview::Event::Window(baseview::WindowEvent::Focused) => {
                     runtime
@@ -734,6 +785,9 @@ impl<P: Params + 'static, M: IcedPlugin<P>> baseview::WindowHandler for IcedBase
                     baseview::EventStatus::Captured
                 }
                 baseview::Event::Window(baseview::WindowEvent::Unfocused) => {
+                    // A release that never comes back here must not later
+                    // keep a release whose press the host saw.
+                    self.kept_keys.clear();
                     // Widgets must release mouse gestures when another window takes focus.
                     runtime
                         .pending_events
@@ -802,6 +856,8 @@ impl<P: Params + 'static, M: IcedPlugin<P>> Editor for IcedEditor<P, M> {
         // `make_plugin` is `Fn`, not `FnOnce`, so destroy/recreate
         // cycles (CLAP `gui_destroy` / `gui_create`) each get a fresh
         // clone.
+        log::info!(target: LIFECYCLE, "open {w}x{h}");
+        let started = std::time::Instant::now();
         let make_plugin = Arc::clone(&self.make_plugin);
         let params = self.params.clone();
         let font = self.font;
@@ -814,6 +870,7 @@ impl<P: Params + 'static, M: IcedPlugin<P>> Editor for IcedEditor<P, M> {
         let max_size = self.max_size;
         let aspect_ratio = self.aspect_ratio;
         let typed_ctx = context.with_params(self.params.clone());
+        let failure_note = self.failure_note.clone();
 
         let parent_wrapper = crate::platform::ParentWindow(parent);
         let options = baseview::WindowOpenOptions {
@@ -826,7 +883,11 @@ impl<P: Params + 'static, M: IcedPlugin<P>> Editor for IcedEditor<P, M> {
             &parent_wrapper,
             options,
             move |window: &mut baseview::Window| {
-                let plugin = (*make_plugin)(params.clone());
+                let mut plugin = (*make_plugin)(params.clone());
+                {
+                    use raw_window_handle::HasRawWindowHandle;
+                    plugin.window_opened(window.raw_window_handle());
+                }
                 let mut param_cache = ParamCache::new(params);
                 if let Some(data) = font {
                     // `apply_font` is idempotent on the iced font-system
@@ -847,9 +908,7 @@ impl<P: Params + 'static, M: IcedPlugin<P>> Editor for IcedEditor<P, M> {
                 // surface pump (off this thread on Windows, inline
                 // elsewhere); `tick()` adopts the pipeline when init
                 // lands. On failure the editor stays blank, host alive.
-                if !runtime.spawn_pump(window) {
-                    log::error!("truce-iced: failed to spawn surface pump; editor disabled");
-                }
+                runtime.spawn_pump(window);
 
                 IcedBaseviewHandler::<P, M> {
                     runtime,
@@ -859,30 +918,34 @@ impl<P: Params + 'static, M: IcedPlugin<P>> Editor for IcedEditor<P, M> {
                     zoom: zoom_cell,
                     host_driven_scale,
                     last_cursor: None,
+                    kept_keys: std::collections::HashSet::new(),
                     min_size,
                     max_size,
                     aspect_ratio,
                     resize_corrector: ResizeCorrector::default(),
                     #[cfg(not(target_os = "linux"))]
                     pending_correct: None,
+                    failure_note,
                 }
             },
         );
 
         self.baseview_window = Some(window);
-        log::info!("editor opened via baseview ({w}x{h})");
+        stage("open returned", started);
     }
 
     fn close(&mut self) {
         // baseview's Linux WindowHandle has no Drop impl, so request
         // teardown explicitly. The handler owns its runtime and is
-        // dropped when the window is destroyed, tearing down the wgpu
+        // dropped when the window closes, tearing down the wgpu
         // surface on the handler's own thread. Idempotent via
         // `baseview_window.take()`.
         if let Some(mut window) = self.baseview_window.take() {
+            log::info!(target: LIFECYCLE, "close");
+            let started = std::time::Instant::now();
             window.close();
+            stage("closed", started);
         }
-        log::info!("editor closed");
     }
 
     fn idle(&mut self) {

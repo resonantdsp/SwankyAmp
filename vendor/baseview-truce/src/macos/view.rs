@@ -1,20 +1,17 @@
-#![allow(deprecated)] // Allow use of NSFilenamesPboardType for now
-
 use objc2::__framework_prelude::Retained;
 use objc2::ffi::objc_disposeClassPair;
 use objc2::rc::Allocated;
 use objc2::runtime::{
-    AnyClass, AnyObject, Bool, ClassBuilder, NSObjectProtocol, ProtocolObject, Sel,
+    AnyClass, AnyObject, Bool, ClassBuilder, NSObjectProtocol, Sel,
 };
 use objc2::{msg_send, sel, AllocAnyThread, ClassType};
 use objc2_app_kit::{
-    NSDragOperation, NSDraggingInfo, NSEvent, NSEventModifierFlags, NSFilenamesPboardType,
-    NSTrackingArea, NSTrackingAreaOptions, NSView, NSWindow, NSWindowDidBecomeKeyNotification,
-    NSWindowDidResignKeyNotification,
+    NSEvent, NSEventModifierFlags, NSTrackingArea, NSTrackingAreaOptions, NSView, NSWindow,
+    NSWindowDidBecomeKeyNotification, NSWindowDidResignKeyNotification,
 };
 use objc2_core_foundation::CFUUID;
 use objc2_foundation::{
-    NSArray, NSNotification, NSNotificationCenter, NSPoint, NSRect, NSSize, NSString,
+    NSNotification, NSNotificationCenter, NSPoint, NSRect, NSSize,
 };
 use std::ffi::{c_void, CStr, CString};
 use std::rc::Rc;
@@ -23,8 +20,8 @@ use super::keyboard::make_modifiers;
 use super::window::WindowState;
 use crate::MouseEvent::{ButtonPressed, ButtonReleased};
 use crate::{
-    DropData, DropEffect, Event, EventStatus, MouseButton, MouseEvent, Point, ScrollDelta, Size,
-    WindowEvent, WindowInfo, WindowOpenOptions,
+    Event, EventStatus, MouseButton, MouseEvent, Point, ScrollDelta, Size, WindowEvent,
+    WindowInfo, WindowOpenOptions,
 };
 
 /// Name of the field used to store the `WindowState` pointer.
@@ -49,6 +46,10 @@ macro_rules! add_mouse_button_class_method {
     ($class:ident, $sel:ident, $event_ty:ident, $button:expr) => {
         #[allow(non_snake_case)]
         extern "C-unwind" fn $sel(this: &NSView, _: Sel, event: &NSEvent){
+            // A click can arrive with no move before it (the first click
+            // into a background app), and the button event carries no
+            // position, so the position goes first.
+            mouse_moved(this, sel!(mouseMoved:), event);
             let state = unsafe { WindowState::from_view(this) };
 
             state.trigger_event(Event::Mouse($event_ty {
@@ -67,15 +68,20 @@ macro_rules! add_simple_keyboard_class_method {
         extern "C-unwind" fn $sel(this: &NSView, _: Sel, event: &NSEvent){
             let state = unsafe { WindowState::from_view(this) };
 
-            if let Some(key_event) = state.process_native_key_event(event){
-                let status = state.trigger_event(Event::Keyboard(key_event));
+            // A key the handler declines goes to `super`, which passes it up
+            // the responder chain to the host's views and window.
+            let declined = match state.process_native_key_event(event) {
+                Some(key_event) => matches!(
+                    state.trigger_event(Event::Keyboard(key_event)),
+                    EventStatus::Ignored
+                ),
+                None => true,
+            };
+            if declined {
+                unsafe {
+                    let superclass = msg_send![this, superclass];
 
-                if let EventStatus::Ignored = status {
-                    unsafe {
-                        let superclass = msg_send![this, superclass];
-
-                        let () = msg_send![super(this, superclass), $sel:event];
-                    }
+                    let () = msg_send![super(this, superclass), $sel:event];
                 }
             }
         }
@@ -116,10 +122,6 @@ pub(super) fn create_view(window_options: &WindowOpenOptions) -> Retained<NSView
             None,
         );
     }
-
-    // SAFETY: This static is a read-only constant
-    let ns_filenames_pboard_type = unsafe { NSFilenamesPboardType };
-    view.registerForDraggedTypes(&NSArray::from_slice(&[ns_filenames_pboard_type]));
 
     view
 }
@@ -218,26 +220,6 @@ unsafe fn create_view_class() -> &'static AnyClass {
         // surface (the base class doesn't notify on this path).
         class.add_method(sel!(setFrameSize:), set_frame_size as extern "C-unwind" fn(_, _, _));
 
-        class.add_method(
-            sel!(draggingEntered:),
-            dragging_entered as extern "C-unwind" fn(_, _, _) -> _,
-        );
-        class.add_method(
-            sel!(prepareForDragOperation:),
-            prepare_for_drag_operation as extern "C-unwind" fn(_, _, _) -> _,
-        );
-        class.add_method(
-            sel!(performDragOperation:),
-            perform_drag_operation as extern "C-unwind" fn(_, _, _) -> _,
-        );
-        class.add_method(
-            sel!(draggingUpdated:),
-            dragging_updated as extern "C-unwind" fn(_, _, _) -> _,
-        );
-        class.add_method(
-            sel!(draggingExited:),
-            dragging_exited as extern "C-unwind" fn(_, _, _) -> _,
-        );
         class.add_method(
             sel!(handleNotification:),
             handle_notification as extern "C-unwind" fn(_, _, _) -> _,
@@ -644,119 +626,6 @@ extern "C-unwind" fn scroll_wheel(this: &NSView, _: Sel, event: &NSEvent) {
         delta,
         modifiers: make_modifiers(event.modifierFlags()),
     }));
-}
-
-fn get_drag_position(sender: Option<&ProtocolObject<dyn NSDraggingInfo>>) -> Point {
-    let point = match sender {
-        Some(sender) => sender.draggingLocation(),
-        None => NSPoint::ZERO,
-    };
-
-    Point::new(point.x, point.y)
-}
-
-fn get_drop_data(sender: Option<&ProtocolObject<dyn NSDraggingInfo>>) -> DropData {
-    let Some(sender) = sender else {
-        return DropData::None;
-    };
-
-    let pasteboard = sender.draggingPasteboard();
-    let Some(file_list) = pasteboard.propertyListForType(unsafe { NSFilenamesPboardType }) else {
-        return DropData::None;
-    };
-
-    let Ok(file_list) = file_list.downcast::<NSArray>() else {
-        return DropData::None;
-    };
-
-    let files = file_list
-        .into_iter()
-        .filter_map(|s| s.downcast::<NSString>().ok())
-        .map(|s| s.to_string().into())
-        .collect();
-
-    DropData::Files(files)
-}
-
-fn on_event(window_state: &WindowState, event: MouseEvent) -> NSDragOperation {
-    let event_status = window_state.trigger_event(Event::Mouse(event));
-    match event_status {
-        EventStatus::AcceptDrop(DropEffect::Copy) => NSDragOperation::Copy,
-        EventStatus::AcceptDrop(DropEffect::Move) => NSDragOperation::Move,
-        EventStatus::AcceptDrop(DropEffect::Link) => NSDragOperation::Link,
-        EventStatus::AcceptDrop(DropEffect::Scroll) => NSDragOperation::Generic,
-        _ => NSDragOperation::None,
-    }
-}
-
-extern "C-unwind" fn dragging_entered(
-    this: &NSView, _sel: Sel, sender: Option<&ProtocolObject<dyn NSDraggingInfo>>,
-) -> NSDragOperation {
-    let state = unsafe { WindowState::from_view(this) };
-    let modifiers = state.keyboard_state().last_mods();
-    let drop_data = get_drop_data(sender);
-
-    let event = MouseEvent::DragEntered {
-        position: get_drag_position(sender),
-        modifiers: make_modifiers(modifiers),
-        data: drop_data,
-    };
-
-    on_event(&state, event)
-}
-
-extern "C-unwind" fn dragging_updated(
-    this: &NSView, _sel: Sel, sender: Option<&ProtocolObject<dyn NSDraggingInfo>>,
-) -> NSDragOperation {
-    let state = unsafe { WindowState::from_view(this) };
-    let modifiers = state.keyboard_state().last_mods();
-    let drop_data = get_drop_data(sender);
-
-    let event = MouseEvent::DragMoved {
-        position: get_drag_position(sender),
-        modifiers: make_modifiers(modifiers),
-        data: drop_data,
-    };
-
-    on_event(&state, event)
-}
-
-extern "C-unwind" fn prepare_for_drag_operation(
-    _this: &NSView, _sel: Sel, _sender: Option<&ProtocolObject<dyn NSDraggingInfo>>,
-) -> Bool {
-    // Always accept drag operation if we get this far
-    // This function won't be called unless dragging_entered/updated
-    // has returned an acceptable operation
-    Bool::YES
-}
-
-extern "C-unwind" fn perform_drag_operation(
-    this: &NSView, _sel: Sel, sender: Option<&ProtocolObject<dyn NSDraggingInfo>>,
-) -> Bool {
-    let state = unsafe { WindowState::from_view(this) };
-    let modifiers = state.keyboard_state().last_mods();
-    let drop_data = get_drop_data(sender);
-
-    let event = MouseEvent::DragDropped {
-        position: get_drag_position(sender),
-        modifiers: make_modifiers(modifiers),
-        data: drop_data,
-    };
-
-    let event_status = state.trigger_event(Event::Mouse(event));
-
-    match event_status {
-        EventStatus::AcceptDrop(_) => Bool::YES,
-        _ => Bool::NO,
-    }
-}
-
-extern "C-unwind" fn dragging_exited(
-    this: &NSView, _sel: Sel, _sender: Option<&ProtocolObject<dyn NSDraggingInfo>>,
-) {
-    let state = unsafe { WindowState::from_view(this) };
-
-    on_event(&state, MouseEvent::DragLeft);
 }
 
 extern "C-unwind" fn handle_notification(this: &NSView, _cmd: Sel, notification: &NSNotification) {

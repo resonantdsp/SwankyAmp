@@ -22,6 +22,8 @@ pub use mouse_cursor::MouseCursor;
 pub use window::*;
 #[cfg(target_os = "macos")]
 pub use macos::FrameWaker;
+#[cfg(target_os = "windows")]
+pub use win::WindowLease;
 pub use window_info::*;
 pub use window_open_options::*;
 

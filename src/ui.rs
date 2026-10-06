@@ -15,7 +15,7 @@ use truce_iced::iced::widget::{
     Column, Row, Space, button, center, column, container, mouse_area, opaque, row, rule, stack,
     text,
 };
-use truce_iced::iced::{Alignment, Border, Color, Subscription, Task, event, keyboard, window};
+use truce_iced::iced::{Alignment, Border, Color, Subscription, Task, event, keyboard};
 use truce_iced::{IcedPlugin, Message, ParamCache, ParamMessage, PluginContext};
 
 const INK: Color = style::INK;
@@ -43,8 +43,8 @@ pub enum Action {
     /// Escape: closes whichever of the panel and the preset menu is open.
     Dismiss,
     Preset(PresetMsg),
-    Focus(bool),
-    Pointer(bool),
+    /// A wheel turn over a cover with nothing beneath it to act on.
+    Covered,
     /// The interface size, in percent, for this installation.
     InterfaceSize(u16),
     /// The standalone app's input, input channels or output.
@@ -62,8 +62,6 @@ pub struct FreeUi {
     meters: Option<Arc<MeterState>>,
     meter_levels: [f32; 4],
     meter_revision: u64,
-    focused: bool,
-    hovered: bool,
     presets: PresetBar,
     owner: Option<Arc<SwankyAmpParams>>,
     /// The knob a pointer gesture is turning, whose readout shows tenths.
@@ -101,8 +99,6 @@ impl FreeUi {
             meters: None,
             meter_levels: [0.0; 4],
             meter_revision: 0,
-            focused: true,
-            hovered: false,
             presets: PresetBar::offline(),
             owner: None,
             turning: None,
@@ -156,21 +152,14 @@ impl FreeUi {
         Vec::new()
     }
 
-    /// Meters go dark while the window has lost focus and the pointer is
-    /// elsewhere, so a background editor stops repainting under running
-    /// audio.
-    fn displays_live(&self) -> bool {
-        self.focused || self.hovered
-    }
-
     fn sync_meters(&mut self) {
         match &self.meters {
-            Some(meters) if self.displays_live() => {
+            Some(meters) => {
                 let snapshot = meters.snapshot();
                 self.meter_levels = snapshot.levels;
                 self.meter_revision = snapshot.revision;
             }
-            _ => self.meter_levels = [0.0; 4],
+            None => self.meter_levels = [0.0; 4],
         }
     }
 
@@ -297,15 +286,16 @@ impl FreeUi {
 impl IcedPlugin<SwankyAmpParams> for FreeUi {
     type Message = Action;
 
+    fn window_opened(&mut self, window: truce_iced::raw_window_handle::RawWindowHandle) {
+        self.presets.set_window(window);
+    }
+
     fn new(params: Arc<SwankyAmpParams>) -> Self {
-        crate::resident::stay_loaded();
         let mut ui = Self {
             releases: Some(release_notice::Service::start()),
             meters: Some(Arc::clone(&params.meter_state)),
             presets: PresetBar::live(&params),
             owner: Some(Arc::clone(&params)),
-            // Some hosts never send focus to an embedded editor, so it
-            // starts live until a focus or pointer event says otherwise.
             ..Self::installed(crate::interface::folder())
         };
         if let Some(name) = CAPTURED_MENU.get() {
@@ -388,19 +378,6 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
                 self.information = false;
                 self.presets.update(PresetMsg::Close, params, ctx);
             }
-            Message::Plugin(Action::Focus(focused)) => {
-                self.focused = focused;
-                self.sync_meters();
-            }
-            Message::Plugin(Action::Pointer(hovered)) => {
-                self.hovered = hovered;
-                self.sync_meters();
-                // The window goes on reporting the last position after the
-                // pointer leaves, so the field never hears it go.
-                if !hovered {
-                    self.presets.update(PresetMsg::Hover(false), params, ctx);
-                }
-            }
             _ => {}
         }
         Task::none()
@@ -412,11 +389,10 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
     // instance stops asking.
     fn needs_redraw(&self) -> bool {
         let notice = self.releases.is_some() && self.latest_notice() != self.notice;
-        let meters = self.displays_live()
-            && self
-                .meters
-                .as_ref()
-                .is_some_and(|meters| meters.revision() != self.meter_revision);
+        let meters = self
+            .meters
+            .as_ref()
+            .is_some_and(|meters| meters.revision() != self.meter_revision);
         let presets = self
             .owner
             .as_ref()
@@ -448,10 +424,6 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
 /// the pointer.
 fn window_action(event: &iced_core::Event) -> Option<Action> {
     Some(match event {
-        iced_core::Event::Window(window::Event::Focused) => Action::Focus(true),
-        iced_core::Event::Window(window::Event::Unfocused) => Action::Focus(false),
-        iced_core::Event::Mouse(mouse::Event::CursorMoved { .. }) => Action::Pointer(true),
-        iced_core::Event::Mouse(mouse::Event::CursorLeft) => Action::Pointer(false),
         iced_core::Event::Keyboard(keyboard::Event::KeyPressed {
             key: keyboard::Key::Named(keyboard::key::Named::Escape),
             ..
@@ -943,9 +915,8 @@ fn input_off_cover<'a, R: FreeRenderer + 'a>(
         opaque(
             mouse_area(Space::new().width(Length::Fill).height(Length::Fill))
                 .on_press(Message::Plugin(Action::Information(true)))
-                // Taking the wheel here keeps it from the knob beneath; the
-                // pointer is over the window, so saying so changes nothing.
-                .on_scroll(|_| Message::Plugin(Action::Pointer(true)))
+                // Taking the wheel here keeps it from the knob beneath.
+                .on_scroll(|_| Message::Plugin(Action::Covered))
                 .interaction(mouse::Interaction::Pointer),
         ),
     )
@@ -1266,12 +1237,16 @@ mod tests {
             );
         }
 
-        /// The window reports the last position with the pointer's leaving.
-        fn leave(&mut self, last: [f32; 2]) {
-            self.send(mouse::Event::CursorLeft, last);
+        /// The pointer leaving the window takes the cursor away with it.
+        fn leave(&mut self) {
+            self.send_with(mouse::Event::CursorLeft, mouse::Cursor::Unavailable);
         }
 
         fn send(&mut self, event: mouse::Event, [x, y]: [f32; 2]) {
+            self.send_with(event, mouse::Cursor::Available(Point::new(x, y)));
+        }
+
+        fn send_with(&mut self, event: mouse::Event, cursor: mouse::Cursor) {
             let mut renderer = Measure;
             let mut messages = Vec::new();
             let event = Event::Mouse(event);
@@ -1286,7 +1261,7 @@ mod tests {
             );
             interface.update(
                 &[event],
-                mouse::Cursor::Available(Point::new(x, y)),
+                cursor,
                 &mut renderer,
                 &mut clipboard::Null,
                 &mut messages,
@@ -1558,7 +1533,7 @@ mod tests {
         );
 
         editor.point(field_centre());
-        editor.leave(field_centre());
+        editor.leave();
         assert_ne!(
             editor.text("footer.line").as_deref(),
             Some(line.as_str()),

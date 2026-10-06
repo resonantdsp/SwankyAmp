@@ -63,7 +63,9 @@ rather than looking one up again.
 A fixed-size editor may still ask for a new size, which is how an interface
 zoom resizes the window. The published standalone resizes the window but
 leaves its content size pinned where the editor opened, so on macOS the zoom
-button snapped it back; the pin now follows the size the editor asked for.
+button snapped it back, and on Windows the size-limits subclass clamped the
+resize itself, leaving the window at its opening size; on both the pin now
+follows the size the editor asked for.
 
 The published help text gave `--input-enabled` a default of off, although an
 application can set its own through `Defaults`, as Swanky Amp does to open
@@ -105,7 +107,40 @@ feeds the plugin from channel 1 alone, where upstream feeds every channel
 straight through, since a guitar is one channel; a saved channel the device
 does not have gives way to channel 1.
 
-The buffer, device, ring, ASIO and zoom-pin changes follow the same fixes in Swanky Amp
-Pro's copy of this crate. Keep these fixes here until a pinned upstream
+The published standalone exits with an error when the output device is
+there but will not start, as CoreAudio, WASAPI or ASIO can refuse an
+interface another program holds or one in a bad state. The windowed
+standalone now opens without sound instead and reports the device through
+`setup` as one that would not start, so the editor can offer another;
+choosing one that starts plays as usual. Without a window the error still
+ends the launch.
+
+The published standalone never stops its audio streams: the workers that
+own them live as long as the controllers, which the standalone keeps for the
+whole process, so the process exits with its streams running. cpal stops an
+ASIO driver only when its last stream is dropped, and a driver left running
+replays the buffers it holds, which on Windows is the last buffer heard
+looping after the window closes. Closing now hides the window at once, has
+the audio callback fade the output to silence over 5 ms and write two whole
+silent buffers, then stops the output (and on ASIO the interface's input) on
+the output worker, then the input stream on its worker, and lets both
+workers exit, before the editor and plugin are torn down
+(`audio::close_streams`).
+The close button, the macOS Quit item, which now closes the window instead
+of terminating the app from inside `AppKit`, and the Ctrl-C handlers of the
+capture modes all take that path. Quitting from the Dock or at logout
+still terminates the app directly; CoreAudio stops with the process. The
+waits are bounded, so a stalled device cannot hold the close.
+
+The Mic Input and Audio Output items have no shortcuts. Cmd+I / Ctrl+I and
+Cmd+O / Ctrl+O toggled them, and once the editor passed the keys it does not
+use on to the standalone, a stray press while playing silenced the input or
+the output. The items stay in the Settings menu. Mic Input and an editor's
+input choice share the flag the audio callback reads, so both always show
+the same state.
+
+The buffer, device, ring, ASIO, zoom-pin, launch-failure, close and
+shortcut changes follow the same fixes in Swanky Amp Pro's copy of this
+crate. Keep these fixes here until a pinned upstream
 release includes equivalent handling; remove the Cargo patch and this
 directory together when upgrading to that release.

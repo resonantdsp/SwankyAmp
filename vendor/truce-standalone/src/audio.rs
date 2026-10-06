@@ -268,6 +268,10 @@ pub struct AudioHandles<P: PluginExport> {
     /// header gets the correct sample count.
     #[cfg(feature = "playback")]
     pub capture: Option<crate::playback::CaptureSink>,
+    /// Why the output could not start at launch, when it could not. The
+    /// handles still work, so a window can open for another device to be
+    /// chosen; nothing plays until one starts.
+    pub output_error: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -375,6 +379,117 @@ impl ChannelRoute {
 }
 
 // ---------------------------------------------------------------------------
+// Closing
+// ---------------------------------------------------------------------------
+
+/// How long the output takes to fade to silence when the standalone closes.
+const CLOSE_FADE: std::time::Duration = std::time::Duration::from_millis(5);
+/// Whole silent buffers the output writes after its fade before it stops.
+/// A driver double-buffers, and some, ASIO among them, replay the buffers
+/// they hold as they stop, so both must be silent by then.
+const CLOSE_SILENT_BUFFERS: u8 = 2;
+/// How long the output worker waits for the fade before stopping the
+/// streams anyway, for a device that has stopped calling back. A device
+/// running larger buffers than this allows for gets four of its buffers.
+const CLOSE_FADE_WAIT: std::time::Duration = std::time::Duration::from_millis(250);
+/// How long closing waits for the workers to stop their streams. Past it
+/// the process exits with whatever is left, as it would without waiting.
+const CLOSE_WAIT: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// The close request the output's audio callback answers by fading out.
+#[derive(Default)]
+struct CloseFade {
+    requested: AtomicBool,
+    /// Set by the callback once the device holds only silence.
+    silent: AtomicBool,
+    /// Frames in the buffers the callback is fading, which bound the wait.
+    buffer_frames: AtomicUsize,
+}
+
+/// One output stream's fade to silence, owned by its audio callback.
+struct FadeOut {
+    shared: Arc<CloseFade>,
+    gain: f32,
+    step: f32,
+    silent_buffers: u8,
+}
+
+impl FadeOut {
+    fn new(shared: Arc<CloseFade>, sample_rate: f64) -> Self {
+        shared.silent.store(false, Ordering::Release);
+        // A stream opened after closing began never plays.
+        let gain = if shared.requested.load(Ordering::Acquire) {
+            0.0
+        } else {
+            1.0
+        };
+        #[allow(clippy::cast_possible_truncation)]
+        let step = (1.0 / (CLOSE_FADE.as_secs_f64() * sample_rate).max(1.0)) as f32;
+        Self {
+            shared,
+            gain,
+            step,
+            silent_buffers: 0,
+        }
+    }
+
+    fn apply(&mut self, data: &mut [f32], channels: usize) {
+        if !self.shared.requested.load(Ordering::Acquire) {
+            return;
+        }
+        self.shared
+            .buffer_frames
+            .store(data.len() / channels.max(1), Ordering::Relaxed);
+        if self.gain > 0.0 {
+            for frame in data.chunks_mut(channels.max(1)) {
+                self.gain = (self.gain - self.step).max(0.0);
+                for sample in frame {
+                    *sample *= self.gain;
+                }
+            }
+            return;
+        }
+        data.fill(0.0);
+        self.silent_buffers = self.silent_buffers.saturating_add(1);
+        if self.silent_buffers >= CLOSE_SILENT_BUFFERS {
+            self.shared.silent.store(true, Ordering::Release);
+        }
+    }
+}
+
+/// Fade the output to silence and stop every audio stream, input and
+/// output, so that no driver is left playing what it last held. The
+/// workers then exit, so nothing reopens a stream afterwards. Returns once
+/// both have stopped, or after a short bound. Closing twice is harmless.
+pub fn close_streams(input: &InputController, output: &OutputController) {
+    output.fade.requested.store(true, Ordering::Release);
+    let deadline = std::time::Instant::now() + CLOSE_WAIT;
+    let wait = |acks: &mpsc::Receiver<()>| {
+        let _ = acks.recv_timeout(deadline.saturating_duration_since(std::time::Instant::now()));
+    };
+    // The command queue is bounded, and full while a slow reopen works
+    // through queued menu choices, so a blocking send could outlast the
+    // bound.
+    let (stopped, acks) = mpsc::channel();
+    let mut close = OutputCmd::Close(stopped);
+    loop {
+        match output.cmd_tx.try_send(close) {
+            Err(mpsc::TrySendError::Full(cmd)) if std::time::Instant::now() < deadline => {
+                close = cmd;
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
+            _ => break,
+        }
+    }
+    // The input stops after the output has faded, so the plugin never
+    // hears its input cut while the output is still at full level.
+    wait(&acks);
+    let (stopped, acks) = mpsc::channel();
+    let _ = input.cmd_tx.send(InputCmd::Close(stopped));
+    wait(&acks);
+}
+
+// ---------------------------------------------------------------------------
 // InputController
 // ---------------------------------------------------------------------------
 
@@ -424,6 +539,8 @@ enum InputCmd {
     Reopen,
     /// The output moved to another driver; follow it.
     DriverChanged,
+    /// Stop the stream, answer, and exit.
+    Close(mpsc::Sender<()>),
 }
 
 impl InputController {
@@ -534,6 +651,7 @@ pub struct OutputController {
     /// Buffer size the open streams run at, in frames; 0 when the device
     /// refused a fixed size and runs at its own.
     buffer_frames: Arc<AtomicU32>,
+    fade: Arc<CloseFade>,
 }
 
 enum OutputCmd {
@@ -565,6 +683,8 @@ enum OutputCmd {
     /// The driver asked to be reset, which it does when its own settings
     /// change, such as a buffer size set in its control panel.
     Reset,
+    /// Wait for the fade, stop the streams, answer, and exit.
+    Close(mpsc::Sender<()>),
 }
 
 fn queue_latency_restart(
@@ -981,9 +1101,18 @@ pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, B
         opts.output_device.is_some() || saved.output_device.is_some(),
     ));
 
-    let default_config = initial_output
-        .default_output_config()
-        .map_err(|e| format!("could not query default config for the audio output: {e}"))?;
+    // A device that will not report its config will not start either; a
+    // stand-in shape lets the launch go on to report it as refused.
+    let default_config = initial_output.default_output_config().unwrap_or_else(|e| {
+        eprintln!("could not query the audio output's config: {e}");
+        cpal::SupportedStreamConfig::new(
+            2,
+            cpal::SAMPLE_RATE_48K,
+            cpal::SupportedBufferSize::Unknown,
+            cpal::SampleFormat::F32,
+        )
+    });
+    let launch_output_name = device_label(&initial_output);
 
     // The plugin runs a declared bus layout; the device stream tries to
     // match its output width but falls back to the device default (the
@@ -1111,6 +1240,7 @@ pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, B
             .latency(),
     ));
     let latency_restart_pending = Arc::new(AtomicBool::new(false));
+    let fade = Arc::new(CloseFade::default());
     let output_controller = OutputController {
         enabled: Arc::clone(&output_enabled),
         cmd_tx: output_cmd_tx,
@@ -1118,6 +1248,7 @@ pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, B
         channel_route: Arc::clone(&output_channel_route),
         layout: Arc::clone(&output_layout_shared),
         buffer_frames: Arc::clone(&buffer_frames),
+        fade: Arc::clone(&fade),
     };
     // Apply `--output-channels` (and its env var) once at launch. The
     // native menus override this live; on Linux (no menu) the CLI is
@@ -1225,6 +1356,7 @@ pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, B
         buffer_frames: Arc::clone(&buffer_frames),
         sample_rate: stream_rate,
         reset_pending: Arc::new(AtomicBool::new(false)),
+        fade,
         commands: Arc::downgrade(&output_controller.cmd_tx),
         output_chosen,
         input_cmd: input_controller.cmd_tx.clone(),
@@ -1252,17 +1384,25 @@ pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, B
         .spawn(move || worker.run(&output_cmd_rx, &open_result_tx))
         .map_err(|e| format!("could not spawn output worker: {e}"))?;
 
-    // Wait for the worker to confirm initial open so any error
-    // propagates back to `start_audio`'s caller synchronously.
-    match open_result_rx.recv() {
-        Ok(Ok(())) => {}
-        Ok(Err(e)) => return Err(e.into()),
+    // Wait for the worker's first open, so the launch knows whether the
+    // output started before the editor opens.
+    let output_error = match open_result_rx.recv() {
+        Ok(Ok(())) => None,
+        // A device that is there but refuses to start, held by another
+        // program or in a bad state, is reported as unavailable rather than
+        // ending the launch, so another can be chosen.
+        Ok(Err(e)) => {
+            setup::report_refused_output(Some(
+                launch_output_name.unwrap_or_else(|| "The audio output".to_owned()),
+            ));
+            Some(e)
+        }
         Err(e) => return Err(format!("output worker exited before reporting: {e}").into()),
-    }
+    };
 
     if !output_enabled.load(Ordering::Relaxed) {
         vlog!(
-            "Output: muted at launch - toggle from the Plugin menu or \
+            "Output: muted at launch - toggle from the Settings menu or \
              pass --output-enabled on"
         );
     }
@@ -1284,6 +1424,7 @@ pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, B
         sidechain_playback,
         #[cfg(feature = "playback")]
         capture,
+        output_error,
     })
 }
 
@@ -1735,6 +1876,7 @@ struct OutputResources<P: PluginExport> {
     /// Set while an ASIO driver's reset request waits for the worker, so a
     /// burst of them, one from each stream, reopens the streams once.
     reset_pending: Arc<AtomicBool>,
+    fade: Arc<CloseFade>,
     /// Where the streams send a reset request or a latency restart. Weak,
     /// so the worker still exits when the controllers are dropped.
     commands: Weak<mpsc::SyncSender<OutputCmd>>,
@@ -1821,6 +1963,11 @@ impl<P: PluginExport> OutputWorker<P> {
             self.config.buffer_size = cpal::BufferSize::Default;
             initial = self.reopen(false, false);
         }
+        // A launch that cannot start keeps the player's buffer size for the
+        // device they choose next.
+        if initial.is_err() {
+            self.config.buffer_size = requested_buffer;
+        }
         if let Err(e) = &initial
             && driver::on_asio()
         {
@@ -1834,8 +1981,14 @@ impl<P: PluginExport> OutputWorker<P> {
                     device_label(&self.device).unwrap_or_else(|| "The ASIO interface".to_owned()),
                 )));
             }
-            self.config.buffer_size = requested_buffer;
             initial = self.switch_driver(AudioDriver::Wasapi);
+            // Later reopens must not reach back to the ASIO interface while
+            // the launch runs on WASAPI.
+            if initial.is_err()
+                && let Some(device) = driver::host().default_output_device()
+            {
+                self.device = device;
+            }
         }
         let _ = open_result.send(initial);
 
@@ -1849,8 +2002,37 @@ impl<P: PluginExport> OutputWorker<P> {
                 OutputCmd::SetLayout { index } => self.set_layout(index),
                 OutputCmd::RestartLatency => self.restart_latency(),
                 OutputCmd::Reset => self.reset(),
+                OutputCmd::Close(stopped) => {
+                    self.close();
+                    // The plugin and the rest go before the answer, so none
+                    // of it is cut short by the process exiting.
+                    drop(self);
+                    let _ = stopped.send(());
+                    return;
+                }
             }
         }
+    }
+
+    /// Stop the streams once the callback has faded the device to silence.
+    /// Dropping the last stream on an ASIO driver stops and releases it, on
+    /// this thread, which loaded it.
+    fn close(&mut self) {
+        if self.streams.is_some() {
+            let start = std::time::Instant::now();
+            let rate = f64::from(self.config.sample_rate.max(1));
+            while !self.res.fade.silent.load(Ordering::Acquire) {
+                #[allow(clippy::cast_precision_loss)]
+                let buffers = std::time::Duration::from_secs_f64(
+                    4.0 * self.res.fade.buffer_frames.load(Ordering::Relaxed) as f64 / rate,
+                );
+                if start.elapsed() >= CLOSE_FADE_WAIT.max(buffers) {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
+        }
+        self.streams = None;
     }
 
     fn current_name(&self) -> Option<String> {
@@ -1881,6 +2063,12 @@ impl<P: PluginExport> OutputWorker<P> {
         self.config.channels = opened.config.channels;
         self.config.sample_rate = opened.config.sample_rate;
         self.streams = Some(opened.streams);
+        // A device that refused at launch and has since started is no
+        // longer unavailable, whichever change reopened it.
+        let opened_name = device_label(&device);
+        if let Some(name) = &opened_name {
+            setup::output_started(name);
+        }
         self.device = device;
         Ok(())
     }
@@ -1966,6 +2154,8 @@ impl<P: PluginExport> OutputWorker<P> {
         }
         match self.switch_driver(target) {
             Ok(()) => {
+                // The old driver's output is no longer what plays.
+                setup::report_refused_output(None);
                 vlog!("audio driver: {}", target.name());
                 self.res.settings.update(|s| s.driver = Some(target));
             }
@@ -2039,7 +2229,11 @@ impl<P: PluginExport> OutputWorker<P> {
             return;
         }
         vlog!("output device: {target} (follows the input)");
-        self.switch_device(Some(&target));
+        // Only an output nobody chose follows the input, so what it clears
+        // is a launch device that refused to start.
+        if self.switch_device(Some(&target)) {
+            setup::report_refused_output(None);
+        }
     }
 
     fn set_buffer_size(&mut self, frames: u32) {
@@ -2402,6 +2596,7 @@ fn open_output_stream<P: PluginExport>(
     };
 
     let mut reader = RingReader::new(sample_rate);
+    let mut fade = FadeOut::new(Arc::clone(&res.fade), sample_rate);
     let output = build_output(
         device,
         config,
@@ -2446,6 +2641,7 @@ fn open_output_stream<P: PluginExport>(
                 #[cfg(feature = "playback")]
                 capture_a.as_ref(),
             );
+            fade.apply(data, channels);
         },
         stream_error_handler(res),
     )?;
@@ -2578,6 +2774,12 @@ impl InputWorker {
                         }
                     }
                     self.apply(&mut stream, want_enabled, device_name.as_deref());
+                }
+                InputCmd::Close(stopped) => {
+                    self.enabled.store(false, Ordering::Relaxed);
+                    drop(stream.take());
+                    let _ = stopped.send(());
+                    return;
                 }
             }
         }
@@ -3483,6 +3685,70 @@ mod ring_tests {
             played.windows(2).all(|pair| pair[1] == pair[0] + 1),
             "input was dropped between captures"
         );
+    }
+}
+
+#[cfg(test)]
+mod close_tests {
+    use super::{CloseFade, FadeOut};
+    use std::sync::Arc;
+    use std::sync::atomic::Ordering;
+
+    const RATE: f64 = 48_000.0;
+    const CHANNELS: usize = 2;
+    const BLOCK: usize = 128;
+
+    fn render(fade: &mut FadeOut) -> Vec<f32> {
+        let mut block = vec![0.5; BLOCK * CHANNELS];
+        fade.apply(&mut block, CHANNELS);
+        block
+    }
+
+    #[test]
+    fn closing_fades_the_output_out_and_stops_only_on_silent_buffers() {
+        let shared = Arc::new(CloseFade::default());
+        let mut fade = FadeOut::new(Arc::clone(&shared), RATE);
+        assert!(
+            render(&mut fade).iter().all(|&s| s == 0.5),
+            "the output plays untouched until closing"
+        );
+
+        shared.requested.store(true, Ordering::Release);
+        // Short enough to feel instant: within 10 ms.
+        let most = (RATE * 0.010) as usize / BLOCK + 1;
+        let mut faded = Vec::new();
+        while faded.last() != Some(&0.0) {
+            assert!(faded.len() / (BLOCK * CHANNELS) < most, "the fade lasts too long");
+            faded.extend(render(&mut fade));
+        }
+        assert!(faded[0] < 0.5, "the fade starts at once");
+        assert!(
+            faded.windows(2).all(|w| w[1] <= w[0]),
+            "the fade never rises"
+        );
+        assert!(
+            !shared.silent.load(Ordering::Acquire),
+            "a buffer holding the fade is not yet silence"
+        );
+
+        assert!(render(&mut fade).iter().all(|&s| s == 0.0));
+        assert!(
+            !shared.silent.load(Ordering::Acquire),
+            "one silent buffer leaves the other half of the driver's pair"
+        );
+        assert!(render(&mut fade).iter().all(|&s| s == 0.0));
+        assert!(
+            shared.silent.load(Ordering::Acquire),
+            "two silent buffers let the stream stop"
+        );
+    }
+
+    #[test]
+    fn a_stream_opened_while_closing_plays_nothing() {
+        let shared = Arc::new(CloseFade::default());
+        shared.requested.store(true, Ordering::Release);
+        let mut fade = FadeOut::new(shared, RATE);
+        assert!(render(&mut fade).iter().all(|&s| s == 0.0));
     }
 }
 

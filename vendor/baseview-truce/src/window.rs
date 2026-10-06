@@ -120,8 +120,21 @@ impl<'a> Window<'a> {
         self.window.frame_waker()
     }
 
+    /// Keeps the window from being destroyed by a close until the lease
+    /// drops, for a renderer whose swapchain may outlive the handler.
+    #[cfg(target_os = "windows")]
+    pub fn lease(&self) -> crate::WindowLease {
+        self.window.lease()
+    }
+
     pub fn set_mouse_cursor(&mut self, cursor: MouseCursor) {
         self.window.set_mouse_cursor(cursor);
+    }
+
+    /// Show one line of native text centred in the window, for a renderer
+    /// that cannot draw. Meant to be called once; a no-op on X11.
+    pub fn show_note(&mut self, text: &str) {
+        self.window.show_note(text);
     }
 
     pub fn has_focus(&mut self) -> bool {

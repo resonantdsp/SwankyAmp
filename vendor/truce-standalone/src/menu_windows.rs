@@ -3,9 +3,8 @@
 //! Builds a Win32 `HMENU` with one top-level "Settings" popup
 //! carrying both the audio and MIDI controls:
 //!
-//! - **Mic Input** (checkable, `Ctrl+I` shown as the accelerator hint;
-//!   effect plugins only)
-//! - **Audio Output** (checkable mute toggle, `Ctrl+O`)
+//! - **Mic Input** (checkable; effect plugins only, no shortcut)
+//! - **Audio Output** (checkable mute toggle, no shortcut)
 //! - **Audio Driver** submenu - ASIO or Windows (WASAPI), ASIO greyed
 //!   when no ASIO driver is installed
 //! - **Input Device** submenu - repopulated from cpal on each open
@@ -37,10 +36,10 @@
 //! - There's no auto-populated "App" menu like Cocoa's. The
 //!   window's `[X]` close button covers Quit; we ship just the
 //!   Settings menu.
-//! - Cocoa's `Cmd+I` accelerator is wired by the menu item itself.
+//! - Cocoa's key equivalents are wired by the menu items themselves.
 //!   Win32 needs a separate `HACCEL` table + `TranslateAccelerator`
 //!   in the message loop, which baseview doesn't expose. The menu
-//!   text shows `Ctrl+I` as a hint; the actual key is dispatched
+//!   text shows `Ctrl+K` as a hint; the actual key is dispatched
 //!   by the keyboard handler in `windowed.rs`.
 //! - `WM_COMMAND` only carries the command ID, not the item's
 //!   string. We use `GetMenuStringW` to look up the device name
@@ -229,12 +228,10 @@ pub fn install(
             std::ptr::null_mut()
         };
 
-        // Mic-input item (effects only). `\t` separates the label
-        // from the accelerator hint; Windows right-aligns the hint
-        // in the popup. The hint is cosmetic - actual `Ctrl+I`
-        // dispatch happens in the baseview keyboard handler.
+        // Mic-input item (effects only). It has no shortcut: a stray
+        // key press must never silence the input.
         if is_effect {
-            let item_text = wide("Mic Input\tCtrl+I");
+            let item_text = wide("Mic Input");
             AppendMenuW(
                 plugin_menu,
                 MF_STRING,
@@ -245,8 +242,9 @@ pub fn install(
 
         // Audio output mute toggle. Applies to every plugin
         // category. Initial state checkmark is set after install
-        // via WM_INITMENUPOPUP.
-        let output_text = wide("Audio Output\tCtrl+O");
+        // via WM_INITMENUPOPUP. It has no shortcut: a stray key press
+        // must never silence the output.
+        let output_text = wide("Audio Output");
         AppendMenuW(
             plugin_menu,
             MF_STRING,

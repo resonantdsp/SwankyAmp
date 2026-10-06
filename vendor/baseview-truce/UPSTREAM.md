@@ -63,3 +63,107 @@ and Shift from `wParam`; Alt and AltGr use the corrected key-state checks.
 
 Remove the Cargo patch and this directory when a pinned upstream release reads
 the same modifier state. Windows real-host qualification remains necessary.
+
+# Windows DPI awareness and lost frame ticks
+
+The published window sets the whole process to per-monitor DPI awareness when
+its window is created. In a plug-in that process is the host's: the call
+either fails (Ableton Live 10 stayed DPI-unaware) or changes the host's DPI
+mode mid-session. The call is removed. The standalone declares per-monitor
+awareness in the manifest `cargo truce run` and `cargo truce package` embed
+in its executable, and the editor reads its window's own DPI either way.
+
+The frame timer posts a tick only while none is pending, and the tick clears
+the flag. When `PostMessageW` failed, for example on a full message queue,
+the flag stayed set and no frame was ever posted again, freezing the editor.
+A failed post now clears the flag so the next timer period tries again.
+
+Remove the Cargo patch and this directory when a pinned upstream release
+behaves the same way.
+
+# Keys the editor declines reach the host
+
+The published Windows window swallows every key addressed to it: the
+`WH_GETMESSAGE` hook takes the message out of the host's loop and the window
+procedure answers it whatever the handler reported, so Space and every other
+host shortcut stopped working once the editor had the focus. A key the handler
+reports `Ignored` is now posted on to the parent window, the host's, where the
+host's loop translates and dispatches it as one of its own. A handler busy
+mid-frame never saw the key, so that key is dropped rather than handed
+over. Alt and F10 alone stay with the editor, as Alt is held for its gestures
+and a forwarded release would open the host's menu bar; a window without a
+parent keeps its old handling, so Alt+F4 still closes the standalone. On macOS
+a declined key already went to `super` and up the responder
+chain; one the keyboard state cannot translate now goes the same way instead
+of being dropped.
+
+Remove it when a pinned upstream release hands declined keys to the host.
+
+# No drag-and-drop registration
+
+The published window registers itself as a drop target, calling
+`OleInitialize` on the host's GUI thread and `RegisterDragDrop` on Windows and
+registering file-name drag types on macOS, though nothing built on it handles a
+drop. The registration, its handlers and the `windows` crate it needed are
+removed; the drag event types remain and are never sent.
+
+Remove it with the rest of this directory.
+
+# Windows close that a renderer can outlast
+
+The published window closes by posting itself a message and destroys itself
+with the handler still inside it, so a renderer whose swapchain lives on
+another thread had its window destroyed under it, and a host that destroys
+its own window straight after closing the editor destroyed this one before the
+message arrived. A close on the window's own thread now runs at once: it drops
+the handler while the window is still attached, then destroys the window. A
+renderer can hold a `WindowLease` from `Window::lease`; a close that finds one
+outstanding hides the window and detaches it from its parent instead, and the
+last lease to drop has the window destroyed on its own thread. No other
+platform is touched.
+
+Remove the Cargo patch and this directory when a pinned upstream release
+closes the same way.
+
+# Windows frames from the display
+
+The published window paints on a multimedia timer, `timeSetEvent` with a
+1 ms resolution, which raises the timer resolution of the whole process -
+in a plug-in, the host's - for as long as an editor is open, and ticks at
+66 Hz whatever the display does. The source change drives frames from a
+thread per window that waits for each desktop composition with `DwmFlush`
+and posts the same frame tick, still at most one outstanding. A composition
+that fails, or comes back sooner than 2 ms after the last tick, as it does
+while nothing is being composed, falls back to a 16 ms interval. Closing the
+window stops the thread: it holds a lock while it posts, so no tick reaches
+the window once the close has cleared its flag. The close does not wait for
+the thread, which exits when its current wait returns, normally within one
+refresh. That is safe only because the products pin their library before an
+editor opens, so the thread never returns into unloaded code; an embedder
+that does not pin must not take this change as it stands. The `WM_TIMER`
+fallback remains for a thread that cannot be started.
+
+Remove the Cargo patch and this directory when a pinned upstream release
+paces Windows frames from the display.
+
+# macOS click position
+
+The published view sends button events without a position, so a click with no
+move before it - the first click into a host in the background, whose tracking
+area reports no moves - lands wherever the pointer was last seen, or nowhere
+once the editor treats a cursor that left as unavailable. Each button event is
+now preceded by a cursor move to the event's own location, as winit does.
+
+Remove the Cargo patch and this directory when a pinned upstream release
+positions button events the same way.
+
+# One line of native text
+
+A renderer whose GPU setup failed leaves the published window blank.
+`Window::show_note` puts one line of native text centred in it: a `STATIC`
+child window on Windows, created once the event has been handled because a
+child's creation calls back into this window, and a selectable `NSTextField`
+label on macOS. It is a no-op on X11.
+
+Remove it with the rest of this directory when a pinned upstream release offers
+the same.

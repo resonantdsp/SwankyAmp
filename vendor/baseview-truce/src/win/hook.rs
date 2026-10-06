@@ -49,8 +49,11 @@ impl Drop for KeyboardHookHandle {
 }
 
 // initialize keyboard hook
-// some DAWs (particularly Ableton) intercept incoming keyboard messages,
-// but we're naughty so we intercept them right back
+// Some DAWs (particularly Ableton) translate keyboard messages in their own
+// loop before dispatching them, so a key addressed to the editor would act as
+// a host shortcut before the editor saw it. The hook takes those messages
+// first; the window procedure posts whatever the editor declines on to the
+// host's window.
 pub(crate) fn init_keyboard_hook(hwnd: HWND) -> KeyboardHookHandle {
     let state = &mut *HOOK_STATE.write().unwrap();
 
