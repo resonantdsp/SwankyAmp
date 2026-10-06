@@ -5,7 +5,9 @@ name: check
 # feature set, every test in one optimised profile, which checks the committed
 # artwork package too, the release scripts' tests and the reference and model
 # comparisons) and `checks (windows)` (clippy on the code only Windows
-# compiles, the ASIO host among it), side by side. Pushes to master also build
+# compiles, the ASIO host among it, and every editor pipeline built through
+# Direct3D 12 on the runner, so a shader Direct3D's compiler rejects fails
+# with its message), side by side. Pushes to master also build
 # the release bundles on macOS and Windows and run the format validators over
 # them; a pull request never does, and candidate.yml builds them again for
 # every release candidate. So nothing compiles the macOS-only code, the Audio
@@ -53,7 +55,7 @@ env:
 # September 23 to October 1, 2026, cold dependency caches included: changes
 # under a minute, bundles 30 minutes (Windows; macOS 26). The Linux checks
 # took up to 13 minutes, but now run the reference and model comparisons every
-# time and build the crate optimised, and the Windows lints have no history
+# time and build the crate optimised, and the Windows checks have no history
 # yet, so both limits are estimates until they have one.
 jobs:
   changes:

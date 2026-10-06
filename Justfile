@@ -239,13 +239,15 @@ promote-check candidate_tag tag record_sha256 directory:
 ci-checks: fmt clippy-all test-all release-tests reference-check model-check
 
 # Windows compiles code no other platform does, the ASIO host among it, so its
-# lints run there; everything else runs once, on Linux.
+# lints run there, and the editor's shaders go through Direct3D's compiler,
+# which rejects programs Metal accepts; everything else runs once, on Linux.
 # What CI runs on Windows for every pull request.
 [windows]
 ci-checks:
     bash scripts/install-asio-sdk.sh
     cargo clippy --all-targets --features tools {{ bundle_features }} -- -D warnings
     cargo clippy --all-targets --no-default-features --features tools -- -D warnings
+    cargo test --no-default-features --features tools --lib every_editor_shader_compiles_on_direct3d_12
 
 # What CI runs on macOS and Windows after a push to master.
 ci-bundles: build-standalone (validate "--skip-gui-tests")

@@ -17,6 +17,21 @@ fn gpu(
 > {
     use iced_wgpu::wgpu;
     let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
+    gpu_on(&instance, scale)
+}
+
+fn gpu_on(
+    instance: &iced_wgpu::wgpu::Instance,
+    scale: f32,
+) -> Result<
+    (
+        iced_wgpu::Renderer,
+        iced_graphics::Viewport,
+        iced_wgpu::wgpu::Device,
+    ),
+    Box<dyn std::error::Error>,
+> {
+    use iced_wgpu::wgpu;
     let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
         // The adapter the live editor asks for.
         power_preference: wgpu::PowerPreference::LowPower,
@@ -137,4 +152,59 @@ fn paint_tree<T>(
         cursor,
     );
     finish(renderer)
+}
+
+#[cfg(all(test, target_os = "windows"))]
+mod tests {
+    use super::*;
+
+    /// Windows compiles every shader through Direct3D's own compiler, which
+    /// refuses programs Metal accepts and takes seconds on the editor's thread
+    /// to do so. Drawing the baked editor and retaining its panel with live
+    /// meters builds every pipeline the editor uses: iced's, the artwork
+    /// compositor's, the meter light's and the panel copy. A shader the
+    /// compiler rejects fails here with the compiler's message. The compiler
+    /// runs on the host, not the adapter, so a runner with only Windows'
+    /// software adapter checks it as well as a GPU.
+    #[test]
+    fn every_editor_shader_compiles_on_direct3d_12() {
+        use iced_wgpu::wgpu;
+        // The released editor's instance: Direct3D 12, wgpu's default
+        // compiler (FXC) and no debug flags, which would compile shaders
+        // unoptimised and so pass programs the optimiser rejects.
+        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::DX12,
+            flags: wgpu::InstanceFlags::empty(),
+            ..Default::default()
+        });
+        let (mut renderer, viewport, device) =
+            gpu_on(&instance, 1.0).expect("a Direct3D 12 adapter");
+        let params = Arc::new(SwankyAmpParams::default());
+        let mut ui = FreeUi::new(Arc::clone(&params));
+        ui.windowed = true;
+        ui.meter_levels = [0.5; 4];
+        let cache = ParamCache::new(params);
+        // Without the bake the editor draws natively and would leave the
+        // compositor and meter pipelines unbuilt.
+        assert!(
+            ui.retains_displays(&cache),
+            "the editor has no matching bake"
+        );
+        let size = viewport.physical_size();
+        let panel = truce_iced::panel::Panel::new(
+            &device,
+            wgpu::TextureFormat::Bgra8UnormSrgb,
+            size.width,
+            size.height,
+        );
+        let background = iced_core::Color::BLACK;
+        paint_tree(
+            &mut renderer,
+            &viewport,
+            ui.compose(&cache, true),
+            |renderer| panel.retain(renderer, background, &viewport),
+        );
+        ui.draw_displays(&cache, &mut renderer);
+        renderer.screenshot(&viewport, background);
+    }
 }
