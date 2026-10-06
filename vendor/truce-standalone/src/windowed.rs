@@ -531,8 +531,7 @@ where
     #[cfg(target_os = "linux")]
     size_hints_scale: f64,
     /// Held for the window's lifetime so the plugin outlives the
-    /// audio stream and the preset controller's clones; not read
-    /// directly (preset actions go through `presets`).
+    /// audio stream.
     _plugin: Arc<Mutex<P>>,
     pending: Arc<ArrayQueue<MidiEvent>>,
     transport: Transport,

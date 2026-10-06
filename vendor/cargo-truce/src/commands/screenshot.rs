@@ -354,9 +354,8 @@ Required:
 Options:
   -p <crate>       Plugin crate name. Required for multi-plugin
                    projects (each plugin gets its own --out path).
-  --state <path>   Load a `.pluginstate` blob (the file format the
-                   standalone host's Save Preset writes) before
-                   rendering. CWD-relative or absolute.
+  --state <path>   Load a `.pluginstate` blob before rendering.
+                   CWD-relative or absolute.
   --scale <f64>    Render scale. Defaults to the plugin's
                    `DEFAULT_SCREENSHOT_SCALE` (currently 2.0) so
                    reference PNGs render at identical dimensions on
