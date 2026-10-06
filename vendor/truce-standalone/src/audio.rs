@@ -2122,6 +2122,9 @@ impl<P: PluginExport> OutputWorker<P> {
         if !self.switch_device(name) {
             return;
         }
+        // The player's choice now plays, so a launch device that refused to
+        // start is no longer what needs them.
+        setup::report_refused_output(None);
         let chosen = self.current_name();
         if driver::on_asio() {
             self.res.settings.update(|s| s.asio_device = chosen);
@@ -2138,6 +2141,7 @@ impl<P: PluginExport> OutputWorker<P> {
             setup::report_failure(Some(InputNeed::DidNotOpen(name.to_owned())));
             return;
         }
+        setup::report_refused_output(None);
         let chosen = self.current_name();
         self.res.settings.update(|s| s.asio_device = chosen);
         let _ = self.res.input_cmd.send(InputCmd::SetEnabled(true));

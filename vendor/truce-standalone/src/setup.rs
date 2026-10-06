@@ -97,8 +97,7 @@ static REGISTRY: Mutex<Option<Arc<Registry>>> = Mutex::new(None);
 /// The last input that failed, reported by the audio workers until the
 /// input plays or the player chooses again.
 static FAILURE: Mutex<Option<InputNeed>> = Mutex::new(None);
-/// The output the launch could not start, until it starts or another output
-/// takes its place by a driver switch or by following the input.
+/// The output the launch could not start, until it or another output plays.
 static REFUSED_OUTPUT: Mutex<Option<String>> = Mutex::new(None);
 
 #[allow(clippy::too_many_arguments)]
@@ -180,17 +179,20 @@ pub fn current() -> Option<Setup> {
     let input_need = registry
         .takes_input
         .then(|| input_need(&registry.launch, enabled, remembered.as_deref(), failure));
-    let refused = REFUSED_OUTPUT.lock().ok().and_then(|refused| refused.clone());
+    let refused = REFUSED_OUTPUT
+        .lock()
+        .ok()
+        .and_then(|refused| refused.clone());
     let output_need = refused.map(OutputNeed::DidNotStart).or_else(|| {
         registry
             .launch
-        .output_missing
-        .as_ref()
-        .filter(|name| {
-            !one_interface
-                && saved.output_device.as_ref() == Some(*name)
-                && output.as_ref() != Some(*name)
-        })
+            .output_missing
+            .as_ref()
+            .filter(|name| {
+                !one_interface
+                    && saved.output_device.as_ref() == Some(*name)
+                    && output.as_ref() != Some(*name)
+            })
             .map(|name| OutputNeed::NotConnected(name.clone()))
     });
     let details = registry.devices.peek_inputs();

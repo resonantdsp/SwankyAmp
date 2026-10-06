@@ -15,7 +15,7 @@ use truce_iced::iced::widget::{
     Column, Row, Space, button, center, column, container, mouse_area, opaque, row, rule, stack,
     text,
 };
-use truce_iced::iced::{Alignment, Border, Color, Subscription, Task, event, keyboard};
+use truce_iced::iced::{Alignment, Border, Color, Task};
 use truce_iced::{IcedPlugin, Message, ParamCache, ParamMessage, PluginContext};
 
 const INK: Color = style::INK;
@@ -121,8 +121,8 @@ impl FreeUi {
     }
 
     /// Opens the panel by itself only for what the standalone's launch found:
-    /// no input ever chosen, a remembered device missing, or an ASIO
-    /// interface that would not open.
+    /// no input ever chosen, a remembered device missing, an ASIO interface
+    /// that would not open, or an output that would not start.
     #[cfg(feature = "standalone")]
     fn attach_audio(&mut self, audio: Option<truce_standalone::setup::Setup>) {
         if audio
@@ -276,10 +276,15 @@ impl FreeUi {
                 self.size_error.as_deref(),
             ));
         }
-        stack(layers)
-            .width(style::WIDTH)
-            .height(style::HEIGHT)
-            .into()
+        crate::widgets::Dismissable {
+            content: stack(layers)
+                .width(style::WIDTH)
+                .height(style::HEIGHT)
+                .into(),
+            open: self.information || self.presets.open,
+            on_escape: Message::Plugin(Action::Dismiss),
+        }
+        .into()
     }
 }
 
@@ -310,10 +315,6 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
         ui.attach_audio(audio_setup());
         ui.sync_meters();
         ui
-    }
-
-    fn subscription(&self) -> Subscription<Msg> {
-        event::listen_with(|event, _, _| window_action(&event).map(Message::Plugin))
     }
 
     fn update(
@@ -418,18 +419,6 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
     ) -> Element<'a, Msg, Theme, iced_wgpu::Renderer> {
         self.view_content(params)
     }
-}
-
-/// What the editor makes of window-wide events, whichever widget is under
-/// the pointer.
-fn window_action(event: &iced_core::Event) -> Option<Action> {
-    Some(match event {
-        iced_core::Event::Keyboard(keyboard::Event::KeyPressed {
-            key: keyboard::Key::Named(keyboard::key::Named::Escape),
-            ..
-        }) => Action::Dismiss,
-        _ => return None,
-    })
 }
 
 fn surface<'a, R: FreeRenderer + 'a>(
@@ -1181,7 +1170,7 @@ mod tests {
     use super::{Action, FreeUi, NoticeAction, display_value, notice_action, oversampling_label};
     use crate::layout::{self, Measure};
     use crate::{NullHost, params::SwankyAmpParams, release_notice::notice_for, style};
-    use iced_core::{Event, Point, Size, clipboard, mouse};
+    use iced_core::{Event, Point, Size, clipboard, keyboard, mouse};
     use iced_runtime::user_interface::{Cache, UserInterface};
     use std::sync::Arc;
     use truce_iced::{IcedPlugin, Message, ParamCache, PluginContext};
@@ -1247,29 +1236,52 @@ mod tests {
         }
 
         fn send_with(&mut self, event: mouse::Event, cursor: mouse::Cursor) {
+            self.offer(Event::Mouse(event), cursor);
+        }
+
+        /// Whether the editor keeps a key pressed now from the host.
+        fn keeps(&mut self, key: keyboard::Key) -> bool {
+            self.offer(
+                Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: key.clone(),
+                    modified_key: key,
+                    physical_key: keyboard::key::Physical::Unidentified(
+                        keyboard::key::NativeCode::Unidentified,
+                    ),
+                    location: keyboard::Location::Standard,
+                    modifiers: keyboard::Modifiers::default(),
+                    text: None,
+                    repeat: false,
+                }),
+                mouse::Cursor::Unavailable,
+            )
+        }
+
+        /// Runs `event` through the editor and reports whether it was kept.
+        fn offer(&mut self, event: Event, cursor: mouse::Cursor) -> bool {
             let mut renderer = Measure;
             let mut messages = Vec::new();
-            let event = Event::Mouse(event);
-            // What the window's subscription hears arrives first, as it
-            // does in the editor.
-            messages.extend(super::window_action(&event).map(Message::Plugin));
             let mut interface = UserInterface::build(
                 self.ui.view_content::<Measure>(&self.params),
                 Size::new(style::WIDTH, style::HEIGHT),
                 self.cache.take().unwrap_or_default(),
                 &mut renderer,
             );
-            interface.update(
+            let (_, statuses) = interface.update(
                 &[event],
                 cursor,
                 &mut renderer,
                 &mut clipboard::Null,
                 &mut messages,
             );
+            let kept = statuses
+                .last()
+                .is_some_and(|status| truce_iced::keeps_key(&mut interface, &renderer, *status));
             self.cache = Some(interface.into_cache());
             for message in messages {
                 let _ = self.ui.update(message, &self.params, &self.ctx);
             }
+            kept
         }
 
         fn centre(&self, id: &str) -> [f32; 2] {
@@ -1316,12 +1328,34 @@ mod tests {
         assert_eq!(editor.bounds("information"), None, "a press outside");
 
         editor.press_button();
-        let _ = editor.ui.update(
-            Message::Plugin(Action::Dismiss),
-            &editor.params,
-            &editor.ctx,
+        assert!(
+            editor.keeps(keyboard::Key::Named(keyboard::key::Named::Escape)),
+            "Escape that closes the panel must not also reach the host"
         );
         assert_eq!(editor.bounds("information"), None, "Escape");
+    }
+
+    #[test]
+    fn the_host_keeps_its_keys_except_a_touched_knobs_arrows_and_escape_over_the_panel() {
+        use keyboard::{Key, key::Named};
+        let mut editor = Editor::new(None);
+        editor.press(editor.centre("parameter.0.knob"));
+        assert!(
+            !editor.keeps(Key::Named(Named::Space)),
+            "Space must reach the host after a knob is touched"
+        );
+        assert!(
+            !editor.keeps(Key::Character("r".into())),
+            "so must the host's other shortcuts"
+        );
+        assert!(
+            !editor.keeps(Key::Named(Named::Escape)),
+            "with nothing open, Escape is the host's"
+        );
+        assert!(
+            editor.keeps(Key::Named(Named::ArrowUp)),
+            "the touched knob keeps its arrows"
+        );
     }
 
     #[test]
