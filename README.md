@@ -36,6 +36,10 @@ The standalone opens with its input on, since an amplifier with its input off is
 
 On Windows the standalone plays through ASIO when an ASIO driver is installed, and its Settings menu chooses between ASIO and Windows (WASAPI); `--driver asio` or `--driver wasapi` overrides that for one launch. On ASIO the interface is one device for input and output. The Windows recipes build the standalone with the Cargo feature `asio`, which compiles the ASIO SDK that `just setup` fetches into `tools/` and needs libclang; no other build compiles it.
 
+The [product plan](docs/product-plan.md) owns design decisions, sound acceptance
+and release qualification. The [editor review](../SwankyAmpPro/docs/editor-robustness.md)
+records findings shared by the two products and links their hardware qualification.
+
 ## Signal path
 
 The shipping path is the 1.4.0 model with tube-only oversampling, plate and power-stage low-passes matched at every rate to their response at 96 kHz where 1.4.0 used its 44.1 kHz design, a smooth triode knee, a capped Grit mapping, the standard tone-stack mapping, a cabinet that keeps its 48 kHz response at the other common sample rates, and level compensation recalibrated against 1.4.0. The legacy path keeps every released mapping and the released cabinet design at every rate so that `just model-check` can prove the port against the frozen 1.4.0 renders.
