@@ -201,6 +201,7 @@ where
 
     // Owned copy for the `move` editor closure - `opts` is a borrow
     // that can't escape into it.
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     let presets_dir = opts.presets_dir.clone();
     Window::open_blocking(window_opts, move |window| {
         let truce_parent = match window.raw_window_handle() {
@@ -229,6 +230,7 @@ where
         // Mic Input toggle and Input Device picker for non-effects
         // (input is silent for instruments / analyzers without
         // input routing).
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
         let preset_ctrl =
             crate::presets::PresetController::new::<P>(Arc::clone(&plugin), presets_dir.clone());
 
@@ -459,7 +461,6 @@ where
             output_ctrl,
             qwerty_enabled: qwerty_enabled.clone(),
             octave_offset: 0,
-            presets: preset_ctrl,
             _midi_thread: midi_thread,
             _midi_ctrl: midi_ctrl,
             #[cfg(feature = "playback")]
@@ -530,8 +531,7 @@ where
     #[cfg(target_os = "linux")]
     size_hints_scale: f64,
     /// Held for the window's lifetime so the plugin outlives the
-    /// audio stream and the preset controller's clones; not read
-    /// directly (preset actions go through `presets`).
+    /// audio stream.
     _plugin: Arc<Mutex<P>>,
     pending: Arc<ArrayQueue<MidiEvent>>,
     transport: Transport,
@@ -544,8 +544,6 @@ where
     /// only plays keys when this is set.
     qwerty_enabled: Arc<AtomicBool>,
     octave_offset: i8,
-    /// Preset library handle - Save / Save As keyboard shortcuts.
-    presets: crate::presets::PresetController,
     /// Keeps the MIDI hot-plug thread alive for the lifetime of the
     /// window; dropped when the window closes.
     _midi_thread: MidiInputThread,
@@ -882,18 +880,6 @@ where
         // macOS / Windows, where a held key repeats KeyDown without a
         // KeyUp - the worst case.)
         if kb.state == KeyState::Down && kb.repeat {
-            return EventStatus::Captured;
-        }
-
-        // Ctrl/Cmd-S → quicksave; add Shift for Save As (name +
-        // location, with overwrite confirmation where the OS panel
-        // provides one).
-        if kb.state == KeyState::Down && kb.code == Code::KeyS && is_mod_pressed(kb.modifiers) {
-            if kb.modifiers.contains(Modifiers::SHIFT) {
-                self.presets.save_as();
-            } else {
-                self.presets.save();
-            }
             return EventStatus::Captured;
         }
 
