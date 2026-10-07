@@ -110,7 +110,7 @@ Swanky Amp and Swanky Amp Pro share one release chain: the same contract script,
 
 ## Where it stands
 
-The current candidate and its qualification are owned by [RD-249](../../../company/work/RD-249.md). Qualification and stable promotion remain open; the earlier build below records verified output and source evidence, not qualification of a newer candidate.
+The frozen candidate is `v2.0.0-rc.6` ([RD-1176](../../../company/work/RD-1176.md)): commit `af56d4e4ed9ffdd7bbe9642ce39ebca19f6ca217`, build 342, `release-record.json` SHA-256 `a74fb79bf5bb6eb6114d778bc7a938fd5327f7023d482fc8b646f5275411fc53`, [candidate run](https://github.com/resonantdsp/SwankyAmp/actions/runs/37651870539). It carries every launch feature, including the 1.x preset import ([RD-1068](../../../company/work/RD-1068.md)), and is a published [pre-release](https://github.com/resonantdsp/SwankyAmp/releases/tag/v2.0.0-rc.6) whose installers and record are public under `https://downloads.resonantdsp.com/swankyamp/candidates/v2.0.0-rc.6/`. Earlier October candidates are superseded, including rc.5 (`70ea023`, build 341), replaced the same day by the product-name fix (#137) before anyone used it; it stays public as a superseded pre-release. Its qualification and promotion are owned by [RD-249](../../../company/work/RD-249.md) and remain open; the earlier build below records verified output and source evidence for RC1, not for rc.6.
 
 ### Retained build evidence
 
@@ -124,9 +124,8 @@ A Windows linkage check proved that the SDK's COM classes and DLL helpers are ab
 
 Remaining, in the order of the [release calendar](../../../company/calendar.md):
 
-1. Garrin's listen to a few imported 1.x presets ([RD-1068](../../../company/work/RD-1068.md)) and his open interface notes ([RD-247](../../../company/work/RD-247.md)).
-2. The [feature freeze](../../../company/work/RD-1176.md): one candidate carrying every launch feature.
-3. Host qualification, as above, with the schedule and current results in [RD-249](../../../company/work/RD-249.md).
-4. The stable tag and exact-byte promotion, website catalogue pull request and release-notice check ([RD-249](../../../company/work/RD-249.md)); the public launch follows [RD-135](../../../company/work/RD-135.md).
+1. Garrin's smoke test of rc.6, his listen to a few imported 1.x presets on it ([RD-1068](../../../company/work/RD-1068.md)) and his open interface notes ([RD-247](../../../company/work/RD-247.md)); fixing any of them means a new candidate.
+2. Host qualification, as above, with the schedule and current results in [RD-249](../../../company/work/RD-249.md).
+3. The stable tag and exact-byte promotion, website catalogue pull request and release-notice check ([RD-249](../../../company/work/RD-249.md)); the public launch follows [RD-135](../../../company/work/RD-135.md).
 
 The audio faults 2.0 launches with are fixed after launch or recorded as accepted ([RD-1153](../../../company/work/RD-1153.md)).
