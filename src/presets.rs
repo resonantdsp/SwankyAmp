@@ -221,11 +221,14 @@ fn read_state(element: roxmltree::Node) -> Preset {
             ))
         })
         .collect();
-    migrate(
-        &mut values,
-        element.attribute("pluginVersion").map(parse_version),
-    );
-    let mut controls = AmpControls::default();
+    let version = element.attribute("pluginVersion").map(parse_version);
+    migrate(&mut values, version);
+    // A control a 1.x file leaves out played at 1.4.0's default, not Init's.
+    let mut controls = if version.is_none_or(|version| version < (2, 0, 0)) {
+        AmpControls::RELEASED_DEFAULTS
+    } else {
+        AmpControls::default()
+    };
     for (id, value) in &values {
         if id == "idCabOnOff" {
             controls.cabinet_on = *value >= 0.5;
@@ -1151,6 +1154,30 @@ mod tests {
     use super::*;
 
     const RELEASED: &str = RELEASED_BANK;
+
+    /// A 1.0 preset predates the tone-stack control and played on the first
+    /// stack, 1.4.0's default, whatever Init starts at.
+    #[test]
+    fn a_preset_without_a_tone_stack_plays_the_released_default() {
+        let xml = "<APVTSSwankyAmp pluginVersion=\"1.0.0\"><PARAM id=\"idTsLow\" value=\"0.5\"/></APVTSSwankyAmp>";
+        let preset = parse_state(xml).expect("a 1.0 preset parses");
+        assert_eq!(preset.controls.tone_stack, 0.);
+    }
+
+    /// Choosing Init and resetting each control in the host land on the same
+    /// sound, since there is no Reset button.
+    #[test]
+    fn init_sets_every_parameter_to_its_host_default() {
+        use truce::prelude::Params;
+        let host = crate::SwankyAmpParams::default();
+        for (id, value) in Library::with_user_root(None).tone(&Entry::init()) {
+            let default = host.get_plain(id).expect("parameter exists");
+            assert!(
+                (value - default).abs() < 1e-6,
+                "parameter {id}: Init sets {value}, the host default is {default}"
+            );
+        }
+    }
 
     fn scratch(name: &str) -> PathBuf {
         let path = std::env::temp_dir().join(format!(

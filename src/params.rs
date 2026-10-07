@@ -17,7 +17,7 @@ pub struct SwankyAmpParams {
     pub high: FloatParam,
     #[param(id = 5, name = "Presence", range = "linear(-1, 1)", default = 0.0)]
     pub presence: FloatParam,
-    #[param(id = 6, name = "Tone Stack", range = "linear(0, 2)", default = 0.0)]
+    #[param(id = 6, name = "Tone Stack", range = "linear(0, 2)", default = 0.4)]
     pub tone_stack: FloatParam,
     #[param(id = 7, name = "Stages", range = "linear(1, 5)", default = 3.0)]
     pub stages: FloatParam,

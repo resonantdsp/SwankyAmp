@@ -68,7 +68,7 @@ Version 2 ships the standard bilinear tone-stack mapping; 1.4.0's placed every t
 just calibrate   # rewrite src/dsp/calibration_data.rs, printing every point
 ```
 
-`calibrate` measures the level compensation on the [guitar recordings](verification/reference/input/README.md), against 1.4.0. It keeps the level into the power stage where 1.4.0 had it at every Drive setting, and holds Init's loudness as Drive, Power Drive and Grit move. `just` tests the result on the same recordings: Drive, Power Drive and Grit at their extremes keep Init's loudness, at default tone each stack feeds the power stage as 1.4.0 did, and the factory defaults play as loud as 1.4.0. The factory voicing uses these levels, so rerun `just refit` after a calibration change and listen to the result.
+`calibrate` measures the level compensation on the [guitar recordings](verification/reference/input/README.md), against 1.4.0. Its level reference is `LEVEL_REFERENCE` in `src/dsp/calibration.rs`, 1.4.0's default settings, fixed so that a change to Init moves neither the levels nor the factory presets; Init differs from it only in starting the tone stack at 2. It keeps the level into the power stage where 1.4.0 had it at every Drive setting, and holds the reference's loudness as Drive, Power Drive and Grit move. `just` tests the result on the same recordings: Drive, Power Drive and Grit at their extremes keep the reference's loudness, at default tone each stack feeds the power stage as 1.4.0 did, and 1.4.0's default settings play as loud as 1.4.0. The factory voicing uses these levels, so rerun `just refit` after a calibration change and listen to the result.
 
 ## Presets
 
@@ -78,14 +78,14 @@ just calibrate   # rewrite src/dsp/calibration_data.rs, printing every point
 just refit
 ```
 
-rewrites `presets/factory-2.0.xml` and its [voicing report](verification/tone-stack/refit-report.md) from the 1.4.0 presets on the guitar recordings. Low, Mid, High and Presence move on half marks to bring each preset's tonal balance as close to 1.4.0's as the corrected stack allows; Power Drive keeps the level 1.4.0 fed the power stage, and Output brings each preset to Init's strike level on the humbucker. It takes minutes in a release build. The plug-in embeds the bank at build time.
+rewrites `presets/factory-2.0.xml` and its [voicing report](verification/tone-stack/refit-report.md) from the 1.4.0 presets on the guitar recordings. Low, Mid, High and Presence move on half marks to bring each preset's tonal balance as close to 1.4.0's as the corrected stack allows; Power Drive keeps the level 1.4.0 fed the power stage, and Output brings each preset to the level reference's strike level on the humbucker. It takes minutes in a release build. The plug-in embeds the bank at build time.
 
 Accepted limits of the corrected stack against 1.4.0:
 
 - 1.4.0's scoop sat an octave higher than any setting of the corrected stack can place it, and the corrected Low acts only at the very bottom. The voiced presets therefore keep the low mids under 1.4.0 and the region around 1.3 kHz over it; the [voicing report](verification/tone-stack/refit-report.md)'s Remaining balance table gives the figures.
-- Init is the corrected stack at its defaults and is not revoiced: against 1.4.0 it has 3 to 6.3 dB less between 100 and 400 Hz and 3.8 to 4.7 dB more between 0.8 and 1.6 kHz.
-- 1.4.0's level fell with Drive and Power Drive, differently on each pickup. Version 2 holds Init's level averaged over the pickups, so high Drive and Power Drive play louder against Init than they did in 1.4.0, and each pickup lands up to about 3 dB either side of Init.
-- On the single coil the driven presets come out louder than Init, because a clean amp follows the pickup where a driven one does not. 1.4.0's factory presets were not balanced at all.
+- 1.4.0's default settings are not revoiced: on the corrected stack they have 3 to 6.3 dB less than 1.4.0 between 100 and 400 Hz and 3.8 to 4.7 dB more between 0.8 and 1.6 kHz. Init starts the tone stack at 2 rather than 0 for more mids.
+- 1.4.0's level fell with Drive and Power Drive, differently on each pickup. Version 2 holds the level reference's level averaged over the pickups, so high Drive and Power Drive play louder against it than they did in 1.4.0, and each pickup lands up to about 3 dB either side of it.
+- On the single coil the driven presets come out louder than the level reference, because a clean amp follows the pickup where a driven one does not. 1.4.0's factory presets were not balanced at all.
 
 These are measured at 44.1 kHz with Auto oversampling on the three tone stacks, not on blends between them.
 
