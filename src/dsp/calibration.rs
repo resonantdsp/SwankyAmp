@@ -37,29 +37,7 @@ use crate::engine::doublings_for;
 /// stack. Fixed apart from Init so that changing a default moves neither the
 /// level tables nor the factory bank's balance, which `just refit` sets to
 /// this reference's strike level.
-pub const LEVEL_REFERENCE: AmpControls = AmpControls {
-    input: 0.,
-    output: 0.,
-    low: 0.,
-    mid: 0.,
-    high: 0.,
-    presence: 0.,
-    tone_stack: 0.,
-    stages: 3.,
-    overhead: 0.,
-    low_cut: 0.,
-    cabinet_on: true,
-    cabinet_brightness: 0.,
-    cabinet_distance: 0.5,
-    cabinet_dynamic: -0.3,
-    preamp_drive: -0.4,
-    preamp_tight: 0.,
-    preamp_grit: 0.,
-    power_drive: -0.2,
-    power_tight: 0.,
-    power_sag: -0.6,
-    power_sag_ratio: 0.,
-};
+pub const LEVEL_REFERENCE: AmpControls = AmpControls::RELEASED_DEFAULTS;
 
 /// The host rate every calibration render runs at, with Auto oversampling.
 pub const SAMPLE_RATE: u32 = 44_100;

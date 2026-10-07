@@ -80,6 +80,34 @@ pub struct AmpControls {
     pub power_sag_ratio: f32,
 }
 
+impl AmpControls {
+    /// Swanky Amp 1.4.0's defaults, which a 1.x preset that leaves a control
+    /// out plays at.
+    pub const RELEASED_DEFAULTS: Self = Self {
+        input: 0.,
+        output: 0.,
+        low: 0.,
+        mid: 0.,
+        high: 0.,
+        presence: 0.,
+        tone_stack: 0.,
+        stages: 3.,
+        overhead: 0.,
+        low_cut: 0.,
+        cabinet_on: true,
+        cabinet_brightness: 0.,
+        cabinet_distance: 0.5,
+        cabinet_dynamic: -0.3,
+        preamp_drive: -0.4,
+        preamp_tight: 0.,
+        preamp_grit: 0.,
+        power_drive: -0.2,
+        power_tight: 0.,
+        power_sag: -0.6,
+        power_sag_ratio: 0.,
+    };
+}
+
 /// Init. The tone stack starts a fifth of the way from the first stack to
 /// the second, 2 on the panel, for more mids than the bright first stack.
 impl Default for AmpControls {

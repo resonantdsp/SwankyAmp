@@ -513,13 +513,13 @@ mod tests {
         engine.reset(&params, 96_000., 64);
         assert_eq!(<SwankyAmp as PluginLogic>::latency(&engine), 32);
 
-        // A new factor is reported with the audio that carries it, which
-        // the host may only read after the block that switched.
-        params.cabinet_on.set_value(false);
         // The first stack's phase is near flat where noise correlates; a
         // stack with more mids delays it by a few samples of its own, which
         // is the tone, not latency.
         params.tone_stack.set_value(0.);
+        // A new factor is reported with the audio that carries it, which
+        // the host may only read after the block that switched.
+        params.cabinet_on.set_value(false);
         params.oversampling.set_value(1);
         assert_eq!(
             <SwankyAmp as PluginLogic>::latency(&engine),
