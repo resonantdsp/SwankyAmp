@@ -45,7 +45,8 @@ installs beside Swanky Amp 1.4.0.
   within about a dB, the nearest half mark on the panel; the
   results are in `verification/tone-stack/refit-report.md`, and Swanky Amp
   1.4.0 remains available for the original voicing. Imported 1.x user
-  presets use a faster conversion and can sound boxier than their originals.
+  presets take the voicing's average correction, which lands them near their
+  originals rather than on them.
 - Started Init's tone stack at 2 rather than 1.4.0's 0: the corrected first
   stack is bright, and 2, a fifth of the way to the second stack, brings in
   more mids. Presets keep the tone stack they store.
@@ -115,9 +116,11 @@ installs beside Swanky Amp 1.4.0.
 - Kept presets in the 1.x XML format, one file per preset under
   `Resonant DSP/Swanky Amp 2`, and applied 1.4.0's migrations for presets from
   earlier releases. Unreadable files are skipped and named.
-- Imported 1.4.0 user presets on first run and on request, refitting each one's
-  Low, Mid, High and Power Drive to the corrected tone stack like the factory
-  set, without overwriting a version 2 preset or touching the 1.4.0 files.
+- Imported 1.4.0 user presets on first run and on request, moving each one's
+  Low, Mid, High and Presence by the average the factory presets moved for
+  the corrected tone stack, without overwriting a version 2 preset or touching
+  the 1.4.0 files. A 1.x file put in the version 2 folder by hand is left out
+  of the menu, and the footer points to Import 1.x presets.
 - Regrouped the editor: six separate rounded boxes in two columns, each traced
   by a V groove, with Pro's outlined header controls, knob markers and
   uncluttered ten-cell meters, and the one-line "SWANKY AMP FREE" wordmark.

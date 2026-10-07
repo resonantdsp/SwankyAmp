@@ -11,7 +11,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::dsp::amp::AmpControls;
-use crate::dsp::refit;
 
 /// The version 2 factory bank, voiced for the corrected tone stack by `just
 /// refit` and accepted by ear.
@@ -249,6 +248,20 @@ pub fn parse_state(xml: &str) -> Result<Preset, String> {
         return Err(format!("not a Swanky Amp preset (<{tag}>)"));
     }
     Ok(read_state(root))
+}
+
+/// Whether a preset file was written by 1.x, which stamps a 1.x version or
+/// none. Version 2 reads such a file only through the import, which converts
+/// it for the corrected tone stack; loaded as it stands it would sound
+/// different from the same preset imported.
+fn written_by_1x(xml: &str) -> bool {
+    roxmltree::Document::parse(xml).is_ok_and(|document| {
+        document
+            .root_element()
+            .attribute("pluginVersion")
+            .map(parse_version)
+            .is_none_or(|version| version < (2, 0, 0))
+    })
 }
 
 /// Reads a bank of named presets in document order.
@@ -701,6 +714,28 @@ fn xml_files(directory: &Path) -> Vec<PathBuf> {
 pub struct Listing {
     pub entries: Vec<Entry>,
     pub unreadable: Vec<String>,
+    /// 1.x files in the version 2 folder, refused until imported.
+    pub legacy: Vec<String>,
+}
+
+impl Listing {
+    /// A footer sentence naming the files left out, if any.
+    pub fn left_out(&self) -> Option<String> {
+        let mut parts = Vec::new();
+        if !self.unreadable.is_empty() {
+            parts.push(format!(
+                "Skipped unreadable presets: {}",
+                self.unreadable.join(", ")
+            ));
+        }
+        if !self.legacy.is_empty() {
+            parts.push(format!(
+                "Skipped 1.x presets: {}. Put them in the Swanky Amp 1.x preset folder and use Import 1.x presets",
+                self.legacy.join(", ")
+            ));
+        }
+        (!parts.is_empty()).then(|| parts.join(" · "))
+    }
 }
 
 /// Init, the factory bank and the user's preset folder.
@@ -756,7 +791,7 @@ impl Library {
     pub fn list(&self) -> Listing {
         let mut listing = Listing {
             entries: self.builtin(),
-            unreadable: Vec::new(),
+            ..Listing::default()
         };
         let Some(root) = &self.user_root else {
             return listing;
@@ -765,9 +800,10 @@ impl Library {
         for path in xml_files(root) {
             match std::fs::read_to_string(&path)
                 .map_err(|error| error.to_string())
-                .and_then(|xml| parse_state(&xml))
+                .and_then(|xml| parse_state(&xml).map(|_| written_by_1x(&xml)))
             {
-                Ok(_) => user.push(Entry::user(path)),
+                Ok(false) => user.push(Entry::user(path)),
+                Ok(true) => listing.legacy.push(file_name(&path)),
                 Err(_) => listing.unreadable.push(file_name(&path)),
             }
         }
@@ -931,8 +967,8 @@ impl Library {
         }
     }
 
-    /// Copies 1.x presets from `source` into the user folder, refitting each
-    /// to the standard tone stack. The 1.x files are only read. A preset
+    /// Copies 1.x presets from `source` into the user folder, converting
+    /// each for the corrected tone stack with [`convert_1x`]. The 1.x files are only read. A preset
     /// whose name is already taken in the user folder is left alone, as is
     /// an unchanged copy of a 1.4.0 factory preset, which the version 2
     /// factory bank already carries voiced for the corrected stack.
@@ -942,7 +978,6 @@ impl Library {
         // The folder marks the first-run import done, even when every 1.x
         // preset is a factory copy and nothing is written.
         self.root()?;
-        let mut pluck = None;
         for path in xml_files(source) {
             let stem = path.file_stem().unwrap_or_default().to_string_lossy();
             let name = legacy_name(&stem).to_owned();
@@ -977,15 +1012,7 @@ impl Library {
                 report.existing.push(reported);
                 continue;
             }
-            let input = pluck.get_or_insert_with(|| refit::pluck(refit::SAMPLE_RATE));
-            let fitted = refit::fit(session_neutral(preset.controls), input);
-            let controls = AmpControls {
-                low: fitted.low,
-                mid: fitted.mid,
-                high: fitted.high,
-                power_drive: fitted.power_drive,
-                ..preset.controls
-            };
+            let controls = convert_1x(preset.controls);
             let source_version = roxmltree::Document::parse(&xml)
                 .ok()
                 .and_then(|document| {
@@ -1014,13 +1041,25 @@ impl Library {
     }
 }
 
-/// The fit measures a preset the way the factory refit did, with Input and
-/// the cabinet switch at their defaults, since the preset does not set them.
-fn session_neutral(controls: AmpControls) -> AmpControls {
-    let defaults = AmpControls::default();
+/// The average move the factory voicing (`just refit`) made to each tone
+/// control of the ten released 1.4.0 presets, in stored units. The corrected
+/// stack puts every feature an octave below 1.4.0's, so a 1.x preset needs
+/// less High, a little less Low and Mid, and more Presence to land near its
+/// original balance. Power Drive and Output are kept: the voicing moved Power
+/// Drive by under half a mark on average, and Output to balance the bank.
+const LOW_CORRECTION: f32 = -0.15;
+const MID_CORRECTION: f32 = -0.28;
+const HIGH_CORRECTION: f32 = -0.71;
+const PRESENCE_CORRECTION: f32 = 0.22;
+
+/// A 1.x preset's controls for the corrected tone stack.
+pub fn convert_1x(controls: AmpControls) -> AmpControls {
+    let shift = |value: f32, correction: f32| (value + correction).clamp(-1., 1.);
     AmpControls {
-        input: defaults.input,
-        cabinet_on: defaults.cabinet_on,
+        low: shift(controls.low, LOW_CORRECTION),
+        mid: shift(controls.mid, MID_CORRECTION),
+        high: shift(controls.high, HIGH_CORRECTION),
+        presence: shift(controls.presence, PRESENCE_CORRECTION),
         ..controls
     }
 }
@@ -1039,8 +1078,8 @@ impl ImportReport {
     pub fn summary(&self) -> String {
         let mut parts = vec![match self.imported.len() {
             0 => "No 1.x presets to import".to_owned(),
-            1 => "Imported 1 preset from 1.x, refitted".to_owned(),
-            count => format!("Imported {count} presets from 1.x, refitted"),
+            1 => "Imported 1 preset from 1.x, converted".to_owned(),
+            count => format!("Imported {count} presets from 1.x, converted"),
         }];
         if !self.existing.is_empty() {
             parts.push(format!("{} already here, kept", self.existing.len()));
@@ -1052,8 +1091,8 @@ impl ImportReport {
     }
 }
 
-/// An import running off the editor thread: the fit renders every preset
-/// through the amplifier, which takes too long for a frame.
+/// An import running off the editor thread, which a slow disk or a large
+/// folder must not hold up.
 pub struct ImportJob {
     result: Arc<Mutex<Option<Result<ImportReport, String>>>>,
 }
@@ -1155,6 +1194,17 @@ mod tests {
 
     const RELEASED: &str = RELEASED_BANK;
 
+    /// A bank preset as the session plays it, with Input and the cabinet switch
+    /// at their defaults, since the preset does not set them.
+    fn session_neutral(controls: AmpControls) -> AmpControls {
+        let defaults = AmpControls::default();
+        AmpControls {
+            input: defaults.input,
+            cabinet_on: defaults.cabinet_on,
+            ..controls
+        }
+    }
+
     /// A 1.0 preset predates the tone-stack control and played on the first
     /// stack, 1.4.0's default, whatever Init starts at.
     #[test]
@@ -1242,8 +1292,8 @@ mod tests {
             "<?xml version=\"1.0\"?><APVTSSwankyAmpPro><PARAM id=\"idTsLow\" value=\"1\"/></APVTSSwankyAmpPro>",
         )
         .unwrap();
-        std::fs::write(root.join("good.xml"), &whole).unwrap();
         let library = Library::with_user_root(Some(root.clone()));
+        saved_as(&library, "good", &AmpControls::default());
         let listing = library.list();
         let user: Vec<&str> = listing
             .entries
@@ -1272,7 +1322,7 @@ mod tests {
     }
 
     #[test]
-    fn import_refits_1x_presets_and_never_overwrites() {
+    fn import_converts_1x_presets_and_never_overwrites() {
         let root = scratch("import");
         let legacy = root.join("Swanky Amp");
         let library = Library::with_user_root(Some(root.join("Swanky Amp 2")));
@@ -1310,24 +1360,9 @@ mod tests {
         assert_eq!(legacy_after, legacy_before, "the 1.x folder was modified");
 
         let original = parse_state(&mine).unwrap().controls;
-        let fitted = refit::fit(session_neutral(original), &refit::pluck(refit::SAMPLE_RATE));
         let entry = library.find("user:mine.xml").unwrap();
         let imported = library.load(&entry).unwrap().unwrap().controls;
-        assert_eq!(
-            imported,
-            AmpControls {
-                low: fitted.low,
-                mid: fitted.mid,
-                high: fitted.high,
-                power_drive: fitted.power_drive,
-                ..original
-            }
-        );
-        assert_ne!(
-            (imported.low, imported.mid, imported.high),
-            (original.low, original.mid, original.high),
-            "the imported preset was not refitted"
-        );
+        assert_eq!(imported, convert_1x(original));
         let file = std::fs::read_to_string(entry.path.unwrap()).unwrap();
         assert_eq!(provenance(&file).imported_from.as_deref(), Some("1.4.0"));
 
@@ -1356,6 +1391,40 @@ mod tests {
             ImportJob::first_run(&library, legacy).is_none(),
             "the next editor open imports the 1.x presets again"
         );
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// A 1.x file put in the version 2 folder by hand is refused with a
+    /// pointer to the import, while what version 2 writes, the import
+    /// included, always loads.
+    #[test]
+    fn a_1x_file_in_the_version_2_folder_is_refused_and_imports_are_not() {
+        let root = scratch("refuse");
+        let legacy = root.join("Swanky Amp");
+        let library = Library::with_user_root(Some(root.join("Swanky Amp 2")));
+        std::fs::create_dir_all(&legacy).unwrap();
+        // Not a factory name, so the import converts it.
+        let mine = legacy_file("edge");
+        std::fs::write(legacy.join("mine.xml"), &mine).unwrap();
+        library.import_legacy(&legacy).unwrap();
+        let folder = library.root().unwrap();
+        std::fs::write(folder.join("copied.xml"), &mine).unwrap();
+        let unversioned = mine.replace(" pluginVersion=\"1.4.0\"", "");
+        std::fs::write(folder.join("unversioned.xml"), unversioned).unwrap();
+        saved_as(&library, "saved", &AmpControls::default());
+
+        let listing = library.list();
+        let user: Vec<&str> = listing
+            .entries
+            .iter()
+            .filter(|entry| entry.scope == Scope::User)
+            .map(|entry| entry.name.as_str())
+            .collect();
+        assert_eq!(user, ["mine", "saved"]);
+        assert_eq!(listing.legacy, ["copied", "unversioned"]);
+        let message = listing.left_out().unwrap();
+        assert!(message.contains("Import 1.x presets"), "{message}");
+
         std::fs::remove_dir_all(root).unwrap();
     }
 }
