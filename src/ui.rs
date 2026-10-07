@@ -340,7 +340,7 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
         }
         if let Some(release) = CAPTURED_INFORMATION.get() {
             ui.releases = None;
-            ui.notice = release_notice::notice_for(release.as_deref());
+            ui.notice = release_notice::notice_for(release.as_deref(), None);
             ui.information = true;
         }
         #[cfg(feature = "standalone")]
@@ -753,7 +753,7 @@ fn information_overlay<'a, R: FreeRenderer + 'a>(
     };
     let mut content = Column::new().spacing(11).push(line(
         "information.product",
-        format!("Swanky Amp Free {}", env!("CARGO_PKG_VERSION")),
+        crate::diagnostics::product(),
         15.0,
         style::BOLD,
         INK,
@@ -1242,7 +1242,7 @@ mod tests {
         fn new(release: Option<&str>) -> Self {
             let params = Arc::new(SwankyAmpParams::default());
             let mut ui = FreeUi::resting();
-            ui.notice = notice_for(release);
+            ui.notice = notice_for(release, None);
             Self {
                 ui,
                 params: ParamCache::new(Arc::clone(&params)),
@@ -1357,7 +1357,11 @@ mod tests {
         editor.press_button();
         assert_eq!(
             editor.text("information.product"),
-            Some(format!("Swanky Amp Free {}", env!("CARGO_PKG_VERSION")))
+            Some(format!(
+                "Swanky Amp Free {} (build {})",
+                env!("CARGO_PKG_VERSION"),
+                env!("SWANKY_AMP_BUILD")
+            ))
         );
         assert_eq!(editor.text("information.release"), None);
 
@@ -1805,7 +1809,7 @@ mod tests {
 
     #[test]
     fn the_header_offers_a_download_only_for_a_reported_newer_release() {
-        let action = |version| notice_action(notice_for(version).as_ref());
+        let action = |version| notice_action(notice_for(version, None).as_ref());
         assert_eq!(action(Some("99.0.0")), NoticeAction::Download);
         assert_eq!(
             action(Some(env!("CARGO_PKG_VERSION"))),

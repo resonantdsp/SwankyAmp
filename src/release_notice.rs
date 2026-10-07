@@ -132,6 +132,7 @@ struct State {
     checked_at: Option<u64>,
     succeeded_at: Option<u64>,
     current_version: Option<String>,
+    current_build: Option<u64>,
 }
 
 impl Service {
@@ -159,7 +160,7 @@ impl Service {
             .state
             .read()
             .ok()
-            .and_then(|state| notice_for(state.current_version.as_deref()))
+            .and_then(|state| notice_for(state.current_version.as_deref(), state.current_build))
     }
 
     #[cfg(test)]
@@ -220,6 +221,7 @@ struct Cache {
     /// count once more as a first check.
     succeeded_at: Option<u64>,
     current_version: Option<String>,
+    current_build: Option<u64>,
 }
 
 /// Unknown fields are ignored: a shipped version can never be taught a new
@@ -230,6 +232,10 @@ struct Document {
     schema_version: u8,
     product_id: String,
     current_version: Option<String>,
+    /// The current release's build number, so a release candidate of the
+    /// same version, built earlier, learns that the release itself is out.
+    /// Anything but a whole number is ignored rather than losing the notice.
+    current_build: Option<serde_json::Value>,
 }
 
 fn refresh(cache_path: &Path, endpoint: &str, now: SystemTime, shared: &RwLock<State>) {
@@ -245,12 +251,14 @@ fn refresh(cache_path: &Path, endpoint: &str, now: SystemTime, shared: &RwLock<S
             checked_at: Some(disk.checked_at),
             succeeded_at: disk.succeeded_at,
             current_version: disk.current_version,
+            current_build: disk.current_build,
         },
         (Some(_), _) => memory,
         (None, Some(disk)) => State {
             checked_at: Some(disk.checked_at),
             succeeded_at: disk.succeeded_at,
             current_version: disk.current_version,
+            current_build: disk.current_build,
         },
         (None, None) => memory,
     };
@@ -269,14 +277,20 @@ fn refresh(cache_path: &Path, endpoint: &str, now: SystemTime, shared: &RwLock<S
             return None;
         }
         match document.current_version {
-            Some(version) if stable_version(&version).is_some() => Some(Some(version)),
+            Some(version) if stable_version(&version).is_some() => Some((
+                Some(version),
+                document.current_build.and_then(|build| build.as_u64()),
+            )),
             Some(_) => None,
-            None => Some(None),
+            None => Some((None, None)),
         }
     });
-    let (retained, succeeded_at) = match fetched {
-        Some(current_version) => (current_version, Some(now)),
-        None => (previous.current_version, previous.succeeded_at),
+    let ((retained, build), succeeded_at) = match fetched {
+        Some(current) => (current, Some(now)),
+        None => (
+            (previous.current_version, previous.current_build),
+            previous.succeeded_at,
+        ),
     };
 
     // Store before publishing so an answer the editor can see is already
@@ -289,6 +303,7 @@ fn refresh(cache_path: &Path, endpoint: &str, now: SystemTime, shared: &RwLock<S
             checked_at: now,
             succeeded_at,
             current_version: retained.clone(),
+            current_build: build,
         },
     );
     replace_state(
@@ -297,6 +312,7 @@ fn refresh(cache_path: &Path, endpoint: &str, now: SystemTime, shared: &RwLock<S
             checked_at: Some(now),
             succeeded_at,
             current_version: retained,
+            current_build: build,
         },
     );
 }
@@ -415,21 +431,36 @@ fn replace_state(shared: &RwLock<State>, state: State) {
     }
 }
 
-/// The notice a reported current version earns: one only when it is a stable
-/// release newer than this build.
-pub(crate) fn notice_for(version: Option<&str>) -> Option<Notice> {
+/// The notice a reported current release earns: one only when it is a stable
+/// release newer than this build, or the same version from a later build, as
+/// the release is for a tester on one of its candidates.
+pub(crate) fn notice_for(version: Option<&str>, build: Option<u64>) -> Option<Notice> {
     version
-        .filter(|candidate| supersedes(candidate, env!("CARGO_PKG_VERSION")))
+        .filter(|candidate| {
+            supersedes(
+                (candidate, build),
+                (env!("CARGO_PKG_VERSION"), crate::diagnostics::BUILD),
+            )
+        })
         .map(|version| Notice {
             version: version.to_owned(),
             url: CATALOGUE_URL,
         })
 }
 
-fn supersedes(candidate: &str, current: &str) -> bool {
-    stable_version(candidate)
-        .zip(stable_version(current))
-        .is_some_and(|(candidate, current)| candidate > current)
+/// A build made without git has build number 0 and cannot tell an earlier
+/// build of its version from a later one, so only a newer version reaches it.
+fn supersedes(candidate: (&str, Option<u64>), current: (&str, u32)) -> bool {
+    let (Some(version), Some(running)) = (stable_version(candidate.0), stable_version(current.0))
+    else {
+        return false;
+    };
+    version > running
+        || (version == running
+            && current.1 > 0
+            && candidate
+                .1
+                .is_some_and(|build| build > u64::from(current.1)))
 }
 
 fn stable_version(version: &str) -> Option<[u64; 3]> {
@@ -814,18 +845,75 @@ mod tests {
 
     #[test]
     fn only_a_numerically_newer_stable_version_supersedes_the_running_one() {
-        assert!(supersedes("2.0.1", "2.0.0"));
-        assert!(supersedes("2.10.0", "2.9.9"));
-        assert!(supersedes("3.0.0", "2.99.99"));
-        assert!(!supersedes("2.0.0", "2.0.0"));
-        assert!(!supersedes("1.9.9", "2.0.0"));
-        assert!(!supersedes("2.0.10", "2.1.0"));
+        let newer = |candidate, current| supersedes((candidate, None), (current, 212));
+        assert!(newer("2.0.1", "2.0.0"));
+        assert!(newer("2.10.0", "2.9.9"));
+        assert!(newer("3.0.0", "2.99.99"));
+        assert!(!newer("2.0.0", "2.0.0"));
+        assert!(!newer("1.9.9", "2.0.0"));
+        assert!(!newer("2.0.10", "2.1.0"));
         for malformed in ["2.1", "2.1.0.0", "v2.1.0", "2.1.0-rc.1", "", "2..1"] {
-            assert!(
-                !supersedes(malformed, "2.0.0"),
-                "{malformed} must not supersede"
-            );
+            assert!(!newer(malformed, "2.0.0"), "{malformed} must not supersede");
         }
+    }
+
+    #[test]
+    fn a_later_build_of_the_same_version_supersedes_a_candidate() {
+        let running = ("2.0.0", 212);
+        assert!(supersedes(("2.0.0", Some(213)), running));
+        assert!(!supersedes(("2.0.0", Some(212)), running));
+        assert!(!supersedes(("2.0.0", Some(150)), running));
+        assert!(!supersedes(("2.0.0", None), running));
+        assert!(!supersedes(("1.9.9", Some(400)), running));
+        assert!(supersedes(("2.0.1", Some(100)), running));
+        assert!(
+            !supersedes(("2.0.0", Some(213)), ("2.0.0", 0)),
+            "a build without git cannot tell it is superseded"
+        );
+    }
+
+    #[test]
+    fn a_malformed_build_number_keeps_the_newer_version_notice() {
+        let directory = TestDirectory::new("malformed-build");
+        let body = serde_json::json!({
+            "schemaVersion": 1,
+            "productId": "SwankyAmp",
+            "currentVersion": "99.0.0",
+            "currentBuild": "not a number",
+        })
+        .to_string()
+        .into_bytes();
+        let mut server = Server::responding(body);
+        let service = Service::spawn(Some(directory.cache()), server.endpoint.clone(), at(1_000));
+        assert_eq!(wait_for_notice(&service).version, "99.0.0");
+        server.finish();
+    }
+
+    #[test]
+    fn a_document_naming_a_later_build_of_this_version_announces_it_after_a_restart() {
+        if crate::diagnostics::BUILD == 0 {
+            // Built without git, the same version never supersedes.
+            return;
+        }
+        let directory = TestDirectory::new("build");
+        let body = serde_json::json!({
+            "schemaVersion": 1,
+            "productId": "SwankyAmp",
+            "currentVersion": env!("CARGO_PKG_VERSION"),
+            "currentBuild": crate::diagnostics::BUILD + 1,
+        })
+        .to_string()
+        .into_bytes();
+        let mut server = Server::responding(body);
+        let service = Service::spawn(Some(directory.cache()), server.endpoint.clone(), at(1_000));
+        assert_eq!(wait_for_notice(&service).version, env!("CARGO_PKG_VERSION"));
+        server.finish();
+        wait_for_cache(&directory.cache(), 1_000);
+
+        let mut cached = Server::responding(document(None));
+        let service = Service::spawn(Some(directory.cache()), cached.endpoint.clone(), at(1_600));
+        assert_eq!(wait_for_notice(&service).version, env!("CARGO_PKG_VERSION"));
+        cached.finish();
     }
 
     #[test]
