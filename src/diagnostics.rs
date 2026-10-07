@@ -60,16 +60,13 @@ pub(crate) const BUILD: u32 = match u32::from_str_radix(env!("SWANKY_AMP_BUILD")
 /// The product, its version and build number, as the information panel
 /// shows them.
 pub(crate) fn product() -> String {
-    format!(
-        "Swanky Amp Free {} (build {BUILD})",
-        env!("CARGO_PKG_VERSION")
-    )
+    format!("Swanky Amp {} (build {BUILD})", env!("CARGO_PKG_VERSION"))
 }
 
 /// The product line of the report and the log, which also name the commit.
 pub(crate) fn heading() -> String {
     format!(
-        "Swanky Amp Free {} (build {BUILD}, {})",
+        "Swanky Amp {} (build {BUILD}, {})",
         env!("CARGO_PKG_VERSION"),
         env!("SWANKY_AMP_COMMIT")
     )
