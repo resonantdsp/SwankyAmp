@@ -306,10 +306,7 @@ pub struct Provenance {
 pub fn write_state(controls: &AmpControls, provenance: &Provenance) -> String {
     let mut attributes = format!(" pluginVersion=\"{}\"", env!("CARGO_PKG_VERSION"));
     if let Some(source) = &provenance.imported_from {
-        attributes.push_str(&format!(
-            " importedFrom=\"{}\" refit=\"standard tone stack\"",
-            escape(source)
-        ));
+        attributes.push_str(&format!(" importedFrom=\"{}\"", escape(source)));
     }
     let mut ids: Vec<&str> = PARAMETERS.iter().map(|(id, _)| *id).collect();
     ids.sort_unstable();
@@ -1012,7 +1009,12 @@ impl Library {
                 report.existing.push(reported);
                 continue;
             }
-            let controls = convert_1x(preset.controls);
+            // A version 2 file copied into the 1.x folder is already converted.
+            let controls = if written_by_1x(&xml) {
+                convert_1x(preset.controls)
+            } else {
+                preset.controls
+            };
             let source_version = roxmltree::Document::parse(&xml)
                 .ok()
                 .and_then(|document| {
