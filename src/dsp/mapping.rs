@@ -80,6 +80,8 @@ pub struct AmpControls {
     pub power_sag_ratio: f32,
 }
 
+/// Init. The tone stack starts a fifth of the way from the first stack to
+/// the second, 2 on the panel, for more mids than the bright first stack.
 impl Default for AmpControls {
     fn default() -> Self {
         Self {
@@ -89,7 +91,7 @@ impl Default for AmpControls {
             mid: 0.,
             high: 0.,
             presence: 0.,
-            tone_stack: 0.,
+            tone_stack: 0.4,
             stages: 3.,
             overhead: 0.,
             low_cut: 0.,

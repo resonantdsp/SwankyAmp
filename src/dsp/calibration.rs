@@ -17,13 +17,13 @@
 //!
 //! The second stage holds loudness, which 1.4.0 let change as Drive and Power
 //! Drive rose. Loudness is ITU-R BS.1770-4 gated integrated loudness, averaged
-//! in LUFS over the two recordings, and the target is the factory defaults'
-//! loudness from the first stage, so Init keeps its level. In order, each with
+//! in LUFS over the two recordings, and the target is `LEVEL_REFERENCE`'s
+//! loudness from the first stage, so the reference keeps its level. In order, each with
 //! the values found so far in place: the power table is rescaled point by
 //! point to the target, then an output gain against Drive, then one against
 //! Grit, all applied after the cabinet so they change level and nothing else.
 //! Stages stays uncompensated, as released. Every render starts from a settled
-//! amplifier with the other controls at their defaults.
+//! amplifier with the other controls at `LEVEL_REFERENCE`.
 
 use super::amp::{
     AmpControls, AmpPath, ClipKnee, CorrectedPath, GRIT_COMPRESSION_LIMIT, LevelTables, SeamOutput,
@@ -31,6 +31,35 @@ use super::amp::{
 };
 use super::mapping::{AmpVoicing, drive_setting, power_drive_setting};
 use crate::engine::doublings_for;
+
+/// The settings every level is measured against: 1.4.0's defaults, which
+/// were Init's until version 2 turned Init's tone stack toward the second
+/// stack. Fixed apart from Init so that changing a default moves neither the
+/// level tables nor the factory bank's balance, which `just refit` sets to
+/// this reference's strike level.
+pub const LEVEL_REFERENCE: AmpControls = AmpControls {
+    input: 0.,
+    output: 0.,
+    low: 0.,
+    mid: 0.,
+    high: 0.,
+    presence: 0.,
+    tone_stack: 0.,
+    stages: 3.,
+    overhead: 0.,
+    low_cut: 0.,
+    cabinet_on: true,
+    cabinet_brightness: 0.,
+    cabinet_distance: 0.5,
+    cabinet_dynamic: -0.3,
+    preamp_drive: -0.4,
+    preamp_tight: 0.,
+    preamp_grit: 0.,
+    power_drive: -0.2,
+    power_tight: 0.,
+    power_sag: -0.6,
+    power_sag_ratio: 0.,
+};
 
 /// The host rate every calibration render runs at, with Auto oversampling.
 pub const SAMPLE_RATE: u32 = 44_100;
@@ -430,7 +459,7 @@ fn mean(values: impl Iterator<Item = f64>) -> f64 {
 
 /// Measures the compensation on `clips`.
 pub fn measure(clips: &Clips) -> Calibration {
-    let defaults = AmpControls::default();
+    let defaults = LEVEL_REFERENCE;
     let mut tables = LevelTables::RELEASED;
 
     let cells: Vec<AmpControls> = (0..TONE_STACKS)
@@ -482,10 +511,10 @@ pub fn measure(clips: &Clips) -> Calibration {
         ..defaults
     });
     tables.drive = std::array::from_fn(|index| to_target(target, drive_loudness[index]) as f32);
-    // Loudness is not linear between table points, so the defaults can miss
-    // the target they set by a few tenths of a dB. Scaling the two Drive
-    // points either side of the default moves the default by exactly that
-    // gain and keeps Init where it was.
+    // Loudness is not linear between table points, so the reference can miss
+    // the target it set by a few tenths of a dB. Scaling the two Drive
+    // points either side of its Drive moves it by exactly that gain and
+    // keeps it where it was.
     let miss = to_target(target, loudness(defaults, clips, tables)) as f32;
     let below = ((AmpVoicing::from_controls(defaults).preamp_drive + 1.) * 5.) as usize;
     tables.drive[below] *= miss;
@@ -510,9 +539,9 @@ pub fn measure(clips: &Clips) -> Calibration {
 }
 
 /// How far the shipping path with `tables` lands from the released level at
-/// the factory defaults.
+/// `LEVEL_REFERENCE`.
 pub fn anchor(clips: &Clips, tables: LevelTables) -> Anchor {
-    let defaults = AmpControls::default();
+    let defaults = LEVEL_REFERENCE;
     let reference = released(defaults, clips);
     let actual = shipping(defaults, clips, tables);
     let cabinet_off = AmpControls {
@@ -598,12 +627,12 @@ mod tests {
     }
 
     /// Drive, Power Drive and Grit change the sound, not the volume: their
-    /// extremes keep the defaults' loudness averaged over the recordings.
+    /// extremes keep the reference's loudness averaged over the recordings.
     #[test]
-    fn drive_power_drive_and_grit_extremes_keep_the_default_loudness() {
+    fn drive_power_drive_and_grit_extremes_keep_the_reference_loudness() {
         const TOLERANCE_DB: f64 = 1.;
         let clips = recordings();
-        let defaults = AmpControls::default();
+        let defaults = LEVEL_REFERENCE;
         let cases: Vec<(&str, f32, AmpControls)> = [-1., 1.]
             .into_iter()
             .flat_map(|extreme| {
@@ -634,7 +663,7 @@ mod tests {
                     ),
                 ]
             })
-            .chain([("Init", 0., defaults)])
+            .chain([("Reference", 0., defaults)])
             .collect();
         let measured = parallel(&cases, |(_, _, controls)| {
             loudness(*controls, &clips, LevelTables::CALIBRATED).blend()
@@ -662,10 +691,10 @@ mod tests {
         let cells: Vec<AmpControls> = [0., 1., 2.]
             .into_iter()
             .flat_map(|tone_stack| {
-                [-1., AmpControls::default().preamp_drive, 1.].map(|preamp_drive| AmpControls {
+                [-1., LEVEL_REFERENCE.preamp_drive, 1.].map(|preamp_drive| AmpControls {
                     tone_stack,
                     preamp_drive,
-                    ..AmpControls::default()
+                    ..LEVEL_REFERENCE
                 })
             })
             .collect();
@@ -682,27 +711,27 @@ mod tests {
         }
     }
 
-    /// The factory defaults play at 1.4.0's level. With the cabinet off the
+    /// 1.4.0's defaults play at 1.4.0's level. With the cabinet off the
     /// only departures are the loudness rescale of the power table and
     /// Drive's correction for missing its target, a few tenths of a dB. With
     /// the cabinet on, the corrected stack's 3 to 6 dB less between 100 and
     /// 400 Hz, where most of the cabinet's output lies, lowers the level by
     /// up to about 2 dB; a power stage or cabinet scale off by more fails.
     #[test]
-    fn factory_defaults_play_as_loud_as_released() {
+    fn released_defaults_play_as_loud_as_released() {
         const AMPLIFIER_TOLERANCE_DB: f64 = 0.5;
         const CABINET_TOLERANCE_DB: f64 = 2.;
         let anchor = anchor(&recordings(), LevelTables::CALIBRATED);
         let amplifier = anchor.output_cabinet_off_db;
         assert!(
             amplifier.abs() <= AMPLIFIER_TOLERANCE_DB,
-            "cabinet off, Init plays {amplifier:+.2} dB from 1.4.0 \
+            "cabinet off, the reference plays {amplifier:+.2} dB from 1.4.0 \
              (tolerance {AMPLIFIER_TOLERANCE_DB} dB)"
         );
         let output = anchor.output_db;
         assert!(
             output.abs() <= CABINET_TOLERANCE_DB,
-            "Init plays {output:+.2} dB from 1.4.0 (tolerance {CABINET_TOLERANCE_DB} dB)"
+            "The reference plays {output:+.2} dB from 1.4.0 (tolerance {CABINET_TOLERANCE_DB} dB)"
         );
     }
 }

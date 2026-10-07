@@ -40,13 +40,13 @@ input level, averaged over the recordings, matches 1.4.0's; where it
 runs out of range, the miss costs 0.5 dB² per dB². The bank
 then takes the grid value nearest that setting in gain.
 - Output then brings each preset's strike level on the humbucker to
-Init's. The strike level is the 95th percentile of momentary
+the level reference's, 1.4.0's defaults. The strike level is the 95th percentile of momentary
 loudness (BS.1770-4 K-weighted 400 ms blocks at a 100 ms hop, those
 above -70 LUFS) over the whole recording. Integrated loudness
 averages over the ring-out, where a driven amp sustains and a clean
-one decays, so a driven preset level with Init on it strikes
+one decays, so a driven preset level with the reference on it strikes
 softer. A clean amp follows the pickup and a driven one does not,
-so on the single coil the driven presets come out louder than Init.
+so on the single coil the driven presets come out louder than the reference.
 
 ## Results
 
@@ -91,7 +91,7 @@ over the recordings, at every other third-octave band and 16 kHz.
 ## Levels
 
 After the Output change, each preset's integrated loudness and strike
-level minus Init's, in dB, for the single coil / humbucker.
+level minus the reference's, in dB, for the single coil / humbucker.
 
 | Preset | Integrated | Strike |
 |---|---|---|
@@ -106,7 +106,7 @@ level minus Init's, in dB, for the single coil / humbucker.
 | high gain | +6.3 / +1.9 | +3.1 / +0.0 |
 | level 11 | +6.2 / +1.7 | +2.8 / +0.0 |
 
-Init's integrated loudness is -23.9 / -20.1 LUFS and its strike level
+The level reference's integrated loudness is -23.9 / -20.1 LUFS and its strike level
 -19.2 / -16.7 LUFS.
 
 The Swanky Amp 1.4.0 build stays installable beside version 2 for

@@ -1152,6 +1152,21 @@ mod tests {
 
     const RELEASED: &str = RELEASED_BANK;
 
+    /// Choosing Init and resetting each control in the host land on the same
+    /// sound, since there is no Reset button.
+    #[test]
+    fn init_sets_every_parameter_to_its_host_default() {
+        use truce::prelude::Params;
+        let host = crate::SwankyAmpParams::default();
+        for (id, value) in Library::with_user_root(None).tone(&Entry::init()) {
+            let default = host.get_plain(id).expect("parameter exists");
+            assert!(
+                (value - default).abs() < 1e-6,
+                "parameter {id}: Init sets {value}, the host default is {default}"
+            );
+        }
+    }
+
     fn scratch(name: &str) -> PathBuf {
         let path = std::env::temp_dir().join(format!(
             "swanky-presets-{name}-{}-{:?}",
