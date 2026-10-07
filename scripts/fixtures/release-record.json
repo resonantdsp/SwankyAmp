@@ -11,12 +11,9 @@
   "product": {
     "website_product_id": "SwankyAmp",
     "plugin_name": "Swanky Amp 2",
-    "plugin_identity": "SwankyAmp2",
     "bundle_id": "com.resonantdsp.swanky-amp-2",
     "fourcc": "SwA2",
-    "crate": "swanky-amp",
-    "repository": "https://github.com/resonantdsp/SwankyAmp",
-    "license": "GPL-3.0-or-later"
+    "crate": "swanky-amp"
   },
   "artifacts": [
     { "name": "swanky-amp-2.0.0-macos.pkg", "kind": "macos-pkg", "platform": "macOS", "architecture": "universal", "bytes": 42315776, "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },

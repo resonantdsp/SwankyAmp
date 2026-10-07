@@ -66,6 +66,16 @@ from a package run. macOS packaging is unchanged and still offers both. This
 is product policy rather than an upstream fix, so an upstream release replaces
 it only with a setting that pins Windows packages to all users.
 
+## Bundle versions
+
+6.3.0 writes `CFBundleVersion` 1 into the CLAP, VST3 and VST2 bundles and
+`CFBundleVersion` 1 with `CFBundleShortVersionString` 1.0 into the standalone
+app, whatever the plugin's version, so Finder and anything else that reads a
+bundle's version see every release as version 1. Staging in
+`src/commands/package/stage.rs` now writes both keys as the plugin's version,
+without a pre-release suffix, in every bundle and the app, read the same way
+as the Audio Unit change above.
+
 ## Removal
 
 `just setup` installs cargo-truce from this directory instead of crates.io.

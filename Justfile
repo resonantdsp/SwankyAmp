@@ -3,13 +3,16 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 set windows-shell := ["bash", "-euo", "pipefail", "-c"]
 
 tools := justfile_directory() / "tools"
+
+# Where the downloads bucket is served: the PUBLIC_DOWNLOAD_BASE_URL variable.
+download_base := "https://downloads.resonantdsp.com"
+
 cargo_truce := if os() == "windows" {
     tools / "cargo-truce/bin/cargo-truce.exe"
 } else {
     tools / "cargo-truce/bin/cargo-truce"
 }
 
-export TRUCE_VERSION := "6.3.0"
 export CARGO_TRUCE := cargo_truce
 export PLUGINVAL := if os() == "macos" {
     tools / "pluginval.app/Contents/MacOS/pluginval"
@@ -69,9 +72,10 @@ test-all:
     cargo test --profile checks --no-default-features --features clap,standalone,rt-paranoid -- adapter_ standalone_audio
     cargo test --profile checks -p truce-standalone
 
+# The release scripts' own tests.
 release-tests:
-    python3 -m unittest discover -s .github/scripts -p 'test_*.py'
-    node --test '.github/scripts/*.test.mjs'
+    python3 -m unittest discover -s scripts -p 'test_*.py'
+    node --test 'scripts/*.test.mjs'
 
 reference-check:
     bash verification/reference/check.sh
@@ -215,22 +219,26 @@ validate-installed *flags:
 package *flags:
     bash scripts/truce.sh package {{ bundle_features }} {{ flags }}
 
-version version:
-    bash .github/scripts/version.sh "{{ version }}"
+# Move Cargo.toml, Cargo.lock and the changelog to a new version, without committing.
+version x_y_z:
+    bash scripts/version.sh {{ x_y_z }}
 
+# Tag the next release candidate for this version, locally, on origin/master.
 tag-candidate:
-    bash .github/scripts/release_tag.sh candidate
+    bash scripts/release-tag.sh candidate
 
-# Tag the accepted candidate's commit as the stable release.
+# Tag the release, locally, on the commit of the pushed candidate it names.
 tag-release candidate_tag:
-    bash .github/scripts/release_tag.sh release "{{ candidate_tag }}"
+    bash scripts/release-tag.sh release {{ candidate_tag }}
 
+# Check a candidate or stable tag against the crate version and the changelog.
 release-check kind tag:
-    python3 .github/scripts/release_contract.py check-tag "{{ kind }}" "{{ tag }}"
+    python3 scripts/release_contract.py check-tag {{ kind }} {{ tag }}
 
+# From a checkout of the release tag: fetch a candidate and check it against the tags and accepted record.
 promote-check candidate_tag tag record_sha256 directory:
-    python3 .github/scripts/release_contract.py verify-candidate \
-        "{{ candidate_tag }}" "{{ tag }}" "{{ record_sha256 }}" "{{ directory }}"
+    python3 scripts/release_contract.py fetch {{ download_base }}/swankyamp/candidates/{{ candidate_tag }} {{ directory }}
+    python3 scripts/release_contract.py verify {{ candidate_tag }} {{ tag }} {{ record_sha256 }} {{ directory }}
 
 # What CI runs on Linux for every pull request. The tests check the
 # committed artwork package against its receipt, so the artwork is checked

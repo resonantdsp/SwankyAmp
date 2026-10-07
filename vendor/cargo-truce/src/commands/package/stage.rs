@@ -240,14 +240,17 @@ fn stage_clap_macos(
     <string>{display_name}</string>
     <key>CFBundlePackageType</key>
     <string>BNDL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>{version}</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>{version}</string>
 </dict>
 </plist>"#,
         display_name = xml_escape(&p.name),
         bundle_id = p.bundle_id,
         vendor_id = xml_escape(&config.vendor.id),
         exec_name = xml_escape(&exec_name),
+        version = xml_escape(bundle_version(&plugin_version(root, p)?)),
     );
     fs::write(bundle.join("Contents/Info.plist"), &plist)?;
     // Presets are part of the bundle's sealed Resources - emit before
@@ -355,14 +358,17 @@ fn stage_vst3_macos(root: &Path, p: &PluginDef, config: &Config, bundle: &Path) 
     <string>{display_name}</string>
     <key>CFBundlePackageType</key>
     <string>BNDL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>{version}</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>{version}</string>
 </dict>
 </plist>"#,
         display_name = xml_escape(&p.name),
         bundle_id = p.bundle_id,
         vendor_id = xml_escape(&config.vendor.id),
         exec_name = xml_escape(&exec_name),
+        version = xml_escape(bundle_version(&plugin_version(root, p)?)),
     );
     fs::write(bundle.join("Contents/Info.plist"), &plist)?;
     codesign_bundle(
@@ -489,14 +495,17 @@ pub(crate) fn stage_vst2(
     <string>{display_name}</string>
     <key>CFBundlePackageType</key>
     <string>BNDL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>{version}</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>{version}</string>
 </dict>
 </plist>"#,
             display_name = xml_escape(&p.name),
             bundle_id = p.bundle_id,
             vendor_id = xml_escape(&config.vendor.id),
             exec_name = xml_escape(&exec_name),
+            version = xml_escape(bundle_version(&plugin_version(root, p)?)),
         );
         fs::write(bundle.join("Contents/Info.plist"), &plist)?;
         fs::write(bundle.join("Contents/PkgInfo"), "BNDL????")?;
@@ -525,10 +534,7 @@ pub(crate) fn au2_info_plist(
     p: &PluginDef,
     config: &Config,
 ) -> Result<String, crate::CargoTruceError> {
-    let version = match &p.version {
-        Some(version) => version.clone(),
-        None => crate::util::read_workspace_version(root)?,
-    };
+    let version = plugin_version(root, p)?;
     let sandbox = match &p.au_resource_usage {
         None => "            <key>sandboxSafe</key>\n            <true/>\n".to_string(),
         Some(usage) => {
@@ -602,6 +608,15 @@ pub(crate) fn au2_info_plist(
         bundle_version = xml_escape(bundle_version(&version)),
         component_version = au_component_version(&version),
     ))
+}
+
+/// The plugin's version: its own `version` in `truce.toml`, else the crate's.
+#[cfg(target_os = "macos")]
+fn plugin_version(root: &Path, p: &PluginDef) -> Result<String, crate::CargoTruceError> {
+    match &p.version {
+        Some(version) => Ok(version.clone()),
+        None => crate::util::read_workspace_version(root),
+    }
 }
 
 /// The release part of a version, without a pre-release or build suffix,
@@ -871,9 +886,9 @@ pub(crate) fn write_standalone_info_plist(
 {icon_key}    <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>{version}</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
+    <string>{version}</string>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSMicrophoneUsageDescription</key>
@@ -888,6 +903,10 @@ pub(crate) fn write_standalone_info_plist(
         bundle_id = plugin.bundle_id,
         exe = xml_escape(bin_stem),
         mic_usage = xml_escape(&mic_usage),
+        version = xml_escape(bundle_version(&plugin_version(
+            &crate::project_root(),
+            plugin
+        )?)),
     );
     fs::write(bundle_root.join("Contents/Info.plist"), plist)?;
     Ok(())

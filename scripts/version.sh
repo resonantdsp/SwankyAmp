@@ -2,11 +2,11 @@
 # Move Cargo.toml, Cargo.lock and the changelog together. This helper prepares
 # the working tree; the operator runs the repository gate before committing.
 set -euo pipefail
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/.."
 
 version=${1:-}
 if ! [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "Usage: bash .github/scripts/version.sh <x.y.z>" >&2
+  echo "Usage: bash scripts/version.sh <x.y.z>" >&2
   exit 1
 fi
 if [ -n "$(git status --porcelain Cargo.toml Cargo.lock CHANGELOG.md)" ]; then
