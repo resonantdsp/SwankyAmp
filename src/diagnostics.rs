@@ -49,9 +49,30 @@ pub fn report(params: &SwankyAmpParams) -> String {
     )
 }
 
-/// The product, its version and, when the build knew it, its commit.
+/// The build number from build.rs: the commits behind the one built, 0 where
+/// git was missing. Every release candidate reports the version of the release
+/// it leads to, so the number tells builds of one version apart.
+pub(crate) const BUILD: u32 = match u32::from_str_radix(env!("SWANKY_AMP_BUILD"), 10) {
+    Ok(build) => build,
+    Err(_) => 0,
+};
+
+/// The product, its version and build number, as the information panel
+/// shows them.
+pub(crate) fn product() -> String {
+    format!(
+        "Swanky Amp Free {} (build {BUILD})",
+        env!("CARGO_PKG_VERSION")
+    )
+}
+
+/// The product line of the report and the log, which also name the commit.
 pub(crate) fn heading() -> String {
-    format!("Swanky Amp Free {}", build())
+    format!(
+        "Swanky Amp Free {} (build {BUILD}, {})",
+        env!("CARGO_PKG_VERSION"),
+        env!("SWANKY_AMP_COMMIT")
+    )
 }
 
 /// Shown in native text in place of an editor that cannot draw, in one line.
@@ -66,15 +87,6 @@ pub(crate) fn graphics_failed(log: Option<&str>) -> String {
     }
 }
 const SUPPORT_ADDRESS: &str = "support@resonantdsp.com";
-
-/// The version and, when the build knew it, the short commit, since every
-/// release candidate reports the version of the release it leads to.
-fn build() -> String {
-    match env!("SWANKY_AMP_COMMIT") {
-        "" => env!("CARGO_PKG_VERSION").to_owned(),
-        commit => format!("{} ({commit})", env!("CARGO_PKG_VERSION")),
-    }
-}
 
 /// Each shipped binary is built for exactly one format, so the feature that
 /// is on names it.

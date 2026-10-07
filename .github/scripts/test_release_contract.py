@@ -2,14 +2,17 @@
 
 import hashlib
 import json
+import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 
 SCRIPT = Path(__file__).with_name("release_contract.py")
+REPOSITORY = Path(__file__).resolve().parents[2]
 VERSION_SCRIPT = Path(__file__).with_name("version.sh")
 TAG_SCRIPT = Path(__file__).with_name("release_tag.sh")
 
@@ -42,6 +45,12 @@ class ReleaseCommandTest(unittest.TestCase):
             'crate = "swanky-amp"\nfourcc = "SwA2"\n',
             encoding="utf-8",
         )
+        (self.root / "vendor" / "cargo-truce").mkdir(parents=True)
+        (self.root / "vendor" / "cargo-truce" / "Cargo.toml").write_text(
+            '[package]\nname = "cargo-truce"\nversion = "6.3.0"\n'
+            '[dependencies.truce-core]\nversion = "6.3.0"\n',
+            encoding="utf-8",
+        )
         (self.root / "rust-toolchain.toml").write_text(
             '[toolchain]\nchannel = "1.97.1"\n', encoding="utf-8"
         )
@@ -52,6 +61,16 @@ class ReleaseCommandTest(unittest.TestCase):
         run(self.root, "git", "init", "-b", "master")
         run(self.root, "git", "config", "user.name", "Release Check")
         run(self.root, "git", "config", "user.email", "release@example.invalid")
+        # A record needs the history a full checkout has: 99 commits before
+        # this one give it build number 100.
+        history = "".join(
+            f"commit refs/heads/master\ncommitter R <r@example.invalid> {n} +0000\ndata 0\n\n"
+            for n in range(99)
+        )
+        subprocess.run(
+            ["git", "fast-import", "--quiet"], cwd=self.root, input=history,
+            text=True, check=True, capture_output=True,
+        )
         run(self.root, "git", "add", ".")
         run(self.root, "git", "commit", "-m", "release")
         run(self.root, "git", "tag", "v2.0.0-rc.1")
@@ -111,7 +130,7 @@ class ReleaseCommandTest(unittest.TestCase):
         path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
         record_hash = hashlib.sha256(path.read_bytes()).hexdigest()
         (self.artifacts / "release-record.sha256").write_text(
-            f"{record_hash}  candidate/release-record.json\n", encoding="utf-8"
+            f"{record_hash}  release-record.json\n", encoding="utf-8"
         )
         return record_hash
 
@@ -122,6 +141,8 @@ class ReleaseCommandTest(unittest.TestCase):
         self.assertEqual(record["product"]["plugin_identity"], "SwankyAmp2")
         self.assertEqual(record["product"]["bundle_id"], "com.resonantdsp.swanky-amp-2")
         self.assertEqual(record["product"]["fourcc"], "SwA2")
+        self.assertEqual(record["cargo_truce"], "6.3.0")
+        self.assertEqual(record["build"], 100)
         self.assertEqual(
             [artifact["kind"] for artifact in record["artifacts"]],
             ["macos-pkg", "windows-exe"],
@@ -177,6 +198,27 @@ class ReleaseCommandTest(unittest.TestCase):
             "v2.0.0", record_hash, str(self.artifacts), check=False,
         )
         self.assertNotEqual(altered.returncode, 0)
+
+    def test_record_refuses_a_shallow_history(self):
+        run(self.root, "git", "checkout", "--orphan", "shallow")
+        run(self.root, "git", "commit", "-m", "only commit")
+        shallow = run(
+            self.root, *self.command, "record", run(self.root, "git", "rev-parse", "HEAD").stdout.strip(),
+            str(self.artifacts), check=False,
+        )
+        self.assertNotEqual(shallow.returncode, 0)
+        self.assertIn("full history", shallow.stderr)
+
+    def test_checksum_file_must_name_the_record_beside_it(self):
+        record_hash = self.record()
+        (self.artifacts / "release-record.sha256").write_text(
+            f"{record_hash}  candidate/release-record.json\n", encoding="utf-8"
+        )
+        refused = run(
+            self.root, *self.command, "verify-candidate", "v2.0.0-rc.1",
+            "v2.0.0", record_hash, str(self.artifacts), check=False,
+        )
+        self.assertNotEqual(refused.returncode, 0)
 
     def test_record_holds_exactly_the_downloads_the_release_declares(self):
         cargo = self.root / "Cargo.toml"
@@ -272,6 +314,16 @@ class ReleaseCommandTest(unittest.TestCase):
         )
         self.assertNotEqual(invalid.returncode, 0)
         self.assertEqual((self.root / "Cargo.toml").read_bytes(), cargo_before)
+
+
+class PinTest(unittest.TestCase):
+    def test_justfile_pins_the_vendored_cargo_truce(self):
+        sys.path.insert(0, str(SCRIPT.parent))
+        from release_contract import cargo_truce_version
+
+        justfile = (REPOSITORY / "Justfile").read_text(encoding="utf-8")
+        pinned = re.search(r'^export TRUCE_VERSION := "([^"]+)"$', justfile, re.M).group(1)
+        self.assertEqual(pinned, cargo_truce_version(REPOSITORY))
 
 
 if __name__ == "__main__":

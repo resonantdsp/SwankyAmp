@@ -2,9 +2,10 @@
   "schema": 1,
   "candidate": "v2.0.0-rc.1",
   "commit": "3f1c0a9d7b2e45c8a1d6f0b39e7c2a4815d6e930",
+  "build": 212,
   "version": "2.0.0",
   "toolchain": "1.97.1",
-  "cargo_truce": "6.3.0+resonantdsp.1",
+  "cargo_truce": "6.3.0",
   "cargo_lock_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
   "artwork_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
   "product": {

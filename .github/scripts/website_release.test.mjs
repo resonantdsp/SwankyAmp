@@ -59,6 +59,7 @@ test('cataloguing version 2 keeps the 1.4 legacy release and other products', ()
   const free = next.products[1];
   assert.equal(free.status, 'available');
   assert.equal(free.version, '2.0.0');
+  assert.equal(free.build, record.build, 'the release names its build for candidates of the same version');
   assert.equal(free.releasedAt, options.releasedAt);
   assert.deepEqual(free.legacy, catalogue.products[1].legacy);
   assert.deepEqual(next.products[0], catalogue.products[0]);

@@ -90,6 +90,7 @@ export function updatedReleases(catalogue, record, options) {
   if (!product) throw new Error(`The catalogue has no ${PRODUCT_ID} release.`);
   product.status = 'available';
   product.version = record.version;
+  product.build = record.build;
   product.releasedAt = options.releasedAt;
   product.licenseSummary = options.licenseSummary ?? DEFAULT_LICENSE_SUMMARY;
   product.releaseNotes = options.releaseNotes;

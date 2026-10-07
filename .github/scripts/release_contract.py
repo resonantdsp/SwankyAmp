@@ -63,6 +63,16 @@ def toml_text(text: str, table: str, key: str) -> str:
     return toml_value(text, table, key, r'"([^"]+)"')
 
 
+def build_number(root: Path = ROOT) -> int:
+    """The number build.rs bakes in: the commits behind HEAD."""
+    return int(git("rev-list", "--count", "HEAD", root=root))
+
+
+def cargo_truce_version(root: Path = ROOT) -> str:
+    """The version of the vendored cargo-truce the candidate was packaged with."""
+    return toml_text(source(root, "vendor/cargo-truce/Cargo.toml"), "[package]", "version")
+
+
 def ships_linux(root: Path = ROOT) -> bool:
     text = source(root, "Cargo.toml")
     return toml_value(text, "[package.metadata.release]", "linux", r"(true|false)") == "true"
@@ -166,6 +176,9 @@ def make_record(label: str, directory: Path, root: Path = ROOT) -> dict:
     )
     if not CANDIDATE_TAG.fullmatch(label) and not REHEARSAL.fullmatch(label):
         raise ValueError("record label must be a candidate tag or commit hash")
+    build = build_number(root)
+    if build < 100:
+        raise ValueError(f"build number {build} is too low; check out the full history")
     artwork = root / "assets" / "artwork.pack"
     if not artwork.is_file():
         raise ValueError("assets/artwork.pack is missing; merge and validate the public artwork first")
@@ -173,9 +186,10 @@ def make_record(label: str, directory: Path, root: Path = ROOT) -> dict:
         "schema": 1,
         "candidate": label,
         "commit": git("rev-parse", "HEAD", root=root),
+        "build": build,
         "version": release_version,
         "toolchain": toolchain(root),
-        "cargo_truce": "6.3.0+resonantdsp.1",
+        "cargo_truce": cargo_truce_version(root),
         "cargo_lock_sha256": sha256(root / "Cargo.lock"),
         "artwork_sha256": sha256(artwork),
         "product": source_metadata(root),
@@ -212,9 +226,10 @@ def verify_candidate(
     expected_fields = {
         "candidate": candidate_tag,
         "commit": candidate_commit,
+        "build": build_number(root),
         "version": stable_version,
         "toolchain": toolchain(root),
-        "cargo_truce": "6.3.0+resonantdsp.1",
+        "cargo_truce": cargo_truce_version(root),
         "cargo_lock_sha256": sha256(root / "Cargo.lock"),
         "artwork_sha256": sha256(root / "assets" / "artwork.pack"),
         "product": source_metadata(root),
@@ -231,7 +246,8 @@ def verify_candidate(
         raise ValueError("candidate artifacts do not match their recorded bytes")
     checksum = directory / "release-record.sha256"
     checksum_parts = checksum.read_text(encoding="utf-8").split() if checksum.is_file() else []
-    if not checksum_parts or checksum_parts[0] != expected_record_sha256:
+    # Names the record beside it, so `sha256sum -c` checks it in place.
+    if checksum_parts != [expected_record_sha256, "release-record.json"]:
         raise ValueError("candidate checksum file does not name the accepted release record")
     allowed = {
         "release-record.json",

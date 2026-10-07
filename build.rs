@@ -29,9 +29,11 @@ fn notices() {
     std::fs::write(out, text).unwrap();
 }
 
-/// The short commit a build was made from, for the support report: release
-/// candidates and the release carry the same version. Empty where git or the
-/// repository is missing, as in a source archive.
+/// The build number and short commit a build was made from: release
+/// candidates and the release carry the same version. The number counts the
+/// commits behind HEAD, so it rises with every master commit and needs a full
+/// checkout. Where git or the repository is missing, as in a source archive,
+/// the number is 0 and the commit "unknown".
 fn commit() {
     let git = |args: &[&str]| {
         std::process::Command::new("git")
@@ -42,8 +44,12 @@ fn commit() {
             .and_then(|output| String::from_utf8(output.stdout).ok())
             .map(|text| text.trim().to_owned())
     };
-    let commit = git(&["rev-parse", "--short=7", "HEAD"]).unwrap_or_default();
+    let commit = git(&["rev-parse", "--short=7", "HEAD"]).unwrap_or_else(|| "unknown".into());
     println!("cargo:rustc-env=SWANKY_AMP_COMMIT={commit}");
+    let build = git(&["rev-list", "--count", "HEAD"])
+        .and_then(|count| count.parse::<u32>().ok())
+        .unwrap_or(0);
+    println!("cargo:rustc-env=SWANKY_AMP_BUILD={build}");
     // Every commit appends to HEAD's reflog, even once `git gc` has packed
     // the branch ref; HEAD itself is the fallback where no reflog is kept.
     let watched = ["logs/HEAD", "HEAD"]
