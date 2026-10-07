@@ -350,22 +350,18 @@ impl PresetBar {
 
     /// The cached listing is for drawing; an action that depends on it
     /// re-reads the folder first, since the player may change it outside the
-    /// editor. Returns the files left out.
-    fn reread(&mut self) -> Vec<String> {
-        let listing = self.library.list();
-        self.list(listing.entries);
-        listing.unreadable
+    /// editor. Returns a sentence naming the files left out, if any.
+    fn reread(&mut self) -> Option<String> {
+        let mut listing = self.library.list();
+        self.list(std::mem::take(&mut listing.entries));
+        listing.left_out()
     }
 
     /// Re-reads the folder and names any file left out. Only actions that
     /// show the listing report it, so stepping never buries a status.
     fn refresh(&mut self) {
-        let unreadable = self.reread();
-        if !unreadable.is_empty() {
-            self.report(Err(format!(
-                "Skipped unreadable presets: {}",
-                unreadable.join(", ")
-            )));
+        if let Some(left_out) = self.reread() {
+            self.report(Err(left_out));
         }
     }
 

@@ -77,7 +77,7 @@ The released stack also ran its three first-order treble sections through the se
 
 The ten factory presets keep their character within reason rather than exactly, because the corrected stack cannot place 1.4.0's scoop an octave up. Each is voiced from its 1.4.0 settings on the guitar recordings, judged at the strikes, every fitted knob on a half mark; Power Drive keeps its drive into the power stage within about 1.2 dB; Output makes every preset strike at the level reference's level on a humbucker. Init is the corrected stack at 1.4.0's defaults except the tone stack, which starts at 2 for more mids than the bright first stack; the reference stays at 0, so the bank does not follow Init. Garrin accepted the bank by ear on September 30, 2026 ([RD-246](../../../company/work/RD-246.md)). `just refit` regenerates it and its [voicing report](https://github.com/resonantdsp/SwankyAmp/blob/master/verification/tone-stack/refit-report.md); the accepted limits are a light 150 to 400 Hz, a little more around 1.3 kHz and up to 2.5 dB missing above 8 kHz.
 
-Users' 1.x presets import on first run and on request, without touching the 1.x files. The importer's current conversion, a fast fit on a generated pluck, can leave them boxier than their originals; [RD-1068](../../../company/work/RD-1068.md) replaces it with the factory voicing's correction before the freeze, and a 1.x file placed in the 2.0 preset folder any other way is refused with a pointer to the import.
+Users' 1.x presets import on first run and on request, without touching the 1.x files. The import shifts Low, Mid, High and Presence by the average move the factory voicing made to the 1.4.0 presets ([RD-1068](../../../company/work/RD-1068.md)), which lands them in the right range rather than on their original balance; a 1.x file placed in the 2.0 preset folder any other way is refused with a pointer to the import.
 
 ## The interface
 
@@ -124,8 +124,8 @@ The [Windows linkage qualification](../verification/fixtures/v2.0.0-rc.1/asio-li
 
 Remaining, in the order of the [release calendar](../../../company/calendar.md):
 
-1. The imported 1.x preset correction ([RD-1068](../../../company/work/RD-1068.md)) and Garrin's open interface notes ([RD-247](../../../company/work/RD-247.md)).
-2. The [feature freeze](../../../company/work/RD-1176.md): one candidate carrying every launch feature, after the import correction.
+1. Garrin's listen to a few imported 1.x presets ([RD-1068](../../../company/work/RD-1068.md)) and his open interface notes ([RD-247](../../../company/work/RD-247.md)).
+2. The [feature freeze](../../../company/work/RD-1176.md): one candidate carrying every launch feature.
 3. Host qualification, as above, with the schedule and current results in [RD-249](../../../company/work/RD-249.md).
 4. The stable tag and exact-byte promotion, website catalogue pull request and release-notice check ([RD-249](../../../company/work/RD-249.md)); the public launch follows [RD-135](../../../company/work/RD-135.md).
 
