@@ -177,74 +177,59 @@ just soak-check    # verdict so far, or the final one
 
 ## Releasing
 
-A release goes candidate tag → candidate workflow → qualification → stable tag → promote workflow. The crate version in `Cargo.toml` is the version authority, and `CHANGELOG.md` must have the matching section. That section's heading carries the planned release date, such as `## 2.0.1 — 2026-11-02`, never "in development": the tagged source is public, and every candidate must be releasable as it stands. `just version` dates a new section; an existing one, such as an "in development" heading, is dated by hand before the first candidate is cut. The website catalogue's date is the day the GitHub Release is published and may differ from the heading; a moved date is never a reason for a new candidate. `[package.metadata.release]` in `Cargo.toml` states whether the release ships a Linux download; 2.0 ships none, so its candidates build and publish macOS and Windows only.
+A release goes candidate tag → candidate workflow → qualification → release tag → promote workflow. The crate version in `Cargo.toml` is the only version, and a release is a git tag equal to it. `CHANGELOG.md` keeps an `## Unreleased` section, which `just version` turns into the version's section dated today; set that date to the planned release date by hand, and never let the heading say "in development", and a moved date is never a reason for a new candidate. The website's date is the day the GitHub release is published.
 
-Prepare the version on a branch and land it through a pull request like any change:
-
-```sh
-just version 2.0.1      # updates Cargo.toml, Cargo.lock and CHANGELOG.md; never stages or commits
-```
-
-Then, on the merged master commit, which CI has checked:
+A candidate tag is for a build we would ship. A signed build for anything else, such as trying a change on a real machine, comes from a `rehearsal/*` branch.
 
 ```sh
-just tone-stack-soak    # must pass before a candidate
-just tag-candidate      # creates the next v2.0.1-rc.N locally
+just version 2.0.1    # edits Cargo.toml, Cargo.lock and CHANGELOG.md; commits nothing
+                      # land that through a pull request, then on origin/master:
+just tone-stack-soak  # must pass before a candidate
+just tag-candidate    # v2.0.1-rc.1, or the next candidate for this version
 git push origin v2.0.1-rc.1
 ```
 
-`tag-candidate` fetches first. It refuses changes in tracked files, a checkout other than `origin/master`, a commit that would fail the stable release check (version and dated heading), and a version whose stable tag `origin` already has. It numbers the candidate past every candidate tag held locally or on `origin`. The tag helpers push nothing.
+Neither tag recipe pushes; pushing a tag is the operator's act, and only administrators can create `v*` tags and `rehearsal/*` branches. `tag-candidate` fetches first and refuses changes in tracked files, a checkout other than `origin/master` and a version `origin` has already released, and numbers the candidate past every candidate tag held locally or on `origin`.
 
-### Candidate workflow
+### Candidate
 
-Only `vX.Y.Z-rc.N` tags start `.github/workflows/candidate.yml`, and its first job refuses a tag whose commit is not on master; stable `vX.Y.Z` tags never build. A manual run is a rehearsal, accepted only from an administrator-owned `rehearsal/*` branch; its artifacts use the commit hash and it creates no GitHub Release.
+A tag `vX.Y.Z-rc.N` starts `.github/workflows/candidate.yml`; a release tag never builds. The workflow refuses a tag whose commit is not on master, whose version is not the crate version, or whose changelog section is missing or says it is in development (`just release-check candidate <tag>` checks the last two locally).
 
-The workflow validates the committed artwork and writes the third-party notices before packaging. It builds a universal macOS package signed with the Resonant DSP Developer ID identities, notarized and stapled, and a Windows x64 installer signed through the Free-specific Azure identity and the shared Resonant DSP publisher profile. The macOS installer offers an install for all users or the current user and the Windows installer installs for all users; both are installed silently for all users on clean runners, pluginval and clap-validator inspect what was installed, and the workflow verifies the publisher identities and that every packaged binary carries the notices. When the release declares a Linux download, the workflow packages it on Linux, installs and validates the tarball, and records no candidate unless that passes; a release that declares none builds none.
+It builds a universal macOS `.pkg` (CLAP, VST3, Audio Unit and the standalone), notarized and stapled, and an x64 Windows `.exe` (CLAP, VST3 and the standalone), signed from the `signing` environment, with the third-party notices embedded. It installs each on a clean runner, runs the format validators over what was installed, and checks every shipped file's signature against the exact publisher. `[package.metadata.release]` in `Cargo.toml` states whether a release ships Linux; when it does, the workflow also packages, installs and validates the Linux tarball. 2.0 ships none.
 
-The final job writes `release-record.json` with the tag, commit, build number, version, toolchain, vendored cargo-truce version, lockfile and artwork hashes, shipping identities, and each artifact's size and SHA-256, and `release-record.sha256` beside it, so `sha256sum -c` checks it in place, and creates a draft GitHub Release once. Every build job checks out the full history, since the build number counts it; the record refuses a build number below 100 as a sign of a shallow checkout. The workflow refuses an RC tag that already has a release, before any signing and again at the end, so new bytes need a new RC number. A run that failed partway resumes with "Re-run failed jobs", unless it failed after creating the draft, which needs a new RC; re-running all jobs is refused once the draft exists.
+`release-record.json` names the candidate, commit, build number, version, toolchain, vendored cargo-truce version, the lockfile and artwork hashes, the plug-in's identity, and each download's kind, size and SHA-256; `release-record.sha256` beside it lets `sha256sum -c` check it in place. The downloads, record and checksum go to the public downloads bucket at `https://downloads.resonantdsp.com/swankyamp/candidates/<tag>/` and to a GitHub pre-release named after the tag. A candidate is written once: the workflow refuses a tag whose record is already stored, so new bytes need a new candidate tag. A run that failed partway resumes with "Re-run failed jobs".
 
-### Qualification and promotion
+A dispatch on a `rehearsal/*` branch (`gh workflow run candidate.yml --ref rehearsal/<name>`) builds, signs and validates the same way, names its run artifacts after the short commit, and publishes nothing.
 
-A person qualifies the candidate's exact installers in real hosts, checks installation, the interface and audio, and records the SHA-256 printed for `release-record.json`. Acceptance is a release decision; workflow success does not make it one. Besides that, these can only be confirmed on a real machine:
+### Qualify
 
-- On Windows, Website, Manual and Support in the information panel, and Download when an update is announced, open the default browser at their page.
-- On Windows, a host that unloads the plug-in while the update check, a save dialog or a preset import is running does not crash.
-- On Windows, saving a preset while another program holds its file reports an error in the footer and leaves the old preset intact.
-- On macOS, opening the Audio Unit in GarageBand twice writes the update check's record beside the interface setting.
-- On each platform, Save as… in a system dialog pointed at another folder never replaces a preset in the preset folder.
-- On macOS, the standalone relaunched with its remembered interface unplugged keeps the input off and opens the information panel naming the interface.
-- On macOS, the standalone relaunched with its remembered output unplugged names that output in the panel with the output that is playing.
-- On macOS, choosing the computer's own microphone in the standalone shows the feedback warning, and the next launch asks for an input instead of opening that microphone.
-- On Windows, the standalone's first launch on ASIO keeps the input off and opens the panel, with both boxes naming the interface; choosing it there turns the input on.
-- On Windows, the standalone relaunched on ASIO with its saved interface unplugged and another ASIO driver installed keeps the input off and names the missing interface.
-- On Windows, the standalone whose ASIO interface is held by another program plays through Windows audio with the input off and says the interface did not open.
-- On Windows, switching the standalone's audio driver from ASIO to Windows audio, and back, turns the input off each time.
-- On Windows, the laptop's own microphone chosen in the standalone on Windows audio shows the feedback warning.
-- On Windows, long device names in the standalone's panel are cut with an ellipsis.
-- On each platform, an oversampling change while playing switches at once in an Audio Unit or VST3 host, with a click at the switch expected, and in a CLAP host applies after the host restarts the plug-in.
-
-The Linux build has never been run on a real machine. Before a release declares a Linux download again, a person confirms there that choosing the standalone's input, input channels and output in the information panel switches the devices.
-
-After acceptance, create the stable tag on the same commit:
+A person qualifies the candidate's exact installers in real hosts and by ear; [verification](verification/README.md#open-limits) lists what only a real machine confirms. Qualifying accepts the SHA-256 of the candidate's `release-record.json`. Then tag the release on the candidate's commit:
 
 ```sh
-just tag-release v2.0.1-rc.3   # tags the commit origin's v2.0.1-rc.3 names as v2.0.1
+just tag-release v2.0.1-rc.3   # v2.0.1, on the commit origin's v2.0.1-rc.3 names
 git push origin v2.0.1
 ```
 
-`tag-release` reads the candidate tag from `origin`, never the checkout or a local tag, and checks the version and the dated changelog heading as committed there. It notes when `origin` holds a higher candidate than the one named.
+`tag-release` reads the candidate tag from `origin`, never the checkout, and refuses unless the version's changelog heading there carries a date.
 
-Then dispatch the protected `promote` workflow from `master` (`gh workflow run promote.yml --ref master ...` or the equivalent UI choice), the only branch its `release` environment permits. It takes the RC tag, stable tag, accepted record SHA-256, and a qualification naming the reviewer, date, hosts, machines and findings. It refuses malformed tags before checking anything out, checks out `refs/tags/<tag>` without leaving the token in the tree, and runs the release-script tests from it. It verifies a successful candidate workflow, requires both tags and the checkout to resolve to the recorded commit, rechecks the record and every artifact byte, and creates the stable GitHub Release from those files; it does not compile or sign. A rerun after a later failure resumes only once the existing release's assets prove byte-for-byte identical; it never overwrites a differing asset.
+### Promote
 
-Promotion resolves each public release URL only through GitHub's release-asset host and compares size and SHA-256 with the record, then opens a website pull request for logical product `SwankyAmp` that keeps the 1.4.0 legacy release and publishes version 2 downloads under the `swanky-amp-2` identity, with the release's build number for the release notice. The release date it catalogues is the day the stable GitHub Release was published, so a rerun on a later day changes nothing. The website's own checks and review control that merge. The `release` environment supplies only the `WEBSITE_TOKEN` for that pull request.
+`.github/workflows/promote.yml` is dispatched from `master`, the only branch its `release` environment admits, and builds nothing:
 
-`just promote-check CANDIDATE_TAG TAG RECORD_SHA256 DIRECTORY` runs the same identity and byte checks locally and read-only from the stable tag checkout.
+```sh
+gh workflow run promote.yml --ref master -f candidate_tag=v2.0.1-rc.3 \
+  -f tag=v2.0.1 -f record_sha256=<hash> -f qualification='...'
+```
 
-### Signing setup
+`qualification` says who qualified the candidate, in which hosts, on which machines, when and what they found; an empty one fails the run. The run checks out the release tag, requires a successful candidate run for the candidate tag, fetches the candidate from the bucket and checks it: both tags and the checkout are one commit, the record is the accepted one and agrees with the tagged tree, and every download matches it. It then copies the candidate and `qualification.md` to `swankyamp/<version>/` in the same bucket, fetches the public URLs back and compares them, publishes the GitHub release with the downloads, record, checksum and `qualification.md`, and opens a website pull request cataloguing the downloads with the build number and the release's publication date. The website's checks and the operator's review merge it.
 
-Rulesets let only administrators create, update or delete `v*` tags and `rehearsal/*` branches. The protected `signing` environment allows only `v*-rc.*` tags and `rehearsal/*` branches, so fork and pull-request runs cannot reach it. It holds the Apple material as `APPLE_CERTIFICATES_P12`, `APPLE_CERTIFICATES_PASSWORD`, `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID` and `APPLE_API_ISSUER_ID`.
+`just promote-check <candidate tag> <tag> <record sha256> <directory>` runs the same fetch and checks locally from a checkout of the release tag. A rerun after a late failure goes on only when an existing release holds exactly the candidate's files, so it takes the same qualification text.
 
-Windows signing uses a Free-specific Azure application and service principal with a federated identity scoped to this repository's `signing` environment, and a signer-only role on the shared Public Trust profile for the Resonant DSP publisher; it has no access to Pro source or resources. These nonsecret repository variables configure it:
+### Settings
+
+Rulesets let only administrators create, update or delete `v*` tags and `rehearsal/*` branches. The `signing` environment admits only `v*-rc.*` tags and `rehearsal/*` branches, so fork and pull-request runs cannot reach it; it holds the Apple material (`APPLE_CERTIFICATES_P12`, `APPLE_CERTIFICATES_PASSWORD`, `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID`) and the credential that writes the downloads bucket (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `R2_ACCOUNT_ID`). The `release` environment admits only `master` and holds a credential that writes the bucket and the `WEBSITE_TOKEN` for the catalogue pull request. The repository variables `PUBLIC_DOWNLOAD_BUCKET` and `PUBLIC_DOWNLOAD_BASE_URL` name the bucket and where it is served.
+
+Windows signing uses a Free-specific Azure application and service principal with a federated identity scoped to this repository's `signing` environment, and a signer-only role on the shared Public Trust profile for the Resonant DSP publisher; it has no access to Pro source or resources. These repository variables, none of them secret, configure it:
 
 - `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and `AZURE_SUBSCRIPTION_ID`
 - `TRUCE_AZURE_ACCOUNT`, `TRUCE_AZURE_PROFILE` and `TRUCE_AZURE_ENDPOINT`

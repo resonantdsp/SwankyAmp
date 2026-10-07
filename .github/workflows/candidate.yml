@@ -1,13 +1,18 @@
 name: candidate
 
-# RC tags create immutable draft candidates. Manual runs are rehearsals from an
-# administrator-owned rehearsal/* branch and keep commit-labelled workflow
-# artifacts only. Stable tags never build; promotion copies qualified RC bytes.
+# A candidate is the signed, notarized build a person then qualifies by ear and
+# in real hosts. A candidate tag `vX.Y.Z-rc.N` builds one, once, and publishes
+# it: to the public downloads bucket under swankyamp/candidates/<tag>/ and as a
+# GitHub pre-release. A dispatch on a rehearsal/* branch builds, signs and
+# validates the same way and publishes nothing. A release tag never builds:
+# promotion publishes the qualified candidate's own bytes.
 on:
   push:
     tags: ["v*-rc.*"]
   workflow_dispatch:
 
+# Signing and notarization are slow and cost Azure signatures; let a running
+# candidate finish rather than cancelling it for a newer one.
 concurrency:
   group: candidate-${{ github.ref }}
   cancel-in-progress: false
@@ -17,41 +22,26 @@ permissions: {}
 env:
   CARGO_TERM_COLOR: always
 
-# A hung step otherwise runs to GitHub's six-hour limit. The bounds sit far
-# above the slowest of ten candidate runs in September 2026 (identify and the
-# record under a minute, Linux 32, Windows 45, macOS 54 minutes), because a
-# signing or notarization job cut off part way costs more than a slow one.
+# A hung step otherwise runs to GitHub's six-hour limit. The limits sit well
+# above the slowest candidate runs of September 2026 (macOS 54, Windows 45,
+# Linux 32 minutes), because a signing job cut off part way costs more than a
+# slow one. A cut-off costs no tag: nothing is published until `publish`.
 jobs:
-  # First and cheap: a tag the contract refuses, or one that already has a
-  # release, fails here, before an hour of signing proves nothing.
+  # First and cheap: a tag on a commit master never had, or one that disagrees
+  # with the crate version or the changelog, fails here, before an hour of
+  # signing proves nothing.
   identify:
     name: identify
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
-      # A read-only token is shown published releases only, and a candidate's
-      # release is a draft until promotion. Write is what lets this job see the
-      # draft that says the name is taken; the token reaches only that query,
-      # never the checked-out tree.
-      contents: write
+      contents: read
     outputs:
       release: ${{ steps.release.outputs.release }}
       tagged: ${{ steps.release.outputs.tagged }}
       linux: ${{ steps.release.outputs.linux }}
     steps:
-      # Any failure other than "release not found" stops the run as itself, so
-      # an outage never reads as a free name.
-      - name: Refuse a candidate tag that already has a release
-        if: github.ref_type == 'tag'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          if gh release view "$GITHUB_REF_NAME" --json isDraft 2>"$RUNNER_TEMP/err" >/dev/null; then
-            echo "$GITHUB_REF_NAME already has a release; use a new RC tag for new bytes." >&2
-            exit 1
-          fi
-          grep -qx 'release not found' "$RUNNER_TEMP/err" || { cat "$RUNNER_TEMP/err" >&2; exit 1; }
+      # The whole history, so the tag's commit can be found on master.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
@@ -59,14 +49,12 @@ jobs:
       - id: release
         run: |
           if [ "$GITHUB_REF_TYPE" = tag ]; then
-            python3 .github/scripts/release_contract.py check-tag candidate "$GITHUB_REF_NAME"
-            # Only reviewed, merged work is signed; a tag pushed from a stale
-            # or unmerged checkout stops here. The full-history checkout has
-            # already fetched master.
+            # Only reviewed, merged work is signed.
             git merge-base --is-ancestor HEAD origin/master || {
-              echo "$GITHUB_REF_NAME is not on master; tag a merged master commit." >&2
+              echo "$GITHUB_REF_NAME is on $(git rev-parse HEAD), which is not on master." >&2
               exit 1
             }
+            python3 scripts/release_contract.py check-tag candidate "$GITHUB_REF_NAME"
             echo "release=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
             echo "tagged=true" >> "$GITHUB_OUTPUT"
           else
@@ -77,11 +65,12 @@ jobs:
             echo "release=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
             echo "tagged=false" >> "$GITHUB_OUTPUT"
           fi
-          linux=$(python3 .github/scripts/release_contract.py ships-linux)
-          echo "linux=$linux" >> "$GITHUB_OUTPUT"
+          if python3 scripts/release_contract.py kinds | grep -qx linux-tarball; then
+            echo "linux=true" >> "$GITHUB_OUTPUT"
+          fi
 
   macos:
-    name: signed installer (macos)
+    name: installer (macos)
     needs: identify
     runs-on: macos-15
     timeout-minutes: 150
@@ -89,10 +78,12 @@ jobs:
     permissions:
       contents: read
     env:
+      # Not secret: the certificates behind these names are, and they live in
+      # the environment.
       TRUCE_SIGNING_IDENTITY: "Developer ID Application: Garrin McGoldrick (U4JWU4JK99)"
       TRUCE_INSTALLER_SIGNING_IDENTITY: "Developer ID Installer: Garrin McGoldrick (U4JWU4JK99)"
     steps:
-      # The whole history: the build number counts the commits behind HEAD.
+      # The whole history: the build number counts the commits to HEAD.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
@@ -102,12 +93,18 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           cache-on-failure: true
+          # Shared with check.yml's macOS bundles job: same platform, same toolchain,
+          # same codegen flags, so the dependency build carries over.
           shared-key: bundles-macos-15
+      # A shipped macOS build is universal, so both Apple targets must exist;
+      # the runner image carries only its own.
       - run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
       - run: just setup
       - run: just validate-assets
       - run: just notices
-      - name: Load signing identities and notarization profile
+      # The certificates and the notary key never touch the working tree: they
+      # go into a keychain created for this job and deleted with it.
+      - name: Load the signing identities
         env:
           APPLE_CERTIFICATES_P12: ${{ secrets.APPLE_CERTIFICATES_P12 }}
           APPLE_CERTIFICATES_PASSWORD: ${{ secrets.APPLE_CERTIFICATES_PASSWORD }}
@@ -120,8 +117,11 @@ jobs:
           security create-keychain -p "$password" "$KEYCHAIN"
           security set-keychain-settings -lut 21600 "$KEYCHAIN"
           security unlock-keychain -p "$password" "$KEYCHAIN"
+          # codesign and productbuild search the keychain list; notarytool
+          # stores and reads its profile in the default keychain.
           security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
           security default-keychain -s "$KEYCHAIN"
+
           certificates="$RUNNER_TEMP/certificates.p12"
           ( umask 077; printf '%s' "$APPLE_CERTIFICATES_P12" | base64 --decode > "$certificates" )
           security import "$certificates" -k "$KEYCHAIN" -P "$APPLE_CERTIFICATES_PASSWORD" \
@@ -129,31 +129,32 @@ jobs:
           rm -f "$certificates"
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$KEYCHAIN" >/dev/null
           security find-identity -v -p codesigning "$KEYCHAIN"
+
           key="$RUNNER_TEMP/notary.p8"
           ( umask 077; printf '%s' "$APPLE_API_KEY_P8" > "$key" )
-          xcrun notarytool store-credentials TRUCE_NOTARY --key "$key" \
-            --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID" --keychain "$KEYCHAIN"
+          xcrun notarytool store-credentials TRUCE_NOTARY \
+            --key "$key" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID" \
+            --keychain "$KEYCHAIN"
           rm -f "$key"
-      # Unscoped, the macOS installer lets the customer choose all users or the
-      # current user; the silent CI install runs as an administrator and takes
-      # the all-users paths the checks read.
       - run: just package
         env:
           THIRD_PARTY_NOTICES: ${{ github.workspace }}/THIRD-PARTY-NOTICES.txt
       - run: bash scripts/notices.sh verify
-      - name: Install and validate the package contents
+      # A candidate is judged on what its installer puts on a clean machine,
+      # not on the staging tree beside it.
+      - name: Install the package and validate what it laid down
         run: |
-          pkg=$(find target/dist -maxdepth 1 -name '*.pkg' -print -quit)
-          test -n "$pkg"
+          pkg=$(ls target/dist/*.pkg)
           sudo installer -pkg "$pkg" -target /
           just validate-installed --skip-gui-tests
-      - name: Verify publisher identity, notarization and staple
+      # Each shipped file by name, and the exact publisher: a glob passes when a
+      # format goes missing, and a prefix passes for anyone's Developer ID.
+      - name: Verify the publisher identity, notarization and staple
         run: |
-          pkg=$(find target/dist -maxdepth 1 -name '*.pkg' -print -quit)
+          pkg=$(ls target/dist/*.pkg)
           spctl -a -vv -t install "$pkg"
           xcrun stapler validate "$pkg"
-          pkgutil --check-signature "$pkg" \
-            | grep 'Developer ID Installer: Garrin McGoldrick (U4JWU4JK99)'
+          pkgutil --check-signature "$pkg" | grep -F "$TRUCE_INSTALLER_SIGNING_IDENTITY"
           for bundle in \
             "/Library/Audio/Plug-Ins/VST3/Swanky Amp 2.vst3" \
             "/Library/Audio/Plug-Ins/CLAP/Swanky Amp 2.clap" \
@@ -161,42 +162,51 @@ jobs:
             "/Applications/Swanky Amp 2.app"; do
             test -e "$bundle"
             codesign --verify --strict --verbose=2 "$bundle"
-            codesign --display --verbose=2 "$bundle" 2>&1 \
-              | grep '^Authority=Developer ID Application: Garrin McGoldrick (U4JWU4JK99)$'
+            codesign --display --verbose=2 "$bundle" 2>&1 | grep -Fx "Authority=$TRUCE_SIGNING_IDENTITY"
           done
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: candidate-macos-${{ needs.identify.outputs.release }}
           path: target/dist/*.pkg
           if-no-files-found: error
-      - name: Remove signing keychain
+      - name: Remove the signing keychain
         if: always()
         run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
 
   windows:
-    name: signed installer (windows)
+    name: installer (windows)
     needs: identify
     runs-on: windows-2025
     timeout-minutes: 150
     environment: signing
     permissions:
       contents: read
+      # Azure Artifact Signing holds the key; the runner proves who it is with
+      # a GitHub OIDC token instead of carrying a certificate file.
       id-token: write
     env:
+      # Not secret, and no client secret exists.
       AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       TRUCE_AZURE_ACCOUNT: ${{ vars.TRUCE_AZURE_ACCOUNT }}
       TRUCE_AZURE_PROFILE: ${{ vars.TRUCE_AZURE_PROFILE }}
       TRUCE_AZURE_ENDPOINT: ${{ vars.TRUCE_AZURE_ENDPOINT }}
+      # The certificate subject the profile issues, checked on every shipped file.
       WINDOWS_SIGNER_SUBJECT: ${{ vars.WINDOWS_SIGNER_SUBJECT }}
       TRUSTED_SIGNING_CLIENT_VERSION: "1.0.95"
+      # The signing library authenticates through Azure.Identity's whole
+      # credential chain. A hosted runner is an Azure VM whose metadata service
+      # answers but carries no identity, so the managed-identity attempt hangs
+      # rather than failing and signtool never returns. Leaving only the CLI
+      # credential leaves the one the login step below established; this is the
+      # set Microsoft's own trusted-signing-action excludes by default.
       TRUCE_AZURE_EXCLUDE_CREDENTIALS: >-
         environmentcredential,workloadidentitycredential,managedidentitycredential,
         sharedtokencachecredential,visualstudiocredential,visualstudiocodecredential,
         azurepowershellcredential,azuredeveloperclicredential,interactivebrowsercredential
     steps:
-      # The whole history: the build number counts the commits behind HEAD.
+      # The whole history: the build number counts the commits to HEAD.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
@@ -206,6 +216,7 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           cache-on-failure: true
+          # Shared with check.yml's Windows bundles job, as above.
           shared-key: bundles-windows-2025
       # The ASIO SDK, as in check.yml's Windows jobs.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -218,15 +229,9 @@ jobs:
         shell: bash
       - run: just notices
         shell: bash
-      - name: Require configured Free signing identity
-        shell: bash
-        run: |
-          for name in AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_SUBSCRIPTION_ID \
-            TRUCE_AZURE_ACCOUNT TRUCE_AZURE_PROFILE TRUCE_AZURE_ENDPOINT \
-            WINDOWS_SIGNER_SUBJECT; do
-            test -n "${!name:-}" || { echo "Repository variable $name is not configured." >&2; exit 1; }
-          done
-      - name: Install pinned Trusted Signing client
+      # signtool signs through this library, which reaches the certificate
+      # profile with the Azure credentials the login step leaves behind.
+      - name: Install the Trusted Signing client library
         shell: pwsh
         run: |
           $version = $env:TRUSTED_SIGNING_CLIENT_VERSION
@@ -236,30 +241,42 @@ jobs:
           $target = Join-Path $env:RUNNER_TEMP "trusted-signing"
           Expand-Archive -Path $package -DestinationPath $target -Force
           $dlib = Join-Path $target "bin\x64\Azure.CodeSigning.Dlib.dll"
-          if (-not (Test-Path $dlib)) { throw "No Azure.CodeSigning.Dlib.dll in the pinned package." }
+          if (-not (Test-Path $dlib)) { throw "No Azure.CodeSigning.Dlib.dll in the package." }
           "TRUCE_AZURE_DLIB=$dlib" | Out-File -FilePath $env:GITHUB_ENV -Append
       - uses: Azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
           client-id: ${{ env.AZURE_CLIENT_ID }}
           tenant-id: ${{ env.AZURE_TENANT_ID }}
           subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
-      - name: Prefetch signing token while the OIDC assertion is valid
+      # The signing library asks for a token when signtool submits a digest,
+      # which is a quarter of an hour into `just package`. By then the federated
+      # assertion the login exchanged has expired, and the CLI holds a token for
+      # the management endpoint only, so it tries to exchange again and fails
+      # with AADSTS700024. Asking for the signing audience here, while the
+      # assertion is valid, leaves an hour-long token in the CLI's cache, which
+      # is what the library reads later.
+      - name: Take a signing token while the login assertion is valid
         shell: bash
         run: az account get-access-token --scope https://codesigning.azure.net/.default --output none
+      # Windows ships x64: `--host-only` skips the ARM64 slice, which nothing
+      # in the product targets and which doubles the build.
       - run: just package --host-only
         shell: bash
         env:
           THIRD_PARTY_NOTICES: ${{ github.workspace }}/THIRD-PARTY-NOTICES.txt
       - run: bash scripts/notices.sh verify
         shell: bash
-      - name: Install and validate the installer contents
+      # Inno's silent switches only reach the installer through Start-Process;
+      # Git Bash rewrites a bare /VERYSILENT into a path.
+      - name: Install the installer
         shell: pwsh
         run: |
           $installer = (Get-ChildItem target\dist\*.exe)[0].FullName
           $run = Start-Process -FilePath $installer -Wait -PassThru `
             -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'
           if ($run.ExitCode -ne 0) { throw "The installer exited $($run.ExitCode)." }
-      - shell: bash
+      - name: Validate what the installer laid down
+        shell: bash
         run: |
           common_files=${COMMONPROGRAMFILES:-${CommonProgramFiles:-}}
           program_files=${PROGRAMFILES:-${ProgramFiles:-}}
@@ -269,7 +286,8 @@ jobs:
           test -f "$program_files/Resonant DSP/Swanky Amp 2/swanky-amp-2.exe"
           CLAP_BUNDLE="$common_files/CLAP/Swanky Amp 2.clap" \
             just validate-installed --skip-gui-tests
-      - name: Verify the exact installed files have the expected publisher identity
+      # As on macOS: each shipped file by name, and the exact publisher.
+      - name: Verify the publisher identity of each installed file
         shell: pwsh
         run: |
           $installer = (Get-ChildItem target\dist\*.exe)[0].FullName
@@ -306,7 +324,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      # The whole history: the build number counts the commits behind HEAD.
+      # The whole history: the build number counts the commits to HEAD.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
@@ -325,10 +343,9 @@ jobs:
         env:
           THIRD_PARTY_NOTICES: ${{ github.workspace }}/THIRD-PARTY-NOTICES.txt
       - run: bash scripts/notices.sh verify
-      - name: Install and validate the bundle contents
+      - name: Install the bundle and validate what it laid down
         run: |
-          archive=$(find target/dist -maxdepth 1 -name '*.tar.gz' -print -quit)
-          test -n "$archive"
+          archive=$(ls target/dist/*.tar.gz)
           mkdir "$RUNNER_TEMP/archive" "$RUNNER_TEMP/home"
           tar -xzf "$archive" -C "$RUNNER_TEMP/archive"
           installer=$(find "$RUNNER_TEMP/archive" -name install.sh -print -quit)
@@ -341,52 +358,80 @@ jobs:
           path: target/dist/*.tar.gz
           if-no-files-found: error
 
-  record:
-    name: immutable candidate record
+  # A candidate tag only. The record names the commit and inputs that produced
+  # the candidate and the exact bytes of each installer; promotion copies
+  # those bytes and checks them against it.
+  publish:
+    name: publish
     needs: [identify, macos, windows, linux]
-    # A Linux job skipped because none is declared must not skip the record.
-    if: ${{ !cancelled() && !failure() }}
+    # A Linux job skipped because none is declared must not skip this one.
+    if: ${{ !cancelled() && !failure() && needs.identify.outputs.tagged == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    # The downloads bucket credentials live here, beside the signing material.
+    environment: signing
     permissions:
+      # The pre-release is the only thing this writes to the repository.
       contents: write
     env:
       RELEASE: ${{ needs.identify.outputs.release }}
-      TAGGED: ${{ needs.identify.outputs.tagged }}
+      PUBLIC_DOWNLOAD_BUCKET: ${{ vars.PUBLIC_DOWNLOAD_BUCKET }}
+      PUBLIC_DOWNLOAD_BASE_URL: ${{ vars.PUBLIC_DOWNLOAD_BASE_URL }}
     steps:
+      # The whole history: the build number counts the commits to HEAD.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: candidate-*-${{ needs.identify.outputs.release }}
           merge-multiple: true
           path: candidate
-      - run: python3 .github/scripts/release_contract.py record "$RELEASE" candidate > candidate/release-record.json
-      # Written beside the record, so `sha256sum -c` checks it where it lies.
+      - run: python3 scripts/release_contract.py record "$RELEASE" candidate > candidate/release-record.json
+      # The hash a person accepts when qualifying the candidate, written beside
+      # the record so `sha256sum -c` checks it where it lies.
       - run: sha256sum release-record.json | tee release-record.sha256
         working-directory: candidate
       - run: cat candidate/release-record.json
-      - name: Create immutable RC draft
-        if: env.TAGGED == 'true'
+      # A candidate is written once: new bytes need a new candidate tag. A rerun
+      # of this job computes the same record from the same artifacts and goes
+      # on; any other record stops it. The record goes last, so a prefix that
+      # holds one holds everything it names.
+      - name: Store the candidate in the downloads bucket
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          r2() { aws --endpoint-url "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com" "$@"; }
+          prefix="s3://$PUBLIC_DOWNLOAD_BUCKET/swankyamp/candidates/$RELEASE"
+          if r2 s3 cp "$prefix/release-record.json" stored.json 2>/dev/null; then
+            cmp stored.json candidate/release-record.json || {
+              echo "$prefix holds another candidate; tag the next candidate for new bytes." >&2
+              exit 1
+            }
+          else
+            r2 s3 cp candidate/ "$prefix/" --recursive --exclude release-record.json
+            r2 s3 cp candidate/release-record.json "$prefix/release-record.json"
+          fi
+          echo "Stored at $PUBLIC_DOWNLOAD_BASE_URL/swankyamp/candidates/$RELEASE/"
+      - name: Publish the pre-release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "$RELEASE" 2>"$RUNNER_TEMP/err" >/dev/null; then
-            echo "$RELEASE already has a GitHub release; refusing to replace candidate bytes." >&2
-            exit 1
-          fi
-          grep -qx 'release not found' "$RUNNER_TEMP/err" || { cat "$RUNNER_TEMP/err" >&2; exit 1; }
-          version=$(python3 .github/scripts/release_contract.py version)
-          awk -v version="$version" '
-            $0 ~ "^## " version "( |$)" { printing = 1; next }
-            printing && /^## / { exit }
-            printing { print }
-          ' CHANGELOG.md > notes.md
-          gh release create "$RELEASE" --verify-tag --draft --title "$RELEASE" \
-            --notes-file notes.md candidate/*
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: candidate-${{ needs.identify.outputs.release }}
-          path: candidate/*
-          if-no-files-found: error
+          {
+            printf 'Candidate %s, build %s. Not a release: it becomes one only after qualification.\n\n' \
+              "$RELEASE" "$(jq .build candidate/release-record.json)"
+            # A candidate tag carries an -rc suffix the changelog section does
+            # not, so the crate version names the section.
+            awk -v version="$(python3 scripts/release_contract.py version)" '
+              $0 ~ "^## " version "( |$)" { printing = 1; next }
+              printing && /^## / { exit }
+              printing { print }
+            ' CHANGELOG.md
+          } > notes.md
+          gh release view "$RELEASE" >/dev/null 2>&1 ||
+            gh release create "$RELEASE" --verify-tag --prerelease --title "$RELEASE" \
+              --notes-file notes.md candidate/*
