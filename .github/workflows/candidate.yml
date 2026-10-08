@@ -168,6 +168,7 @@ jobs:
         with:
           name: candidate-macos-${{ needs.identify.outputs.release }}
           path: target/dist/*.pkg
+          retention-days: 7
           if-no-files-found: error
       - name: Remove the signing keychain
         if: always()
@@ -312,6 +313,7 @@ jobs:
         with:
           name: candidate-windows-${{ needs.identify.outputs.release }}
           path: target/dist/*.exe
+          retention-days: 7
           if-no-files-found: error
 
   # Runs, and must pass, exactly when Cargo.toml declares a Linux download.
@@ -356,6 +358,7 @@ jobs:
         with:
           name: candidate-linux-${{ needs.identify.outputs.release }}
           path: target/dist/*.tar.gz
+          retention-days: 7
           if-no-files-found: error
 
   # A candidate tag only. The record names the commit and inputs that produced
