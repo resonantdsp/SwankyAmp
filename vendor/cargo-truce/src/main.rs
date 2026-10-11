@@ -148,7 +148,7 @@ Build / Install / Package:
       -p <crate>     Install only the plugin with this cargo crate name
                      (e.g. -p truce-example-gain)
       --target-cpu <value>
-                     Override the x86_64 default of `-C target-cpu=x86-64-v3`.
+                     Default: no flag, rustc's base target (SSE2 on x86_64).
                      Accepts baseline|v2|v3|v4|native or any literal
                      rustc target-cpu name (apple-m1, znver4, ...).
                      See `cargo truce build --help` for the full
@@ -177,7 +177,7 @@ Build / Install / Package:
                      Bundles still stage and sign correctly, but the
                      binary inside is debug-quality - not for shipping.
       --target-cpu <value>
-                     Override the x86_64 default of `-C target-cpu=x86-64-v3`.
+                     Default: no flag, rustc's base target (SSE2 on x86_64).
                      baseline|v2|v3|v4|native or any literal rustc
                      target-cpu name. See `cargo truce build --help` for
                      the per-value description.
@@ -200,7 +200,7 @@ Build / Install / Package:
       in `truce.toml` to override the default for a project.
 
       --target-cpu <value>
-                     Override the x86_64 default of `-C target-cpu=x86-64-v3`.
+                     Default: no flag, rustc's base target (SSE2 on x86_64).
                      baseline|v2|v3|v4|native or any literal rustc
                      target-cpu name. See `cargo truce build --help`.
 
@@ -208,7 +208,7 @@ Build / Install / Package:
       Build and run a plugin standalone. Pass `--debug` for a
       faster-compile dev-profile build (fine when iterating outside
       a DAW); release otherwise. `--target-cpu` mirrors `build`'s flag
-      (x86_64 defaults to x86-64-v3).
+      (default: rustc's base target).
 
   uninstall [--clap] [--vst3] [--vst2] [--au2] [--au3] [--aax] [--user|--system] [-p <crate>] [-n <name>] [--stale] [--dry-run] [--yes]
       Uninstall plugin bundles for this project.

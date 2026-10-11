@@ -637,27 +637,20 @@ fn extract_target_triples<'a>(args: &'a [&'a str]) -> Vec<&'a str> {
 }
 
 /// Apply the active [`crate::util::TargetCpu`] choice to a `cargo build`
-/// command. When `--target <triple>` is in play we set
-/// `CARGO_TARGET_<TRIPLE>_RUSTFLAGS` per target so a multi-arch
-/// invocation (lipo universal builds) can give each slice the right
-/// flag; otherwise we set plain `RUSTFLAGS` since cargo's
-/// per-target rustflags don't apply to host builds that omit
+/// command: in each target's `CARGO_TARGET_<TRIPLE>_RUSTFLAGS` when
+/// `--target <triple>` is in play, otherwise in plain `RUSTFLAGS`, since
+/// cargo's per-target rustflags don't apply to host builds that omit
 /// `--target`.
 fn apply_target_cpu(cmd: &mut Command, targets: &[&str]) {
-    use crate::util::resolve_target_cpu;
-
-    if targets.is_empty() {
-        if let Some(cpu) = resolve_target_cpu(truce_build::host_triple()) {
-            append_rustflags_env(cmd, "RUSTFLAGS", &format!("-C target-cpu={cpu}"));
-        }
+    let Some(cpu) = crate::util::resolve_target_cpu() else {
         return;
+    };
+    let flag = format!("-C target-cpu={cpu}");
+    if targets.is_empty() {
+        append_rustflags_env(cmd, "RUSTFLAGS", &flag);
     }
     for triple in targets {
-        let Some(cpu) = resolve_target_cpu(triple) else {
-            continue;
-        };
-        let var = cargo_target_rustflags_var(triple);
-        append_rustflags_env(cmd, &var, &format!("-C target-cpu={cpu}"));
+        append_rustflags_env(cmd, &cargo_target_rustflags_var(triple), &flag);
     }
 }
 

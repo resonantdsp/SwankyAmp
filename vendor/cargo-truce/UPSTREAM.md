@@ -98,6 +98,24 @@ app (`APPL????`, also for `cargo truce run`), as macOS bundles conventionally
 carry one. Code signing leaves `PkgInfo` out of the seal. `install` still
 writes it only for VST2.
 
+## x86_64 builds for every processor
+
+6.3.0 builds every x86_64 binary with `-C target-cpu=x86-64-v3` unless
+`--target-cpu` says otherwise. That needs AVX2, and a processor without it
+does not refuse the plug-in: the host dies with an illegal instruction, often
+during its plug-in scan. Intel-only hosts under Rosetta before macOS 15 fail
+the same way. The default now passes no flag, which is rustc's own x86_64
+target (SSE2), as `--target-cpu baseline` already did; an explicit
+`--target-cpu` still applies.
+
+Renders of both products are bit-identical at the base target, v2 and v3, and
+on hosted x86_64 runners the render cost at default oversampling was within
+about 4% across the three, a fraction of a percent of one core. This is
+product policy rather than an upstream fix: an upstream release replaces it
+only if its default sets no processor level. Otherwise, dropping this copy
+needs `--target-cpu baseline` on every build, install, package and run
+recipe, or the builds silently return to AVX2.
+
 ## Removal
 
 `just setup` installs cargo-truce from this directory instead of crates.io.

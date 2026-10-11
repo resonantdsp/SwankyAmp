@@ -438,10 +438,9 @@ Windows defaults to system scope (the directory every commercial host
 scans); pass --user for the per-user `%LOCALAPPDATA%\\Programs\\Common\\VST3`
 location.
 
-x86_64 builds default to `-C target-cpu=x86-64-v3` (AVX2 + FMA + BMI2)
-so `wide`'s compile-time SIMD dispatch picks the wider path. aarch64
-builds use NEON unconditionally and get no extra flag. Override with
-`--target-cpu`.
+Builds pass no `-C target-cpu` by default, so x86_64 binaries use
+rustc's base target (SSE2) and run on any x86_64 processor. Pick a
+level with `--target-cpu`.
 
 Options:
   --clap           CLAP only
@@ -469,9 +468,10 @@ Options:
                    (e.g. ara) to each per-format build.
   -p <crate>       Install only the plugin with this cargo crate name.
   --target-cpu <value>
-                   Override the x86_64 default. Accepted values:
-                     baseline   no flag (rustc default = x86-64 / SSE2)
-                     v2|v3|v4   x86-64-v<N> (v3 is the implicit default)
+                   Pick a CPU level. Accepted values:
+                     baseline   no flag (rustc default = x86-64 / SSE2),
+                                the default
+                     v2|v3|v4   x86-64-v<N>
                      native     -C target-cpu=native (local-dev only;
                                 won't run on machines without the
                                 build host's exact feature set)
