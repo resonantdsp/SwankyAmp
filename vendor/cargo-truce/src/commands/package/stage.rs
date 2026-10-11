@@ -253,6 +253,7 @@ fn stage_clap_macos(
         version = xml_escape(bundle_version(&plugin_version(root, p)?)),
     );
     fs::write(bundle.join("Contents/Info.plist"), &plist)?;
+    fs::write(bundle.join("Contents/PkgInfo"), "BNDL????")?;
     // Presets are part of the bundle's sealed Resources - emit before
     // codesign so the signature covers them.
     if let Some(fp) = presets::load_factory_presets(root, p, config)? {
@@ -371,6 +372,7 @@ fn stage_vst3_macos(root: &Path, p: &PluginDef, config: &Config, bundle: &Path) 
         version = xml_escape(bundle_version(&plugin_version(root, p)?)),
     );
     fs::write(bundle.join("Contents/Info.plist"), &plist)?;
+    fs::write(bundle.join("Contents/PkgInfo"), "BNDL????")?;
     codesign_bundle(
         bundle.to_str().unwrap(),
         &crate::application_identity(),
@@ -655,6 +657,7 @@ pub(crate) fn stage_au2(root: &Path, p: &PluginDef, config: &Config, staging: &P
 
     let plist = au2_info_plist(root, p, config)?;
     fs::write(bundle.join("Contents/Info.plist"), &plist)?;
+    fs::write(bundle.join("Contents/PkgInfo"), "BNDL????")?;
     // The shim's kAudioUnitProperty_FactoryPresets handler enumerates
     // these from the sealed bundle - emit before codesign.
     if let Some(fp) = presets::load_factory_presets(root, p, config)? {
@@ -845,7 +848,7 @@ pub(crate) fn stage_standalone(root: &Path, p: &PluginDef, config: &Config, stag
     Ok(())
 }
 
-/// Write a `.app/Contents/Info.plist` for a standalone host bundle.
+/// Write a `.app/Contents/Info.plist` and `PkgInfo` for a standalone host bundle.
 /// Shared between `commands::run` (dev iteration) and the packaging
 /// pipeline so the live-run app and the installed app present
 /// identically to the OS - same Dock name, same mic-permission prompt,
@@ -909,6 +912,7 @@ pub(crate) fn write_standalone_info_plist(
         )?)),
     );
     fs::write(bundle_root.join("Contents/Info.plist"), plist)?;
+    fs::write(bundle_root.join("Contents/PkgInfo"), "APPL????")?;
     Ok(())
 }
 
@@ -1063,7 +1067,7 @@ pub(crate) fn generate_distribution_xml(
         r#"<?xml version="1.0" encoding="utf-8"?>
 <installer-gui-script minSpecVersion="2">
     <title>{plugin_name}</title>
-{welcome}{license}{domains}    <options customize="always" require-scripts="false"/>
+{welcome}{license}{domains}    <options customize="always" require-scripts="false" hostArchitectures="x86_64,arm64"/>
 
     <choices-outline>
 {choices_outline}    </choices-outline>

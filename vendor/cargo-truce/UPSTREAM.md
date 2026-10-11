@@ -84,6 +84,20 @@ itself and usually shows the generic one. With an installer icon set, the
 `.iss` now also names the uninstaller, which carries that icon, as the display
 icon.
 
+## macOS installer architectures and bundle PkgInfo
+
+6.3.0's installer `Distribution` files, per plugin and suite, leave
+`hostArchitectures` out of the options element, so Installer on an Apple
+silicon Mac evaluates the package under Rosetta and offers to install Rosetta
+when it is missing, although every binary inside is universal. Both templates now
+name `x86_64,arm64`.
+
+6.3.0 writes `Contents/PkgInfo` only into the VST2 bundle. Staging now writes
+it into the CLAP, VST3 and Audio Unit bundles (`BNDL????`) and the standalone
+app (`APPL????`, also for `cargo truce run`), as macOS bundles conventionally
+carry one. Code signing leaves `PkgInfo` out of the seal. `install` still
+writes it only for VST2.
+
 ## Removal
 
 `just setup` installs cargo-truce from this directory instead of crates.io.

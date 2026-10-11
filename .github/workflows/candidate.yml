@@ -155,12 +155,16 @@ jobs:
           spctl -a -vv -t install "$pkg"
           xcrun stapler validate "$pkg"
           pkgutil --check-signature "$pkg" | grep -F "$TRUCE_INSTALLER_SIGNING_IDENTITY"
+          # Without arm64 here, Installer on Apple silicon asks for Rosetta.
+          pkgutil --expand "$pkg" "$RUNNER_TEMP/expanded-pkg"
+          grep -F 'hostArchitectures="x86_64,arm64"' "$RUNNER_TEMP/expanded-pkg/Distribution"
           for bundle in \
             "/Library/Audio/Plug-Ins/VST3/Swanky Amp 2.vst3" \
             "/Library/Audio/Plug-Ins/CLAP/Swanky Amp 2.clap" \
             "/Library/Audio/Plug-Ins/Components/Swanky Amp 2.component" \
             "/Applications/Swanky Amp 2.app"; do
             test -e "$bundle"
+            test -f "$bundle/Contents/PkgInfo"
             codesign --verify --strict --verbose=2 "$bundle"
             codesign --display --verbose=2 "$bundle" 2>&1 | grep -Fx "Authority=$TRUCE_SIGNING_IDENTITY"
           done
