@@ -99,7 +99,7 @@ Garrin qualifies the frozen candidate's installers beside 1.4.0, following the s
 - Every interface size in each format, and Windows display scaling at 150 % and 200 % combined with it.
 - The Windows standalone on ASIO with a real interface.
 - An oversampling change while playing: in an Audio Unit and a VST3 host it applies at once with a click, in a CLAP host after the restart ([Free #122](https://github.com/resonantdsp/SwankyAmp/pull/122)).
-- The first-run import on a real 1.4.0 preset folder, which has not yet run end to end.
+- The first-run import on a real 1.4.0 preset folder ran end to end in the October 7 smoke test on both systems; the sitting repeats it only if the import changes.
 - The Copy diagnostics line pasting correctly on both systems.
 - Installation for all users and for the current user on macOS, and for all users on Windows.
 - Every check in the [verification record's open limits](../verification/README.md#open-limits), which keeps that list; it covers what only a real machine can confirm.
