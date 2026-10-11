@@ -29,6 +29,9 @@ installs beside Swanky Amp 1.4.0.
 - Let the macOS installer install for all users or only the current user.
   The Windows installer installs for every account on the computer, where
   every host finds the plug-in.
+- Gave the standalone app and its window, its Start menu shortcut, the Windows
+  installer and its Apps & Features entry the Resonant DSP mark instead of a
+  generic icon.
 - Oversampled the tube stages: Auto runs them at 2x at 44.1 and 48 kHz and
   1x at 88.2 kHz and above, and the header's oversampling button cycles Auto,
   1x, 2x and 4x and names the factor the engine resolved. Up to 10 kHz every
