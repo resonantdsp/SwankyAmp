@@ -610,7 +610,7 @@ fn generate_suite_distribution_xml(
         r#"<?xml version="1.0" encoding="utf-8"?>
 <installer-gui-script minSpecVersion="2">
     <title>{title}</title>
-{welcome}{license}{domains}    <options customize="always" require-scripts="false"/>
+{welcome}{license}{domains}    <options customize="always" require-scripts="false" hostArchitectures="x86_64,arm64"/>
 
     <choices-outline>
 {outline}    </choices-outline>
