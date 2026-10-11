@@ -581,7 +581,7 @@ Build invocation (Linux):
                        if no manifest is present.
 
 Codegen tuning (all platforms):
-  --target-cpu <value> Override the x86_64 default of `-C target-cpu=x86-64-v3`.
+  --target-cpu <value> Pick a CPU level; the default passes no flag (SSE2).
                        baseline|v2|v3|v4|native or any literal rustc
                        target-cpu name. See `cargo truce build --help`
                        for the full description.

@@ -315,7 +315,7 @@ struct Opts {
     /// expect; `--host-only` opts out for dev iteration speed.
     host_only: bool,
     /// Raw `--target-cpu` value (parsed into `TargetCpu` via
-    /// `parse_target_cpu_arg`). `None` keeps the per-arch default.
+    /// `parse_target_cpu_arg`). `None` passes no flag.
     target_cpu_arg: Option<String>,
 }
 

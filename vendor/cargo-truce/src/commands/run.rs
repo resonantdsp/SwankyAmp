@@ -335,9 +335,9 @@ feature. Pass `--no-default-features` to drop the non-format defaults too.
 Anything after `--` is forwarded verbatim to the standalone binary
 (e.g. `cargo truce run -- --headless --bpm 140`).
 
-x86_64 builds default to `-C target-cpu=x86-64-v3` (AVX2 + FMA + BMI2);
-override with `--target-cpu` (see `cargo truce build --help` for the
-full value list).
+Builds pass no `-C target-cpu` by default (rustc's base target);
+pick a level with `--target-cpu` (see `cargo truce build --help` for
+the full value list).
 
 Options:
   -p <crate>       Build and run only the plugin with this cargo crate name.
@@ -347,7 +347,7 @@ Options:
                    alongside `standalone`.
   --debug          Cargo dev profile (faster compile).
   --target-cpu <value>
-                   Override the x86_64 default. baseline|v2|v3|v4|native
+                   Pick a CPU level (default baseline). baseline|v2|v3|v4|native
                    or any literal rustc target-cpu name.
   -h, --help       Show this message."
     );

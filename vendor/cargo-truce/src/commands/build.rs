@@ -418,11 +418,9 @@ cargo target; bundles land in target/bundles/<triple>/. Without
 --target, the host build lands in target/bundles/ (flat layout, as
 before).
 
-x86_64 builds default to `-C target-cpu=x86-64-v3` (AVX2 + FMA +
-BMI2) so `wide`'s compile-time SIMD dispatch picks the wider path.
-Modern DAWs already require this floor, so any host that loads a
-truce plugin already has the feature set. aarch64 builds use NEON
-unconditionally and get no extra flag. Override with `--target-cpu`.
+Builds pass no `-C target-cpu` by default, so x86_64 binaries use
+rustc's base target (SSE2) and run on any x86_64 processor. Pick a
+level with `--target-cpu`.
 
 Options:
   --clap           CLAP only
@@ -452,9 +450,10 @@ Options:
                    stripped).
   --debug          Cargo dev profile (faster compile, slower DSP)
   --target-cpu <value>
-                   Override the x86_64 default. Accepted values:
-                     baseline   no flag (rustc default = x86-64 / SSE2)
-                     v2|v3|v4   x86-64-v<N> (v3 is the implicit default)
+                   Pick a CPU level. Accepted values:
+                     baseline   no flag (rustc default = x86-64 / SSE2),
+                                the default
+                     v2|v3|v4   x86-64-v<N>
                      native     -C target-cpu=native (local-dev only;
                                 won't run on machines without the
                                 build host's exact feature set)
