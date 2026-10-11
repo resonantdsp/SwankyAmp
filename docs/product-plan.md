@@ -95,9 +95,9 @@ Rust and iced own the interface definition. `export-layout` drives the private p
 
 Garrin qualifies the frozen candidate's installers beside 1.4.0, following the session and dates owned by [RD-249](../../../company/work/RD-249.md). What 2.0 adds to the ordinary load, play, automate, save and reopen:
 
-- The Audio Unit in Logic Pro and GarageBand.
+- The Audio Unit in GarageBand, which shares Apple's AU hosting with Logic Pro; Logic itself is covered by beta testers (a KVR tester's Logic on rc.6) until Garrin has it.
 - Every interface size in each format, and Windows display scaling at 150 % and 200 % combined with it.
-- The Windows standalone on ASIO with a real interface.
+- The Windows standalone on ASIO, which every Windows check runs on.
 - An oversampling change while playing: in an Audio Unit and a VST3 host it applies at once with a click, in a CLAP host after the restart ([Free #122](https://github.com/resonantdsp/SwankyAmp/pull/122)).
 - The first-run import on a real 1.4.0 preset folder ran end to end in the October 7 smoke test on both systems; the sitting repeats it only if the import changes.
 - The Copy diagnostics line pasting correctly on both systems.
