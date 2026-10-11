@@ -1548,6 +1548,9 @@ fn render_iss(
     setup.push_str("\r\n");
     if let Some(icon) = &installer_icon {
         let _ = write!(setup, "SetupIconFile={}\r\n", iss_escape_path(icon));
+        // The uninstaller carries the setup icon; without this line Apps &
+        // Features picks an icon itself, usually the generic one.
+        setup.push_str("UninstallDisplayIcon={uninstallexe}\r\n");
     }
     if let Some(bmp) = &welcome_bmp {
         let _ = write!(setup, "WizardImageFile={}\r\n", iss_escape_path(bmp));
@@ -2004,6 +2007,9 @@ fn write_suite_setup_section(
     );
     if let Some(icon) = &installer_icon {
         let _ = write!(setup, "SetupIconFile={}\r\n", iss_escape_path(icon));
+        // The uninstaller carries the setup icon; without this line Apps &
+        // Features picks an icon itself, usually the generic one.
+        setup.push_str("UninstallDisplayIcon={uninstallexe}\r\n");
     }
     if let Some(bmp) = &welcome_bmp {
         let _ = write!(setup, "WizardImageFile={}\r\n", iss_escape_path(bmp));

@@ -11,6 +11,10 @@ crate = "swanky-amp"
 fourcc = "SwA2"
 category = "effect"
 vst3_subcategory = "Distortion"
+# The standalone app's icon, the Resonant DSP mark from the website's favicon.
+# Windows embeds it in the .exe, which the Start menu shortcut shows.
+windows_icon = "assets/app-icon.ico"
+macos_icon = "assets/app-icon.icns"
 
 # The editor checks for a newer release over the network and imports and saves
 # presets as files outside a host's container, so the Audio Unit states both to
@@ -28,3 +32,7 @@ formats = ["clap", "vst3", "au2", "standalone"]
 # explicitly with --no-notarize; candidate builds may not.
 [macos.packaging]
 notarize = true
+
+# The Windows installer and its Apps & Features entry show the same mark.
+[windows.packaging]
+installer_icon = "assets/app-icon.ico"

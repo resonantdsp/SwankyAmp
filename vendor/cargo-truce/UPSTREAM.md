@@ -76,6 +76,14 @@ bundle's version see every release as version 1. Staging in
 without a pre-release suffix, in every bundle and the app, read the same way
 as the Audio Unit change above.
 
+## Apps & Features icon
+
+6.3.0 sets the installer's icon from `[windows.packaging] installer_icon` but
+leaves `UninstallDisplayIcon` unset, so Windows picks the Apps & Features icon
+itself and usually shows the generic one. With an installer icon set, the
+`.iss` now also names the uninstaller, which carries that icon, as the display
+icon.
+
 ## Removal
 
 `just setup` installs cargo-truce from this directory instead of crates.io.
