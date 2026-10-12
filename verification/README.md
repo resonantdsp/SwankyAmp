@@ -23,6 +23,6 @@ These can only be confirmed on a real machine, so qualification confirms them on
 - On each platform, an oversampling change while playing switches at once in an Audio Unit or VST3 host, with a click at the switch expected, and in a CLAP host applies after the host restarts the plug-in.
 - On Windows, the installer, the Start menu entry, the standalone's title bar and taskbar button, and Apps & Features show the Resonant DSP icon.
 - On an Apple silicon Mac, the installer runs without offering Rosetta, and Finder shows each installed bundle, the Audio Unit's `.component` among them, as one file.
-- On an x86_64 processor without AVX2, a host scans and plays the plug-in and the standalone opens; the beta tester who reported RD-1195 is the available machine.
+- On an x86_64 processor without AVX2, a host scans and plays the plug-in and the standalone opens.
 
 The Linux build has never been run on a real machine. Before a release declares a Linux download again, a person confirms there that choosing the standalone's input, input channels and output in the information panel switches the devices.
