@@ -32,9 +32,9 @@ pub const CONTROL_RADIUS: f32 = 5.0;
 /// than a single-texel bake already was at 100 % there. Smaller drawings read
 /// the box-filtered levels the package stores.
 pub const SUPERSAMPLE: u32 = 2;
-/// The cabinet switch's disc diameter, half a small knob's: the whole switch
-/// is a track two discs tall, about a small knob's height.
-pub const SWITCH_DIAMETER: f32 = 20.0;
+/// The cabinet switch's disc diameter, a large knob's radius: the track, two
+/// discs tall, spans the row exactly as a large knob does.
+pub const SWITCH_DIAMETER: f32 = KNOB_LARGE_RADIUS;
 /// Corner radius of a group's groove outline.
 pub const SECTION_RADIUS: f32 = 8.0;
 /// How much brighter than the accent a lit ring reads, before the display
@@ -60,6 +60,10 @@ pub const MARGIN: f32 = 10.0;
 
 pub const KNOB_LARGE_RADIUS: f32 = 26.0;
 pub const KNOB_SMALL_RADIUS: f32 = 20.0;
+/// The knobs' height and edge; the switch disc takes their edge, so it catches
+/// the light as a knob's does, and half their height.
+const KNOB_HEIGHT: f32 = 26.33;
+const KNOB_BEVEL: f32 = 1.36;
 pub const METER_BARS: u32 = 10;
 pub const METER_GAP: f32 = 0.25;
 
@@ -106,14 +110,17 @@ pub struct PhysicalStyle {
     /// this wide and twice this tall, so the disc sits flush in one end or
     /// the other with no travel beyond them.
     pub switch_diameter: f32,
-    /// The disc's top face above the faceplate.
+    /// The disc's top face above the faceplate: tall enough to read as a
+    /// knob's aluminium, low enough that its shadow leaves the empty half of
+    /// the track readable.
     pub disc_height: f32,
     pub disc_bevel: f32,
     /// Clearance baked around the disc in its sprite, which is what its cast
     /// shadow needs.
     pub disc_margin: f32,
-    /// Depth of the track's V below the faceplate: deeper than the section
-    /// grooves, so the empty half of the track reads as a recess at 1x.
+    /// Depth of the track's V below the faceplate: as deep as the track is
+    /// wide, so the empty half reads as a recess at 1x and the disc as
+    /// sitting in it.
     pub slot_depth: f32,
 }
 
@@ -131,8 +138,8 @@ impl Default for PhysicalStyle {
             groove_depth: 2.2,
             groove_bevel: 0.12,
             groove_width: 2.0,
-            knob_height: 26.33,
-            knob_bevel: 1.36,
+            knob_height: KNOB_HEIGHT,
+            knob_bevel: KNOB_BEVEL,
             collar_radius: 1.09,
             ring_radius: 1.22,
             ring_half_width: 0.046,
@@ -158,10 +165,10 @@ impl Default for PhysicalStyle {
             meter_reflection_extent: 16.0,
             meter_radiance: [[0.084, 1.512, METER_PEAK], meter_radiance(METER_OUTPUT)],
             switch_diameter: SWITCH_DIAMETER,
-            disc_height: 3.2,
-            disc_bevel: 0.96,
-            disc_margin: 10.0,
-            slot_depth: 8.0,
+            disc_height: KNOB_HEIGHT / 2.0,
+            disc_bevel: KNOB_BEVEL,
+            disc_margin: 20.0,
+            slot_depth: SWITCH_DIAMETER,
         }
     }
 }
@@ -176,11 +183,19 @@ fn ring_radiance(color: Color) -> [f32; 3] {
     })
 }
 
-/// A lit cell's emitter in the colour's hue, as bright as the input meter.
+/// A lit cell's emitter, as bright as the input meter, found as the ring's
+/// is: the radiance whose compressed display value is the colour, scaled to
+/// that brightness. Scaling the colour's linear values instead leaves the
+/// weaker channels relatively brighter after the compositor's compression,
+/// which reads as a paler tint of the accent.
 fn meter_radiance(color: Color) -> [f32; 3] {
     let rgb = linear(color);
     let peak = rgb.into_iter().fold(f32::MIN, f32::max);
-    rgb.map(|channel| channel / peak * METER_PEAK)
+    let display_peak = METER_PEAK / (1.0 + METER_PEAK);
+    rgb.map(|channel| {
+        let display = channel / peak * display_peak;
+        display / (1.0 - display)
+    })
 }
 
 fn linear(color: Color) -> [f32; 3] {
