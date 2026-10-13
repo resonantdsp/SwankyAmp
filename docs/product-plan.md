@@ -126,7 +126,6 @@ A Windows linkage check proved that the SDK's COM classes and DLL helpers are ab
 
 Remaining, in the order of the [release calendar](../../../company/calendar.md):
 
-1. The rc.7 install check on a Mac and a Windows PC: the [open limits](../verification/README.md#open-limits) rc.7 added, with the schedule and results in [RD-249](../../../company/work/RD-249.md).
-2. The stable tag and exact-byte promotion, website catalogue pull request and release-notice check ([RD-249](../../../company/work/RD-249.md)); the public launch follows [RD-135](../../../company/work/RD-135.md).
+1. The catalogue pull request, website #108, merges on launch day ([RD-135](../../../company/work/RD-135.md)), then the release-notice check against the published release ([RD-249](../../../company/work/RD-249.md)).
 
 The audio faults 2.0 launches with are fixed after launch or recorded as accepted ([RD-1153](../../../company/work/RD-1153.md)).
