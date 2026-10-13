@@ -414,14 +414,22 @@ jobs:
         run: |
           r2() { aws --endpoint-url "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com" "$@"; }
           prefix="s3://$PUBLIC_DOWNLOAD_BUCKET/swankyamp/candidates/$RELEASE"
-          if r2 s3 cp "$prefix/release-record.json" stored.json 2>/dev/null; then
+          # Only a 404 means nothing is stored; any other failure stops the job
+          # rather than risk writing over a stored candidate.
+          if err=$(r2 s3api head-object --bucket "$PUBLIC_DOWNLOAD_BUCKET" \
+              --key "swankyamp/candidates/$RELEASE/release-record.json" 2>&1 >/dev/null); then
+            r2 s3 cp "$prefix/release-record.json" stored.json
             cmp stored.json candidate/release-record.json || {
               echo "$prefix holds another candidate; tag the next candidate for new bytes." >&2
               exit 1
             }
-          else
+          elif [[ $err == *"(404)"* ]]; then
             r2 s3 cp candidate/ "$prefix/" --recursive --exclude release-record.json
             r2 s3 cp candidate/release-record.json "$prefix/release-record.json"
+          else
+            echo "$err" >&2
+            echo "Could not tell whether $prefix holds a candidate." >&2
+            exit 1
           fi
           echo "Stored at $PUBLIC_DOWNLOAD_BASE_URL/swankyamp/candidates/$RELEASE/"
       - name: Publish the pre-release

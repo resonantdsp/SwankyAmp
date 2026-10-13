@@ -111,8 +111,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release download "$TAG" --dir published 2>/dev/null; then
+          # Only "release not found" means there is no release; any other
+          # failure stops the job before the copy to the public prefix.
+          if err=$(gh release download "$TAG" --dir published 2>&1); then
             diff -r candidate published
+          elif [[ $err != *"release not found"* ]]; then
+            echo "$err" >&2
+            exit 1
           fi
       - name: Copy the candidate to the release prefix
         env:
