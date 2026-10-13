@@ -53,10 +53,13 @@ installs beside Swanky Amp 1.4.0.
 - Started Init's tone stack at 2 rather than 1.4.0's 0: the corrected first
   stack is bright, and 2, a fifth of the way to the second stack, brings in
   more mids. Presets keep the tone stack they store.
+- Lowered the overall output by 2 dB for headroom: a hard strum on a hot
+  humbucker at the default settings now peaks around -6 dBFS. Raise Output by
+  2 dB to match 1.4.0's level.
 - Balanced the factory presets to one level, which 1.4.0's never were: each
-  preset's Output moves so that all ten strike as loud as 1.4.0's default
-  settings on a humbucker, so switching presets no longer jumps in level. On
-  a single coil the driven presets play louder than those settings, because
+  preset's Output moves so that all ten strike at one level, 2 dB under
+  1.4.0's default settings, on a humbucker, so switching presets no longer
+  jumps in level. On a single coil the driven presets play louder than those settings, because
   their sustain holds up where a clean tone decays. Imported 1.x presets are
   not rebalanced.
 - Fixed a slow tone-stack instability that silenced high-gain presets after
@@ -83,7 +86,7 @@ installs beside Swanky Amp 1.4.0.
   In 1.4.0 the level moved by several dB across Drive and Power Drive, most on
   a humbucker, and Grit silenced the amplifier at its top. Output gains
   measured by `just calibrate` hold the loudness, averaged over the
-  recordings, close to that of 1.4.0's default settings across each control.
+  recordings, steady across each control.
 - Fixed Grit silencing the amplifier near its top: it raised a triode
   compressor's threshold past the stage's plate signal, collapsing the
   stage's output to a constant, 52 dB down. The threshold now stops just
