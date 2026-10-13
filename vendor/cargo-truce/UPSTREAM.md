@@ -116,6 +116,16 @@ only if its default sets no processor level. Otherwise, dropping this copy
 needs `--target-cpu baseline` on every build, install, package and run
 recipe, or the builds silently return to AVX2.
 
+## Signing retries
+
+6.3.0 runs `signtool` and `codesign` once, so a transient failure of the
+remote signing service or a timestamp server fails a whole candidate job. A
+Windows package run now makes up to three `signtool` attempts, 10 s and then
+30 s apart; signing again replaces any signature a failed attempt left.
+`codesign` is retried the same way only when its captured output says Apple's
+timestamp service is not available, since any other failure repeats; with
+`--verbose` the output is not captured and nothing is retried.
+
 ## Removal
 
 `just setup` installs cargo-truce from this directory instead of crates.io.

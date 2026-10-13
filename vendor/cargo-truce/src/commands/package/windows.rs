@@ -1255,12 +1255,21 @@ fn sign_files(files: &[PathBuf]) -> Res {
         args.push(f.display().to_string());
     }
 
-    eprintln!("  signtool: signing {} file(s)", files.len());
-    let status = Command::new(&signtool).args(&args).status()?;
-    if !status.success() {
-        return Err("signtool failed".into());
+    // The remote signing service and the RFC 3161 timestamp server both have
+    // transient failures that would otherwise fail a whole release job.
+    // Signing again replaces any signature a failed attempt left behind.
+    let mut backoff = [10u64, 30].into_iter();
+    loop {
+        eprintln!("  signtool: signing {} file(s)", files.len());
+        if Command::new(&signtool).args(&args).status()?.success() {
+            return Ok(());
+        }
+        let Some(secs) = backoff.next() else {
+            return Err("signtool failed after 3 attempts".into());
+        };
+        eprintln!("  signtool failed; retrying in {secs} s");
+        std::thread::sleep(std::time::Duration::from_secs(secs));
     }
-    Ok(())
 }
 
 /// The `"ExcludeCredentials"` clause of the signing metadata, or an

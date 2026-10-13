@@ -941,14 +941,29 @@ pub(crate) fn run_codesign(args: &[&OsStr], use_sudo: bool) -> crate::Res {
     };
     cmd.args(args);
 
-    let (status, captured_stderr) = if is_verbose() {
-        (cmd.status()?, String::new())
-    } else {
-        let output = cmd.stderr(Stdio::piped()).output()?;
-        (
-            output.status,
-            String::from_utf8_lossy(&output.stderr).into_owned(),
-        )
+    // Apple's timestamp service has transient outages that would otherwise
+    // fail a whole release job. Only that error is retried: any other
+    // failure fails the same way again. Verbose mode does not capture
+    // stderr, so it cannot tell and never retries.
+    let mut backoff = [10u64, 30].into_iter();
+    let (status, captured_stderr) = loop {
+        let (status, captured_stderr) = if is_verbose() {
+            (cmd.status()?, String::new())
+        } else {
+            let output = cmd.stderr(Stdio::piped()).output()?;
+            (
+                output.status,
+                String::from_utf8_lossy(&output.stderr).into_owned(),
+            )
+        };
+        if status.success() || !captured_stderr.contains("timestamp service is not available") {
+            break (status, captured_stderr);
+        }
+        let Some(secs) = backoff.next() else {
+            break (status, captured_stderr);
+        };
+        eprintln!("    timestamp service unavailable for {target_label}; retrying in {secs} s");
+        std::thread::sleep(std::time::Duration::from_secs(secs));
     };
 
     if status.success() {
