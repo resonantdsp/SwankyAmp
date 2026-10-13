@@ -70,6 +70,8 @@ just calibrate   # rewrite src/dsp/calibration_data.rs, printing every point
 
 `calibrate` measures the level compensation on the [guitar recordings](verification/reference/input/README.md), against 1.4.0. Its level reference is `LEVEL_REFERENCE` in `src/dsp/calibration.rs`, 1.4.0's default settings, fixed so that a change to Init moves neither the levels nor the factory presets; Init differs from it only in starting the tone stack at 2. It keeps the level into the power stage where 1.4.0 had it at every Drive setting, and holds the reference's loudness as Drive, Power Drive and Grit move. `just` tests the result on the same recordings: Drive, Power Drive and Grit at their extremes keep the reference's loudness, at default tone each stack feeds the power stage as 1.4.0 did, and 1.4.0's default settings play as loud as 1.4.0. The factory voicing uses these levels, so rerun `just refit` after a calibration change and listen to the result.
 
+The plug-in plays 2 dB under these levels: a fixed output headroom, `OUTPUT_HEADROOM_DB` in `src/engine.rs`, applied last, after the amplifier, cabinet and Output, so Init on a hard humbucker strum peaks near -6 dB true peak rather than -4. Calibration, the refit and the level tests measure without it, so it moves none of the tables, presets or comparisons with 1.4.0; the output meter reads after it.
+
 ## Presets
 
 ### Factory bank

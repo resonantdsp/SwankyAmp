@@ -9,6 +9,10 @@ const AUTO_TARGET_RATE: f64 = 88_200.;
 const MAX_INTERNAL_RATE: f64 = 192_000. * 1.01;
 /// A meter level falls to 1/e of itself in this time.
 const METER_RELEASE_SECONDS: f64 = 0.3;
+/// Taken off the final output, after the amplifier and cabinet and outside
+/// everything calibration and the refit measure, so a hard humbucker strum on
+/// Init peaks near -6 dB true peak rather than -4.
+pub(crate) const OUTPUT_HEADROOM_DB: f32 = -2.;
 
 pub(crate) fn doublings_cap(sample_rate: f64) -> usize {
     (0..=MAX_OVERSAMPLING)
@@ -140,6 +144,7 @@ impl Engine {
         }
 
         let input_gain = AmpVoicing::from_controls(controls).input_gain;
+        let headroom = 10_f32.powf(OUTPUT_HEADROOM_DB / 20.);
         self.begin();
         let mut start = 0;
         while start < frames {
@@ -153,6 +158,7 @@ impl Engine {
                 zero_unplayable(samples);
                 let input_peak = peak(samples);
                 self.paths[channel].process(samples, self.doublings);
+                samples.iter_mut().for_each(|sample| *sample *= headroom);
                 self.observe_input(channel, input_peak * input_gain);
                 self.observe_output(channel, peak(&self.scratch[channel][..length]));
                 buffer.output(channel)[start..start + length]
