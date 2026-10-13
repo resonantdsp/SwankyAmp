@@ -118,10 +118,12 @@ recipe, or the builds silently return to AVX2.
 
 ## Signing retries
 
-6.3.0 runs `signtool` and `codesign` once, so a transient failure of the
-remote signing service or a timestamp server fails a whole candidate job. A
-Windows package run now makes up to three `signtool` attempts, 10 s and then
-30 s apart; signing again replaces any signature a failed attempt left.
+6.3.0 runs `signtool` and `codesign` once, so a transient failure fails a
+whole candidate job. The Azure signing library already retries its own HTTP
+calls; what it does not cover is the RFC 3161 timestamp server and a hiccup
+while getting a credential. A Windows package run now makes up to three
+`signtool` attempts, 10 s and then 30 s apart; signing again replaces any
+signature a failed attempt left.
 `codesign` is retried the same way only when its captured output says Apple's
 timestamp service is not available, since any other failure repeats; with
 `--verbose` the output is not captured and nothing is retried.

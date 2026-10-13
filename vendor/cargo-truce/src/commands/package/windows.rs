@@ -1255,9 +1255,10 @@ fn sign_files(files: &[PathBuf]) -> Res {
         args.push(f.display().to_string());
     }
 
-    // The remote signing service and the RFC 3161 timestamp server both have
-    // transient failures that would otherwise fail a whole release job.
-    // Signing again replaces any signature a failed attempt left behind.
+    // The Azure signing library retries its own HTTP calls, but not the
+    // RFC 3161 timestamp server or a credential hiccup, either of which
+    // would otherwise fail a whole release job. Signing again replaces any
+    // signature a failed attempt left behind.
     let mut backoff = [10u64, 30].into_iter();
     loop {
         eprintln!("  signtool: signing {} file(s)", files.len());
