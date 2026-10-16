@@ -92,7 +92,7 @@ Before the cut the humbucker as recorded peaked at −4.84 dBFS, as #148's proof
 
 **Where the records and the recollection part.**
 
-- The −4.1 dBTP and −13.6 LUFS in #148 have no recorded source: no take, host, player or loudness reading is named. They are not the committed humbucker recording, which before the cut peaked at −4.84 dBFS and read −16.3 LUFS integrated on the stereo output, so they describe a harder strum or a different reading. RD-1192 also records Garrin reaching 0 dBFS at Init with a hot humbucker before rc.8, which fits neither figure; it does not say on which take.
+- The −4.1 dBTP and −13.6 LUFS in #148 have no recorded source: no take, host, player or loudness reading is named. They are not the committed humbucker recording, which before the cut peaked at −4.84 dBFS and read −16.3 LUFS integrated on the stereo output, so they describe a harder strum or a different reading. RD-1192 also records a hot humbucker reaching 0 dBFS at Init before rc.8, which fits neither figure; it does not say on which take.
 - "Reference amp sims sit around −6 dB" is not backed by any measurement of another amplifier simulation in this repository, in Pro's or in the company records.
 - No record states a guitar reference of about −18 dBFS RMS peaking near −6 dBFS. The closest figures are the measurement above: Init on the humbucker recording as recorded plays −18.3 LUFS integrated and peaks at −6.8 dBTP, but its RMS is −22.0 dBFS, and that measurement was not the basis of the cut.
 
