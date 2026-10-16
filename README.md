@@ -72,6 +72,8 @@ just calibrate   # rewrite src/dsp/calibration_data.rs, printing every point
 
 The plug-in plays 2 dB under these levels: a fixed output headroom, `OUTPUT_HEADROOM_DB` in `src/engine.rs`, applied last, after the amplifier, cabinet and Output, so Init on a hard humbucker strum peaks near -6 dB true peak rather than -4. Calibration, the refit and the level tests measure without it, so it moves none of the tables, presets or comparisons with 1.4.0; the output meter reads after it.
 
+[Input and output levels](docs/level-calibration.md) traces a sample at the input to volts at the first triode and records what the output cut was based on.
+
 ## Presets
 
 ### Factory bank
