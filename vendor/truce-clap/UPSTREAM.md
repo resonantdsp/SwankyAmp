@@ -51,3 +51,11 @@ latency while clearing the current processing history; the full off-thread
 reset remains the activation path that adopts the requested latency. Its
 `dynamic_latency_transition` also reports the callback requests and how the
 active reset compares with a fresh instance, for the plugin's tests.
+
+## Stable storage name
+
+`PluginLogic::storage_name` optionally preserves a renamed product's preset
+namespace and audio settings directory. The static and hot wrapper macros
+forward it to `PluginRuntime::storage_name`; omitted overrides keep the
+metadata display name. Native presets and CLAP discovery use this namespace
+for directories and URIs without changing host IDs or state hashes.

@@ -5,7 +5,6 @@
 //! and the Windows Inno Setup pipeline (`windows.rs`).
 
 use crate::CargoTruceError;
-#[cfg(target_os = "macos")]
 use crate::PluginDef;
 use crate::Res;
 
@@ -374,6 +373,23 @@ impl PkgFormat {
             PkgFormat::Lv2 => format!("{}.lv2", stage::lv2_slug(&plugin.name)),
             _ => format!("{}.{}", plugin.file_stem(), self.extension()),
         }
+    }
+
+    /// This format's bundle name followed by the ones the plugin's
+    /// `previous_names` installed, which an upgrade removes.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    pub(crate) fn installed_bundle_names(&self, plugin: &PluginDef) -> Vec<String> {
+        let previous = plugin.previous_names.iter().map(|name| {
+            let stem = truce_utils::safe_filename(name);
+            match self {
+                PkgFormat::Au3 | PkgFormat::Standalone => format!("{stem}.app"),
+                PkgFormat::Lv2 => format!("{}.lv2", stage::lv2_slug(name)),
+                _ => format!("{stem}.{}", self.extension()),
+            }
+        });
+        std::iter::once(self.bundle_name(plugin))
+            .chain(previous)
+            .collect()
     }
 
     pub(crate) fn choice_description(&self) -> &'static str {

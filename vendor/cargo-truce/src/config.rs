@@ -179,6 +179,10 @@ pub(crate) struct PluginDef {
     #[serde(default)]
     #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     pub(crate) au_resource_usage: Option<AuResourceUsage>,
+    /// Former display names whose installed bundles this package replaces.
+    #[serde(default)]
+    #[cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
+    pub(crate) previous_names: Vec<String>,
     /// Per-plugin Windows app icon (`.ico`, path relative to workspace
     /// root). Embedded as `RT_GROUP_ICON` in the standalone `.exe`.
     /// Distinct from `[windows.packaging] installer_icon` (Inno-wizard
@@ -689,6 +693,7 @@ mod suite_tests {
             au3_subtype: None,
             au_tag: default_au_tag(),
             au_resource_usage: None,
+            previous_names: Vec::new(),
             windows_icon: None,
             macos_icon: None,
             ios_app_group: None,

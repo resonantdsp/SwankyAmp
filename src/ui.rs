@@ -459,7 +459,7 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
     }
 
     fn title(&self) -> String {
-        "Swanky Amp 2".into()
+        "Swanky Amp Free".into()
     }
 
     fn zoom(&self) -> f64 {
@@ -763,7 +763,7 @@ fn information_overlay<'a, R: FreeRenderer + 'a>(
             row![
                 line(
                     "information.release",
-                    format!("Swanky Amp {} is available", notice.version),
+                    format!("Swanky Amp Free {} is available", notice.version),
                     13.0,
                     style::FONT,
                     ACCENT,
@@ -1358,7 +1358,7 @@ mod tests {
         assert_eq!(
             editor.text("information.product"),
             Some(format!(
-                "Swanky Amp {} (build {})",
+                "Swanky Amp Free {} (build {})",
                 env!("CARGO_PKG_VERSION"),
                 env!("SWANKY_AMP_BUILD")
             ))
@@ -1764,7 +1764,7 @@ mod tests {
         editor.press_button();
         assert_eq!(
             editor.text("information.release"),
-            Some("Swanky Amp 99.0.0 is available".into())
+            Some("Swanky Amp Free 99.0.0 is available".into())
         );
     }
 

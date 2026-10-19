@@ -1630,6 +1630,8 @@ fn render_iss(
         );
     }
 
+    setup.push_str(&iss_previous_name_deletes(p, formats, scope));
+
     // [UninstallDelete] - per-format (bundle dirs get wholesale cleanup).
     setup.push_str("[UninstallDelete]\r\n");
     for fmt in formats {
@@ -1640,6 +1642,39 @@ fn render_iss(
     }
 
     setup
+}
+
+/// Remove only bundles and shortcuts installed under the former display names.
+fn iss_previous_name_deletes(p: &PluginDef, formats: &[PkgFormat], scope: PkgScope) -> String {
+    if p.previous_names.is_empty() {
+        return String::new();
+    }
+    let cf = scoped_cf(scope);
+    let mut out = String::from("[InstallDelete]\r\n");
+    for name in &p.previous_names {
+        let stem = iss_escape_quoted(&truce_utils::safe_filename(name));
+        if formats.contains(&PkgFormat::Clap) {
+            let _ = write!(
+                out,
+                "Type: files; Name: \"{cf}\\CLAP\\{stem}.clap\"; Components: clap\r\n"
+            );
+        }
+        if formats.contains(&PkgFormat::Vst3) {
+            let _ = write!(
+                out,
+                "Type: filesandordirs; Name: \"{cf}\\VST3\\{stem}.vst3\"; Components: vst3\r\n"
+            );
+        }
+        if formats.contains(&PkgFormat::Standalone) {
+            let _ = write!(
+                out,
+                "Type: files; Name: \"{}\\{stem}.lnk\"; Components: standalone\r\n",
+                scoped_programs(scope)
+            );
+        }
+    }
+    out.push_str("\r\n");
+    out
 }
 
 /// Emit the `PrivilegesRequired=…` line(s) for an Inno `[Setup]`

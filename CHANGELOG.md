@@ -10,6 +10,12 @@ candidate.
 
 ## Unreleased
 
+## 2.0.1 — 2026-10-20
+
+- Renamed the plug-in, app and installer to Swanky Amp Free. Existing 2.0
+  sessions, presets and settings keep working; Swanky Amp 1.4 stays separate.
+- Updated the product links to the Swanky Amp Free page.
+
 ## 2.0.0 — 2026-10-30
 
 Swanky Amp 2 preserves the released Free amplifier and cabinet sound, with the

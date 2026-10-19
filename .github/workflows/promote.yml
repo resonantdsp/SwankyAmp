@@ -166,7 +166,7 @@ jobs:
           node scripts/website-release.mjs site --record candidate/release-record.json \
             --base-url "$PUBLIC_DOWNLOAD_BASE_URL" --site website/site --released-at "$RELEASED_AT"
           {
-            printf 'Swanky Amp %s is qualified and its bytes are public.\n\n' "$VERSION"
+            printf 'Swanky Amp Free %s is qualified and its bytes are public.\n\n' "$VERSION"
             printf 'Release: %s\n\nCandidate: %s, build %s, record SHA-256 `%s`\n\n' \
               "$RELEASE_URL" "$CANDIDATE_TAG" "$(jq .build candidate/release-record.json)" "$RECORD_SHA256"
             printf '| Download | Bytes | SHA-256 |\n| --- | --- | --- |\n'
@@ -183,10 +183,10 @@ jobs:
           git switch -c "$branch"
           git add site/src/data/releases.json site/src/data/site.json
           if git diff --quiet --cached; then
-            echo "The catalogue already lists Swanky Amp $VERSION."
+            echo "The catalogue already lists Swanky Amp Free $VERSION."
             exit 0
           fi
-          git commit -m "Catalogue Swanky Amp $VERSION downloads"
+          git commit -m "Catalogue Swanky Amp Free $VERSION downloads"
           # The promotion owns this branch: a rerun replaces its own commit.
           git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch" || true
           git push --force-with-lease origin "HEAD:refs/heads/$branch"
@@ -195,5 +195,5 @@ jobs:
             gh pr edit "$existing" --body-file ../pr-body.md
           else
             gh pr create --repo "$WEBSITE_REPO" --base master --head "$branch" \
-              --title "Swanky Amp $VERSION downloads" --body-file ../pr-body.md
+              --title "Swanky Amp Free $VERSION downloads" --body-file ../pr-body.md
           fi

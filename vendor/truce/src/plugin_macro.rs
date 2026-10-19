@@ -342,6 +342,14 @@ macro_rules! __plugin_hot_reload {
                 <$logic as $crate::__reexport::truce_plugin::PluginLogicCore<Sample>>::supports_in_place()
             }
 
+            fn storage_name() -> &'static str
+            where
+                Self: Sized,
+            {
+                <$logic as $crate::__reexport::truce_plugin::PluginLogicCore<Sample>>::storage_name()
+                    .unwrap_or(Self::info().name)
+            }
+
             fn info() -> $crate::core::info::PluginInfo
             where
                 Self: Sized,

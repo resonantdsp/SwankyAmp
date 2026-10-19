@@ -13,3 +13,11 @@ an equivalent lifecycle distinction.
 The shell also replays the `latency_held_while_active` flag of the last
 `reset` (see `vendor/truce-core/UPSTREAM.md`) when it resets a reloaded or
 lock-contended state.
+
+## Stable storage name
+
+`PluginLogic::storage_name` optionally preserves a renamed product's preset
+namespace and audio settings directory. The static and hot wrapper macros
+forward it to `PluginRuntime::storage_name`; omitted overrides keep the
+metadata display name. Native presets and CLAP discovery use this namespace
+for directories and URIs without changing host IDs or state hashes.

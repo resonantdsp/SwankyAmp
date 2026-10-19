@@ -33,6 +33,10 @@ impl PluginLogic for SwankyAmp {
     type Params = SwankyAmpParams;
     type DspState = engine::Engine;
 
+    fn storage_name() -> Option<&'static str> {
+        Some("Swanky Amp 2")
+    }
+
     /// A guitar usually arrives on a mono track, and a host offers that track a
     /// stereo output only when the plugin declares mono in, stereo out.
     fn bus_layouts() -> Vec<BusLayout> {
@@ -160,6 +164,12 @@ mod tests {
     #[test]
     fn the_identities_hosts_saved_the_plugin_under_hold() {
         let info = <crate::Plugin as PluginRuntime>::info();
+        assert_eq!(info.name, "Swanky Amp Free", "host display name");
+        assert_eq!(
+            Plugin::storage_name(),
+            "Swanky Amp 2",
+            "preset/settings namespace"
+        );
         assert_eq!(info.clap_id, "com.resonantdsp.swanky-amp-2", "CLAP id");
         let cid: String = truce::core::state::vst3_cid(info.vst3_id)
             .iter()

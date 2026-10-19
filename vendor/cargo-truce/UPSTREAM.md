@@ -141,8 +141,12 @@ a pinned upstream release carries these changes.
 This source-only copy was first taken from `resonantdsp/SwankyAmpPro` commit
 `47842d2ece1a558fbab85cb8cd68564654414d35` on September 20, 2026.
 
-This copy has no `previous_names` key, so its installers replace only bundles
-of the current name, as 6.3.0's do. The `cargo truce screenshot` help no
+The `previous_names` key removes the former display name's bundles in the
+selected install scope before replacement. Free uses it for `Swanky Amp 2`
+to `Swanky Amp Free`; the 1.4 name is never listed. Windows removes the former
+Start menu shortcut too and retains the stable AppId, so Inno upgrades the
+existing app directory. Deletions follow the selected format components.
+No preset-folder migration is needed: Free's preset storage stays unchanged. The `cargo truce screenshot` help no
 longer names the standalone's Cmd+S / Ctrl+S, which Swanky Amp's standalone
 does not have (see `vendor/truce-standalone/UPSTREAM.md`). The Swanky Amp
 repository carries no other Swanky Amp Pro release, licensing, bake-store or

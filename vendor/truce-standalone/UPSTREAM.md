@@ -175,3 +175,9 @@ stream records. The product shows these in its information panel.
 they saved `.trucepreset` files that the product's preset library never
 lists. The Presets menu items stay. The upstream MIDI menus and computer
 keyboard toggle are kept for every plugin.
+
+## Stable storage name
+
+Audio device settings and the native preset store use `PluginRuntime::storage_name`
+for their directories and preset URIs. Free keeps `Swanky Amp 2` there while
+its window and host display names say `Swanky Amp Free`.

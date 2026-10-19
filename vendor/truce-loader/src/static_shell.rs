@@ -404,6 +404,14 @@ macro_rules! export_static {
                 <$logic as $crate::__macro_deps::truce_plugin::PluginLogicCore<Sample>>::supports_in_place()
             }
 
+            fn storage_name() -> &'static str
+            where
+                Self: Sized,
+            {
+                <$logic as $crate::__macro_deps::truce_plugin::PluginLogicCore<Sample>>::storage_name()
+                    .unwrap_or(Self::info().name)
+            }
+
             fn info() -> $crate::__macro_deps::truce_core::info::PluginInfo
             where
                 Self: Sized,
