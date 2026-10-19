@@ -318,8 +318,12 @@ fn stage_components_only(root: &Path, p: &PluginDef, o: &PackageOpts) -> Res {
     fs::create_dir_all(&components_dir)?;
     for fmt in &plugin_formats {
         let appex_id = (*fmt == PkgFormat::Au3).then(|| au3_appex_id(o.config, p));
-        let scripts_dir =
-            write_format_scripts(&staging, fmt, &fmt.bundle_name(p), appex_id.as_deref())?;
+        let scripts_dir = write_format_scripts(
+            &staging,
+            fmt,
+            &fmt.installed_bundle_names(p),
+            appex_id.as_deref(),
+        )?;
         run_pkgbuild_for_format(p, fmt, &staging, &components_dir, &scripts_dir, o)?;
     }
     // VST3 presets ride as their own component; the suite distribution
@@ -1125,8 +1129,12 @@ fn package_one_plugin(root: &Path, p: &PluginDef, dist_dir: &Path, o: &PackageOp
 
     for fmt in &plugin_formats {
         let appex_id = (*fmt == PkgFormat::Au3).then(|| au3_appex_id(o.config, p));
-        let scripts_dir =
-            write_format_scripts(&staging, fmt, &fmt.bundle_name(p), appex_id.as_deref())?;
+        let scripts_dir = write_format_scripts(
+            &staging,
+            fmt,
+            &fmt.installed_bundle_names(p),
+            appex_id.as_deref(),
+        )?;
         run_pkgbuild_for_format(p, fmt, &staging, &components_dir, &scripts_dir, o)?;
     }
     // Out-of-bundle VST3 presets ship as their own component.

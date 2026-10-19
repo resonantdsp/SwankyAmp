@@ -10,3 +10,11 @@ This copy exposes `reset_realtime` on the plugin logic traits and forwards it
 through the sample-precision bridge. Its default is a no-op for stateless
 plugins. Keep this copy until a pinned upstream release provides an equivalent
 lifecycle distinction.
+
+## Stable storage name
+
+`PluginLogic::storage_name` optionally preserves a renamed product's preset
+namespace and audio settings directory. The static and hot wrapper macros
+forward it to `PluginRuntime::storage_name`; omitted overrides keep the
+metadata display name. Native presets and CLAP discovery use this namespace
+for directories and URIs without changing host IDs or state hashes.

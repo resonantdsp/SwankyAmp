@@ -159,15 +159,31 @@ jobs:
           pkgutil --expand "$pkg" "$RUNNER_TEMP/expanded-pkg"
           grep -F 'hostArchitectures="x86_64,arm64"' "$RUNNER_TEMP/expanded-pkg/Distribution"
           for bundle in \
-            "/Library/Audio/Plug-Ins/VST3/Swanky Amp 2.vst3" \
-            "/Library/Audio/Plug-Ins/CLAP/Swanky Amp 2.clap" \
-            "/Library/Audio/Plug-Ins/Components/Swanky Amp 2.component" \
-            "/Applications/Swanky Amp 2.app"; do
+            "/Library/Audio/Plug-Ins/VST3/Swanky Amp Free.vst3" \
+            "/Library/Audio/Plug-Ins/CLAP/Swanky Amp Free.clap" \
+            "/Library/Audio/Plug-Ins/Components/Swanky Amp Free.component" \
+            "/Applications/Swanky Amp Free.app"; do
             test -e "$bundle"
             test -f "$bundle/Contents/PkgInfo"
             codesign --verify --strict --verbose=2 "$bundle"
             codesign --display --verbose=2 "$bundle" 2>&1 | grep -Fx "Authority=$TRUCE_SIGNING_IDENTITY"
           done
+      - name: Check upgrade from the published 2.0.0 package
+        run: |
+          old="$RUNNER_TEMP/swanky-amp-2.0.0-macos.pkg"
+          curl --fail --location --output "$old" https://downloads.resonantdsp.com/swankyamp/2.0.0/swanky-amp-2.0.0-macos.pkg
+          echo "74403994c982c5f35c28da23065d3b0ab79248e25a69c050071506cfaac99d44  $old" | shasum -a 256 -c -
+          sudo installer -pkg "$old" -target /
+          pkg=$(ls target/dist/*.pkg)
+          sudo installer -pkg "$pkg" -target /
+          for bundle in \
+            "/Library/Audio/Plug-Ins/VST3/Swanky Amp 2.vst3" \
+            "/Library/Audio/Plug-Ins/CLAP/Swanky Amp 2.clap" \
+            "/Library/Audio/Plug-Ins/Components/Swanky Amp 2.component" \
+            "/Applications/Swanky Amp 2.app"; do
+            test ! -e "$bundle"
+          done
+          just validate-installed --skip-gui-tests
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: candidate-macos-${{ needs.identify.outputs.release }}
@@ -287,9 +303,9 @@ jobs:
           program_files=${PROGRAMFILES:-${ProgramFiles:-}}
           test -n "$common_files"
           test -n "$program_files"
-          test -f "$common_files/CLAP/Swanky Amp 2.clap"
-          test -f "$program_files/Resonant DSP/Swanky Amp 2/swanky-amp-2.exe"
-          CLAP_BUNDLE="$common_files/CLAP/Swanky Amp 2.clap" \
+          test -f "$common_files/CLAP/Swanky Amp Free.clap"
+          test -f "$program_files/Resonant DSP/Swanky Amp Free/swanky-amp-2.exe"
+          CLAP_BUNDLE="$common_files/CLAP/Swanky Amp Free.clap" \
             just validate-installed --skip-gui-tests
       # As on macOS: each shipped file by name, and the exact publisher.
       - name: Verify the publisher identity of each installed file
@@ -298,9 +314,9 @@ jobs:
           $installer = (Get-ChildItem target\dist\*.exe)[0].FullName
           $signed = @(
             $installer,
-            (Join-Path $env:COMMONPROGRAMFILES 'CLAP\Swanky Amp 2.clap'),
-            (Join-Path $env:COMMONPROGRAMFILES 'VST3\Swanky Amp 2.vst3\Contents\x86_64-win\Swanky Amp 2.vst3'),
-            (Join-Path $env:PROGRAMFILES 'Resonant DSP\Swanky Amp 2\swanky-amp-2.exe')
+            (Join-Path $env:COMMONPROGRAMFILES 'CLAP\Swanky Amp Free.clap'),
+            (Join-Path $env:COMMONPROGRAMFILES 'VST3\Swanky Amp Free.vst3\Contents\x86_64-win\Swanky Amp Free.vst3'),
+            (Join-Path $env:PROGRAMFILES 'Resonant DSP\Swanky Amp Free\swanky-amp-2.exe')
           )
           foreach ($file in $signed) {
             if (-not (Test-Path $file -PathType Leaf)) { throw "Expected installed file is missing: $file" }
@@ -313,6 +329,35 @@ jobs:
             }
             "{0}: {1}" -f (Split-Path $file -Leaf), $signature.SignerCertificate.Subject
           }
+      - name: Check upgrade from the published 2.0.0 installer
+        shell: pwsh
+        run: |
+          function Install-Quietly($path) {
+            $run = Start-Process -FilePath $path -Wait -PassThru -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'
+            if ($run.ExitCode -ne 0) { throw "$path exited $($run.ExitCode)." }
+          }
+          # Start with the old install directory and its existing AppId.
+          Install-Quietly "$env:PROGRAMFILES\Resonant DSP\Swanky Amp Free\unins000.exe"
+          $old = "$env:RUNNER_TEMP\swanky-amp-2.0.0-windows.exe"
+          Invoke-WebRequest https://downloads.resonantdsp.com/swankyamp/2.0.0/swanky-amp-2.0.0-windows.exe -OutFile $old
+          if ((Get-FileHash $old -Algorithm SHA256).Hash -ne 'edb8ebf84ec1a713f27ce0dcf08571584bc962ffaf0e7a21010da99e88ed16ca') { throw 'Old installer checksum mismatch.' }
+          Install-Quietly $old
+          Install-Quietly (Get-ChildItem target\dist\*.exe)[0].FullName
+          foreach ($path in @(
+            "$env:COMMONPROGRAMFILES\CLAP\Swanky Amp 2.clap",
+            "$env:COMMONPROGRAMFILES\VST3\Swanky Amp 2.vst3",
+            "$env:PROGRAMDATA\Microsoft\Windows\Start Menu\Programs\Swanky Amp 2.lnk"
+          )) {
+            if (Test-Path $path) { throw "Upgrade left $path behind." }
+          }
+          $app = "$env:PROGRAMFILES\Resonant DSP\Swanky Amp 2\swanky-amp-2.exe"
+          if (!(Test-Path $app)) { throw 'Upgrade lost the existing app directory.' }
+          if ((Get-AuthenticodeSignature $app).Status -ne 'Valid') { throw 'Upgraded app signature invalid.' }
+          $shortcut = "$env:PROGRAMDATA\Microsoft\Windows\Start Menu\Programs\Swanky Amp Free.lnk"
+          if (!(Test-Path $shortcut)) { throw 'Renamed shortcut missing.' }
+          $env:CLAP_BUNDLE = "$env:COMMONPROGRAMFILES\CLAP\Swanky Amp Free.clap"
+          just validate-installed --skip-gui-tests
+          if ($LASTEXITCODE -ne 0) { throw 'Upgraded bundles failed validation.' }
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: candidate-windows-${{ needs.identify.outputs.release }}

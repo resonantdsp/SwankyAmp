@@ -1173,25 +1173,30 @@ exit 0
 pub(crate) fn write_format_scripts(
     staging: &Path,
     fmt: &PkgFormat,
-    bundle_name: &str,
+    bundle_names: &[String],
     appex_id: Option<&str>,
 ) -> std::result::Result<PathBuf, crate::CargoTruceError> {
     let scripts_dir = staging.join(format!("{}_scripts", fmt.pkg_id_suffix()));
     let _ = fs::remove_dir_all(&scripts_dir);
     fs::create_dir_all(&scripts_dir)?;
 
-    let escaped_bundle = bundle_name.replace('"', "\\\"");
+    let bundles = bundle_names
+        .iter()
+        .map(|name| format!("\"$2/{}\"", name.replace('"', "\\\"")))
+        .collect::<Vec<_>>()
+        .join(" ");
     let preinstall = scripts_dir.join("preinstall");
     fs::write(
         &preinstall,
         format!(
             "#!/bin/bash\n\
              # `cargo truce package` preinstall: remove any prior\n\
-             # bundle at the destination before shove writes ours.\n\
+             # bundle at the destination before shove writes ours,\n\
+             # and any the plugin installed under a previous name.\n\
              # `$2` is the resolved install destination (with\n\
              # `enable_currentUserHome` redirection applied).\n\
              set -u\n\
-             BUNDLE=\"$2/{escaped_bundle}\"\n\
+             for BUNDLE in {bundles}; do\n\
              if [ -e \"$BUNDLE\" ]; then\n    \
                  if rm -rf \"$BUNDLE\" 2>/dev/null; then\n        \
                      echo \"preinstall: removed existing $BUNDLE\"\n    \
@@ -1204,6 +1209,7 @@ pub(crate) fn write_format_scripts(
                      exit 1\n    \
                  fi\n\
              fi\n\
+             done\n\
              exit 0\n",
         ),
     )?;

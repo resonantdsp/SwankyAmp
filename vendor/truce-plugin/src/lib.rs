@@ -84,6 +84,11 @@ pub trait PluginLogicCore<S: Sample = f32>: 'static {
     /// on reload.
     const PRESERVE_DSP_STATE: bool = true;
 
+    /// Override the preset/settings namespace when the display name changes.
+    fn storage_name() -> Option<&'static str> {
+        None
+    }
+
     #[must_use]
     fn supports_in_place() -> bool {
         false
@@ -235,6 +240,11 @@ macro_rules! plugin_logic_leaf_trait {
             /// plugin serializes it. Set to `false` to always re-init on
             /// reload.
             const PRESERVE_DSP_STATE: bool = true;
+
+            /// Stable preset/settings namespace, or the product display name.
+            fn storage_name() -> Option<&'static str> {
+                None
+            }
 
             /// Opt into zero-copy in-place I/O. When this returns `true`,
             /// the format wrapper skips its safety memcpy on host-aliased
@@ -599,6 +609,11 @@ macro_rules! pure_plugin_leaf_trait {
             /// `Arc`.
             type Params: crate::__plugin_logic_deps::Params;
 
+            /// Stable preset/settings namespace, or the product display name.
+            fn storage_name() -> Option<&'static str> {
+                None
+            }
+
             /// Opt into zero-copy in-place I/O. Same contract as the
             /// stateful leaf's `supports_in_place`.
             #[must_use]
@@ -653,6 +668,10 @@ macro_rules! pure_plugin_leaf_trait {
         impl<T: $name> $leaf for T {
             type Params = <T as $name>::Params;
             type DspState = ();
+
+            fn storage_name() -> Option<&'static str> {
+                <T as $name>::storage_name()
+            }
 
             fn supports_in_place() -> bool {
                 <T as $name>::supports_in_place()
@@ -819,6 +838,10 @@ macro_rules! plugin_logic_bridge {
             type DspState = <T as $leaf>::DspState;
 
             const PRESERVE_DSP_STATE: bool = <T as $leaf>::PRESERVE_DSP_STATE;
+
+            fn storage_name() -> Option<&'static str> {
+                <Self as $leaf>::storage_name()
+            }
 
             fn supports_in_place() -> bool {
                 <Self as $leaf>::supports_in_place()

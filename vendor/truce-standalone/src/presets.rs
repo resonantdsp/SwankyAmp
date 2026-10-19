@@ -6,7 +6,7 @@
 //! resolves the **factory** root from two first-class sources (the
 //! installed `.app`/bundle, or a `--presets-dir` handoff during
 //! `cargo truce run`); user and pack scopes always resolve from
-//! `P::info()` alone.
+//! `P::info()` and its stable `P::storage_name()`.
 //!
 //! Lean by construction: this reads only `.trucepreset` containers
 //! through `truce-core`, never authored TOML, so the shipped binary
@@ -31,7 +31,7 @@ use crate::vlog;
 pub fn store<P: PluginExport>(presets_dir: Option<&std::path::Path>) -> PresetStore {
     let info = P::info();
     let hash = hash_plugin_id(info.clap_id);
-    let mut store = PresetStore::new(info.vendor, info.name, hash, info.preset_user_dir);
+    let mut store = PresetStore::new(info.vendor, P::storage_name(), hash, info.preset_user_dir);
     if let Some(root) = presets_dir
         .map(PathBuf::from)
         .filter(|p| p.is_dir())
@@ -280,7 +280,7 @@ impl PresetController {
 
         let info = P::info();
         let hash = hash_plugin_id(info.clap_id);
-        let user_root = user_preset_root(info.vendor, info.name, info.preset_user_dir);
+        let user_root = user_preset_root(info.vendor, P::storage_name(), info.preset_user_dir);
         let save_as = Box::new(move || save_as_dialog::<P>(&plugin, hash, user_root.as_deref()));
 
         Self {

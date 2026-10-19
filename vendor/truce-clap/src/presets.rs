@@ -245,7 +245,7 @@ unsafe extern "C" fn provider_init<P: PluginExport>(
             );
         }
         let info = P::info();
-        if let Some(root) = user_preset_root(info.vendor, info.name, info.preset_user_dir)
+        if let Some(root) = user_preset_root(info.vendor, P::storage_name(), info.preset_user_dir)
             && root.is_dir()
         {
             declare_dir(
@@ -335,7 +335,7 @@ unsafe extern "C" fn provider_get_metadata<P: PluginExport>(
             };
             let hash = shared_plugin_state_hash(&info);
             for preset in
-                truce_core::presets::enumerate_scope(path, scope, info.vendor, info.name, hash)
+                truce_core::presets::enumerate_scope(path, scope, info.vendor, P::storage_name(), hash)
             {
                 if !report_preset::<P>(receiver, metadata_receiver, &preset) {
                     return false;
@@ -354,7 +354,7 @@ unsafe extern "C" fn provider_get_metadata<P: PluginExport>(
             path,
             PresetScope::User,
             info.vendor,
-            info.name,
+            P::storage_name(),
             shared_plugin_state_hash(&info),
         ) else {
             return true;

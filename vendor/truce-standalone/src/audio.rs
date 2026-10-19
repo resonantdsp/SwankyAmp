@@ -1071,7 +1071,10 @@ impl DeviceCache {
 #[allow(clippy::too_many_lines)]
 pub fn start_audio<P: PluginExport>(opts: &Options) -> Result<AudioHandles<P>, BoxErr> {
     let is_effect = P::info().category == PluginCategory::Effect;
-    let settings = SettingsStore::open(settings::path_for(P::info().vendor, P::info().name));
+    let settings = SettingsStore::open(settings::path_for(
+        P::info().vendor,
+        P::storage_name(),
+    ));
     let saved = settings.saved();
 
     driver::set_active(settings::launch_driver(

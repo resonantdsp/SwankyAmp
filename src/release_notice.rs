@@ -7,7 +7,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 
 const ENDPOINT: &str = "https://resonantdsp.com/release-notices/swanky-amp.json";
-const CATALOGUE_URL: &str = "https://resonantdsp.com/products/swanky-amp/?utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=release-notice";
+const CATALOGUE_URL: &str = "https://resonantdsp.com/products/swanky-amp-free/?utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=release-notice";
 const PRODUCT_ID: &str = "SwankyAmp";
 const CACHE_INTERVAL: Duration = Duration::from_secs(24 * 60 * 60);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(3);
@@ -24,7 +24,7 @@ pub struct Notice {
 pub const LINKS: [(&str, &str); 3] = [
     (
         "Website",
-        "https://resonantdsp.com/products/swanky-amp/?utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=information",
+        "https://resonantdsp.com/products/swanky-amp-free/?utm_source=swanky-amp-2&utm_medium=plugin&utm_campaign=information",
     ),
     (
         "Manual",
@@ -667,16 +667,16 @@ mod tests {
     #[test]
     fn a_newer_stable_release_uses_the_fixed_tagged_catalogue_and_fresh_cache() {
         let directory = TestDirectory::new("cache");
-        let mut first = Server::responding(document(Some("2.0.1")));
+        let mut first = Server::responding(document(Some("99.0.0")));
         let service = Service::spawn(Some(directory.cache()), first.endpoint.clone(), at(1_000));
         let notice = wait_for_notice(&service);
-        assert_eq!(notice.version, "2.0.1");
+        assert_eq!(notice.version, "99.0.0");
         assert_eq!(notice.url, CATALOGUE_URL);
         first.finish();
 
         let mut cached = Server::responding(document(Some("2.0.2")));
         let service = Service::spawn(Some(directory.cache()), cached.endpoint.clone(), at(1_600));
-        assert_eq!(wait_for_notice(&service).version, "2.0.1");
+        assert_eq!(wait_for_notice(&service).version, "99.0.0");
         cached.finish();
         assert_eq!(cached.requests.load(Ordering::Relaxed), 0);
     }
@@ -687,14 +687,14 @@ mod tests {
         let body = serde_json::json!({
             "schemaVersion": 1,
             "productId": "SwankyAmp",
-            "currentVersion": "2.0.1",
+            "currentVersion": "99.0.0",
             "downloadUrl": "https://example.com/elsewhere",
             "minimumOs": { "macos": "12" },
         });
         let mut server = Server::responding(body.to_string().into_bytes());
         let service = Service::spawn(Some(directory.cache()), server.endpoint.clone(), at(1_000));
         let notice = wait_for_notice(&service);
-        assert_eq!(notice.version, "2.0.1");
+        assert_eq!(notice.version, "99.0.0");
         assert_eq!(notice.url, CATALOGUE_URL, "the document chose the link");
         server.finish();
     }
@@ -712,7 +712,7 @@ mod tests {
         assert_eq!(service.current(), None);
         malformed.finish();
 
-        let mut retry = Server::responding(document(Some("2.0.1")));
+        let mut retry = Server::responding(document(Some("99.0.0")));
         let service = Service::spawn(Some(directory.cache()), retry.endpoint.clone(), at(2_600));
         std::thread::sleep(Duration::from_millis(25));
         assert_eq!(service.current(), None);
@@ -770,20 +770,20 @@ mod tests {
 
         let oversized_cache = TestDirectory::new("oversized-cache");
         std::fs::write(oversized_cache.cache(), vec![b' '; MAX_DOCUMENT_BYTES + 1]).unwrap();
-        let mut replacement = Server::responding(document(Some("2.0.1")));
+        let mut replacement = Server::responding(document(Some("99.0.0")));
         let service = Service::spawn(
             Some(oversized_cache.cache()),
             replacement.endpoint.clone(),
             at(5_000),
         );
-        assert_eq!(wait_for_notice(&service).version, "2.0.1");
+        assert_eq!(wait_for_notice(&service).version, "99.0.0");
         replacement.finish();
         assert_eq!(replacement.requests.load(Ordering::Relaxed), 1);
 
         let directory = TestDirectory::new("future");
-        let mut first = Server::responding(document(Some("2.0.1")));
+        let mut first = Server::responding(document(Some("99.0.0")));
         let service = Service::spawn(Some(directory.cache()), first.endpoint.clone(), at(10_000));
-        assert_eq!(wait_for_notice(&service).version, "2.0.1");
+        assert_eq!(wait_for_notice(&service).version, "99.0.0");
         first.finish();
 
         let mut corrected = Server::responding(document(Some("2.0.2")));
@@ -818,7 +818,7 @@ mod tests {
         const OCTOBER_1_2026: u64 = 1_790_812_800;
         const JANUARY_1_2027: u64 = 1_798_761_600;
         let directory = TestDirectory::new("request");
-        let valid = || document(Some("2.0.1"));
+        let valid = || document(Some("99.0.0"));
 
         assert_eq!(
             request_line_at(&directory, b"unavailable".to_vec(), SEPTEMBER_10_2026),
@@ -922,16 +922,16 @@ mod tests {
         let blocker = directory.0.join("not-a-directory");
         std::fs::write(&blocker, b"blocks cache directory creation").unwrap();
         let cache = blocker.join("release-notice.json");
-        let mut server = Server::responding(document(Some("2.0.1")));
+        let mut server = Server::responding(document(Some("99.0.0")));
         let service = Service::spawn(Some(cache), server.endpoint.clone(), at(7_000));
-        assert_eq!(wait_for_notice(&service).version, "2.0.1");
+        assert_eq!(wait_for_notice(&service).version, "99.0.0");
 
         for _ in 0..20 {
             service.schedule(at(7_600));
             std::thread::sleep(Duration::from_millis(5));
         }
 
-        assert_eq!(service.current().unwrap().version, "2.0.1");
+        assert_eq!(service.current().unwrap().version, "99.0.0");
         assert_eq!(server.requests.load(Ordering::Relaxed), 1);
         server.finish();
     }

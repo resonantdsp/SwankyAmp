@@ -82,6 +82,14 @@ pub trait PluginRuntime: Send + 'static {
     where
         Self: Sized;
 
+    /// Stable preset namespace and settings directory, independent of display names.
+    fn storage_name() -> &'static str
+    where
+        Self: Sized,
+    {
+        Self::info().name
+    }
+
     /// Supported bus layouts. The host picks one. Default: the standard
     /// audio effect - stereo and mono.
     #[must_use]
