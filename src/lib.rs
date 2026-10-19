@@ -164,7 +164,7 @@ mod tests {
     #[test]
     fn the_identities_hosts_saved_the_plugin_under_hold() {
         let info = <crate::Plugin as PluginRuntime>::info();
-        assert_eq!(info.name, "Swanky Amp Free", "host display name");
+        assert_eq!(info.name, "Swanky Amp Free 2", "host display name");
         assert_eq!(
             Plugin::storage_name(),
             "Swanky Amp 2",

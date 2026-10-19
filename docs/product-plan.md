@@ -12,7 +12,7 @@ Version 2 brings the free amplifier to Pro 2.0's stack and visual standard and r
 - **Same character.** Its modelling stays its own: the 1.4.0 knob mappings, compression on all five preamp stages, its power-drive and sag curves and its parametric cabinet. None of old Pro's voicing changes are adopted; the numerical fixes below are.
 - **Decoupled from Pro.** The licences differ, so the two products share no crates and no repository; code is copied, never linked. Where both products do the same job the copy is kept whole and identical to Pro's, so a fix ports as a plain patch; where they differ, including all of Free's DSP, Free's code stays its own and nothing copied may change its tone or model ([convergence plan](../../../company/engineering/pro-free-convergence.md)). Garrin-owned code may be published under GPLv3; third-party code keeps its licence and notices.
 - **Minimal public surface.** The public repository holds the GPLv3-or-later plugin source, public artwork packing and validation, and the finished artwork package under CC BY 4.0. Free's private production companion, `SwankyAmp-production`, holds its trimmed Blender tooling. Licensing, Pro-only DSP and bake scripts never enter the public repository. The [artwork architecture](../../../company/engineering/product-artwork-pipeline.md) defines the boundary.
-- **A new plugin identity, installed beside 1.4.0.** Version 2 is `Swanky Amp Free` / `com.resonantdsp.swanky-amp-2` / `SwA2`; 1.4.0 is bundle `com.ResonantDSP.SwankyAmp`, manufacturer `Manu`, code `ccwf`. Old sessions keep loading 1.4.0; presets come across through an importer.
+- **A new plugin identity, installed beside 1.4.0.** Version 2 is `Swanky Amp Free 2` / `com.resonantdsp.swanky-amp-2` / `SwA2`; 1.4.0 is bundle `com.ResonantDSP.SwankyAmp`, manufacturer `Manu`, code `ccwf`. Old sessions keep loading 1.4.0; presets come across through an importer.
 - **Formats.** CLAP, VST3 and a standalone on macOS and Windows, and an Audio Unit v2 on macOS ([RD-1046](../../../company/work/RD-1046.md)). The Windows standalone plays through ASIO, built under the ASIO SDK's GPLv3 option. Whether a release ships a Linux download is declared in `Cargo.toml` (`[package.metadata.release]`, issue #40). 2.0 declares none and launches on macOS and Windows only: the Linux build has never run on a real machine, and its standalone's audio panel must be confirmed there before a release declares Linux again.
 - **Around the amplifier.** An information panel from the header's cog: version, links, interface size 75 to 150 % on the 864 × 512 layout ([RD-1051](../../../company/work/RD-1051.md)), Copy diagnostics and third-party licence notices ([RD-1056](../../../company/work/RD-1056.md)). The release notice, the free plugin's first network code, turns the cog into a download arrow when the site reports a newer version; the README states exactly what is fetched ([RD-248](../../../company/work/RD-248.md), [RD-911](../../../company/work/RD-911.md)).
 
@@ -110,7 +110,7 @@ Swanky Amp Free and Swanky Amp Pro share one release chain: the same contract sc
 
 ## Where it stands
 
-The launch rename is 2.0.1: Swanky Amp Free in hosts and installers, with
+The launch rename is 2.0.1: Swanky Amp Free 2 in hosts and installers, with
 2.x identities, presets, settings and sound preserved. Its candidate requires
 an upgrade check in the existing installation scope, old-session reopen and
 new-name discovery in AU, VST3 and CLAP, plus standalone device recall.
