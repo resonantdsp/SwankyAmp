@@ -117,7 +117,7 @@ new-name discovery in AU, VST3 and CLAP, plus standalone device recall.
 [RD-249](../../../company/work/RD-249.md) owns candidate qualification and
 exact-byte promotion; 2.0.0 qualification below does not qualify 2.0.1.
 
-`v2.0.0` is promoted from `v2.0.0-rc.8` ([RD-249](../../../company/work/RD-249.md)) on October 13, 2026: commit `8338751`, build 354, `release-record.json` SHA-256 `b803b2e5e096e74ef5a43130a7a26301b678d14d44d8d385a799a59c13e8181e`, the [GitHub release](https://github.com/resonantdsp/SwankyAmp/releases/tag/v2.0.0). rc.8 is rc.7 plus a fixed 2 dB cut at the final output (#148). The catalogue pull request, website #108, waits for the launch.
+`v2.0.0` is promoted from `v2.0.0-rc.8` ([RD-249](../../../company/work/RD-249.md)) on October 13, 2026: commit `8338751`, build 354, `release-record.json` SHA-256 `b803b2e5e096e74ef5a43130a7a26301b678d14d44d8d385a799a59c13e8181e`, the [GitHub release](https://github.com/resonantdsp/SwankyAmp/releases/tag/v2.0.0). rc.8 is rc.7 plus a fixed 2 dB cut at the final output (#148). The 2.0.0 catalogue in website #108 is superseded for the launch by the renamed 2.0.1 release; [RD-135](../../../company/work/RD-135.md) owns the final catalogue and cutover.
 
 The candidate before it was `v2.0.0-rc.7`: commit `3a4e05e5cb8f2c3d48521ede24c8baefbd6d3d0c`, build 351, `release-record.json` SHA-256 `91d5b2379a94faedd6bc44b0389cdfc87227311f60d1b0864056eca092b3160b`, [candidate run](https://github.com/resonantdsp/SwankyAmp/actions/runs/38193050499), a published [pre-release](https://github.com/resonantdsp/SwankyAmp/releases/tag/v2.0.0-rc.7) whose installers and record are public under `https://downloads.resonantdsp.com/swankyamp/candidates/v2.0.0-rc.7/`. It is rc.6 (`af56d4e`, build 342, [RD-1176](../../../company/work/RD-1176.md)), which passed host qualification above, plus four install and interface fixes: the standalone app and Windows installer carry the Resonant DSP icon (#143); the macOS installer declares arm64 so Apple silicon is not offered Rosetta, and every bundle carries `Contents/PkgInfo` so Finder shows the `.component` as one file (#144); x86_64 builds target the base processor level instead of AVX2, so processors without AVX2 run it, with renders byte-identical and Init's CPU within measurement spread (#146, [RD-1195](../../../company/work/RD-1195.md)); and Garrin's three interface notes ([RD-247](../../../company/work/RD-247.md), #145). The earlier build below records verified output and source evidence for RC1, not for rc.7 or rc.8.
 
@@ -125,7 +125,7 @@ The candidate before it was `v2.0.0-rc.7`: commit `3a4e05e5cb8f2c3d48521ede24c8b
 
 `v2.0.0-rc.1` is built at `7d9e1e7270bf6ddf358702ac0f8322e85ab2709e`. All jobs in its [candidate workflow](https://github.com/resonantdsp/SwankyAmp/actions/runs/37220277995) passed: the signed, notarized universal macOS package, signed Windows x64 installer, installed-format validators, publisher checks and licence notices. The installers downloaded from its draft release matched its release record, whose SHA-256 is `595d2d4828ff598f30fa61119ae32af1ff5d401f74110d956de232bcafae42ed`, and a local macOS check confirmed signatures, notarization and universal formats.
 
-The pre-release tone-stack soak passed all 21 cases representing 24 hours of samples per case: maximum drift **0.00500 dB** against the **0.01 dB** limit and maximum offset/RMS **3.82 × 10⁻⁵** against **10⁻⁴**. Host qualification and stable promotion remain open. The [candidate history](../../../company/engineering/evidence/release-candidates-2026-09/README.md) lists the removed September candidates.
+The pre-release tone-stack soak passed all 21 cases representing 24 hours of samples per case: maximum drift **0.00500 dB** against the **0.01 dB** limit and maximum offset/RMS **3.82 × 10⁻⁵** against **10⁻⁴**. The [candidate history](../../../company/engineering/evidence/release-candidates-2026-09/README.md) lists the removed September candidates.
 
 The private `resonantdsp-bakes/swankyamp/candidates/v2.0.0-rc.1/` prefix was deleted on October 7, 2026 with the other superseded candidates ([RD-1190](../../../company/work/RD-1190.md)). Only the pinned ASIO SDK source zip survives, at `resonantdsp-bakes/swankyamp/retained/`, so the source of the GPLv3 build stays available ([RD-249](../../../company/work/RD-249.md)).
 
@@ -133,6 +133,7 @@ A Windows linkage check proved that the SDK's COM classes and DLL helpers are ab
 
 Remaining, in the order of the [release calendar](../../../company/calendar.md):
 
-1. The catalogue pull request, website #108, merges on launch day ([RD-135](../../../company/work/RD-135.md)), then the release-notice check against the published release ([RD-249](../../../company/work/RD-249.md)).
+1. Qualify the renamed 2.0.1 candidate and promote its exact installers ([RD-249](../../../company/work/RD-249.md)).
+2. Publish the 2.0.1 catalogue with the Free website cutover ([RD-135](../../../company/work/RD-135.md)), then check the release notice against the published release ([RD-249](../../../company/work/RD-249.md)).
 
 The audio faults 2.0 launches with are fixed after launch or recorded as accepted ([RD-1153](../../../company/work/RD-1153.md)).
