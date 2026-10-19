@@ -147,7 +147,7 @@ jobs:
               ' CHANGELOG.md
               printf '\n## Qualification\n\nCandidate: %s\n\n%s\n' "$CANDIDATE_TAG" "$QUALIFICATION"
             } > notes.md
-            gh release create "$TAG" --verify-tag --latest --title "$TAG" --notes-file notes.md candidate/*
+            gh release create "$TAG" --verify-tag --latest --title "Swanky Amp Free ${TAG#v}" --notes-file notes.md candidate/*
           fi
           gh release view "$TAG" --json url,publishedAt \
             --jq '"RELEASE_URL=\(.url)\nRELEASED_AT=\(.publishedAt[0:10])"' >> "$GITHUB_ENV"
@@ -176,7 +176,7 @@ jobs:
             printf '\nEvery URL above served exactly these bytes before this pull request was opened.\n\n'
             printf '## Qualification\n\n%s\n' "$QUALIFICATION"
           } > pr-body.md
-          branch="release/swanky-amp-2-$VERSION"
+          branch="release/swanky-amp-free-$VERSION"
           cd website
           git config user.name "resonantdsp release"
           git config user.email "releases@resonantdsp.com"

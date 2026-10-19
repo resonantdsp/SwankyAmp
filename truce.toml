@@ -8,6 +8,8 @@ au_manufacturer = "Rsnt"
 name = "Swanky Amp Free"
 # Replace 2.0 bundles in the selected install scope; leave 1.4 untouched.
 previous_names = ["Swanky Amp 2"]
+previous_standalone_binaries = ["swanky-amp-2"]
+artifact_name = "swanky-amp-free"
 bundle_id = "swanky-amp-2"
 crate = "swanky-amp"
 fourcc = "SwA2"

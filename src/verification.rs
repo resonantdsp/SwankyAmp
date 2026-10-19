@@ -38,7 +38,7 @@ fn gpu_on(
         ..Default::default()
     }))?;
     let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-        label: Some("Swanky Amp verification"),
+        label: Some("Swanky Amp Free verification"),
         required_limits: adapter.limits(),
         ..Default::default()
     }))?;

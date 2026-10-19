@@ -159,6 +159,13 @@ class ReleaseTest(unittest.TestCase):
         self.assertNotEqual(shallow.returncode, 0)
         self.assertIn("full history", shallow.stderr)
 
+    def test_a_record_refuses_download_names_for_another_product(self):
+        installer = self.candidate / f"{ARTIFACT_PREFIX}-2.0.0-macos.pkg"
+        installer.rename(self.candidate / "other-product-2.0.0-macos.pkg")
+        result = self.contract("record", CANDIDATE, str(self.candidate))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unexpected artifact name", result.stderr)
+
     def test_tags_are_checked_against_the_crate_version_and_the_changelog(self):
         self.assertEqual(self.contract("check-tag", "candidate", CANDIDATE).returncode, 0)
         self.assertNotEqual(self.contract("check-tag", "candidate", "v2.0.1-rc.1").returncode, 0)

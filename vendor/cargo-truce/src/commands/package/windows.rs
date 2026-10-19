@@ -246,7 +246,7 @@ pub(crate) fn cmd_package_windows(args: &[String], selection: &super::SuiteSelec
         fs::write(&iss_path, &iss)?;
         run_iscc(&iss_path)?;
 
-        let installer = dist_dir.join(format!("{}-{}-windows.exe", p.crate_name, version));
+        let installer = dist_dir.join(format!("{}-{}-windows.exe", p.artifact_name(), version));
         if !installer.exists() {
             return Err(format!(
                 "ISCC reported success but installer is missing: {}",
@@ -1526,15 +1526,11 @@ fn render_iss(
     );
     setup.push_str("DisableDirPage=yes\r\n");
     let _ = write!(setup, "OutputDir={}\r\n", iss_escape_path(dist_dir));
-    // Output filename uses `crate_name` so plugins-vs-suites + the
-    // three OSes all line up on a single slug-style basename - see
-    // matching note in `macos.rs::run_productbuild` for the
-    // reasoning. The wizard UI still shows the display `p.name`
-    // (set above as the `AppName`); only the .exe filename changes.
+    // The download name can change without changing the crate or AppId.
     let _ = write!(
         setup,
         "OutputBaseFilename={}-{}-windows\r\n",
-        iss_escape_directive(&p.crate_name),
+        iss_escape_directive(p.artifact_name()),
         iss_escape_directive(version),
     );
     setup.push_str("Compression=lzma2\r\n");
@@ -1644,9 +1640,9 @@ fn render_iss(
     setup
 }
 
-/// Remove only bundles and shortcuts installed under the former display names.
+/// Remove only the selected formats’ former bundles, app binaries and shortcuts.
 fn iss_previous_name_deletes(p: &PluginDef, formats: &[PkgFormat], scope: PkgScope) -> String {
-    if p.previous_names.is_empty() {
+    if p.previous_names.is_empty() && p.previous_standalone_binaries.is_empty() {
         return String::new();
     }
     let cf = scoped_cf(scope);
@@ -1670,6 +1666,15 @@ fn iss_previous_name_deletes(p: &PluginDef, formats: &[PkgFormat], scope: PkgSco
                 out,
                 "Type: files; Name: \"{}\\{stem}.lnk\"; Components: standalone\r\n",
                 scoped_programs(scope)
+            );
+        }
+    }
+    if formats.contains(&PkgFormat::Standalone) {
+        for name in &p.previous_standalone_binaries {
+            let stem = iss_escape_quoted(&truce_utils::safe_filename(name));
+            let _ = write!(
+                out,
+                "Type: files; Name: \"{{app}}\\{stem}.exe\"; Components: standalone\r\n"
             );
         }
     }

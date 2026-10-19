@@ -106,7 +106,7 @@ pub const THIRD_PARTY_NOTICES: &str = include_str!(concat!(env!("OUT_DIR"), "/no
 /// embedded rather than installed beside the plug-in, so every format carries
 /// the notices for exactly the code it runs. Failure is ignored, as for links.
 pub fn show_notices() {
-    let path = std::env::temp_dir().join("Swanky Amp third-party licences.txt");
+    let path = std::env::temp_dir().join("Swanky Amp Free third-party licences.txt");
     if std::fs::write(&path, THIRD_PARTY_NOTICES).is_ok() {
         open_in_browser(&path.to_string_lossy());
     }

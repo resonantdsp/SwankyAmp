@@ -179,6 +179,13 @@ pub(crate) struct PluginDef {
     #[serde(default)]
     #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     pub(crate) au_resource_usage: Option<AuResourceUsage>,
+    /// Download filename prefix, independent of the crate and host identities.
+    #[serde(default)]
+    pub(crate) artifact_name: Option<String>,
+    /// Former standalone binary stems removed from the Windows app directory.
+    #[serde(default)]
+    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+    pub(crate) previous_standalone_binaries: Vec<String>,
     /// Former display names whose installed bundles this package replaces.
     #[serde(default)]
     #[cfg_attr(not(any(target_os = "macos", target_os = "windows")), allow(dead_code))]
@@ -281,6 +288,10 @@ impl std::ops::Deref for PluginDef {
 }
 
 impl PluginDef {
+    pub(crate) fn artifact_name(&self) -> &str {
+        self.artifact_name.as_deref().unwrap_or(&self.crate_name)
+    }
+
     pub(crate) fn resolved_fourcc(&self) -> &str {
         self.fourcc
             .as_deref()
@@ -693,6 +704,8 @@ mod suite_tests {
             au3_subtype: None,
             au_tag: default_au_tag(),
             au_resource_usage: None,
+            artifact_name: None,
+            previous_standalone_binaries: Vec::new(),
             previous_names: Vec::new(),
             windows_icon: None,
             macos_icon: None,

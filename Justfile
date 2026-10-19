@@ -149,46 +149,46 @@ soak-check:
     bash scripts/soak.sh check
 
 export-layout output="assets/layout":
-    cargo run --quiet --bin swanky-amp-2 -- export-layout "{{ output }}"
+    cargo run --quiet --bin swanky-amp-free -- export-layout "{{ output }}"
 
 capture output="verification/interface":
-    cargo run --quiet --bin swanky-amp-2 -- capture "{{ output }}"
+    cargo run --quiet --bin swanky-amp-free -- capture "{{ output }}"
 
 # Capture with a factory preset applied, its name in the header.
 capture-preset name="high gain" output="verification/interface-preset":
-    cargo run --quiet --bin swanky-amp-2 -- capture "{{ output }}" preset "{{ name }}"
+    cargo run --quiet --bin swanky-amp-free -- capture "{{ output }}" preset "{{ name }}"
 
 # Capture after a deterministic stereo note so the meters are lit.
 capture-live output="verification/interface-live":
-    cargo run --quiet --bin swanky-amp-2 -- capture "{{ output }}" live
+    cargo run --quiet --bin swanky-amp-free -- capture "{{ output }}" live
 
 # Capture with the information panel open; name a newer release, such as
 # 2.0.1, to show its notice.
 capture-information output="verification/interface-information" release="":
-    cargo run --quiet --bin swanky-amp-2 -- capture "{{ output }}" information {{ release }}
+    cargo run --quiet --bin swanky-amp-free -- capture "{{ output }}" information {{ release }}
 
 # Capture the standalone's audio choices in the information panel, in one of
 # the states choose, missing, built-in, interface, long-names, asio, fell-back
 # or refused; off shows the Input knob's OFF with the panel closed.
 capture-audio state="choose" output="verification/interface-audio":
-    cargo run --quiet --bin swanky-amp-2 -- capture "{{ output }}" audio "{{ state }}"
+    cargo run --quiet --bin swanky-amp-free -- capture "{{ output }}" audio "{{ state }}"
 
 # Capture with the preset menu open under a user preset of this name, and
 # the pointer over the field so the footer names it.
 capture-menu name="Friday night rehearsal lead with the extra gain on the neck pickup" output="verification/interface-menu":
-    cargo run --quiet --bin swanky-amp-2 -- capture "{{ output }}" menu "{{ name }}"
+    cargo run --quiet --bin swanky-amp-free -- capture "{{ output }}" menu "{{ name }}"
 
 pack-artwork layers package="assets/artwork.pack":
-    cargo run --quiet --bin swanky-amp-2 -- pack-artwork "{{ layers }}" "{{ package }}"
+    cargo run --quiet --bin swanky-amp-free -- pack-artwork "{{ layers }}" "{{ package }}"
 
 unpack-artwork package="assets/artwork.pack" output="verification/artwork-unpacked":
-    cargo run --quiet --bin swanky-amp-2 -- unpack-artwork "{{ package }}" "{{ output }}"
+    cargo run --quiet --bin swanky-amp-free -- unpack-artwork "{{ package }}" "{{ output }}"
 
 validate-assets package="assets/artwork.pack" layers="assets/artwork":
-    cargo run --quiet --bin swanky-amp-2 -- validate-assets "{{ package }}" "{{ layers }}"
+    cargo run --quiet --bin swanky-amp-free -- validate-assets "{{ package }}" "{{ layers }}"
 
 refresh-artwork layers="assets/artwork":
-    cargo run --quiet --bin swanky-amp-2 -- refresh-artwork "{{ layers }}"
+    cargo run --quiet --bin swanky-amp-free -- refresh-artwork "{{ layers }}"
 
 # Write THIRD-PARTY-NOTICES.txt from the shipped dependency tree, the ASIO SDK
 # and the bundled fonts; candidates embed it for the information panel.
@@ -203,7 +203,7 @@ build:
     bash scripts/truce.sh build {{ bundle_formats }} {{ bundle_features }}
 
 build-standalone:
-    cargo build --release --no-default-features --features standalone {{ bundle_features }} --bin swanky-amp-2
+    cargo build --release --no-default-features --features standalone {{ bundle_features }} --bin swanky-amp-free
 
 # Open the standalone shell for local interface and audio checks.
 run:

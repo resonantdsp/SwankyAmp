@@ -239,13 +239,13 @@ fn read_state(element: roxmltree::Node) -> Preset {
 }
 
 /// Reads one preset file as 1.4.0 wrote it or version 2 writes it. A file
-/// that is not well-formed XML or not a Swanky Amp preset is an error.
+/// that is not well-formed XML or not a Swanky Amp Free preset is an error.
 pub fn parse_state(xml: &str) -> Result<Preset, String> {
     let document = roxmltree::Document::parse(xml).map_err(|error| format!("not XML ({error})"))?;
     let root = document.root_element();
     let tag = root.tag_name().name();
     if tag != PRESET_TAG && tag != RENAMED_TAG {
-        return Err(format!("not a Swanky Amp preset (<{tag}>)"));
+        return Err(format!("not a Swanky Amp Free preset (<{tag}>)"));
     }
     Ok(read_state(root))
 }

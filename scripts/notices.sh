@@ -95,7 +95,7 @@ asio_sdk() {
   echo "Its complete source is Steinberg's package at"
   echo "  ${url}"
   echo "  (SHA-256 ${sha})."
-  echo "Swanky Amp uses the SDK under the GNU General Public License, version 3,"
+  echo "Swanky Amp Free uses the SDK under the GNU General Public License, version 3,"
   echo "the open-source option of the dual licence below; the text of that licence"
   echo "follows, after the BSD licence of the SDK's host helpers."
   echo
@@ -109,7 +109,7 @@ asio_sdk() {
 
 generate() {
   cat <<'HEADER'
-Swanky Amp is free software under the GNU General Public License, version 3
+Swanky Amp Free is free software under the GNU General Public License, version 3
 or later; its source and licence are at https://github.com/resonantdsp/SwankyAmp.
 It includes the third-party fonts and software listed below, each under the
 licence that follows its name.

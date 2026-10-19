@@ -620,7 +620,7 @@ impl PresetBar {
             .spawn(move || {
                 let chosen = owned(rfd::FileDialog::new(), owner)
                     .set_title("Save preset as")
-                    .add_filter("Swanky Amp preset", &["xml"])
+                    .add_filter("Swanky Amp Free preset", &["xml"])
                     .set_directory(directory)
                     .set_file_name(format!("{suggested}.xml"))
                     .save_file();
