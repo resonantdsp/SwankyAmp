@@ -9,7 +9,7 @@ publish = false
 # Binaries are declared below so that a new file in src/bin cannot join the
 # plug-in format builds without the `tools` gate.
 autobins = false
-default-run = "swanky-amp-2"
+default-run = "swanky-amp-free"
 
 # The release's own statement of whether it ships a Linux download. A
 # candidate builds exactly the declared downloads and fails without any of
@@ -23,7 +23,7 @@ linux = false
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [[bin]]
-name = "swanky-amp-2"
+name = "swanky-amp-free"
 path = "src/main.rs"
 required-features = ["standalone"]
 

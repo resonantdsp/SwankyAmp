@@ -60,7 +60,8 @@ never scan that folder, so the plug-in silently goes missing. A Windows package
 run therefore always builds the all-users installer: administrator elevation,
 the common CLAP, VST3 and Program Files folders, and no mode page. `--system`
 is accepted, and `--user`, `--ask` and any other `preferred_scope` are refused.
-The installer keeps the unsuffixed `<crate>-<version>-windows.exe` name. The
+The installer keeps the unsuffixed `<artifact-name>-<version>-windows.exe` name;
+without an override the artifact name is the crate name. The
 `.iss` generator's per-user branches stay as upstream wrote them, unreachable
 from a package run. macOS packaging is unchanged and still offers both. This
 is product policy rather than an upstream fix, so an upstream release replaces
@@ -136,7 +137,7 @@ a pinned upstream release carries these changes.
 
 ## Where the products differ
 
-### Swanky Amp
+### Swanky Amp Free
 
 This source-only copy was first taken from `resonantdsp/SwankyAmpPro` commit
 `47842d2ece1a558fbab85cb8cd68564654414d35` on September 20, 2026.
@@ -146,6 +147,11 @@ selected install scope before replacement. Free uses it for `Swanky Amp 2`
 to `Swanky Amp Free`; the 1.4 name is never listed. Windows removes the former
 Start menu shortcut too and retains the stable AppId, so Inno upgrades the
 existing app directory. Deletions follow the selected format components.
+The optional `artifact_name` key changes the download filename prefix on every
+platform while retaining the crate and host identities.
+`previous_standalone_binaries` removes old executable stems from the Windows
+app directory when the standalone component is selected. Free uses it to
+replace `swanky-amp-2.exe` with `swanky-amp-free.exe`.
 No preset-folder migration is needed: Free's preset storage stays unchanged. The `cargo truce screenshot` help no
 longer names the standalone's Cmd+S / Ctrl+S, which Swanky Amp's standalone
 does not have (see `vendor/truce-standalone/UPSTREAM.md`). The Swanky Amp

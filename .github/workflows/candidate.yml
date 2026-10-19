@@ -304,7 +304,7 @@ jobs:
           test -n "$common_files"
           test -n "$program_files"
           test -f "$common_files/CLAP/Swanky Amp Free.clap"
-          test -f "$program_files/Resonant DSP/Swanky Amp Free/swanky-amp-2.exe"
+          test -f "$program_files/Resonant DSP/Swanky Amp Free/swanky-amp-free.exe"
           CLAP_BUNDLE="$common_files/CLAP/Swanky Amp Free.clap" \
             just validate-installed --skip-gui-tests
       # As on macOS: each shipped file by name, and the exact publisher.
@@ -316,7 +316,7 @@ jobs:
             $installer,
             (Join-Path $env:COMMONPROGRAMFILES 'CLAP\Swanky Amp Free.clap'),
             (Join-Path $env:COMMONPROGRAMFILES 'VST3\Swanky Amp Free.vst3\Contents\x86_64-win\Swanky Amp Free.vst3'),
-            (Join-Path $env:PROGRAMFILES 'Resonant DSP\Swanky Amp Free\swanky-amp-2.exe')
+            (Join-Path $env:PROGRAMFILES 'Resonant DSP\Swanky Amp Free\swanky-amp-free.exe')
           )
           foreach ($file in $signed) {
             if (-not (Test-Path $file -PathType Leaf)) { throw "Expected installed file is missing: $file" }
@@ -346,15 +346,18 @@ jobs:
           foreach ($path in @(
             "$env:COMMONPROGRAMFILES\CLAP\Swanky Amp 2.clap",
             "$env:COMMONPROGRAMFILES\VST3\Swanky Amp 2.vst3",
-            "$env:PROGRAMDATA\Microsoft\Windows\Start Menu\Programs\Swanky Amp 2.lnk"
+            "$env:PROGRAMDATA\Microsoft\Windows\Start Menu\Programs\Swanky Amp 2.lnk",
+            "$env:PROGRAMFILES\Resonant DSP\Swanky Amp 2\swanky-amp-2.exe"
           )) {
             if (Test-Path $path) { throw "Upgrade left $path behind." }
           }
-          $app = "$env:PROGRAMFILES\Resonant DSP\Swanky Amp 2\swanky-amp-2.exe"
+          $app = "$env:PROGRAMFILES\Resonant DSP\Swanky Amp 2\swanky-amp-free.exe"
           if (!(Test-Path $app)) { throw 'Upgrade lost the existing app directory.' }
           if ((Get-AuthenticodeSignature $app).Status -ne 'Valid') { throw 'Upgraded app signature invalid.' }
           $shortcut = "$env:PROGRAMDATA\Microsoft\Windows\Start Menu\Programs\Swanky Amp Free.lnk"
           if (!(Test-Path $shortcut)) { throw 'Renamed shortcut missing.' }
+          $target = (New-Object -ComObject WScript.Shell).CreateShortcut($shortcut).TargetPath
+          if ($target -ne $app) { throw "Shortcut targets $target instead of $app." }
           $env:CLAP_BUNDLE = "$env:COMMONPROGRAMFILES\CLAP\Swanky Amp Free.clap"
           just validate-installed --skip-gui-tests
           if ($LASTEXITCODE -ne 0) { throw 'Upgraded bundles failed validation.' }
@@ -482,7 +485,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           {
-            printf 'Candidate %s, build %s. Not a release: it becomes one only after qualification.\n\n' \
+            printf 'Swanky Amp Free candidate %s, build %s. Not a release: it becomes one only after qualification.\n\n' \
               "$RELEASE" "$(jq .build candidate/release-record.json)"
             # A candidate tag carries an -rc suffix the changelog section does
             # not, so the crate version names the section.
@@ -493,5 +496,5 @@ jobs:
             ' CHANGELOG.md
           } > notes.md
           gh release view "$RELEASE" >/dev/null 2>&1 ||
-            gh release create "$RELEASE" --verify-tag --prerelease --title "$RELEASE" \
+            gh release create "$RELEASE" --verify-tag --prerelease --title "Swanky Amp Free ${RELEASE#v}" \
               --notes-file notes.md candidate/*

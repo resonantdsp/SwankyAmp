@@ -1,6 +1,6 @@
 # Input and output levels
 
-How Swanky Amp 2.0 stages a guitar's level on the way in and on the way out: the facts behind the input meter, the Input and Drive controls and the fixed output cut. This is an engineering reference. It does not own the calibration method or the acceptance; those are in the [README](../README.md#level-calibration), the [product plan](product-plan.md#level-calibration) and the module comment of `src/dsp/calibration.rs`.
+How Swanky Amp Free 2.0 stages a guitar's level on the way in and on the way out: the facts behind the input meter, the Input and Drive controls and the fixed output cut. This is an engineering reference. It does not own the calibration method or the acceptance; those are in the [README](../README.md#level-calibration), the [product plan](product-plan.md#level-calibration) and the module comment of `src/dsp/calibration.rs`.
 
 Each figure says where it comes from:
 

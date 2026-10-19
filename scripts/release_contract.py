@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The release contract: check a tag, record a candidate, fetch and verify it.
 
-The same file in Swanky Amp and Swanky Amp Pro apart from the product block.
+The same file in Swanky Amp Free and Swanky Amp Pro apart from the product block.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 # The product block: everything in it differs between the two products.
 WEBSITE_PRODUCT_ID = "SwankyAmp"
-ARTIFACT_PREFIX = "swanky-amp"
+ARTIFACT_PREFIX = "swanky-amp-free"
 
 
 def asset_field(root: Path) -> tuple[str, str]:
