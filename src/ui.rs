@@ -459,7 +459,7 @@ impl IcedPlugin<SwankyAmpParams> for FreeUi {
     }
 
     fn title(&self) -> String {
-        "Swanky Amp Free".into()
+        "Swanky Amp Free 2".into()
     }
 
     fn zoom(&self) -> f64 {
