@@ -110,12 +110,17 @@ Swanky Amp Free and Swanky Amp Pro share one release chain: the same contract sc
 
 ## Where it stands
 
-The launch rename is 2.0.1: Swanky Amp Free 2 in hosts and installers, with
-2.x identities, presets, settings and sound preserved. Its candidate requires
-an upgrade check in the existing installation scope, old-session reopen and
-new-name discovery in AU, VST3 and CLAP, plus standalone device recall.
-[RD-249](../../../company/work/RD-249.md) owns candidate qualification and
-exact-byte promotion; 2.0.0 qualification below does not qualify 2.0.1.
+`v2.0.1` is [published](https://github.com/resonantdsp/SwankyAmp/releases/tag/v2.0.1)
+from `v2.0.1-rc.3`, build 362. Its
+[release record](https://downloads.resonantdsp.com/swankyamp/2.0.1/release-record.json)
+identifies the exact bytes, and its
+[qualification](https://downloads.resonantdsp.com/swankyamp/2.0.1/qualification.md)
+records Garrin's acceptance and the automated installation, signature and
+upgrade checks. Hosts and installers display Swanky Amp Free 2, with 2.x
+identities, presets, settings and DSP preserved. The installers replace the
+earlier `Swanky Amp 2` and `Swanky Amp Free` names in the selected install scope.
+[RD-249](../../../company/work/RD-249.md) owns the release record;
+[RD-135](../../../company/work/RD-135.md) owns the website cutover.
 
 `v2.0.0` is promoted from `v2.0.0-rc.8` ([RD-249](../../../company/work/RD-249.md)) on October 13, 2026: commit `8338751`, build 354, `release-record.json` SHA-256 `b803b2e5e096e74ef5a43130a7a26301b678d14d44d8d385a799a59c13e8181e`, the [GitHub release](https://github.com/resonantdsp/SwankyAmp/releases/tag/v2.0.0). rc.8 is rc.7 plus a fixed 2 dB cut at the final output (#148). The 2.0.0 catalogue in website #108 is superseded for the launch by the renamed 2.0.1 release; [RD-135](../../../company/work/RD-135.md) owns the final catalogue and cutover.
 
